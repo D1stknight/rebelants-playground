@@ -2,17 +2,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 type Phase = 'idle' | 'shuffling' | 'pick' | 'reveal';
 type Rarity = 'common' | 'rare' | 'ultra' | null;
-
-type PrizePayload = {
-  ok: boolean;
-  prizeLabel?: string;
-  rarity?: Rarity;
-  nextPlayableAt?: number | null;
-  error?: string;
-};
+type PrizePayload = { ok: boolean; prizeLabel?: string; rarity?: Rarity; nextPlayableAt?: number | null; error?: string };
 
 function showPrize(label: string, rarity: Rarity) {
-  // Fire the global modal event (PrizeModalHost listens for this)
   window.dispatchEvent(new CustomEvent('prize:show', { detail: { label, type: 'crate', rarity } }));
 }
 
@@ -20,13 +12,14 @@ export default function Shuffle() {
   const [phase, setPhase] = useState<Phase>('idle');
   const [progress, setProgress] = useState(0);
   const [positions, setPositions] = useState<number[]>([0, 1, 2]); // eggIdx -> slotIdx
-  const [slotCenters, setSlotCenters] = useState<number[]>([0, 0, 0]); // px center of each slot
+  const [slotCenters, setSlotCenters] = useState<number[]>([0, 0, 0]);
 
   const sceneRef = useRef<HTMLDivElement | null>(null);
   const swapTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const progTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pickingLock = useRef(false);
 
-  // Layout three evenly spaced centers inside the scene
+  // layout centers
   useEffect(() => {
     const layout = () => {
       const el = sceneRef.current;
@@ -45,20 +38,22 @@ export default function Shuffle() {
     return () => window.removeEventListener('resize', onR);
   }, []);
 
-  // Start shuffle
+  function clearTimers() {
+    if (swapTimer.current) { clearInterval(swapTimer.current); swapTimer.current = null; }
+    if (progTimer.current) { clearInterval(progTimer.current); progTimer.current = null; }
+  }
+
   function start() {
     if (phase !== 'idle') return;
     setPhase('shuffling');
     setProgress(0);
+    pickingLock.current = false;
 
-    // randomize starting order
     setPositions([0, 1, 2].sort(() => Math.random() - 0.5));
 
-    // progress driver
     progTimer.current && clearInterval(progTimer.current);
     progTimer.current = setInterval(() => setProgress((p) => Math.min(99, p + 3)), 60);
 
-    // do a bunch of swaps with accel/decel
     let swapsLeft = 22 + Math.floor(Math.random() * 10);
     let speed = 140;
 
@@ -76,15 +71,12 @@ export default function Shuffle() {
       });
 
       swapsLeft--;
-      if (swapsLeft > 12) speed = Math.max(70, speed - 6); // accelerate
-      else speed = Math.min(220, speed + 14);             // decelerate
+      if (swapsLeft > 12) speed = Math.max(70, speed - 6);
+      else speed = Math.min(220, speed + 14);
 
       if (swapsLeft <= 0) {
-        if (swapTimer.current) clearInterval(swapTimer.current);
-        if (progTimer.current) {
-          clearInterval(progTimer.current);
-          setProgress(100);
-        }
+        clearTimers();
+        setProgress(100);
         setTimeout(() => setPhase('pick'), 200);
       } else {
         if (swapTimer.current) clearInterval(swapTimer.current);
@@ -96,8 +88,11 @@ export default function Shuffle() {
   }
 
   async function pick(slotChosen: number) {
-    if (phase !== 'pick') return;
+    if (phase !== 'pick' || pickingLock.current) return;
+    pickingLock.current = true;            // ignore double clicks
     setPhase('reveal');
+    clearTimers();                          // super safety
+
     try {
       const r = await fetch('/api/spin', { method: 'POST' });
       const data: PrizePayload = await r.json();
@@ -112,16 +107,23 @@ export default function Shuffle() {
         setPositions([0, 1, 2]);
         setProgress(0);
         setPhase('idle');
+        pickingLock.current = false;
       }, 500);
     }
   }
 
-  // compute transforms; subtract half card width so centers align
+  function onEggClick(e: React.MouseEvent, eggIdx: number) {
+    e.preventDefault();
+    e.stopPropagation();        // <- block bubbling to anything behind/around
+    if (phase !== 'pick') return;
+    pick(positions[eggIdx]);
+  }
+
   const cardW = 120;
   const eggTransforms = useMemo(() => {
     return positions.map((slotIdx) => {
       const cx = slotCenters[slotIdx] ?? 0;
-      const left = cx - cardW / 2;
+      const left = cx - cardW / 2; // center alignment
       return `translate3d(${left}px,0,0)`;
     });
   }, [positions, slotCenters]);
@@ -137,10 +139,11 @@ export default function Shuffle() {
         {[0, 1, 2].map((eggIdx) => (
           <button
             key={eggIdx}
+            type="button"
             className={`egg-card ${canPick ? 'can-pick' : ''}`}
             style={{ transform: eggTransforms[eggIdx] }}
+            onClick={(e) => onEggClick(e, eggIdx)}
             disabled={!canPick}
-            onClick={() => pick(positions[eggIdx])}
             aria-label="Pick this egg"
           >
             <div className="egg-body always-wobble">
@@ -154,7 +157,13 @@ export default function Shuffle() {
       </div>
 
       <div className="mt-4">
-        <button onClick={start} disabled={phase !== 'idle'} className="btn" aria-busy={phase !== 'idle'}>
+        <button
+          type="button"
+          onClick={start}
+          disabled={phase !== 'idle'}
+          className="btn"
+          aria-busy={phase !== 'idle'}
+        >
           {phase === 'idle' ? 'Shuffle' : 'Shuffling…'}
         </button>
       </div>
