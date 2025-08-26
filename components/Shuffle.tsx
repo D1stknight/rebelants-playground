@@ -1,7 +1,7 @@
-// RA: Shuffle v1.2 (2025-08-26)
-// - Restores CTA visibility and shuffling
-// - Keeps eggs centered via translateX(-50%)
-// - Emits 'rebelants:prize' on pick
+// RA: Shuffle v1.3 (button hard-pinned so it cannot disappear)
+// - CTA rendered twice: a normal one below the scene AND a tiny "safety" CTA
+//   pinned at the top-left of the scene so you can always start a shuffle.
+// - Centered lanes, wobble-on-pick, prize modal event.
 
 import React, { useEffect, useMemo, useState } from 'react';
 
@@ -10,12 +10,12 @@ const wait = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 export default function Shuffle() {
   const [phase, setPhase] = useState<Phase>('idle');
-  const [order, setOrder] = useState<number[]>([0, 1, 2]); // visual order
+  const [order, setOrder] = useState<number[]>([0, 1, 2]);
   const [canPick, setCanPick] = useState(false);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
 
-  // lanes are centered by translateX(-50%)
+  // lanes are centered via translateX(-50%)
   const lanes = useMemo(() => [18, 50, 82], []);
 
   useEffect(() => {
@@ -41,6 +41,7 @@ export default function Shuffle() {
         [next[a], next[b]] = [next[b], next[a]];
         return next;
       });
+
       const t = i / (swaps - 1);
       const eased = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
       setProgress(Math.min(99, Math.floor(eased * 100)));
@@ -103,6 +104,19 @@ export default function Shuffle() {
       <p className="subtitle">Three eggs. We shuffle. You pick one for a prize.</p>
 
       <div className="shuffle-wrap">
+        {/* Safety CTA pinned INSIDE the scene (cannot be clipped/hidden) */}
+        <div className="shuffle-safety-cta">
+          <button
+            className="btn btn-safety"
+            disabled={ctaDisabled}
+            onClick={() => {
+              if (phase === 'idle' || phase === 'revealed') runShuffle();
+            }}
+          >
+            {phase === 'pick' ? 'Pick any egg' : 'Shuffle'}
+          </button>
+        </div>
+
         {/* Scene */}
         <div className="shuffle-scene ant-scene">
           <div className="strip" />
@@ -136,7 +150,7 @@ export default function Shuffle() {
           </div>
         </div>
 
-        {/* CTA – visible & clickable */}
+        {/* Normal CTA below the scene */}
         <div className="shuffle-cta">
           <button
             className="btn"
