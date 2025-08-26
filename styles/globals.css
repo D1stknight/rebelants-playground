@@ -117,3 +117,85 @@ body { @apply bg-slate-950 text-slate-100; }
   filter: blur(2px);
   border-radius: 999px;
 }
+
+/* ================== SHUFFLE – isolated styles ================== */
+.shuffle-scene{
+  position: relative;
+  height: 260px;
+  border-radius: 14px;
+  border: 1px solid rgb(36 41 59 / 80%);
+  overflow: hidden;
+  background: radial-gradient(120% 90% at 50% 0%, #0b1b31 0%, #0e1730 55%, #0a1226 100%);
+  box-shadow: 0 12px 28px rgba(0,0,0,.35) inset, 0 2px 0 rgba(255,255,255,.04) inset;
+}
+
+.shuffle-bg{
+  position:absolute; inset:0;
+  background:
+    radial-gradient(80% 40% at 50% -10%, rgba(106,169,255,.25), rgba(0,0,0,0) 60%),
+    radial-gradient(70% 40% at 50% 110%, rgba(157,255,122,.10), rgba(0,0,0,0) 60%);
+}
+
+.shuffle-queen{
+  position:absolute; right:2%; bottom:8%;
+  width:120px; height:120px; opacity:.08;
+  background:
+    radial-gradient(120% 120% at 40% 25%, rgba(255,255,255,.2), rgba(255,255,255,0) 60%),
+    conic-gradient(from 0deg, #7e5bef 0 25%, #f472b6 25% 50%, #22d3ee 50% 75%, #8b5cf6 75% 100%);
+  -webkit-mask:
+    radial-gradient(70% 65% at 50% 35%, #000 98%, transparent 100%) top / 100% 60% no-repeat,
+    radial-gradient(80% 60% at 50% 100%, #000 98%, transparent 100%) bottom / 70% 40% no-repeat;
+  mask:
+    radial-gradient(70% 65% at 50% 35%, #000 98%, transparent 100%) top / 100% 60% no-repeat,
+    radial-gradient(80% 60% at 50% 100%, #000 98%, transparent 100%) bottom / 70% 40% no-repeat;
+  border-radius: 50%;
+  filter: blur(1px);
+}
+
+/* floor track */
+.shuffle-floor{
+  position:absolute; left:8%; right:8%; bottom:18%;
+  height: 8px; border-radius:999px;
+  background: linear-gradient(90deg, #2c354d, #6be6ff 40%, #9dff7a 80%, #ffd966);
+  box-shadow: 0 0 0 1px rgba(255,255,255,.06) inset, 0 8px 24px rgba(0,0,0,.55);
+}
+
+/* each egg (absolutely positioned) */
+.shuffle-egg{
+  position:absolute; bottom:26%;
+  width:86px; height:120px;
+  transform:translateX(-50%);
+  display:grid; place-items:center;
+  border-radius:14px;
+  background: rgba(14,24,42,.45);
+  border:1px solid rgba(255,255,255,.06);
+  box-shadow: 0 10px 24px rgba(0,0,0,.35);
+  transition: left .32s ease, transform .18s ease;
+}
+.shuffle-egg.is-pickable{ cursor:pointer; }
+.shuffle-egg:disabled{ cursor:not-allowed; opacity:.9; }
+
+/* egg body */
+.egg-body{
+  width:58px; height:76px; border-radius:52% 52% 46% 46%;
+  background:
+    radial-gradient(120% 80% at 30% 20%, rgba(255,255,255,.85), rgba(255,255,255,0) 36%),
+    radial-gradient(80% 110% at 50% 60%, #ffde59, #ffb74d 70%, #c77b2d 100%);
+  box-shadow: 0 2px 8px rgba(0,0,0,.35) inset, 0 0 0 1px rgba(255,255,255,.08);
+}
+.shuffle-egg.is-pickable:hover .egg-body{ animation: wobble .7s ease-in-out; }
+
+.egg-shadow{
+  position:absolute; bottom:-12px; width:64px; height:12px;
+  background: radial-gradient(60% 80% at 50% 50%, rgba(0,0,0,.45), rgba(0,0,0,0) 70%);
+  filter: blur(2px); border-radius:999px;
+}
+
+/* click shake */
+.shuffle-egg.is-shaking { animation: pop .25s ease; }
+
+/* if your file already has @keyframes wobble/pop, keep only one copy */
+@keyframes pop{
+  0%{ transform:translateX(-50%) scale(.95); opacity:.9 }
+  100%{ transform:translateX(-50%) scale(1); opacity:1 }
+}
