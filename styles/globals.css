@@ -179,3 +179,7 @@ body { @apply bg-slate-950 text-slate-100; }
   75% { transform: rotate(-2deg) }
   90% { transform: rotate(1deg) }
 }
+
+/* Shuffle: make the egg gently wobble always (subtle), but only clickable after shuffle */
+.egg-body.always-wobble { animation: wobble 2.6s ease-in-out infinite; opacity: .98; }
+.egg-card.can-pick .egg-body.always-wobble { animation-duration: 1.4s; } /* slightly snappier when pickable */
