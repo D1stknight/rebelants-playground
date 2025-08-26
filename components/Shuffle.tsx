@@ -1,139 +1,184 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
-type Prize = { prizeLabel: string; rarity: 'common'|'rare'|'ultra'|null }
+type Phase = 'idle' | 'shuffling' | 'pick' | 'reveal';
 
-const crateImg: Record<'common'|'rare'|'ultra', string> = {
-  common: '/crates/common.png',
-  rare: '/crates/rare.png',
-  ultra: '/crates/ultra.png',
+type PrizePayload = {
+  ok: boolean;
+  prizeLabel?: string;
+  rarity?: 'common' | 'rare' | 'ultra' | null;
+  nextPlayableAt?: number | null;
+  error?: string;
+};
+
+function emitPrize(label: string, rarity: PrizePayload['rarity']) {
+  // Uses the global modal host we added earlier
+  window.dispatchEvent(
+    new CustomEvent('prize:show', {
+      detail: { label, type: 'crate', rarity },
+    })
+  );
 }
 
-export default function Shuffle(){
-  const [running, setRunning] = useState(false)
-  const [progress, setProgress] = useState(0)
-  const [canPick, setCanPick] = useState(false)
-  const [modal, setModal] = useState<{open:boolean; prize?: Prize}>({open:false})
+export default function Shuffle() {
+  const [phase, setPhase] = useState<Phase>('idle');
+  const [progress, setProgress] = useState(0);
+  const [positions, setPositions] = useState<number[]>([0, 1, 2]); // egg index -> slot index
+  const [slotXs, setSlotXs] = useState<number[]>([0, 0, 0]);
 
-  // Center points for each slot across the track
-  const positions = useMemo(() => [20, 50, 80], [])
-  // During shuffle, we move a “sheen” panel across the scene for flair
-  const sheenRef = useRef<HTMLDivElement|null>(null)
-  const barRef = useRef<HTMLDivElement|null>(null)
+  const sceneRef = useRef<HTMLDivElement | null>(null);
+  const swapTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const progTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  function animateSheen(ms: number){
-    const start = performance.now()
-    const raf = () => {
-      const t = performance.now() - start
-      const pct = Math.min(1, t / ms)
-      if (sheenRef.current){
-        const x = -40 + pct * 180 // move across
-        sheenRef.current.style.transform = `skewX(-15deg) translateX(${x}%)`
-      }
-      if (pct < 1) requestAnimationFrame(raf)
+  // Lay out three even slots based on scene width
+  useEffect(() => {
+    function layout() {
+      const el = sceneRef.current;
+      if (!el) return;
+      const w = el.clientWidth;
+      const card = 120; // px width of an egg card
+      const pad = 24;
+      const usable = w - pad * 2;
+      const gap = (usable - card * 3) / 2;
+      const start = pad + card / 2;
+      setSlotXs([start, start + card + gap, start + (card + gap) * 2]);
     }
-    requestAnimationFrame(raf)
-  }
+    layout();
+    const onR = () => layout();
+    window.addEventListener('resize', onR);
+    return () => window.removeEventListener('resize', onR);
+  }, []);
 
-  async function doShuffle(){
-    if (running) return
-    setModal({open:false})
-    setCanPick(false)
-    setRunning(true)
-    setProgress(0)
+  // Start shuffle
+  async function start() {
+    if (phase !== 'idle') return;
+    setPhase('shuffling');
+    setProgress(0);
 
-    // progress bar + sheen sweep
-    animateSheen(1400)
-    const start = Date.now()
-    const total = 1400
-    const interval = setInterval(() => {
-      const pct = Math.min(100, Math.round(((Date.now()-start)/total)*100))
-      setProgress(pct)
-      if (pct >= 100){
-        clearInterval(interval)
-        setRunning(false)
-        setCanPick(true)
+    // randomize starting mapping
+    setPositions([0, 1, 2].sort(() => Math.random() - 0.5));
+
+    // Drive the progress bar
+    progTimer.current && clearInterval(progTimer.current);
+    progTimer.current = setInterval(() => {
+      setProgress((p) => Math.min(99, p + 3));
+    }, 60);
+
+    // Do N random swaps with easing-ish cadence
+    let swapsLeft = 22 + Math.floor(Math.random() * 10); // 22–31 swaps
+    let speed = 140; // ms between swaps at start
+    swapTimer.current && clearInterval(swapTimer.current);
+
+    const doSwap = () => {
+      setPositions((prev) => {
+        const a = Math.floor(Math.random() * 3);
+        let b = Math.floor(Math.random() * 3);
+        if (b === a) b = (b + 1) % 3;
+        const next = [...prev];
+        const ai = next.indexOf(a);
+        const bi = next.indexOf(b);
+        // swap the slot indexes of eggs a and b
+        [next[ai], next[bi]] = [next[bi], next[ai]];
+        return next;
+      });
+
+      swapsLeft--;
+      // accelerate then decelerate: shorten then lengthen
+      if (swapsLeft > 12) speed = Math.max(70, speed - 6);
+      else speed = Math.min(220, speed + 14);
+
+      if (swapsLeft <= 0) {
+        // stop
+        if (swapTimer.current) clearInterval(swapTimer.current);
+        if (progTimer.current) {
+          clearInterval(progTimer.current);
+          setProgress(100);
+        }
+        setTimeout(() => setPhase('pick'), 200);
+      } else {
+        // reschedule next swap with new speed
+        if (swapTimer.current) clearInterval(swapTimer.current);
+        swapTimer.current = setInterval(doSwap, speed);
       }
-    }, 60)
+    };
+
+    swapTimer.current = setInterval(doSwap, speed);
   }
 
-  async function pick(index:number){
-    if (!canPick) return
-    setCanPick(false)
-    // Seed can be anything; we use the index to tie choice to result a bit
-    const seed = `guest-${index}-${Date.now()}`
-    const res = await fetch('/api/spin', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ seed }),
-    }).then(r=>r.json())
+  async function pick(slotChosen: number) {
+    if (phase !== 'pick') return;
+    setPhase('reveal');
 
-    const prize: Prize = { prizeLabel: res.prizeLabel ?? 'Nothing this time', rarity: res.rarity ?? null }
-    setModal({open:true, prize})
+    try {
+      // Let the API decide the prize. We only animate/host visuals here.
+      const r = await fetch('/api/spin', { method: 'POST' });
+      const data: PrizePayload = await r.json();
+
+      const label =
+        data.prizeLabel ??
+        (data.rarity ? `${data.rarity[0].toUpperCase()}${data.rarity.slice(1)} Loot Crate` : 'Nothing this time');
+
+      emitPrize(label, data.rarity ?? null);
+    } catch (e) {
+      emitPrize('Nothing this time', null);
+    } finally {
+      // Cooldown tiny pause so players see the layout reset
+      setTimeout(() => {
+        setPositions([0, 1, 2]);
+        setProgress(0);
+        setPhase('idle');
+      }, 500);
+    }
   }
+
+  // convenience lookups: egg index -> x
+  const eggTransforms = useMemo(() => {
+    return positions.map((slotIdx) => {
+      const x = slotXs[slotIdx] ?? 0;
+      return `translate3d(${x}px,0,0)`;
+    });
+  }, [positions, slotXs]);
+
+  const interactive = phase === 'pick';
 
   return (
-    <section className="ant-card">
-      <h3 className="title mb-1">Queen&apos;s Egg Shuffle</h3>
-      <p className="subtitle mb-4">Three eggs. We shuffle. You pick one for a prize.</p>
+    <div className="ant-card">
+      <div className="shuffle-scene" ref={sceneRef}>
+        {/* light sweeps */}
+        <div className={`sweep ${phase === 'shuffling' ? 'run' : ''}`} />
+        <div className={`sweep delay ${phase === 'shuffling' ? 'run' : ''}`} />
 
-      {/* Scene */}
-      <div className="shuffle-wrap">
-        <div className="sky">
-          <div className="stars" />
-          <div ref={sheenRef} className="sheen" />
-        </div>
-
-        {/* floor */}
-        <div className="shuffle-floor" />
-
-        {/* three slots */}
-        {positions.map((x, i)=>(
-          <div key={i} className="egg-slot" style={{left:`${x}%`}}>
-            <div
-              className={`shuffle-egg ${canPick ? 'cursor-pointer' : 'opacity-80'}`}
-              onClick={()=>pick(i)}
-              onMouseEnter={(e)=> e.currentTarget.classList.add('wobble')}
-              onAnimationEnd={(e)=> e.currentTarget.classList.remove('wobble')}
-              aria-label={`Egg ${i+1}`}
-              role="button"
-            />
-          </div>
+        {/* eggs */}
+        {[0, 1, 2].map((eggIdx) => (
+          <button
+            key={eggIdx}
+            className={`egg-card ${interactive ? 'can-pick' : ''}`}
+            style={{ transform: eggTransforms[eggIdx] }}
+            disabled={!interactive}
+            onClick={() => pick(positions[eggIdx])}
+          >
+            <div className="egg-body">
+              <div className="egg-gloss" />
+              <div className="egg-speckle" />
+            </div>
+          </button>
         ))}
+
+        {/* progress rail */}
+        <div className="rail">
+          <div className="rail-fill" style={{ width: `${progress}%` }} />
+        </div>
       </div>
 
-      {/* progress */}
-      <div className="bar mt-4">
-        <div ref={barRef} className="bar-fill" style={{width:`${progress}%`}} />
-      </div>
-
-      {/* controls */}
-      <div className="mt-4 flex gap-3">
-        <button className="btn" onClick={doShuffle} disabled={running}>
-          {running ? 'Shuffling…' : 'Shuffle'}
+      <div className="mt-4">
+        <button
+          onClick={start}
+          disabled={phase !== 'idle'}
+          className="btn"
+          aria-busy={phase !== 'idle'}
+        >
+          {phase === 'idle' ? 'Shuffle' : 'Shuffling…'}
         </button>
       </div>
-
-      {/* Prize Modal */}
-      {modal.open && (
-        <div className="modal" onClick={()=>setModal({open:false})}>
-          <div className="modal-card pop-in" onClick={(e)=>e.stopPropagation()}>
-            <h4 className="text-lg font-semibold mb-2">Result</h4>
-            {modal.prize?.rarity ? (
-              <>
-                <p className="mb-3">{modal.prize.prizeLabel}</p>
-                <img
-                  alt={modal.prize.rarity}
-                  className="mx-auto w-28"
-                  src={crateImg[modal.prize.rarity]}
-                />
-              </>
-            ) : (
-              <p className="mb-3">Nothing this time</p>
-            )}
-            <button className="btn mt-4" onClick={()=>setModal({open:false})}>Close</button>
-          </div>
-        </div>
-      )}
-    </section>
-  )
+    </div>
+  );
 }
