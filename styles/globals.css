@@ -5,15 +5,14 @@
 /* ---------- Base ---------- */
 :root { color-scheme: dark; }
 body { @apply bg-slate-950 text-slate-100; }
-
-.ant-card { @apply bg-slate-900/70 border border-slate-800 rounded-xl shadow-lg; }
-.btn { @apply px-4 py-2 rounded-lg border border-slate-700 hover:bg-slate-800 transition; }
+.ant-card { @apply bg-slate-900/70 border border-slate-800 rounded-xl p-6 shadow; }
+.btn { @apply px-4 py-2 rounded-lg border border-slate-700 hover:bg-slate-800 active:scale-[.98] transition; }
 .title { @apply text-3xl font-bold tracking-tight; }
 .subtitle { @apply text-slate-400; }
-.tab { @apply inline-flex items-center gap-2 rounded-full border border-slate-700 px-3 py-1; }
+.tab { @apply inline-flex items-center gap-2 rounded-full border border-slate-700 px-3 py-1 text-sm; }
 .tab-active { @apply bg-slate-800; }
 
-/* ---------- Tiny helpers ---------- */
+/* tiny helpers */
 @keyframes wobble {
   15%,100% { transform: rotate(0) }
   25% { transform: rotate(-6deg) }
@@ -25,47 +24,34 @@ body { @apply bg-slate-950 text-slate-100; }
 }
 .wobble { animation: wobble .7s ease-in-out; }
 
-@keyframes pop { 
-  0% { transform:scale(.9); opacity:0 } 
-  100% { transform:scale(1); opacity:1 } 
-}
+@keyframes pop { 0%{ transform:scale(.9); opacity:.0 } 100%{ transform:scale(1); opacity:1 } }
 .pop-in { animation: pop .25s ease-out; }
 
-/* ---------- Expedition Scene ---------- */
-.ant-scene {
-  position: relative;
-  height: 260px;
-  overflow: hidden;
-  background: radial-gradient(120% 80% at 50% 0%, #0b1b31 0%, #091225 55%, #060b14 100%);
-  border-radius: 12px;
-  border: 1px solid rgb(30 41 59);
+/* ---------- Egg + cards ---------- */
+.egg {
+  width: 56px; height: 56px; border-radius: 50% 50% 45% 45%;
+  background: radial-gradient(circle at 45% 40%, #ffe26a 0%, #ffc400 60%, #c27900 100%);
+  box-shadow: inset 0 10px 20px rgba(0,0,0,.35), 0 8px 20px rgba(0,0,0,.35);
+}
+.egg-card { @apply w-24 h-28 rounded-lg bg-slate-900/60 border border-slate-700 grid place-items-center hover:bg-slate-900 transition; }
+
+/* ---------- Tunnel scout icon ---------- */
+.ant-scout {
+  width: 52px; height: 52px;
+  background:
+   radial-gradient(circle at 60% 35%, #111827 0 40%, transparent 41%) 12px 8px / 30px 18px no-repeat,
+   radial-gradient(circle at 50% 50%, #ff7b00 0 70%, transparent 71%) 10px 8px / 32px 32px no-repeat,
+   radial-gradient(circle at 50% 50%, #2563eb 0 60%, transparent 61%) 6px 26px / 40px 22px no-repeat;
+  filter: drop-shadow(0 6px 10px rgba(0,0,0,.4));
+  transform: translateY(2px);
 }
 
-/* sky / ambience */
-.ant-scene .sky { 
-  position:absolute; inset:0; overflow:hidden;
-}
-.ant-scene .stars {
-  position:absolute; inset:0;
-  background: url('/stars.png');
-  opacity:.4;
-  animation: twinkle 6s ease-in-out infinite;
-}
-@keyframes twinkle {
-  0%,100% { opacity:.4 }
-  50% { opacity:.7 }
-}
+/* ---------- Expedition scene + progress ---------- */
+.ant-scene { position: relative; height: 260px; overflow: hidden; background: radial-gradient(120% 80% at 50% 0%, #0b1b31 0%, #091225 55%, #06142d 100%); border-radius: 12px; border: 1px solid rgb(30 41 59); }
+.bar { position: absolute; left: 32px; right: 32px; bottom: 18px; height: 8px; border-radius: 999px; background: #0f172a; border: 1px solid #1f2a44; }
+.bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #00ffcc, #4f46e5, #22d3ee); border-radius: 999px; transition: width .15s linear; }
+.bar-text { position: absolute; left: 0; top: -24px; font-size: 12px; color: #94a3b8; }
 
-/* Expedition progress bar */
-.ant-progress {
-  position: absolute; bottom: 10px; left: 0; right: 0;
-  height: 12px;
-  background: #1e293b;
-  border-radius: 6px;
-  overflow:hidden;
-}
-.ant-progress-fill {
-  height: 100%;
-  background: linear-gradient(to right, #22c55e, #3b82f6, #8b5cf6);
-  transition: width 0.3s ease;
-}
+/* ---------- Simple modal ---------- */
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,.55); display:grid; place-items:center; z-index: 50; }
+.modal-card { background:#0b122e; border:1px solid #172937; padding: 18px; border-radius:12px; width: 320px; text-align:left; }
