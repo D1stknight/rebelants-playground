@@ -15,12 +15,12 @@ export default function Expedition() {
   const [seed] = useState('guest-' + Math.random().toString(36).slice(2,8))
   const [modal, setModal] = useState<Prize | null>(null)
   const [glow, setGlow] = useState<'common'|'rare'|'ultra'|null>(null)
-  const [w, setW] = useState(0) // progress 0..100
+  const [w, setW] = useState(0)
+  const [frame, setFrame] = useState(1)
 
   const sceneRef = useRef<HTMLDivElement>(null)
   const antRef = useRef<HTMLDivElement>(null)
 
-  // set ant travel distance precisely based on trail width (CSS anim uses this value)
   useEffect(() => {
     const r = () => {
       const scene = sceneRef.current
@@ -30,7 +30,6 @@ export default function Expedition() {
       const trailRect = trail.getBoundingClientRect()
       const antRect = ant.getBoundingClientRect()
       const distance = Math.max(0, trailRect.width - antRect.width)
-      // we move the ant with JS translate during the run for accuracy
       ant.style.setProperty('--travel', `${distance}px`)
     }
     r()
@@ -62,17 +61,16 @@ export default function Expedition() {
     setGlow(null)
     setW(0)
 
-    // enable scene animation & start the “march”
     const scene = sceneRef.current
     const ant = antRef.current
     scene?.classList.add('animating','running')
 
-    // drive progress & ant movement (~5.2s)
     const start = Date.now()
     const dur = 5200
     const trail = scene?.querySelector('.trail') as HTMLDivElement | null
     const travel = ant ? parseFloat(getComputedStyle(ant).getPropertyValue('--travel')) || 0 : 0
 
+    // progress bar + ant movement
     const tick = () => {
       const t = Math.min(1, (Date.now() - start) / dur)
       setW(Math.round(t * 100))
@@ -81,7 +79,12 @@ export default function Expedition() {
     }
     requestAnimationFrame(tick)
 
-    // ask the API
+    // frame swap for walking (8fps)
+    let frameInterval: NodeJS.Timer | null = setInterval(() => {
+      setFrame(f => (f % 3) + 1)
+    }, 125)
+
+    // call API
     let prize: Prize = { type:'none', label:'Nothing this time' }
     try {
       const res = await fetch('/api/expedition', {
@@ -98,9 +101,12 @@ export default function Expedition() {
       }
     } catch (_) {}
 
-    // finish the run
+    // finish run
     await new Promise(r => setTimeout(r, dur))
     scene?.classList.remove('running')
+    if (frameInterval) clearInterval(frameInterval)
+    setFrame(2) // back to center
+
     if (prize.type === 'crate') {
       setGlow(prize.rarity)
       if (prize.rarity !== 'common' && scene) confettiBurst(scene)
@@ -112,11 +118,10 @@ export default function Expedition() {
   return (
     <section>
       <h2 className="text-xl font-semibold mb-2">Colony Forage Expedition</h2>
-      <p className="text-slate-400 mb-4">Send a scout on a longer run. Bigger rewards, cinematic vibes.</p>
+      <p className="text-slate-400 mb-4">Your Rebel Ant Samurai marches for loot. Bigger rewards, cinematic vibes.</p>
 
       {/* Scene */}
       <div ref={sceneRef} className="exp-scene mb-4">
-        {/* fireflies */}
         <div className="fireflies">
           {Array.from({length:14}).map((_,i)=>(
             <i key={i} style={{
@@ -126,13 +131,16 @@ export default function Expedition() {
             }} />
           ))}
         </div>
-
         <div className="hills"></div>
         <div className="trail"></div>
 
-        {/* Ant — Rebel Ant Samurai */}
+        {/* Ant Walk Cycle */}
         <div ref={antRef} className="ant" aria-hidden="true">
-          <img src="/ant-samurai.svg" alt="Rebel Ant Samurai" className="w-16 h-16 animate-bounce-slow" />
+          <img
+            src={`/ant-samurai-${frame}.svg`}
+            alt="Rebel Ant Samurai"
+            className="w-16 h-16"
+          />
         </div>
       </div>
 
