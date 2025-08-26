@@ -287,3 +287,102 @@ body { @apply bg-slate-950 text-slate-100; }
   50% { transform: translate(-50%, -50%) rotate(4deg); }
   75% { transform: translate(-50%, -50%) rotate(-2deg); }
 }
+
+/* =========================
+   SHUFFLE — scene + eggs
+   ========================= */
+.shuffle-wrap {
+  max-width: 980px;
+  margin: 0 auto;
+  position: relative;
+}
+
+.shuffle-scene {
+  position: relative;
+  height: 280px;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(20,40,80,.6), rgba(10,20,40,.4));
+  border-radius: 14px;
+  border: 1px solid rgba(60,70,120,.35);
+  box-shadow: inset 0 10px 28px rgba(0,0,0,.35);
+}
+
+/* glossy strip + rails */
+.shuffle-scene .strip {
+  position: absolute; left: 4%; right: 4%;
+  top: 54%; height: 6px; border-radius: 6px;
+  background: linear-gradient(90deg, #79d1ff, #f3ff5d, #7effaf);
+  opacity: .9; filter: saturate(120%); box-shadow: 0 0 12px rgba(0,0,0,.25) inset;
+}
+.shuffle-scene .rail {
+  position: absolute; left: 6%; right: 6%; height: 8px; border-radius: 8px;
+  background: rgba(255,255,255,.12);
+  box-shadow: inset 0 2px 8px rgba(0,0,0,.35);
+}
+.shuffle-scene .rail-top { top: 40%; }
+.shuffle-scene .rail-bottom { top: 70%; }
+
+/* egg cards */
+.egg-card {
+  position: absolute;
+  width: 150px; height: 110px;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 14px;
+  box-shadow: 0 10px 24px rgba(0,0,0,.35), inset 0 8px 18px rgba(255,255,255,.05);
+  display: grid; place-items: center;
+  transition: left .28s ease, transform .28s ease, box-shadow .18s ease;
+  cursor: default;
+  pointer-events: none; /* disabled until we say it can pick */
+}
+.egg-card.can-pick {
+  cursor: pointer;
+  pointer-events: auto;
+}
+.egg-card:hover { box-shadow: 0 14px 32px rgba(0,0,0,.45), inset 0 10px 22px rgba(255,255,255,.06); }
+
+/* egg body (CSS “3D” look) */
+.egg-body {
+  position: relative;
+  width: 70px; height: 90px; border-radius: 40px 40px 36px 36px / 50px 50px 40px 40px;
+  background:
+    radial-gradient(35% 25% at 35% 28%, rgba(255,255,255,.85), rgba(255,255,255,0) 70%),
+    radial-gradient(80% 80% at 60% 65%, #ffc400, #ff9a00 70%, #ff8d00 100%);
+  filter: saturate(115%);
+  transform: translateY(-2px);
+}
+.egg-speckle {
+  position: absolute; right: 14px; top: 18px; width: 12px; height: 12px; border-radius: 50%;
+  background: radial-gradient(circle at 40% 40%, rgba(255,255,255,.8), transparent 70%);
+  opacity: .6;
+}
+.egg-shadow {
+  position: absolute; left: 50%; top: 84%; width: 72px; height: 12px;
+  background: radial-gradient(60% 60% at 50% 50%, rgba(0,0,0,.35), transparent 80%);
+  transform: translateX(-50%);
+}
+
+/* wobble */
+@keyframes wobble {
+  0%,100% { transform: translateX(-50%) rotate(0deg); }
+  25% { transform: translateX(-50%) rotate(-5deg); }
+  50% { transform: translateX(-50%) rotate(4deg); }
+  75% { transform: translateX(-50%) rotate(-2deg); }
+}
+.egg-card.can-pick .egg-body { animation: wobble 0.9s ease-in-out infinite; }
+
+/* progress */
+.shuffle-progress { margin-top: 14px; }
+.shuffle-progress .bar {
+  width: 100%; height: 8px; border-radius: 8px;
+  background: rgba(255,255,255,.08);
+  box-shadow: inset 0 2px 6px rgba(0,0,0,.35);
+}
+.shuffle-progress .fill {
+  height: 100%; border-radius: 8px;
+  background: linear-gradient(90deg, #79d1ff, #f3ff5d, #7effaf);
+  transition: width .2s ease;
+}
+
+/* CTA above z-wise so it never hides */
+.shuffle-cta { margin-top: 12px; position: relative; z-index: 3; }
