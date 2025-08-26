@@ -1,31 +1,31 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { createHash, randomUUID } from 'crypto'
 
-const SERVER_SEED = process.env.SERVER_SEED || 'dev-seed'
+type Prize =
+  | { type: 'crate'; label: string; rarity: 'common' | 'rare' | 'ultra' }
+  | { type: 'none'; label: string }
 
-function rng01(serverSeed: string, userSeed: string, nonce: string) {
-  const h = createHash('sha256')
-    .update(serverSeed + '|' + userSeed + '|' + nonce)
-    .digest('hex')
-  const x = parseInt(h.slice(0, 8), 16) / 0xffffffff
-  return { u: x, hash: h }
+// simple seeded-ish random
+function rnd(seed: string) {
+  let h = 0
+  for (let i = 0; i < seed.length; i++) h = Math.imul(31, h) + seed.charCodeAt(i) | 0
+  return () => {
+    h = Math.imul(48271, h) | 0
+    return ((h >>> 0) % 1000) / 1000
+  }
 }
 
-function pickPrize(u: number) {
-  if (u < 0.60) return { label: '+10 $REBEL', type: 'points', amount: 10 as const }
-  if (u < 0.88) return { label: '+25 $REBEL', type: 'points', amount: 25 as const }
-  if (u < 0.96) return { label: 'Nothing this time', type: 'none' as const }
-  if (u < 0.995) return { label: 'Common Loot Crate', type: 'crate' as const, rarity: 'common' as const }
-  if (u < 0.999) return { label: 'Rare Loot Crate', type: 'crate' as const, rarity: 'rare' as const }
-  return { label: 'Ultra Loot Crate', type: 'crate' as const, rarity: 'ultra' as const }
-}
+export default function handler(req: NextApiRequest, res: NextApiResponse<Prize>) {
+  const s = (req.body?.seed as string) || 'guest'
+  const rand = rnd(s + Date.now())
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { seed } = req.body || {}
-  const uid = typeof seed === 'string' && seed.trim() ? seed.trim() : 'guest-' + randomUUID()
-  const day = new Date().toISOString().slice(0, 10)
-  const nonce = `expedition|${uid}|${day}|${Math.floor(Date.now()/1000)}`
-  const { u, hash } = rng01(SERVER_SEED, uid, nonce)
-  const prize = pickPrize(u)
-  res.status(200).json({ prize, proof: { hash, nonce, u } })
+  const u = rand()
+  if (u > 0.85) {
+    // 15% chance to win a crate (weighted)
+    const r = rand()
+    if (r > 0.8) return res.status(200).json({ type: 'crate', label: 'Ultra Loot Crate', rarity: 'ultra' })
+    if (r > 0.4) return res.status(200).json({ type: 'crate', label: 'Rare Loot Crate', rarity: 'rare' })
+    return res.status(200).json({ type: 'crate', label: 'Common Loot Crate', rarity: 'common' })
+  }
+
+  return res.status(200).json({ type: 'none', label: 'Nothing this time' })
 }
