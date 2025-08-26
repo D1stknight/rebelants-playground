@@ -11,3 +11,26 @@ body { @apply bg-slate-950 text-slate-100; }
 .badge { @apply inline-flex items-center gap-2 rounded-full border border-slate-700 px-3 py-1 text-sm; }
 .tab { @apply px-4 py-2 rounded-lg border border-slate-700 hover:bg-slate-800 transition; }
 .tab-active { @apply bg-slate-800; }
+
+/* --- Rebel Ants small animations & UI helpers --- */
+@keyframes wobble {
+  0%,100% { transform: rotate(0deg) }
+  15% { transform: rotate(-6deg) }
+  30% { transform: rotate(6deg) }
+  45% { transform: rotate(-4deg) }
+  60% { transform: rotate(4deg) }
+  75% { transform: rotate(-2deg) }
+  90% { transform: rotate(2deg) }
+}
+.wobble { animation: wobble .7s ease-in-out; }
+
+@keyframes pop { 0%{transform:scale(.8);opacity:0} 100%{transform:scale(1);opacity:1}}
+.pop-in { animation: pop .25s ease-out; }
+
+/* expedition progress bar fill */
+@keyframes barfill { from { width: 0 } to { width: 100% } }
+.bar-fill { animation: barfill 5s linear forwards; }
+
+/* simple modal */
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,.5); display:grid; place-items:center; z-index:50 }
+.modal-card { background: #0b1220; border: 1px solid #1f2937; padding: 18px; border-radius: 12px; width: 320px; text-align:center }
