@@ -183,3 +183,9 @@ body { @apply bg-slate-950 text-slate-100; }
 /* Shuffle: make the egg gently wobble always (subtle), but only clickable after shuffle */
 .egg-body.always-wobble { animation: wobble 2.6s ease-in-out infinite; opacity: .98; }
 .egg-card.can-pick .egg-body.always-wobble { animation-duration: 1.4s; } /* slightly snappier when pickable */
+
+/* Ensure eggs sit above everything and don't click-through */
+.shuffle-scene { position: relative; }
+.egg-card { position: absolute; top: 48px; z-index: 5; } /* top aligns with your scene’s strip */
+.egg-body.always-wobble { animation: wobble 2.6s ease-in-out infinite; opacity: .98; }
+.egg-card.can-pick .egg-body.always-wobble { animation-duration: 1.4s; }
