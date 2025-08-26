@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react'
 
 type Prize =
-  | { type: 'crate'; label: string; rarity: 'common'|'rare'|'ultra' }
-  | { type: 'none';  label: string }
+  | { type: 'crate'; label: string; rarity: 'common' | 'rare' | 'ultra' }
+  | { type: 'none'; label: string }
 
-const crateImg: Record<'common'|'rare'|'ultra', string> = {
+const crateImg: Record<'common' | 'rare' | 'ultra', string> = {
   common: '/crates/common.png',
   rare: '/crates/rare.png',
   ultra: '/crates/ultra.png',
@@ -12,9 +12,9 @@ const crateImg: Record<'common'|'rare'|'ultra', string> = {
 
 export default function Expedition() {
   const [busy, setBusy] = useState(false)
-  const [seed] = useState('guest-' + Math.random().toString(36).slice(2,8))
+  const [seed] = useState('guest-' + Math.random().toString(36).slice(2, 8))
   const [modal, setModal] = useState<Prize | null>(null)
-  const [glow, setGlow] = useState<'common'|'rare'|'ultra'|null>(null)
+  const [glow, setGlow] = useState<'common' | 'rare' | 'ultra' | null>(null)
   const [w, setW] = useState(0)
   const [frame, setFrame] = useState(1)
 
@@ -37,144 +37,142 @@ export default function Expedition() {
     return () => window.removeEventListener('resize', r)
   }, [])
 
-  function confettiBurst(container: HTMLElement) {
-    const conf = document.createElement('div')
-    conf.className = 'confetti'
-    container.appendChild(conf)
-    const colors = ['#ff6b6b','#ffd93d','#6bcBff','#B28DFF','#7CFFB2','#ff9f43']
-    for (let i=0;i<28;i++){
-      const el = document.createElement('i')
-      el.style.left = `${10 + Math.random()*80}%`
-      el.style.top  = `${20 + Math.random()*10}%`
-      el.style.background = colors[i % colors.length]
-      el.style.transform = `translateY(-20px) rotate(${Math.random()*180}deg)`
-      el.style.animationDelay = `${Math.random()*200}ms`
-      conf.appendChild(el)
-    }
-    setTimeout(()=>conf.remove(), 1200)
-  }
-
   async function run() {
     if (busy) return
     setBusy(true)
-    setModal(null)
-    setGlow(null)
-    setW(0)
 
     const scene = sceneRef.current
-    const ant = antRef.current
-    scene?.classList.add('animating','running')
+    if (!scene) return
 
-    const start = Date.now()
-    const dur = 5200
-    const trail = scene?.querySelector('.trail') as HTMLDivElement | null
-    const travel = ant ? parseFloat(getComputedStyle(ant).getPropertyValue('--travel')) || 0 : 0
+    // glow start
+    setGlow(null)
+    scene.classList.add('running')
 
-    // progress bar + ant movement
-    const tick = () => {
-      const t = Math.min(1, (Date.now() - start) / dur)
-      setW(Math.round(t * 100))
-      if (ant) ant.style.transform = `translateX(${travel * t}px)`
-      if (t < 1) requestAnimationFrame(tick)
+    // move progress bar
+    const bar = scene.querySelector('.exp-bar') as HTMLDivElement | null
+    if (bar) {
+      bar.classList.remove('fill')
+      await new Promise(r => setTimeout(r, 10))
+      bar.classList.add('fill')
     }
-    requestAnimationFrame(tick)
 
-    // frame swap for walking (8fps)
-    let frameInterval: NodeJS.Timer | null = setInterval(() => {
-      setFrame(f => (f % 3) + 1)
-    }, 125)
+    // animate frames
+    let f = 1
+    let frameInterval: NodeJS.Timeout | null = setInterval(() => {
+      f = f % 3 + 1
+      setFrame(f)
+    }, 250)
 
-    // call API
-    let prize: Prize = { type:'none', label:'Nothing this time' }
-    try {
-      const res = await fetch('/api/expedition', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ seed })
-      })
-      if (res.ok) {
-        const r = await res.json()
-        const p = r?.prize
-        if (p?.type === 'crate') {
-          prize = { type:'crate', label: p.label, rarity: p.rarity }
-        }
-      }
-    } catch (_) {}
+    // call backend
+    const res = await fetch('/api/expedition', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ seed }),
+    })
+    const prize: Prize = await res.json()
 
-    // finish run
-    await new Promise(r => setTimeout(r, dur))
-    scene?.classList.remove('running')
+    // wait 5s (expedition length)
+    await new Promise(r => setTimeout(r, 5000))
+
+    // cleanup
+    scene.classList.remove('running')
     if (frameInterval) clearInterval(frameInterval)
-    setFrame(2) // back to center
+    setFrame(2) // idle center
 
     if (prize.type === 'crate') {
+      setModal(prize)
       setGlow(prize.rarity)
-      if (prize.rarity !== 'common' && scene) confettiBurst(scene)
     }
-    setModal(prize)
+
     setBusy(false)
   }
 
   return (
-    <section>
-      <h2 className="text-xl font-semibold mb-2">Colony Forage Expedition</h2>
-      <p className="text-slate-400 mb-4">Your Rebel Ant Samurai marches for loot. Bigger rewards, cinematic vibes.</p>
+    <div>
+      <h2 className="title mb-4">Colony Forage Expedition</h2>
+      <p className="subtitle mb-6">
+        Send a samurai ant on a longer run. 5-second expedition with bigger
+        rewards.
+      </p>
 
-      {/* Scene */}
-      <div ref={sceneRef} className="exp-scene mb-4">
-        <div className="fireflies">
-          {Array.from({length:14}).map((_,i)=>(
-            <i key={i} style={{
-              left: `${Math.random()*100}%`,
-              top:  `${10 + Math.random()*60}%`,
-              animationDelay: `${Math.random()*2000}ms`
-            }} />
-          ))}
-        </div>
-        <div className="hills"></div>
-        <div className="trail"></div>
+      <div
+        ref={sceneRef}
+        className={`scene relative bg-slate-900/70 border border-slate-800 rounded-xl p-8 shadow-lg overflow-hidden ${
+          busy ? 'running' : ''
+        }`}
+      >
+        <div className="trail relative h-32 w-full bg-slate-800/40 rounded-lg overflow-hidden">
+          {/* glowing aura when reward */}
+          {glow && (
+            <div
+              className={`absolute inset-0 rounded-lg animate-pulse blur-2xl ${
+                glow === 'common'
+                  ? 'bg-blue-500/30'
+                  : glow === 'rare'
+                  ? 'bg-purple-500/30'
+                  : 'bg-yellow-400/30'
+              }`}
+            />
+          )}
 
-        {/* Ant Walk Cycle */}
-        <div ref={antRef} className="ant" aria-hidden="true">
-          <img
-            src={`/ant-samurai-${frame}.svg`}
-            alt="Rebel Ant Samurai"
-            className="w-16 h-16"
-          />
+          {/* walking ant */}
+          <div
+            ref={antRef}
+            className="ant absolute bottom-2 left-0 transition-transform duration-[5000ms] ease-linear"
+            style={{
+              transform: busy
+                ? 'translateX(var(--travel, 0px))'
+                : 'translateX(0)',
+            }}
+          >
+            <img
+              src={`/ant-samurai-${frame}.svg`}
+              alt="Samurai Ant"
+              className="w-20 h-20 drop-shadow-lg"
+            />
+          </div>
+
+          {/* progress bar */}
+          <div className="exp-bar absolute bottom-0 left-0 h-1 bg-green-400 w-0 transition-all duration-[5000ms]" />
         </div>
       </div>
 
-      {/* Progress + CTA */}
-      <div className="exp-bar mb-3">
-        <div className="bar-fill" style={{ width: `${w}%` }} />
-      </div>
-      <button className="btn" disabled={busy} onClick={run}>
-        {busy ? 'Marching...' : 'Start Expedition'}
+      <button
+        onClick={run}
+        disabled={busy}
+        className="btn btn-primary mt-6 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-lg"
+      >
+        {busy ? 'Exploring...' : 'Start Expedition'}
       </button>
 
-      {/* Prize Modal */}
+      {/* modal */}
       {modal && (
-        <div className="modal">
-          <div className="modal-card bounce-in" style={{ position:'relative' }}>
-            <div className="text-lg font-semibold mb-2">You found:</div>
+        <div className="modal fixed inset-0 bg-black/70 flex items-center justify-center">
+          <div className="modal-card bg-slate-900 border border-slate-700 p-8 rounded-lg shadow-2xl text-center">
+            <h3 className="text-xl mb-4">You found:</h3>
             {modal.type === 'crate' ? (
-              <>
-                <div className="mb-2">{modal.label}</div>
-                <div className={[
-                  "prize-wrap mx-auto w-28 rounded-xl p-2 shine",
-                  glow==='ultra' ? "glow-ultra" : glow==='rare' ? "glow-rare" : "glow-common"
-                ].join(' ')}
-                style={{ background:'rgba(8,10,20,.35)' }}>
-                  <img src={crateImg[modal.rarity]} alt={modal.rarity} className="mx-auto block" />
-                </div>
-              </>
+              <div>
+                <img
+                  src={crateImg[modal.rarity]}
+                  alt={`${modal.rarity} crate`}
+                  className="w-24 mx-auto animate-bounce"
+                />
+                <p className="mt-2 text-lg capitalize">
+                  {modal.rarity} crate!
+                </p>
+              </div>
             ) : (
-              <div className="mb-2">Nothing this time</div>
+              <p>{modal.label}</p>
             )}
-            <button className="btn mt-3" onClick={() => setModal(null)}>Close</button>
+            <button
+              className="btn mt-6 bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg"
+              onClick={() => setModal(null)}
+            >
+              Close
+            </button>
           </div>
         </div>
       )}
-    </section>
+    </div>
   )
 }
