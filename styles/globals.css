@@ -233,3 +233,122 @@ body { @apply bg-slate-950 text-slate-100; }
 .animate-bounce-slow {
   animation: bounceSlow 1s infinite;
 }
+
+/* ===== Rebel Ants — Expedition cinematic look ===== */
+
+.ant-scene {
+  position: relative;
+  height: 220px;
+  background: radial-gradient(120% 90% at 50% 110%, #0c1223 0%, #0a0f1d 45%, #070b15 100%);
+  box-shadow: inset 0 0 40px rgba(0,0,0,.35);
+}
+
+/* Parallax sky layers */
+.ant-scene .sky { position:absolute; inset:0; overflow:hidden; pointer-events:none; }
+.ant-scene .stars {
+  position:absolute; inset:0;
+  background:
+    radial-gradient(2px 2px at 20% 30%, rgba(255,255,255,.9), transparent 55%),
+    radial-gradient(2px 2px at 70% 60%, rgba(255,255,255,.8), transparent 55%),
+    radial-gradient(1.5px 1.5px at 40% 80%, rgba(255,255,255,.7), transparent 55%),
+    radial-gradient(1.5px 1.5px at 85% 40%, rgba(255,255,255,.75), transparent 55%);
+  opacity:.6;
+  animation: twinkle 4s ease-in-out infinite alternate;
+}
+.ant-scene .aurora {
+  position:absolute; inset:-20% -10% 30%;
+  background: radial-gradient(60% 80% at 30% 60%, rgba(56,189,248,.12), transparent),
+              radial-gradient(70% 90% at 70% 50%, rgba(168,85,247,.10), transparent);
+  filter: blur(12px);
+  animation: drift-slow 12s ease-in-out infinite alternate;
+}
+.ant-scene .clouds {
+  position:absolute; inset:0;
+  background:
+    radial-gradient(40% 25% at 20% 30%, rgba(255,255,255,.06), transparent 60%),
+    radial-gradient(35% 20% at 60% 20%, rgba(255,255,255,.05), transparent 60%),
+    radial-gradient(45% 28% at 80% 40%, rgba(255,255,255,.04), transparent 60%);
+  animation: drift-slow 16s ease-in-out infinite alternate-reverse;
+}
+
+/* Hills + ground */
+.ant-scene .hills {
+  position:absolute; left:0; right:0; bottom:68px; height:80px;
+  background:
+    radial-gradient(120px 60px at 15% 100%, rgba(41,65,112,.25), transparent 70%),
+    radial-gradient(160px 70px at 55% 100%, rgba(41,65,112,.22), transparent 70%),
+    radial-gradient(120px 60px at 85% 100%, rgba(41,65,112,.20), transparent 70%);
+}
+.ant-scene .ground {
+  position:absolute; left:0; right:0; bottom:48px; height:52px;
+  background: linear-gradient(#0f172a, #0b1227);
+  box-shadow: inset 0 8px 16px rgba(0,0,0,.35);
+}
+
+/* Trail with grid + subtle glow */
+.ant-scene .trail {
+  position:absolute; left:16px; right:16px; bottom:56px; height:72px;
+  border-radius:12px; overflow:hidden;
+  background:
+    linear-gradient(180deg, rgba(24,31,53,.65), rgba(12,16,30,.65)),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.05) 0 8px, transparent 8px 16px);
+  box-shadow: inset 0 6px 12px rgba(0,0,0,.35), inset 0 -6px 12px rgba(0,0,0,.3);
+}
+
+.ant-scene .exp-bar {
+  position:absolute; left:0; bottom:0; height:4px; width:0%;
+  background: linear-gradient(90deg, #22c55e, #a7f3d0);
+  transition: width 5s linear;
+}
+.ant-scene.running .exp-bar { width:100%; }
+
+/* Reward aura */
+.reward-aura { position:absolute; inset:0; mix-blend-mode:screen; filter: blur(10px) saturate(1.2); opacity:.6; pointer-events:none; }
+.reward-aura.common { background: radial-gradient(60% 60% at 50% 50%, rgba(56,189,248,.25), transparent 70%); }
+.reward-aura.rare   { background: radial-gradient(60% 60% at 50% 50%, rgba(168,85,247,.25), transparent 70%); }
+.reward-aura.ultra  { background: radial-gradient(60% 60% at 50% 50%, rgba(251,191,36,.30),  transparent 70%); }
+
+/* Ant + fake 3D with bob + shadow */
+.ant { position:absolute; left:16px; bottom:64px; width:84px; height:84px; }
+.ant-img { width:84px; height:84px; display:block; filter: drop-shadow(0 8px 14px rgba(0,0,0,.55)); }
+.ant.idle .ant-img { animation: idle-bob 1.6s ease-in-out infinite; }
+.ant.walking .ant-img { animation: walk-bob .5s ease-in-out infinite; }
+
+.ant .shadow {
+  position:absolute; bottom:-8px; left:10px; right:10px; height:12px; border-radius:50%;
+  background: radial-gradient(60% 70% at 50% 50%, rgba(0,0,0,.45), rgba(0,0,0,0) 70%);
+  transform-origin:center;
+}
+.ant.idle .shadow   { transform: scale(1); }
+.ant.walking .shadow{ animation: shadow-bob .5s ease-in-out infinite; }
+
+/* Katana shimmer while running */
+.ant-scene.shine .ant-img { filter: drop-shadow(0 8px 14px rgba(0,0,0,.55)) contrast(1.04) brightness(1.04); }
+.ant-scene.shine .trail::after {
+  content:""; position:absolute; inset:-30% -20%;
+  background: conic-gradient(from 0deg, rgba(255,255,255,.0), rgba(255,255,255,.15), rgba(255,255,255,.0) 25% 100%);
+  animation: spin 2.2s linear infinite; pointer-events:none;
+}
+
+/* Foreground grass */
+.ant-scene .grass.fg {
+  position:absolute; left:0; right:0; bottom:40px; height:36px; pointer-events:none;
+  background:
+    radial-gradient(40px 24px at 10% 100%, rgba(34,197,94,.22), transparent 70%),
+    radial-gradient(50px 28px at 40% 100%, rgba(34,197,94,.20), transparent 70%),
+    radial-gradient(40px 24px at 70% 100%, rgba(34,197,94,.20), transparent 70%),
+    radial-gradient(50px 28px at 90% 100%, rgba(34,197,94,.18), transparent 70%);
+  filter: blur(1px);
+}
+
+/* Animations */
+@keyframes twinkle { from {opacity:.45} to {opacity:.8} }
+@keyframes drift-slow { from{transform:translateY(0)} to{transform:translateY(-6px)} }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes idle-bob { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-4px) } }
+@keyframes walk-bob { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-6px) } }
+@keyframes shadow-bob { 0%,100% { transform: scale(1) } 50% { transform: scale(.92) } }
+
+/* Modal entrance */
+.bounce-in { animation: pop .22s ease-out; }
+@keyframes pop { from { transform: scale(.95); opacity:0 } to { transform: scale(1); opacity:1 } }
