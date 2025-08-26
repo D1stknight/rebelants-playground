@@ -1,13 +1,12 @@
-import type { AppProps } from 'next/app'
-import '../styles/globals.css'
-import PrizeModalHost from '../components/PrizeModal'
+// pages/_app.tsx
+import type { AppProps } from 'next/app';
+import '../styles/globals.css';
+import PrizeModalProvider from '../components/PrizeModalHost';
 
-export default function App({ Component, pageProps }: AppProps) {
+export default function MyApp({ Component, pageProps }: AppProps) {
   return (
-    <>
+    <PrizeModalProvider>
       <Component {...pageProps} />
-      {/* Global prize modal listener/host */}
-      <PrizeModalHost />
-    </>
-  )
+    </PrizeModalProvider>
+  );
 }
