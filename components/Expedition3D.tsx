@@ -1,21 +1,20 @@
 import React, { useEffect, useRef, useState } from 'react'
+import * as THREE from 'three'                     // ✅ add this import
 import { Canvas, useFrame } from '@react-three/fiber'
 import { Float } from '@react-three/drei'
 
 // Simple stylized 3D ant made from basic shapes
 function SamuraiAnt({ running, progress }: { running: boolean; progress: number }) {
-  const group = useRef<THREE.Group>(null!)
+  const group = useRef<THREE.Group>(null!)        // now THREE is imported
 
   // walk bobbing + leg swing
   useFrame((state) => {
     const t = state.clock.getElapsedTime()
-    // bob while running, subtle idle bob otherwise
     const amp = running ? 0.05 : 0.015
     const speed = running ? 6 : 2
     if (group.current) {
       group.current.position.y = 0.18 + Math.sin(t * speed) * amp
       group.current.rotation.z = Math.sin(t * speed * 0.5) * (running ? 0.06 : 0.02)
-      // map progress [0..1] along the track ( -2.2 .. 2.2 )
       const x = -2.2 + progress * 4.4
       group.current.position.x = x
     }
@@ -75,7 +74,6 @@ export default function Expedition3D() {
   const [progress, setProgress] = useState(0) // 0..1
   const [pct, setPct] = useState(0) // 0..100
 
-  // smooth timer for 5s run
   const start = () => {
     if (running) return
     setRunning(true)
@@ -90,7 +88,6 @@ export default function Expedition3D() {
       setPct(Math.round(p * 100))
       if (p < 1) requestAnimationFrame(raf)
       else {
-        // done — show modal via event so we reuse existing PrizeModal
         const ev = new CustomEvent('rebelants:prize', {
           detail: { title: 'You found:', type: 'none' },
         })
@@ -118,7 +115,6 @@ export default function Expedition3D() {
             shadows
             camera={{ position: [0, 2.2, 5.5], fov: 45 }}
           >
-            {/* lighting */}
             <ambientLight intensity={0.6} />
             <directionalLight
               position={[3, 5, 2]}
@@ -127,26 +123,19 @@ export default function Expedition3D() {
               shadow-mapSize-width={1024}
               shadow-mapSize-height={1024}
             />
-
-            {/* ground */}
             <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.06, 0]} receiveShadow>
               <planeGeometry args={[8, 3]} />
               <meshStandardMaterial color="#0b1220" roughness={0.9} />
             </mesh>
-
-            {/* glow strip under track */}
             <Float speed={1.5} rotationIntensity={0.05} floatIntensity={0.02}>
               <mesh position={[0, 0.0, 0]}>
                 <boxGeometry args={[4.6, 0.02, 0.08]} />
                 <meshStandardMaterial color="#22d3ee" emissive="#22d3ee" emissiveIntensity={0.35} />
               </mesh>
             </Float>
-
-            {/* the ant */}
             <SamuraiAnt running={running} progress={progress} />
           </Canvas>
 
-          {/* progress overlay */}
           <div className="exp-ui">
             <div className="exp-bar">
               <div className="exp-bar-fill" style={{ width: `${pct}%` }} />
