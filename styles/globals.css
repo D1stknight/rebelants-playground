@@ -225,3 +225,11 @@ body { @apply bg-slate-950 text-slate-100; }
 @keyframes conf {
   to { transform: translateY(220px) rotate(360deg); opacity:0 }
 }
+
+@keyframes bounceSlow {
+  0%, 100% { transform: translateY(0) }
+  50% { transform: translateY(-6px) }
+}
+.animate-bounce-slow {
+  animation: bounceSlow 1s infinite;
+}
