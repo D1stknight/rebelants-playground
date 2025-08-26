@@ -34,3 +34,74 @@ body { @apply bg-slate-950 text-slate-100; }
 /* simple modal */
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,.5); display:grid; place-items:center; z-index:50 }
 .modal-card { background: #0b1220; border: 1px solid #1f2937; padding: 18px; border-radius: 12px; width: 320px; text-align:center }
+
+/* ===== Rebel Ants Animation Kit ===== */
+
+/* subtle float for idle eggs */
+@keyframes floaty {
+  0% { transform: translateY(0px) }
+  50% { transform: translateY(-6px) }
+  100% { transform: translateY(0px) }
+}
+.floaty { animation: floaty 2.4s ease-in-out infinite; }
+
+/* pick wobble (you already have wobble – keep both) */
+@keyframes wobble2 {
+  0% { transform: rotate(0) }
+  15% { transform: rotate(5deg) }
+  30% { transform: rotate(-5deg) }
+  45% { transform: rotate(4deg) }
+  60% { transform: rotate(-4deg) }
+  75% { transform: rotate(2deg) }
+  100% { transform: rotate(0) }
+}
+.wobble-quick { animation: wobble2 .5s ease-in-out; }
+
+/* egg flip + lift on pick */
+.pick-anim {
+  animation: pickLift .35s ease-out forwards;
+}
+@keyframes pickLift {
+  0% { transform: translateY(0) scale(1) rotate(0deg); filter: brightness(1); }
+  60% { transform: translateY(-16px) scale(1.06) rotate(-8deg); filter: brightness(1.2); }
+  100% { transform: translateY(-10px) scale(1.03) rotate(0deg); }
+}
+
+/* shiny sweep on crates */
+.shine-wrap { position: relative; overflow: hidden; }
+.shine-wrap::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(120deg, transparent 0%, rgba(255,255,255,.25) 40%, transparent 60%);
+  transform: translateX(-120%);
+  animation: shine 1.1s ease-out forwards;
+}
+@keyframes shine {
+  to { transform: translateX(120%); }
+}
+
+/* rarity glows */
+.glow-common  { box-shadow: 0 0 18px rgba(255,184,108,.25); }
+.glow-rare    { box-shadow: 0 0 22px rgba(80,200,255,.35); }
+.glow-ultra   { box-shadow: 0 0 28px rgba(255,120,0,.5), 0 0 60px rgba(255,120,0,.25); }
+
+/* modal pop already exists; add a bounce entrance */
+@keyframes bounce-in {
+  0%   { transform: translateY(12px) scale(.96); opacity:.0 }
+  60%  { transform: translateY(-6px) scale(1.02); opacity:1 }
+  100% { transform: translateY(0) scale(1) }
+}
+.bounce-in { animation: bounce-in .35s ease-out; }
+
+/* tiny sparkles for Ultra */
+.sparkles {
+  position: absolute; inset: 0; pointer-events: none; overflow: hidden;
+}
+.sparkles i {
+  position: absolute; width: 6px; height: 6px; border-radius: 9999px;
+  background: radial-gradient(circle, #fff, rgba(255,255,255,.2));
+  animation: sparkle-fall 900ms linear forwards;
+}
+@keyframes sparkle-fall {
+  to { transform: translateY(70px) scale(.6); opacity: 0; }
+}
