@@ -1,31 +1,49 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { rng01, hashSeed } from '../../lib/fair'
-import { table as tableTunnel, pick as pickTunnel } from '../../lib/prizesTunnel'
+import crypto from 'crypto'
 
-const startOfDay = () => { const d = new Date(); d.setHours(0,0,0,0); return d.getTime() }
+function rng(seed: string) {
+  let h = crypto.createHash('sha256').update(seed).digest()
+  const n =
+    (h[0] & 0x1f) * 2 ** 48 +
+    h[1] * 2 ** 40 +
+    h[2] * 2 ** 32 +
+    h[3] * 2 ** 24 +
+    h[4] * 2 ** 16 +
+    h[5] * 2 ** 8 +
+    h[6]
+  return (n % 9_007_199_254_740_992) / 9_007_199_254_740_992
+}
 
-let nonceByIp: Record<string, number> = {}
-let cooldownByIp: Record<string, number> = {}
+function startOfDay() {
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  return d.getTime()
+}
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method not allowed' })
-  const { userSeed } = req.body || {}
-  if (!userSeed || typeof userSeed !== 'string') return res.status(400).json({ ok: false, error: 'Missing userSeed' })
+  if (req.method !== 'POST') {
+    return res.status(405).json({ ok: false, error: 'Method not allowed' })
+  }
+  const clientSeed = (req.body?.seed as string) || 'guest'
+  const serverSeed = process.env.SERVER_SEED || 'rebel-ants-dev-seed-change-me'
+  const day = startOfDay()
 
-  const ip = (req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || 'unknown').split(',')[0].trim()
-  const now = Date.now()
-  const cdSeconds = parseInt(process.env.PLAY_COOLDOWN_SECONDS || '15', 10)
-  const nextPlayable = cooldownByIp[ip] || 0
-  if (now < nextPlayable) return res.status(429).json({ ok:false, error:'Cooldown active', nextPlayableAt: nextPlayable })
+  const roll = rng(`${serverSeed}:${clientSeed}:${day}`)
 
-  const serverSeed = process.env.SERVER_SEED || 'dev-seed-change-me'
-  const dayNonceBase = Math.floor(startOfDay()/1000)
-  const nonce = (nonceByIp[ip] ?? 0) + 1; nonceByIp[ip] = nonce
+  // Odds: 70% nothing, 25% common, 4% rare, 1% ultra
+  let prizeLabel = 'Nothing this time'
+  let rarity: 'common' | 'rare' | 'ultra' | null = null
 
-  const u = rng01(serverSeed, userSeed, dayNonceBase + nonce)
-  const prize = pickTunnel(u)
-  const serverSeedHash = hashSeed(serverSeed)
-  cooldownByIp[ip] = now + cdSeconds * 1000
+  if (roll >= 0.70 && roll < 0.95) {
+    prizeLabel = 'Common Loot Crate'
+    rarity = 'common'
+  } else if (roll >= 0.95 && roll < 0.99) {
+    prizeLabel = 'Rare Loot Crate'
+    rarity = 'rare'
+  } else if (roll >= 0.99) {
+    prizeLabel = 'Ultra Loot Crate'
+    rarity = 'ultra'
+  }
 
-  res.json({ ok:true, prizeLabel: prize.label, prizeType: prize.type, amount: prize.amount ?? null, serverSeedHash, userSeed, nonce: dayNonceBase + nonce, u01: u, nextPlayableAt: cooldownByIp[ip] })
+  return res.json({ ok: true, prizeLabel, rarity })
 }
