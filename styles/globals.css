@@ -199,3 +199,158 @@ body { @apply bg-slate-950 text-slate-100; }
   0%{ transform:translateX(-50%) scale(.95); opacity:.9 }
   100%{ transform:translateX(-50%) scale(1); opacity:1 }
 }
+
+/* ================== SHUFFLE – polished, isolated styles ================== */
+.shuffle-scene{
+  position: relative;
+  height: 260px;
+  border-radius: 14px;
+  border: 1px solid rgb(36 41 59 / 80%);
+  overflow: hidden;
+  background: radial-gradient(120% 90% at 50% 0%, #0b1b31 0%, #0e1730 55%, #0a1226 100%);
+  box-shadow: 0 12px 28px rgba(0,0,0,.35) inset, 0 2px 0 rgba(255,255,255,.04) inset;
+}
+
+.shuffle-bg{
+  position:absolute; inset:0;
+  background:
+    radial-gradient(80% 40% at 50% -10%, rgba(106,169,255,.25), rgba(0,0,0,0) 60%),
+    radial-gradient(70% 40% at 50% 110%, rgba(157,255,122,.10), rgba(0,0,0,0) 60%);
+}
+
+/* queen silhouette – decorative */
+.shuffle-queen{
+  position:absolute; right:2.5%; bottom:10%;
+  width:120px; height:120px; opacity:.10;
+  background:
+    radial-gradient(120% 120% at 40% 25%, rgba(255,255,255,.25), rgba(255,255,255,0) 60%),
+    conic-gradient(from 0deg, #7e5bef 0 25%, #f472b6 25% 50%, #22d3ee 50% 75%, #8b5cf6 75% 100%);
+  -webkit-mask:
+    radial-gradient(70% 65% at 50% 35%, #000 98%, transparent 100%) top / 100% 60% no-repeat,
+    radial-gradient(80% 60% at 50% 100%, #000 98%, transparent 100%) bottom / 70% 40% no-repeat;
+  mask:
+    radial-gradient(70% 65% at 50% 35%, #000 98%, transparent 100%) top / 100% 60% no-repeat,
+    radial-gradient(80% 60% at 50% 100%, #000 98%, transparent 100%) bottom / 70% 40% no-repeat;
+  border-radius: 50%;
+  filter: blur(1px);
+}
+
+/* ambience motes */
+.shuffle-motes{
+  position:absolute; inset:0; pointer-events:none;
+  background-image:
+    radial-gradient(2px 2px at 20% 30%, rgba(255,255,255,.25), transparent 60%),
+    radial-gradient(1.5px 1.5px at 60% 40%, rgba(255,255,255,.18), transparent 60%),
+    radial-gradient(2px 2px at 80% 75%, rgba(255,255,255,.22), transparent 60%),
+    radial-gradient(1.5px 1.5px at 35% 70%, rgba(255,255,255,.20), transparent 60%),
+    radial-gradient(1.8px 1.8px at 68% 15%, rgba(255,255,255,.20), transparent 60%);
+  animation: motes 12s linear infinite;
+  opacity:.6;
+}
+.shuffle-motes.delay{ animation-delay:-6s; opacity:.45; }
+@keyframes motes{
+  0%{ transform: translateY(0) }
+  100%{ transform: translateY(-14px) }
+}
+
+/* floor track */
+.shuffle-floor{
+  position:absolute; left:8%; right:8%; bottom:18%;
+  height: 8px; border-radius:999px;
+  background: linear-gradient(90deg, #2c354d, #6be6ff 40%, #9dff7a 80%, #ffd966);
+  box-shadow: 0 0 0 1px rgba(255,255,255,.06) inset, 0 8px 24px rgba(0,0,0,.55);
+}
+
+/* eggs */
+.shuffle-egg{
+  position:absolute; bottom:26%;
+  width:86px; height:120px;
+  transform:translateX(-50%);
+  display:grid; place-items:center;
+  border-radius:14px;
+  background: rgba(14,24,42,.45);
+  border:1px solid rgba(255,255,255,.06);
+  box-shadow: 0 10px 24px rgba(0,0,0,.35);
+  transition: left .32s ease, transform .18s ease;
+}
+.shuffle-egg.is-pickable{ cursor:pointer; }
+.shuffle-egg:disabled{ cursor:not-allowed; opacity:.9; }
+
+/* sheen & body */
+.egg-sheen{
+  position:absolute; inset:0; border-radius:inherit;
+  background: linear-gradient(110deg, rgba(255,255,255,.0) 0%, rgba(255,255,255,.18) 45%, rgba(255,255,255,.0) 60%);
+  transform: translateX(-120%);
+}
+.shuffle-egg.is-pickable:hover .egg-sheen{ animation: sheen 1200ms ease forwards; }
+@keyframes sheen{
+  100%{ transform: translateX(120%); }
+}
+
+.egg-body{
+  width:58px; height:76px; border-radius:52% 52% 46% 46%;
+  background:
+    radial-gradient(120% 80% at 30% 20%, rgba(255,255,255,.85), rgba(255,255,255,0) 36%),
+    radial-gradient(80% 110% at 50% 60%, #ffde59, #ffb74d 70%, #c77b2d 100%);
+  box-shadow: 0 2px 8px rgba(0,0,0,.35) inset, 0 0 0 1px rgba(255,255,255,.08);
+}
+.shuffle-egg.is-pickable:hover .egg-body{ animation: wobble .7s ease-in-out; }
+
+.egg-shadow{
+  position:absolute; bottom:-12px; width:64px; height:12px;
+  background: radial-gradient(60% 80% at 50% 50%, rgba(0,0,0,.45), rgba(0,0,0,0) 70%);
+  filter: blur(2px); border-radius:999px;
+}
+
+/* click shake */
+.shuffle-egg.is-shaking { animation: pop .25s ease; }
+
+/* ---------- Local Prize Overlay (no impact elsewhere) ---------- */
+.prize-overlay{
+  position: fixed; inset:0; z-index: 60;
+  display:grid; place-items:center;
+  background: rgba(6,10,18,.55);
+  backdrop-filter: blur(4px);
+}
+.prize-card{
+  position:relative;
+  width: 420px; max-width: 92vw;
+  border-radius: 16px;
+  padding: 20px;
+  text-align:center;
+  color: #d6e1ff;
+  background: radial-gradient(120% 120% at 50% 0%, #162036 0%, #0e1830 55%, #0b1427 100%);
+  border: 1px solid rgba(255,255,255,.08);
+  box-shadow: 0 20px 50px rgba(0,0,0,.55), 0 2px 0 rgba(255,255,255,.06) inset;
+}
+.prize-title{ font-size:14px; letter-spacing:.12em; text-transform:uppercase; color:#8aa2d8; }
+.prize-label{ font-size:22px; font-weight:700; margin-top:6px; }
+.prize-sub{ margin-top:8px; color:#a7b5d4; }
+.prize-crate{ display:block; margin:14px auto 0 auto; filter: drop-shadow(0 8px 20px rgba(0,0,0,.4)); }
+
+/* celebratory ring */
+.prize-burst{
+  position:absolute; inset:-2px; border-radius:16px; pointer-events:none;
+  background: radial-gradient(120% 80% at 50% 0%, rgba(108, 255, 194, .12), rgba(0,0,0,0) 60%);
+  animation: burst 800ms ease-out forwards;
+}
+@keyframes burst{
+  0%{ opacity:0; transform: scale(.96); }
+  40%{ opacity:1; transform: scale(1.02); }
+  100%{ opacity:.6; transform: scale(1); }
+}
+
+/* If your file already defines these keyframes, keep only one copy. */
+@keyframes pop{
+  0%{ transform:translateX(-50%) scale(.95); opacity:.9 }
+  100%{ transform:translateX(-50%) scale(1); opacity:1 }
+}
+@keyframes wobble{
+  15%,100%{ transform: translateX(-50%) rotate(0) }
+  25%{ transform: translateX(-50%) rotate(-6deg) }
+  35%{ transform: translateX(-50%) rotate(6deg) }
+  45%{ transform: translateX(-50%) rotate(-4deg) }
+  65%{ transform: translateX(-50%) rotate(4deg) }
+  75%{ transform: translateX(-50%) rotate(-2deg) }
+  90%{ transform: translateX(-50%) rotate(2deg) }
+}
