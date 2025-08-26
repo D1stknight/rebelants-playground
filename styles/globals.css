@@ -147,3 +147,48 @@ body { @apply bg-slate-950 text-slate-100; }
 
 /* 3D card sizing */
 .exp-card canvas { width: 100% !important; height: 340px !important; border-radius: 12px; }
+
+/* ===== Expedition 3D layout ===== */
+.exp-wrap { padding: 12px 12px 18px; }
+.exp-stage {
+  position: relative;
+  height: 260px;           /* stage height */
+  border-radius: 10px;
+  background: linear-gradient(180deg, #0f1a2b 0%, #0a1220 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+  overflow: hidden;
+}
+.exp-canvas {
+  position: absolute;
+  inset: 0;               /* fill the stage */
+}
+.exp-ui {
+  position: absolute;
+  left: 0; right: 0; bottom: 14px;
+  display: flex; align-items: center; gap: 10px;
+  justify-content: center;
+  pointer-events: none;   /* clicks pass through */
+}
+.exp-bar {
+  width: 72%;
+  height: 8px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.exp-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #22d3ee, #60a5fa, #f59e0b);
+  box-shadow: 0 0 12px rgba(34,211,238,0.5);
+  transition: width 120ms linear;
+}
+.exp-pct {
+  min-width: 44px;
+  text-align: right;
+  color: #cbd5e1;
+  font-size: 12px;
+}
+@media (min-width: 900px) {
+  .exp-stage { height: 300px; }
+}
