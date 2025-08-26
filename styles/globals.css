@@ -204,3 +204,57 @@ body { @apply bg-slate-950 text-slate-100; }
 .egg-card { position: absolute; top: 48px; z-index: 25; pointer-events: auto; }
 .egg-body.always-wobble { animation: wobble 2.6s ease-in-out infinite; opacity: .98; }
 .egg-card.can-pick .egg-body.always-wobble { animation-duration: 1.4s; }
+
+/* --- Shuffle essentials (cannot be clipped/hide button) --- */
+.shuffle-scene { position: relative; z-index: 20; overflow: hidden; height: 260px; }
+.shuffle-cta { position: relative; z-index: 21; margin-top: 12px; }
+
+/* Stage + rails */
+.ant-scene .strip { position:absolute; left:10%; right:10%; top:48%; height:56px;
+  background: linear-gradient(180deg, rgba(18,37,69,.6), rgba(10,20,36,.7));
+  border-radius: 10px; box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 10px 40px rgba(0,0,0,.35);
+}
+.ant-scene .rail { position:absolute; left:12%; right:12%; height:6px; border-radius: 4px;
+  background: linear-gradient(90deg,#85e0ff,#78ffa1,#ffe15a,#ff8a42);
+  opacity:.85; filter:saturate(1.1) contrast(1.05);
+  box-shadow: 0 0 10px rgba(120,255,200,.25);
+}
+.ant-scene .rail-top { top: 60%; }
+.ant-scene .rail-bottom { bottom: 16%; opacity:.35; }
+
+/* Egg cards */
+.egg-card { position:absolute; width: 120px; height: 150px; border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(0,0,0,.15));
+  border: 1px solid rgba(200,220,255,.12);
+  display:grid; place-items:center; transform: translateX(-50%); /* center on left% */
+  transition: left .28s ease-in-out, top .28s ease-in-out, transform .2s ease-in-out;
+  z-index: 25; cursor: default; pointer-events: none; /* default: not clickable */
+}
+.egg-card.can-pick { cursor: pointer; pointer-events: auto; }
+.egg-card:hover { transform: translateX(-50%) translateY(-2px); }
+
+/* Egg body look */
+.egg-body { width: 64px; height: 86px; border-radius: 46px 46px 40px 40px / 55px 55px 32px 32px;
+  background: radial-gradient(60% 50% at 40% 30%, #ffe56b, #ffb500 65%, #d27a00 100%);
+  box-shadow: inset 0 -6px 12px rgba(0,0,0,.25), inset 0 16px 16px rgba(255,255,255,.25), 0 8px 30px rgba(255,210,80,.18);
+}
+.egg-shadow { width: 70px; height: 12px; border-radius: 50%; filter: blur(3px); opacity:.35;
+  background: radial-gradient(60% 60% at 50% 40%, rgba(0,0,0,.35), transparent 70%);
+  position:absolute; bottom: 18px;
+}
+.egg-speckle { position:absolute; right: 12px; top: 24px; width: 10px; height:10px; border-radius:50%;
+  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,.7), transparent 70%);
+  opacity:.6;
+}
+
+/* Subtle wobble when pickable */
+@keyframes wobble {
+  15%,100% { transform: translateX(-50%) rotate(0); }
+  25% { transform: translateX(-50%) rotate(-4deg); }
+  45% { transform: translateX(-50%) rotate(4deg); }
+  65% { transform: translateX(-50%) rotate(3deg); }
+  75% { transform: translateX(-50%) rotate(-2deg); }
+  90% { transform: translateX(-50%) rotate(1deg); }
+}
+.egg-body.always-wobble { animation: wobble 2.6s ease-in-out infinite; opacity:.98; }
+.egg-card.can-pick .egg-body.always-wobble { animation-duration: 1.45s; }
