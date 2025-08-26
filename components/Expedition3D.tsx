@@ -1,200 +1,214 @@
-// components/Expedition3D.tsx
-'use client'
-// @ts-nocheck
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import * as THREE from 'three';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { Html } from '@react-three/drei';
 
-import React, { useRef, useState, useMemo } from 'react'
-import { Canvas, useFrame } from '@react-three/fiber'
-import { Environment, Float, Html } from '@react-three/drei'
-import * as THREE from 'three'
-import PrizeModal from './PrizeModal'
+type Prize =
+  | { type: 'crate'; label: 'Common Crate' | 'Rare Crate' | 'Ultra Loot Crate'; rarity: 'common' | 'rare' | 'ultra' }
+  | { type: 'none'; label: 'Nothing this time' };
 
-/** ------- Simple prize fetch (reuses your existing API) ------- */
-async function getPrize(seed: string) {
-  const res = await fetch('/api/expedition', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ seed })
-  })
-  return res.json()
-}
+type ModalState = { title: string; text?: string } | null;
 
-/** ------- 3D Ant made from simple shapes (placeholder until GLB) ------- */
-function SamuraiAnt({ running, progress }) {
-  const group = useRef()
-  const t = useRef(0)
+/** ---------- Tiny 3D Samurai Ant made from simple meshes (placeholder until GLB) ---------- */
+type SamuraiAntProps = { running: boolean; progress: number };
+function SamuraiAnt({ running, progress }: SamuraiAntProps) {
+  const group = useRef<THREE.Group>(null!);
+  const bob = useRef(0);
 
-  useFrame((_, delta) => {
-    t.current += delta * (running ? 6 : 1)
-    if (!group.current) return
+  // body pieces
+  const mats = useMemo(() => {
+    return {
+      body: new THREE.MeshStandardMaterial({ color: 0x7a4b21, metalness: 0.2, roughness: 0.7 }),
+      eye: new THREE.MeshStandardMaterial({ color: 0xff3a2f, emissive: 0x7a140f, emissiveIntensity: 0.7 }),
+      cloth: new THREE.MeshStandardMaterial({ color: 0x2f6fff, metalness: 0.1, roughness: 0.9 }),
+      sword: new THREE.MeshStandardMaterial({ color: 0x999999, metalness: 0.8, roughness: 0.25 })
+    };
+  }, []);
 
-    // Bob + tiny tilt to feel alive
-    const bob = Math.sin(t.current * 6) * 0.06
-    group.current.position.y = 0.22 + bob
-    group.current.rotation.z = Math.sin(t.current * 2) * 0.06
+  const geom = useMemo(() => {
+    return {
+      head: new THREE.SphereGeometry(0.35, 24, 24),
+      eye: new THREE.SphereGeometry(0.09, 16, 16),
+      torso: new THREE.SphereGeometry(0.28, 18, 18),
+      limb: new THREE.CapsuleGeometry(0.06, 0.24, 8, 16),
+      sword: new THREE.BoxGeometry(0.5, 0.03, 0.03),
+      handle: new THREE.CylinderGeometry(0.04, 0.04, 0.15, 12)
+    };
+  }, []);
 
-    // Move across X from -1.9 → 1.9
-    const x = THREE.MathUtils.lerp(-1.9, 1.9, progress)
-    group.current.position.x = x
-  })
+  useFrame((_state, delta) => {
+    // subtle breathing / bobbing
+    bob.current += delta * (running ? 6 : 2);
+    const y = Math.sin(bob.current) * 0.03 + (running ? 0.02 : 0);
+    if (group.current) {
+      group.current.position.y = y;
+      // run wobble
+      const wobble = running ? Math.sin(bob.current * 2) * 0.15 : 0;
+      group.current.rotation.z = wobble;
+    }
+  });
+
+  // horizontal position follows progress (0..1) inside the canvas logical width
+  useEffect(() => {
+    if (!group.current) return;
+    // canvas scene is -3..3 on X; keep ant inside ~[-2.6, 2.6]
+    const min = -2.6;
+    const max = 2.6;
+    const x = min + (max - min) * progress;
+    group.current.position.x = x;
+  }, [progress]);
 
   return (
-    <group ref={group} position={[-1.9, 0.22, 0]} castShadow>
-      {/* Body */}
-      <mesh castShadow>
-        <sphereGeometry args={[0.18, 32, 32]} />
-        <meshStandardMaterial color={'#ffb257'} metalness={0.1} roughness={0.45} />
+    <group ref={group} position={[-2.6, 0, 0]}>
+      {/* head */}
+      <mesh geometry={geom.head} material={mats.body} position={[0, 0.55, 0]} />
+      {/* eyes */}
+      <mesh geometry={geom.eye} material={mats.eye} position={[-0.13, 0.55, 0.28]} />
+      <mesh geometry={geom.eye} material={mats.eye} position={[0.13, 0.55, 0.28]} />
+      {/* antennae */}
+      <mesh material={mats.body} position={[-0.2, 0.95, 0]}>
+        <cylinderGeometry args={[0.02, 0.02, 0.45, 10]} />
+        <meshStandardMaterial color={0x7a4b21} />
+      </mesh>
+      <mesh material={mats.body} position={[0.2, 0.95, 0]}>
+        <cylinderGeometry args={[0.02, 0.02, 0.45, 10]} />
+        <meshStandardMaterial color={0x7a4b21} />
       </mesh>
 
-      {/* Head */}
-      <mesh position={[0.0, 0.22, 0]} castShadow>
-        <sphereGeometry args={[0.14, 32, 32]} />
-        <meshStandardMaterial color={'#ffb257'} metalness={0.1} roughness={0.45} />
-      </mesh>
+      {/* torso / gi */}
+      <mesh geometry={geom.torso} material={mats.cloth} position={[0, 0.2, 0]} />
+      {/* arms (swing when running) */}
+      <group position={[0, 0.25, 0]} rotation={[0, 0, Math.sin(bob.current) * 0.2]}>
+        <mesh geometry={geom.limb} material={mats.body} position={[-0.35, 0, 0]} rotation={[0, 0, 0.9]} />
+        <mesh geometry={geom.limb} material={mats.body} position={[0.35, 0, 0]} rotation={[0, 0, -0.9]} />
+      </group>
 
-      {/* Kimono (torso wrap) */}
-      <mesh position={[0, 0.02, 0]}>
-        <cylinderGeometry args={[0.16, 0.2, 0.22, 24]} />
-        <meshStandardMaterial color={'#3c6ff7'} metalness={0} roughness={0.8} />
-      </mesh>
+      {/* legs */}
+      <mesh geometry={geom.limb} material={mats.body} position={[-0.12, -0.15, 0]} rotation={[0, 0, 0.2]} />
+      <mesh geometry={geom.limb} material={mats.body} position={[0.12, -0.15, 0]} rotation={[0, 0, -0.2]} />
 
-      {/* Katana on back */}
-      <mesh position={[0.08, 0.23, -0.05]} rotation={[Math.PI * 0.07, 0.2, -0.2]}>
-        <boxGeometry args={[0.02, 0.36, 0.02]} />
-        <meshStandardMaterial color={'#222'} />
-      </mesh>
-      <mesh position={[0.0, 0.23, -0.07]} rotation={[Math.PI * 0.07, 0.15, 0.1]}>
-        <boxGeometry args={[0.02, 0.34, 0.02]} />
-        <meshStandardMaterial color={'#222'} />
-      </mesh>
-
-      {/* Legs (6 quick cylinders that wiggle while running) */}
-      {[ -0.12, -0.06, 0.0, 0.06, 0.12, 0.18 ].map((x, i) => (
-        <Leg key={i} x={x} running={running} phase={i * 0.5} />
-      ))}
+      {/* katana on back */}
+      <mesh geometry={geom.sword} material={mats.sword} position={[0, 0.45, -0.2]} rotation={[0, 0.8, 0.1]} />
+      <mesh geometry={geom.handle} material={mats.sword} position={[-0.2, 0.4, -0.22]} rotation={[0, 0, Math.PI / 2]} />
     </group>
-  )
+  );
 }
 
-function Leg({ x = 0, running, phase = 0 }) {
-  const ref = useRef()
-  useFrame((_, delta) => {
-    if (!ref.current) return
-    const t = performance.now() / 1000 + phase
-    const a = running ? Math.sin(t * 12) * 0.55 : 0
-    ref.current.rotation.x = -Math.PI / 2 + a
-  })
+/** ---------- Ground + progress rail ---------- */
+function Rail({ progress }: { progress: number }) {
+  const rail = useRef<THREE.Mesh>(null!);
+  const glow = useRef<THREE.Mesh>(null!);
+
+  useEffect(() => {
+    if (!glow.current) return;
+    // scale glow along X based on progress
+    glow.current.scale.x = Math.max(0.001, progress);
+    // move origin so it fills left-to-right
+    glow.current.position.x = -2.6 + 5.2 * (progress / 2);
+  }, [progress]);
+
   return (
-    <mesh ref={ref} position={[x, 0.02, 0.1]} castShadow>
-      <cylinderGeometry args={[0.015, 0.01, 0.26, 10]} />
-      <meshStandardMaterial color={'#2a2222'} roughness={0.6} />
-    </mesh>
-  )
-}
-
-/** ------- Track, glow, markers ------- */
-function Track() {
-  return (
-    <group>
-      {/* Base slab */}
-      <mesh position={[0, 0, 0]} receiveShadow>
-        <boxGeometry args={[4.2, 0.04, 0.62]} />
-        <meshStandardMaterial color={'#0f1a2d'} roughness={0.95} />
+    <group position={[0, -0.75, 0]}>
+      <mesh ref={rail} position={[0, 0, 0]}>
+        <boxGeometry args={[5.2, 0.06, 0.2]} />
+        <meshStandardMaterial color={0x2a3344} roughness={0.9} />
       </mesh>
-
-      {/* Emissive line */}
-      <mesh position={[0, 0.025, 0]}>
-        <boxGeometry args={[4.0, 0.01, 0.04]} />
-        <meshStandardMaterial color={'#0ff'} emissive={'#00d9ff'} emissiveIntensity={1.2} />
+      <mesh ref={glow} position={[-2.6, 0.01, 0]}>
+        <boxGeometry args={[5.2, 0.04, 0.18]} />
+        <meshStandardMaterial color={0x22cc88} emissive={0x22cc88} emissiveIntensity={0.8} />
       </mesh>
-
-      {/* Markers */}
-      {[-1.4, -0.35, 0.7, 1.75].map((x, i) => (
-        <mesh key={i} position={[x, 0.03, 0]}>
-          <cylinderGeometry args={[0.03, 0.03, 0.02, 18]} />
-          <meshStandardMaterial color={'#7ef7c1'} emissive={'#7ef7c1'} emissiveIntensity={0.6} />
-        </mesh>
-      ))}
     </group>
-  )
+  );
 }
 
-/** ------- Scene container ------- */
+/** ---------- The 3D scene canvas ---------- */
 function ExpeditionScene({ running, progress }: { running: boolean; progress: number }) {
   return (
     <Canvas
-      shadows
-      camera={{ position: [0, 1.4, 3.4], fov: 40 }}
+      camera={{ position: [0, 0.6, 4], fov: 45 }}
+      style={{ width: '100%', height: 260, borderRadius: 12 }}
       gl={{ antialias: true }}
-      style={{ width: '100%', height: 340, borderRadius: 12 }}
     >
-      {/* soft background */}
-      <color attach="background" args={['#0a1220']} />
-      <fog attach="fog" args={['#0a1220', 6, 12]} />
-
       {/* lights */}
-      <ambientLight intensity={0.35} />
-      <directionalLight
-        position={[4, 5, 3]}
-        intensity={1.1}
-        castShadow
-        shadow-mapSize={[1024, 1024]}
-      />
-      <hemisphereLight color={'#7ab8ff'} groundColor={'#09111d'} intensity={0.4} />
+      <hemisphereLight args={[0x88aaff, 0x223355, 0.6]} />
+      <directionalLight position={[3, 3, 3]} intensity={1.2} />
+      <directionalLight position={[-3, 2, 1]} intensity={0.3} />
 
-      {/* ground */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.001, 0]} receiveShadow>
-        <planeGeometry args={[30, 30]} />
-        <meshStandardMaterial color={'#0b1526'} roughness={1} metalness={0} />
+      {/* background plane with soft gradient */}
+      <mesh position={[0, 0, -1]}>
+        <planeGeometry args={[8, 3]} />
+        <meshBasicMaterial color={0x0f1623} />
       </mesh>
 
-      <Float floatIntensity={0.2} rotationIntensity={0.02}>
-        <Track />
-      </Float>
-
+      <Rail progress={progress} />
       <SamuraiAnt running={running} progress={progress} />
 
-      {/* soft environment */}
-      <Environment preset="city" />
+      {/* HUD % label */}
+      <Html position={[0, 0.95, 0]} center>
+        <div style={{ color: '#cbd5e1', fontSize: 12, fontFamily: 'Inter, system-ui, sans-serif' }}>
+          {Math.round(progress * 100)}%
+        </div>
+      </Html>
     </Canvas>
-  )
+  );
 }
 
-/** ------- UI wrapper reusing your modal ------- */
+/** ---------- UI wrapper + game logic ---------- */
 export default function Expedition3D() {
-  const [busy, setBusy] = useState(false)
-  const [progress, setProgress] = useState(0)    // 0..1 for the 3D scene
-  const [modal, setModal] = useState<{ title: string; text?: string; rarity?: 'common'|'rare'|'ultra' } | null>(null)
-  const seed = useMemo(() => 'guest-' + Math.random().toString(36).slice(2, 8), [])
+  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [seed] = useState('guest-' + Math.random().toString(36).slice(2, 8));
+  const [modal, setModal] = useState<ModalState>(null);
 
   async function run() {
-    if (busy) return
-    setBusy(true)
-    setModal(null)
-    setProgress(0)
+    if (busy) return;
+    setBusy(true);
+    setModal(null);
+    setProgress(0);
 
-    const duration = 5_000 // 5s
-    const start = performance.now()
+    // simple 5s tween (60fps-ish)
+    const start = performance.now();
+    const duration = 5200;
+    let raf = 0;
+    const tick = (t: number) => {
+      const e = Math.min(1, (t - start) / duration);
+      // ease in-out
+      const eased = 0.5 - 0.5 * Math.cos(Math.PI * e);
+      setProgress(eased);
+      if (e < 1) {
+        raf = requestAnimationFrame(tick);
+      }
+    };
+    raf = requestAnimationFrame(tick);
 
-    // animate locally
-    const step = () => {
-      const now = performance.now()
-      const t = Math.min(1, (now - start) / duration)
-      setProgress(t)
-      if (t < 1) requestAnimationFrame(step)
+    // call API while the animation runs
+    let prize: Prize = { type: 'none', label: 'Nothing this time' };
+    try {
+      const res = await fetch('/api/expedition', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ seed })
+      }).then((r) => r.json());
+      prize = res?.prize ?? prize;
+    } catch (e) {
+      // ignore network errors (show "nothing this time")
     }
-    requestAnimationFrame(step)
 
-    // wait for duration, then get prize
-    await new Promise(r => setTimeout(r, duration + 100))
-    const result = await getPrize(seed)
-    const p = result?.prize
+    // wait to finish bar
+    await new Promise((r) => setTimeout(r, duration));
+    cancelAnimationFrame(raf);
+    setProgress(1);
 
-    if (p?.type === 'crate') {
-      setModal({ title: p.label, rarity: p.rarity })
+    if (prize.type === 'crate') {
+      setModal({ title: prize.label });
     } else {
-      setModal({ title: 'Nothing this time', text: 'Try again soon!' })
+      setModal({ title: 'Nothing this time' });
     }
-    setBusy(false)
+
+    // small reset pause
+    await new Promise((r) => setTimeout(r, 600));
+    setProgress(0);
+    setBusy(false);
   }
 
   return (
@@ -202,21 +216,25 @@ export default function Expedition3D() {
       <h2 className="title mb-2">Colony Forage Expedition</h2>
       <p className="subtitle mb-4">Send a samurai ant on a longer run. 5-second expedition with bigger rewards.</p>
 
-      <div className="exp-card">
+      <div className="overflow-hidden rounded-xl border border-slate-800">
         <ExpeditionScene running={busy} progress={progress} />
       </div>
 
-      <button className="btn btn-primary mt-4" onClick={run} disabled={busy}>
-        {busy ? 'Marching…' : 'Start Expedition'}
+      <button disabled={busy} onClick={run} className="btn btn-primary mt-5">
+        {busy ? 'Exploring…' : 'Start Expedition'}
       </button>
 
       {modal && (
-        <PrizeModal
-          title={modal.title}
-          rarity={modal.rarity}
-          onClose={() => setModal(null)}
-        />
+        <div className="modal" onClick={() => setModal(null)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <h3 className="title mb-1">You found:</h3>
+            <p className="subtitle">{modal.title}</p>
+            <button className="btn mt-4" onClick={() => setModal(null)}>
+              Close
+            </button>
+          </div>
+        </div>
       )}
     </section>
-  )
+  );
 }
