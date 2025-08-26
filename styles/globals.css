@@ -144,3 +144,6 @@ body { @apply bg-slate-950 text-slate-100; }
 /* modal */
 .modal{ position:fixed; inset:0; background:rgba(0,0,0,.65); display:grid; place-items:center; z-index:50; }
 .modal-card{ background:#0b1222; border:1px solid #1f2937; padding:18px; border-radius:12px; width:320px; text-align:center; }
+
+/* 3D card sizing */
+.exp-card canvas { width: 100% !important; height: 340px !important; border-radius: 12px; }
