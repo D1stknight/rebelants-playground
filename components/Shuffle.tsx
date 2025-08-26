@@ -1,70 +1,46 @@
-import React, { useState } from 'react';
-import PrizeModal from './PrizeModal';
+import React, { useState } from 'react'
+import PrizeModal from './PrizeModal'
 
-const crateImg: Record<'common'|'rare'|'ultra', string> = {
-  common: '/crates/common.png',
-  rare: '/crates/rare.png',
-  ultra: '/crates/ultra.png',
-};
+type Result = { ok:boolean; prizeLabel?:string; rarity?: 'common'|'rare'|'ultra'|null }
+
+function EggCard({ index, onPick }:{ index:number; onPick:(i:number)=>void }) {
+  return (
+    <button onClick={() => onPick(index)} className="egg-card group">
+      <div className="egg group-hover:wobble" aria-hidden />
+    </button>
+  )
+}
 
 export default function Shuffle() {
-  const [busy, setBusy] = useState(false);
-  const [modal, setModal] = useState<{open:boolean; label:string; sub?:string; rarity?:'common'|'rare'|'ultra'}>({open:false, label:''});
-  const [pick, setPick] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false)
+  const [modal, setModal] = useState({ open:false, label:'', sub:'' })
 
-  async function choose(i: number) {
-    if (busy) return;
-    setBusy(true);
-    setPick(i);
+  async function pick(i:number) {
+    if (busy) return
+    setBusy(true)
     try {
-      const res = await fetch('/api/spin', { method:'POST' }).then(r => r.json());
-      const p = res.prize as { type:'crate'|'none'; label:string; rarity?:'common'|'rare'|'ultra' };
-      if (p.type === 'crate') {
-        setModal({ open:true, label:p.label, sub:p.rarity?.toUpperCase(), rarity:p.rarity });
+      const res = await fetch('/api/spin', { method:'POST' })
+      const data:Result = await res.json()
+      if (data.ok) {
+        setModal({ open:true, label: data.prizeLabel ?? 'You found something!', sub: data.rarity ? `Rarity: ${data.rarity}` : '' })
       } else {
-        setModal({ open:true, label:'Nothing this time' });
+        setModal({ open:true, label:'Nothing this time', sub:'Try again soon.' })
       }
     } finally {
-      setBusy(false);
-      setTimeout(() => setPick(null), 600);
+      setBusy(false)
     }
   }
 
   return (
-    <section className="ant-card relative overflow-hidden">
-      <header className="mb-4">
-        <h2 className="title">Queen&apos;s Egg Shuffle</h2>
-        <p className="subtitle">Three eggs. Pick one. Flip for a prize.</p>
-      </header>
+    <section className="ant-card">
+      <h2 className="title">Queen&apos;s Egg Shuffle</h2>
+      <p className="subtitle mb-3">Three eggs. Pick one. Flip for a prize.</p>
 
-      <div className="flex items-center justify-center gap-6 py-8">
-        {[0,1,2].map(i => (
-          <button
-            key={i}
-            disabled={busy}
-            onClick={() => choose(i)}
-            className={`w-20 h-28 rounded-xl bg-slate-900/60 border border-slate-700 shadow-lg transition
-                        ${pick === i ? 'animate-wobble scale-105' : 'hover:scale-[1.03]'}`}
-          >
-            <div className="mx-auto mt-6 w-7 h-7 rounded-full bg-yellow-400 shadow" />
-          </button>
-        ))}
+      <div className="flex gap-6">
+        {[0,1,2].map(i => <EggCard key={i} index={i} onPick={pick} />)}
       </div>
 
-      <PrizeModal
-        open={modal.open}
-        onClose={() => setModal({ ...modal, open:false })}
-        label={modal.label}
-        sub={modal.sub}
-      >
-        {modal.rarity ? (
-          <img
-            src={crateImg[modal.rarity]}
-            alt={modal.rarity}
-            className="mx-auto mt-4 w-28"
-          />
-        ) : null}
-      </PrizeModal>
+      <PrizeModal open={modal.open} onClose={() => setModal(m => ({...m, open:false}))} label={modal.label} sub={modal.sub} />
     </section>
-  );
+  )
 }
