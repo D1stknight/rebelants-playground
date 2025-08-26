@@ -1,56 +1,42 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 
 type PrizeDetail = { label: string; sub?: string; rarity?: 'common'|'rare'|'ultra' | null }
 
 function showPrize(detail: PrizeDetail) {
-  // If you added PrizeModalHost earlier, it listens for this event:
   if (typeof window !== 'undefined') {
+    // If PrizeModalHost exists it will catch this. Otherwise we'll alert below.
     window.dispatchEvent(new CustomEvent('prize:show', { detail }))
-  } else {
-    // Build-time precaution
-    console.log('Prize:', detail)
-  }
-}
-
-/* Utility to emit fallback if host not present */
-function showPrizeWithFallback(detail: PrizeDetail) {
-  try {
-    showPrize(detail)
-  } catch (e) {
-    alert(`${detail.label}${detail.sub ? '\n' + detail.sub : ''}`)
   }
 }
 
 export default function Shuffle() {
-  // 3 slots across the row: indices 0,1,2
-  const [slots, setSlots] = useState<[number, number, number]>([0, 1, 2]) // which egg sits in each slot
-  const [shuffling, setShuffling] = useState(false)
+  // slots = which eggId sits at each slot index (0..2)
+  // start left→right: slot0=egg0, slot1=egg1, slot2=egg2
+  const [slots, setSlots] = useState<[number, number, number]>([0, 1, 2])
+  const [isShuffling, setIsShuffling] = useState(false)
   const [canPick, setCanPick] = useState(false)
-  const [seed] = useState('guest-' + Math.random().toString(36).slice(2, 8))
   const [shakeIdx, setShakeIdx] = useState<number | null>(null)
+  const [seed] = useState('guest-' + Math.random().toString(36).slice(2, 8))
 
-  // absolute positions (in %) for the centers of the 3 columns
-  const positions = useMemo(() => [8, 42, 76], [])
+  // fixed visual x-positions for slots
+  const positions = useMemo(() => [10, 45, 80], [])
 
-  // runs the shell shuffle animation
-  async function runShuffle() {
-    if (shuffling) return
+  async function startShuffle() {
+    if (isShuffling) return
     setCanPick(false)
-    setShuffling(true)
+    setIsShuffling(true)
 
-    // Start from a clean left->right mapping
+    // reset to ordered
     setSlots([0, 1, 2])
 
-    // number of swaps
     const swaps = Math.floor(10 + Math.random() * 5)
     for (let i = 0; i < swaps; i++) {
-      await new Promise((r) => setTimeout(r, 350 + Math.random() * 150))
+      await new Promise((r) => setTimeout(r, 320 + Math.random() * 120))
       setSlots((prev) => {
-        // choose two distinct indices to swap
+        // swap two slot positions
         let a = Math.floor(Math.random() * 3)
         let b = Math.floor(Math.random() * 3)
         while (b === a) b = Math.floor(Math.random() * 3)
-
         const next = [...prev] as [number, number, number]
         const tmp = next[a]
         next[a] = next[b]
@@ -59,18 +45,16 @@ export default function Shuffle() {
       })
     }
 
-    // tiny settle delay
-    await new Promise((r) => setTimeout(r, 350))
-    setShuffling(false)
+    await new Promise((r) => setTimeout(r, 300))
+    setIsShuffling(false)
     setCanPick(true)
   }
 
-  async function pickEgg(slotIndex: number) {
-    if (!canPick || shuffling) return
+  async function pick(slotIndex: number) {
+    if (!canPick || isShuffling) return
 
-    // click feedback: shake that egg
     setShakeIdx(slotIndex)
-    setTimeout(() => setShakeIdx(null), 750)
+    setTimeout(() => setShakeIdx(null), 700)
 
     try {
       const res = await fetch('/api/spin', {
@@ -79,73 +63,69 @@ export default function Shuffle() {
         body: JSON.stringify({ seed }),
       })
       const data = await res.json()
-
-      // your /api/spin returns something like: { ok:true, prizeLabel:string, rarity?:'common'|'rare'|'ultra' }
       const label = (data?.prizeLabel as string) || 'Nothing this time'
       const rarity = (data?.rarity as PrizeDetail['rarity']) ?? null
 
-      showPrizeWithFallback({
+      // try global modal first
+      showPrize({
         label,
         sub: rarity ? `Rarity: ${rarity}` : 'Better luck next time.',
         rarity,
       })
+
+      // fallback if no host is listening
+      setTimeout(() => {
+        // @ts-ignore
+        if (!window.__PRIZE_MODAL_HANDLED__) {
+          alert(`${label}${rarity ? `\nRarity: ${rarity}` : ''}`)
+        }
+      }, 50)
     } catch (e) {
-      showPrizeWithFallback({ label: 'Oops', sub: 'Network error. Try again.' })
+      alert('Network error. Try again.')
     } finally {
-      // let users shuffle again
-      setCanPick(false)
+      setCanPick(false) // must shuffle again for another pick
     }
   }
+
+  // We render by EGG id (0..2). For each egg, find which slot it currently occupies.
+  const eggs = [0, 1, 2]
 
   return (
     <div className="ant-card">
       <h2 className="title mb-2">Queen&apos;s Egg Shuffle</h2>
       <p className="subtitle mb-4">Three eggs. We shuffle. You pick one for a prize.</p>
 
-      <div className="shuffle-box">
-        {/* visual floor */}
-        <div className="shuffle-floor" />
+      <div className="shuffle-scene">
+        <div className="shuffle-bg" />
+        {/* (Optional) Queen silhouette – purely decorative */}
+        <div className="shuffle-queen" aria-hidden />
 
-        {/* Eggs */}
-        {[0, 1, 2].map((slotIndex) => {
-          // which logical egg sits in this slot? (not actually used for prize; purely visual)
-          const eggId = slots[slotIndex]
+        {/* Eggs (rendered by eggId; positioned by its slot index) */}
+        {eggs.map((eggId) => {
+          const slotIndex = slots.indexOf(eggId) // <-- THIS makes them actually move
+          const left = positions[slotIndex]
           return (
             <button
-              key={slotIndex}
+              key={eggId}
+              className={`shuffle-egg ${canPick ? 'is-pickable' : ''} ${shakeIdx === slotIndex ? 'is-shaking' : ''}`}
+              style={{ left: `${left}%` }}
               disabled={!canPick}
-              onClick={() => pickEgg(slotIndex)}
-              className={`egg-card ${canPick ? 'can-pick' : ''} ${shakeIdx === slotIndex ? 'wobble' : ''}`}
-              style={{
-                left: `${positions[slotIndex]}%`,
-                transition: 'transform 320ms ease, left 320ms ease',
-                // tiny z offset to help crossings look smooth
-                transform: `translateZ(0)`,
-              }}
+              onClick={() => pick(slotIndex)}
+              aria-label={`Pick egg ${eggId + 1}`}
             >
-              <div className="egg glossy group-hover:wobble" aria-label={`egg-${eggId}`} />
+              <div className="egg-body" />
               <div className="egg-shadow" />
             </button>
           )
         })}
+
+        {/* floor bar */}
+        <div className="shuffle-floor" />
       </div>
 
-      <div className="mt-4 flex gap-3">
-        <button
-          onClick={runShuffle}
-          disabled={shuffling}
-          className="btn"
-          title={shuffling ? 'Shuffling…' : 'Shuffle the eggs'}
-        >
-          {shuffling ? 'Shuffling…' : 'Shuffle'}
-        </button>
-        <button
-          onClick={() => setCanPick(true)}
-          disabled={shuffling || canPick}
-          className="btn"
-          title="Enable picking"
-        >
-          {canPick ? 'Pick enabled' : 'Enable Pick'}
+      <div className="mt-4">
+        <button className="btn" onClick={startShuffle} disabled={isShuffling}>
+          {isShuffling ? 'Shuffling…' : 'Shuffle'}
         </button>
       </div>
 
