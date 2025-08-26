@@ -190,13 +190,17 @@ body { @apply bg-slate-950 text-slate-100; }
 .egg-body.always-wobble { animation: wobble 2.6s ease-in-out infinite; opacity: .98; }
 .egg-card.can-pick .egg-body.always-wobble { animation-duration: 1.4s; }
 
-/* --- Shuffle click-through hardening --- */
+/* --- Shuffle click-through hardening (fixed button visibility) --- */
 .shuffle-wrap { position: relative; }
 .shuffle-scene { position: relative; z-index: 20; pointer-events: auto; }
-.shuffle-cta { position: relative; z-index: 1; }          /* button sits underneath */
 
-/* Only eggs accept clicks; decor ignores them */
+/* Button must sit ABOVE the card background but BELOW eggs (no overlap anyway). */
+.shuffle-cta { position: relative; z-index: 21; margin-top: 12px; pointer-events: auto; }
+
+/* Only eggs accept clicks; decorative layers ignore them */
 .sweep, .rail { pointer-events: none; }
+
+/* Eggs sit highest so clicks never reach the button */
 .egg-card { position: absolute; top: 48px; z-index: 25; pointer-events: auto; }
 .egg-body.always-wobble { animation: wobble 2.6s ease-in-out infinite; opacity: .98; }
 .egg-card.can-pick .egg-body.always-wobble { animation-duration: 1.4s; }
