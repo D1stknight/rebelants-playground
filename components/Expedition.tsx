@@ -19,9 +19,8 @@ export default function Expedition() {
 
   const sceneRef = useRef<HTMLDivElement>(null)
   const antRef = useRef<HTMLDivElement>(null)
-  const barRef = useRef<HTMLDivElement>(null)
 
-  // set ant travel distance precisely based on trail width
+  // set ant travel distance precisely based on trail width (CSS anim uses this value)
   useEffect(() => {
     const r = () => {
       const scene = sceneRef.current
@@ -30,7 +29,8 @@ export default function Expedition() {
       if (!scene || !ant || !trail) return
       const trailRect = trail.getBoundingClientRect()
       const antRect = ant.getBoundingClientRect()
-      const distance = trailRect.width - antRect.width
+      const distance = Math.max(0, trailRect.width - antRect.width)
+      // we move the ant with JS translate during the run for accuracy
       ant.style.setProperty('--travel', `${distance}px`)
     }
     r()
@@ -62,21 +62,26 @@ export default function Expedition() {
     setGlow(null)
     setW(0)
 
-    // enable scene animation
-    sceneRef.current?.classList.add('animating','running')
-    antRef.current?.classList.add('walk')
+    // enable scene animation & start the “march”
+    const scene = sceneRef.current
+    const ant = antRef.current
+    scene?.classList.add('animating','running')
 
-    // drive progress bar in ~5s
+    // drive progress & ant movement (~5.2s)
     const start = Date.now()
     const dur = 5200
+    const trail = scene?.querySelector('.trail') as HTMLDivElement | null
+    const travel = ant ? parseFloat(getComputedStyle(ant).getPropertyValue('--travel')) || 0 : 0
+
     const tick = () => {
       const t = Math.min(1, (Date.now() - start) / dur)
       setW(Math.round(t * 100))
+      if (ant) ant.style.transform = `translateX(${travel * t}px)`
       if (t < 1) requestAnimationFrame(tick)
     }
     requestAnimationFrame(tick)
 
-    // call API near the end
+    // ask the API
     let prize: Prize = { type:'none', label:'Nothing this time' }
     try {
       const res = await fetch('/api/expedition', {
@@ -94,15 +99,11 @@ export default function Expedition() {
     } catch (_) {}
 
     // finish the run
-    await new Promise(r => setTimeout(r, 5200))
-    sceneRef.current?.classList.remove('running')
-    antRef.current?.classList.remove('walk')
-    setW(100)
-
+    await new Promise(r => setTimeout(r, dur))
+    scene?.classList.remove('running')
     if (prize.type === 'crate') {
       setGlow(prize.rarity)
-      // confetti for rare/ultra
-      if (prize.rarity !== 'common' && sceneRef.current) confettiBurst(sceneRef.current)
+      if (prize.rarity !== 'common' && scene) confettiBurst(scene)
     }
     setModal(prize)
     setBusy(false)
@@ -115,6 +116,7 @@ export default function Expedition() {
 
       {/* Scene */}
       <div ref={sceneRef} className="exp-scene mb-4">
+        {/* fireflies */}
         <div className="fireflies">
           {Array.from({length:14}).map((_,i)=>(
             <i key={i} style={{
@@ -128,34 +130,15 @@ export default function Expedition() {
         <div className="hills"></div>
         <div className="trail"></div>
 
-        {/* Ant */}
+        {/* Ant — Rebel Ant Samurai */}
         <div ref={antRef} className="ant" aria-hidden="true">
-          {/* SVG ant (eyes, body, legs) */}
-          <svg viewBox="0 0 40 24" width="40" height="24">
-            <g fill="#f9a13a">
-              <circle cx="12" cy="12" r="6"/>
-              <ellipse cx="22" cy="12" rx="7" ry="6"/>
-              <ellipse cx="31" cy="12" rx="6" ry="5"/>
-            </g>
-            <g stroke="#f9a13a" strokeWidth="2" className="legs">
-              <line x1="10" y1="16" x2="6" y2="22"/>
-              <line x1="14" y1="16" x2="18" y2="22"/>
-              <line x1="22" y1="16" x2="20" y2="22"/>
-              <line x1="26" y1="16" x2="30" y2="22"/>
-              <line x1="30" y1="16" x2="36" y2="22"/>
-            </g>
-            <g stroke="#f9a13a" strokeWidth="1.6" fill="none">
-              <path d="M8 7 Q4 2 2 2"/>
-              <path d="M8 7 Q6 2 12 2"/>
-            </g>
-            <circle cx="33" cy="10.5" r="1.2" fill="#1a2135"/>
-          </svg>
+          <img src="/ant-samurai.svg" alt="Rebel Ant Samurai" className="w-16 h-16 animate-bounce-slow" />
         </div>
       </div>
 
       {/* Progress + CTA */}
       <div className="exp-bar mb-3">
-        <div ref={barRef} className="bar-fill" style={{ width: `${w}%` }} />
+        <div className="bar-fill" style={{ width: `${w}%` }} />
       </div>
       <button className="btn" disabled={busy} onClick={run}>
         {busy ? 'Marching...' : 'Start Expedition'}
