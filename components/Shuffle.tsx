@@ -1,175 +1,149 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
-type Phase = 'idle' | 'shuffling' | 'pick' | 'reveal';
-type Rarity = 'common' | 'rare' | 'ultra' | null;
-type PrizePayload = { ok: boolean; prizeLabel?: string; rarity?: Rarity; nextPlayableAt?: number | null; error?: string };
+// Small helper: wait ms
+const wait = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-function showPrize(label: string, rarity: Rarity) {
-  window.dispatchEvent(new CustomEvent('prize:show', { detail: { label, type: 'crate', rarity } }));
-}
+type Phase = 'idle' | 'shuffling' | 'pick' | 'revealed';
 
 export default function Shuffle() {
   const [phase, setPhase] = useState<Phase>('idle');
-  const [progress, setProgress] = useState(0);
-  const [positions, setPositions] = useState<number[]>([0, 1, 2]); // eggIdx -> slotIdx
-  const [slotCenters, setSlotCenters] = useState<number[]>([0, 0, 0]);
+  const [order, setOrder] = useState<number[]>([0, 1, 2]);   // visual order
+  const [canPick, setCanPick] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const sceneRef = useRef<HTMLDivElement>(null);
 
-  const sceneRef = useRef<HTMLDivElement | null>(null);
-  const swapTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-  const progTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pickingLock = useRef(false);
+  // layout: three fixed lanes we reuse no matter the order
+  const lanes = useMemo(
+    () => [
+      { left: '8%',  top: '58%' },
+      { left: '45%', top: '58%' },
+      { left: '82%', top: '58%' }
+    ],
+    []
+  );
 
-  // layout: compute 3 card centers
-  useEffect(() => {
-    const layout = () => {
-      const el = sceneRef.current;
-      if (!el) return;
-      const w = el.clientWidth;
-      const cardW = 120;
-      const pad = 32;
-      const usable = Math.max(0, w - pad * 2);
-      const gap = (usable - cardW * 3) / 2;
-      const first = pad + cardW / 2;
-      setSlotCenters([first, first + cardW + gap, first + (cardW + gap) * 2]);
-    };
-    layout();
-    const r = () => layout();
-    window.addEventListener('resize', r);
-    return () => window.removeEventListener('resize', r);
-  }, []);
-
-  function clearTimers() {
-    if (swapTimer.current) { clearInterval(swapTimer.current); swapTimer.current = null; }
-    if (progTimer.current) { clearInterval(progTimer.current); progTimer.current = null; }
-  }
-
-  function start() {
-    if (phase !== 'idle') return;
-
+  // shuffle animation: swaps indexes quickly then slows down
+  const runShuffle = async () => {
+    if (busy) return;
+    setBusy(true);
     setPhase('shuffling');
-    setProgress(0);
-    pickingLock.current = false;
+    setCanPick(false);
 
-    // random start permutation
-    setPositions([0, 1, 2].sort(() => Math.random() - 0.5));
-
-    progTimer.current && clearInterval(progTimer.current);
-    progTimer.current = setInterval(() => setProgress((p) => Math.min(99, p + 3)), 60);
-
-    let swapsLeft = 22 + Math.floor(Math.random() * 10);
-    let speed = 140;
-
-    const swapOnce = () => {
-      setPositions((prev) => {
-        const a = Math.floor(Math.random() * 3);
+    // 20–28 swaps with easing
+    const swaps = 22 + Math.floor(Math.random() * 6);
+    for (let i = 0; i < swaps; i++) {
+      setOrder(prev => {
+        // pick two distinct positions and swap
+        let a = Math.floor(Math.random() * 3);
         let b = Math.floor(Math.random() * 3);
-        if (b === a) b = (b + 1) % 3;
+        while (b === a) b = Math.floor(Math.random() * 3);
         const next = [...prev];
-        const ai = next.indexOf(a);
-        const bi = next.indexOf(b);
-        [next[ai], next[bi]] = [next[bi], next[ai]];
+        [next[a], next[b]] = [next[b], next[a]];
         return next;
       });
+      // ease: faster at start, slower near the end
+      const t = i / swaps;
+      const dur = 70 + Math.floor(380 * t * t);
+      // eslint-disable-next-line no-await-in-loop
+      await wait(dur);
+    }
 
-      swapsLeft--;
-      // ease in/out speed
-      if (swapsLeft > 12) speed = Math.max(70, speed - 6);
-      else speed = Math.min(220, speed + 14);
+    setPhase('pick');
+    setCanPick(true);
+    setBusy(false);
+  };
 
-      if (swapsLeft <= 0) {
-        clearTimers();
-        setProgress(100);
-        setTimeout(() => setPhase('pick'), 200);
-      } else {
-        if (swapTimer.current) clearInterval(swapTimer.current);
-        swapTimer.current = setInterval(swapOnce, speed);
-      }
-    };
+  // egg click => fetch result and reveal
+  const onPick = async (idx: number) => {
+    if (!canPick || busy || phase !== 'pick') return;
 
-    swapTimer.current = setInterval(swapOnce, speed);
-  }
-
-  async function pick(slotChosen: number) {
-    if (phase !== 'pick' || pickingLock.current) return;
-    pickingLock.current = true;
-    setPhase('reveal');
-    clearTimers(); // belt & suspenders
+    setBusy(true);
+    setCanPick(false);
 
     try {
-      const r = await fetch('/api/spin', { method: 'POST' });
-      const data: PrizePayload = await r.json();
-      const label =
-        data.prizeLabel ??
-        (data.rarity ? `${data.rarity[0].toUpperCase()}${data.rarity.slice(1)} Loot Crate` : 'Nothing this time');
-      showPrize(label, data.rarity ?? null);
-    } catch {
-      showPrize('Nothing this time', null);
-    } finally {
-      setTimeout(() => {
-        setPositions([0, 1, 2]);
-        setProgress(0);
-        setPhase('idle');
-        pickingLock.current = false;
-      }, 500);
+      // hit our API for a prize (uses your existing endpoint)
+      const res = await fetch('/api/spin', { method: 'POST' });
+      const data = await res.json();
+
+      // broadcast a global prize event for the modal host (works with our PrizeModalHost)
+      window.dispatchEvent(
+        new CustomEvent('rebelants:prize', {
+          detail: {
+            label: data?.prizeLabel ?? 'Nothing this time',
+            type: data?.type ?? 'none',
+            rarity: data?.rarity ?? null,
+            sub: data?.sub ?? undefined,
+          },
+        })
+      );
+    } catch (e) {
+      window.dispatchEvent(
+        new CustomEvent('rebelants:prize', {
+          detail: { label: 'Nothing this time', type: 'none', rarity: null },
+        })
+      );
     }
-  }
 
-  function onEggClick(e: React.MouseEvent, eggIdx: number) {
-    e.preventDefault();
-    e.stopPropagation();                // stop bubbling
-    if (phase !== 'pick') return;
-    pick(positions[eggIdx]);
-  }
+    setPhase('revealed');
+    // small pause before allowing another round
+    await wait(600);
+    setBusy(false);
+  };
 
-  const cardW = 120;
-  const eggTransforms = useMemo(() => {
-    return positions.map((slotIdx) => {
-      const cx = slotCenters[slotIdx] ?? 0;
-      const left = cx - cardW / 2;
-      return `translate3d(${left}px,0,0)`;
-    });
-  }, [positions, slotCenters]);
+  // CTA label
+  const ctaLabel =
+    phase === 'idle' || phase === 'revealed'
+      ? 'Shuffle'
+      : phase === 'shuffling'
+      ? 'Shuffling…'
+      : 'Pick an egg';
 
-  const canPick = phase === 'pick';
+  // CTA disabled rules
+  const ctaDisabled = phase === 'shuffling' || phase === 'pick' || busy;
 
   return (
-    <div className="ant-card shuffle-wrap">
-      {/* Scene sits ABOVE the button in stacking order */}
-      <div className="shuffle-scene" ref={sceneRef} aria-live="polite">
-        {/* decorative sweeps, ignore pointer events */}
-        <div className={`sweep ${phase === 'shuffling' ? 'run' : ''}`} aria-hidden />
-        <div className={`sweep delay ${phase === 'shuffling' ? 'run' : ''}`} aria-hidden />
+    <div className="ant-card">
+      <div className="title">Queen&apos;s Egg Shuffle</div>
+      <p className="subtitle">Three eggs. We shuffle. You pick one for a prize.</p>
 
-        {[0, 1, 2].map((eggIdx) => (
-          <button
-            key={eggIdx}
-            type="button"
-            className={`egg-card ${canPick ? 'can-pick' : ''}`}
-            style={{ transform: eggTransforms[eggIdx] }}
-            onClick={(e) => onEggClick(e, eggIdx)}
-            disabled={!canPick}
-            aria-label="Pick this egg"
-          >
-            <div className="egg-body always-wobble">
-              <div className="egg-gloss" />
-              <div className="egg-speckle" />
+      {/* scene */}
+      <div ref={sceneRef} className="shuffle-scene ant-scene">
+        {/* stage / strip */}
+        <div className="strip" />
+        {/* ambient sweeping lights */}
+        <div className="sweep sweep-left" />
+        <div className="sweep sweep-right" />
+        {/* rail/progress purely decorative here */}
+        <div className="rail" />
+
+        {/* eggs */}
+        {order.map((eggId, pos) => {
+          const lane = lanes[pos];
+          return (
+            <div
+              key={eggId}
+              className={`egg-card ${canPick ? 'can-pick' : ''}`}
+              style={{ left: lane.left, top: lane.top }}
+              onClick={() => onPick(eggId)}
+            >
+              <div className={`egg-body ${canPick ? 'always-wobble' : ''}`} />
+              <div className="egg-shadow" />
+              <div className="egg-spec" />
             </div>
-          </button>
-        ))}
-
-        <div className="rail" aria-hidden><div className="rail-fill" style={{ width: `${progress}%` }} /></div>
+          );
+        })}
       </div>
 
-      {/* Button stays UNDER the scene */}
-      <div className="mt-4 shuffle-cta">
+      {/* CTA always renders so it cannot disappear due to z-index/clipping */}
+      <div className="shuffle-cta">
         <button
-          type="button"
-          onClick={start}
-          disabled={phase !== 'idle'}
           className="btn"
-          aria-busy={phase !== 'idle'}
+          disabled={ctaDisabled}
+          onClick={() => {
+            if (phase === 'idle' || phase === 'revealed') runShuffle();
+          }}
         >
-          {phase === 'idle' ? 'Shuffle' : 'Shuffling…'}
+          {ctaLabel}
         </button>
       </div>
     </div>
