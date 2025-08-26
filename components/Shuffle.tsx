@@ -1,8 +1,4 @@
-// RA: Shuffle v1.3 (button hard-pinned so it cannot disappear)
-// - CTA rendered twice: a normal one below the scene AND a tiny "safety" CTA
-//   pinned at the top-left of the scene so you can always start a shuffle.
-// - Centered lanes, wobble-on-pick, prize modal event.
-
+// RA: Shuffle v1.4 — button hard-pinned + centered lanes + working pick -> modal
 import React, { useEffect, useMemo, useState } from 'react';
 
 type Phase = 'idle' | 'shuffling' | 'pick' | 'revealed';
@@ -15,7 +11,7 @@ export default function Shuffle() {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
 
-  // lanes are centered via translateX(-50%)
+  // lanes are centered via translateX(-50%) in CSS
   const lanes = useMemo(() => [18, 50, 82], []);
 
   useEffect(() => {
@@ -31,6 +27,7 @@ export default function Shuffle() {
     setPhase('shuffling');
     setProgress(0);
 
+    // 22–28 swaps with easing
     const swaps = 22 + Math.floor(Math.random() * 7);
     for (let i = 0; i < swaps; i++) {
       setOrder(prev => {
@@ -43,7 +40,7 @@ export default function Shuffle() {
       });
 
       const t = i / (swaps - 1);
-      const eased = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+      const eased = t < 0.6 ? 2 * t * t : -1 + (4 - 2 * t) * t; // in-out
       setProgress(Math.min(99, Math.floor(eased * 100)));
       // eslint-disable-next-line no-await-in-loop
       await wait(120 + Math.floor(140 * eased));
@@ -63,6 +60,7 @@ export default function Shuffle() {
     try {
       const res = await fetch('/api/spin', { method: 'POST' });
       const data = await res.json();
+
       window.dispatchEvent(
         new CustomEvent('rebelants:prize', {
           detail: {
@@ -71,97 +69,79 @@ export default function Shuffle() {
             rarity: data?.rarity ?? null,
             sub: data?.sub ?? undefined,
           },
-        }),
+        })
       );
     } catch {
       window.dispatchEvent(
         new CustomEvent('rebelants:prize', {
           detail: { label: 'Nothing this time', type: 'none', rarity: null },
-        }),
+        })
       );
     }
 
     setPhase('revealed');
-    setTimeout(() => {
-      setPhase('idle');
-      setProgress(0);
-      setBusy(false);
-    }, 800);
+    await wait(400);
+    setBusy(false);
   }
 
-  const ctaLabel =
-    phase === 'idle' || phase === 'revealed'
-      ? 'Shuffle'
-      : phase === 'shuffling'
-      ? 'Shuffling…'
-      : 'Pick an egg';
-
-  const ctaDisabled = phase === 'shuffling' || phase === 'pick' || busy;
+  const label =
+    phase === 'shuffling' ? 'Shuffling…' : phase === 'pick' ? 'Pick an egg' : 'Shuffle';
+  const disabled = phase === 'shuffling' || phase === 'pick' || busy;
 
   return (
     <div className="ant-card">
       <div className="title">Queen&apos;s Egg Shuffle</div>
       <p className="subtitle">Three eggs. We shuffle. You pick one for a prize.</p>
 
-      <div className="shuffle-wrap">
-        {/* Safety CTA pinned INSIDE the scene (cannot be clipped/hidden) */}
-        <div className="shuffle-safety-cta">
+      {/* Safety CTA pinned so it never disappears */}
+      <button
+        className="btn btn-safety"
+        disabled={disabled}
+        onClick={() => {
+          if (phase === 'idle' || phase === 'revealed') runShuffle();
+        }}
+      >
+        {label}
+      </button>
+
+      {/* Scene */}
+      <div className="shuffle-scene ant-scene">
+        <div className="strip" />
+        <div className="rail rail-top" />
+        <div className="rail rail-mid" />
+        <div className="rail rail-bottom" />
+
+        {order.map((eggId, pos) => (
           <button
-            className="btn btn-safety"
-            disabled={ctaDisabled}
-            onClick={() => {
-              if (phase === 'idle' || phase === 'revealed') runShuffle();
-            }}
+            key={eggId}
+            className={`egg-card ${canPick ? 'can-pick' : ''}`}
+            style={{ left: `${lanes[pos]}%`, top: '58%' }}
+            onClick={onPick}
+            disabled={!canPick || busy}
+            aria-label="Pick egg"
           >
-            {phase === 'pick' ? 'Pick any egg' : 'Shuffle'}
+            <div className={`egg-body ${canPick ? 'always-wobble' : ''}`} />
+            <div className="egg-speckle" />
+            <div className="egg-shadow" />
           </button>
-        </div>
+        ))}
+      </div>
 
-        {/* Scene */}
-        <div className="shuffle-scene ant-scene">
-          <div className="strip" />
-          <div className="rail rail-top" />
-          <div className="rail rail-bottom" />
+      {/* Progress + bottom CTA (normal button) */}
+      <div className="shuffle-progress">
+        <div style={{ width: `${progress}%` }} />
+      </div>
 
-          {order.map((eggId, pos) => (
-            <button
-              key={eggId}
-              className={`egg-card ${canPick ? 'can-pick' : ''}`}
-              style={{
-                left: `${lanes[pos]}%`,
-                transform: 'translateX(-50%)',
-                top: '58%',
-              }}
-              onClick={onPick}
-              disabled={!canPick || busy}
-              aria-label="Pick egg"
-            >
-              <div className={`egg-body ${canPick ? 'always-wobble' : ''}`} />
-              <div className="egg-shadow" />
-              <div className="egg-speckle" />
-            </button>
-          ))}
-        </div>
-
-        {/* Progress */}
-        <div className="shuffle-progress">
-          <div className="bar">
-            <div className="fill" style={{ width: `${progress}%` }} />
-          </div>
-        </div>
-
-        {/* Normal CTA below the scene */}
-        <div className="shuffle-cta">
-          <button
-            className="btn"
-            disabled={ctaDisabled}
-            onClick={() => {
-              if (phase === 'idle' || phase === 'revealed') runShuffle();
-            }}
-          >
-            {ctaLabel}
-          </button>
-        </div>
+      <div className="shuffle-cta">
+        <button
+          className="btn"
+          disabled={disabled}
+          onClick={() => {
+            if (phase === 'idle' || phase === 'revealed') runShuffle();
+          }}
+        >
+          {label}
+        </button>
       </div>
     </div>
   );
