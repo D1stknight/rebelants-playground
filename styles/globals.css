@@ -189,3 +189,14 @@ body { @apply bg-slate-950 text-slate-100; }
 .egg-card { position: absolute; top: 48px; z-index: 5; } /* top aligns with your scene’s strip */
 .egg-body.always-wobble { animation: wobble 2.6s ease-in-out infinite; opacity: .98; }
 .egg-card.can-pick .egg-body.always-wobble { animation-duration: 1.4s; }
+
+/* --- Shuffle click-through hardening --- */
+.shuffle-wrap { position: relative; }
+.shuffle-scene { position: relative; z-index: 20; pointer-events: auto; }
+.shuffle-cta { position: relative; z-index: 1; }          /* button sits underneath */
+
+/* Only eggs accept clicks; decor ignores them */
+.sweep, .rail { pointer-events: none; }
+.egg-card { position: absolute; top: 48px; z-index: 25; pointer-events: auto; }
+.egg-body.always-wobble { animation: wobble 2.6s ease-in-out infinite; opacity: .98; }
+.egg-card.can-pick .egg-body.always-wobble { animation-duration: 1.4s; }
