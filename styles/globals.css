@@ -105,3 +105,123 @@ body { @apply bg-slate-950 text-slate-100; }
 @keyframes sparkle-fall {
   to { transform: translateY(70px) scale(.6); opacity: 0; }
 }
+
+/* ===== Expedition Cinematic Kit ===== */
+
+/* animated dusk sky */
+:root {
+  --sky-a:#0b1220;
+  --sky-b:#0d1b34;
+  --sky-c:#172c4a;
+  --hill-a:#0e1526;
+  --hill-b:#0b1220;
+  --trail:#1e2a44;
+  --trail-glow: rgba(80,200,255,.3);
+}
+.exp-scene {
+  position: relative;
+  height: 240px;
+  border-radius: 16px;
+  background: radial-gradient(120% 140% at 50% 0%, var(--sky-c) 0%, var(--sky-b) 40%, var(--sky-a) 100%);
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px #0f1a2e, 0 6px 24px rgba(0,0,0,.45);
+}
+@keyframes skyShift {
+  0% { filter: hue-rotate(0deg) brightness(1) }
+  50% { filter: hue-rotate(-8deg) brightness(1.05) }
+  100% { filter: hue-rotate(0deg) brightness(1) }
+}
+.exp-scene.animating { animation: skyShift 6s ease-in-out infinite }
+
+/* distant hills (parallax) */
+.hills, .hills:before, .hills:after {
+  position:absolute; left:0; right:0; content:"";
+  height: 52%; bottom:0; border-radius: 40% 60% 0 0 / 20% 30% 0 0;
+}
+.hills { background: linear-gradient(to bottom, var(--hill-a), var(--hill-b)); transform: translateY(12px); }
+.hills:before { height: 58%; bottom:-10px; background: linear-gradient(to bottom, #0a1120, #0b1322); filter: blur(1px); opacity:.85 }
+.hills:after  { height: 48%; bottom: 10px; background: linear-gradient(to bottom, #0e172a, #0b1322); opacity:.7 }
+
+/* fireflies */
+@keyframes fly {
+  0%   { transform: translate(0,0); opacity:.2 }
+  50%  { transform: translate(30px,-16px); opacity:1 }
+  100% { transform: translate(-10px,10px); opacity:.15 }
+}
+.fireflies { position:absolute; inset:0; pointer-events:none; }
+.fireflies i {
+  position:absolute; width:4px; height:4px; border-radius:50%;
+  background: radial-gradient(circle,#fff,rgba(255,255,255,.2));
+  box-shadow: 0 0 12px rgba(120,200,255,.7);
+  animation: fly 3.8s ease-in-out infinite;
+}
+.fireflies i:nth-child(odd) { animation-duration: 4.5s }
+.fireflies i:nth-child(3n)  { animation-duration: 3.2s }
+
+/* trail */
+.trail {
+  position:absolute; left:6%; right:6%; bottom:64px; height: 6px;
+  background: linear-gradient(to right, #0c1a2f, var(--trail), #0c1a2f);
+  border-radius: 9999px; box-shadow: 0 0 0 1px #0e1a2e inset, 0 0 10px rgba(0,0,0,.4) inset;
+}
+.trail::after {
+  content:""; position:absolute; inset:-6px -8px; border-radius:9999px;
+  box-shadow: 0 0 18px var(--trail-glow);
+  opacity: .0; transition: opacity .25s ease;
+}
+.exp-scene.running .trail::after { opacity:.7 }
+
+/* ant sprite (SVG sized container) */
+.ant {
+  position:absolute; bottom:74px; left:6%;
+  width:40px; height:24px;
+  transform-origin:center bottom;
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,.6));
+}
+@keyframes march {
+  0%   { transform: translateX(0) }
+  100% { transform: translateX(calc(88vw - 160px)) } /* desktop-ish; JS will override on mount for precision */
+}
+.ant.walk { animation: march 5s linear forwards }
+
+/* leg wiggle */
+@keyframes legs {
+  0%,100% { transform: rotate(6deg) }
+  50%     { transform: rotate(-6deg) }
+}
+.ant .legs { transform-origin: 18px 12px; animation: legs .25s linear infinite }
+
+/* progress bar upgrades */
+.exp-bar {
+  height: 10px; border-radius: 9999px;
+  background: rgba(255,255,255,.06); overflow:hidden;
+  box-shadow: inset 0 0 0 1px rgba(15,30,50,.6);
+}
+.bar-fill {
+  height:100%; width:0%;
+  background: linear-gradient(90deg, #4fb0ff, #71ffd7);
+  box-shadow: 0 0 20px rgba(80,200,255,.5);
+  transition: width .25s linear;
+}
+
+/* modal glam (reuse in Shuffle) */
+.prize-wrap.shine { position: relative; overflow: hidden; }
+.prize-wrap.shine::after {
+  content:""; position:absolute; inset:0;
+  background: linear-gradient(110deg, transparent 0%, rgba(255,255,255,.25) 40%, transparent 60%);
+  transform: translateX(-120%); animation: shine 1s ease-out forwards;
+}
+.glow-common  { box-shadow: 0 0 18px rgba(255,184,108,.25); }
+.glow-rare    { box-shadow: 0 0 22px rgba(80,200,255,.35); }
+.glow-ultra   { box-shadow: 0 0 28px rgba(255,120,0,.5), 0 0 60px rgba(255,120,0,.25); }
+
+/* confetti */
+.confetti { position:absolute; inset:0; pointer-events:none; overflow:hidden; }
+.confetti i {
+  position:absolute; width:8px; height:12px; opacity:.9;
+  transform: translateY(-20px) rotate(0deg);
+  animation: conf 900ms ease-out forwards;
+}
+@keyframes conf {
+  to { transform: translateY(220px) rotate(360deg); opacity:0 }
+}
