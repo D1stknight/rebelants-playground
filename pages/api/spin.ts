@@ -1,49 +1,33 @@
-import type { NextApiRequest, NextApiResponse } from 'next'
-import crypto from 'crypto'
+import type { NextApiRequest, NextApiResponse } from 'next';
 
-function rng(seed: string) {
-  let h = crypto.createHash('sha256').update(seed).digest()
-  const n =
-    (h[0] & 0x1f) * 2 ** 48 +
-    h[1] * 2 ** 40 +
-    h[2] * 2 ** 32 +
-    h[3] * 2 ** 24 +
-    h[4] * 2 ** 16 +
-    h[5] * 2 ** 8 +
-    h[6]
-  return (n % 9_007_199_254_740_992) / 9_007_199_254_740_992
-}
+type Rarity = 'common' | 'rare' | 'ultra' | null;
+type Prize = { label: string; type: 'crate' | 'none'; rarity: Rarity; sub?: string | null };
 
-function startOfDay() {
-  const d = new Date()
-  d.setHours(0, 0, 0, 0)
-  return d.getTime()
+function rollPrize(): Prize {
+  // TEMP: generous odds while we test in staging
+  // 35% win: 26% common, 7% rare, 2% ultra
+  const r = Math.random();
+  if (r < 0.35) {
+    const rr = Math.random();
+    if (rr < 0.26 / 0.35) return { label: 'Common Crate', type: 'crate', rarity: 'common' };
+    if (rr < (0.26 + 0.07) / 0.35) return { label: 'Rare Crate', type: 'crate', rarity: 'rare' };
+    return { label: 'Ultra Loot Crate', type: 'crate', rarity: 'ultra' };
+  }
+  return { label: 'Nothing this time', type: 'none', rarity: null, sub: 'Try again soon.' };
 }
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ ok: false, error: 'Method not allowed' })
-  }
-  const clientSeed = (req.body?.seed as string) || 'guest'
-  const serverSeed = process.env.SERVER_SEED || 'rebel-ants-dev-seed-change-me'
-  const day = startOfDay()
-
-  const roll = rng(`${serverSeed}:${clientSeed}:${day}`)
-
-  // Odds: 70% nothing, 25% common, 4% rare, 1% ultra
-  let prizeLabel = 'Nothing this time'
-  let rarity: 'common' | 'rare' | 'ultra' | null = null
-
-  if (roll >= 0.70 && roll < 0.95) {
-    prizeLabel = 'Common Loot Crate'
-    rarity = 'common'
-  } else if (roll >= 0.95 && roll < 0.99) {
-    prizeLabel = 'Rare Loot Crate'
-    rarity = 'rare'
-  } else if (roll >= 0.99) {
-    prizeLabel = 'Ultra Loot Crate'
-    rarity = 'ultra'
+    return res.status(405).json({ ok: false, error: 'Method not allowed' });
   }
 
-  return res.json({ ok: true, prizeLabel, rarity })
+  const p = rollPrize();
+  // Shape expected by the frontend Shuffle component
+  return res.json({
+    ok: true,
+    prizeLabel: p.label,
+    type: p.type,
+    rarity: p.rarity,
+    sub: p.sub ?? null,
+  });
 }
