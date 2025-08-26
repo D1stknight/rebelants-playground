@@ -18,7 +18,7 @@ export default function Shuffle() {
   const [prize, setPrize] = useState<PrizeDetail | null>(null)
 
   // fixed visual x-positions for slots
-  const positions = useMemo(() => [10, 45, 80], [])
+const positions = useMemo(() => [20, 50, 80], [])
 
   async function startShuffle() {
     if (phase === 'shuffling') return
