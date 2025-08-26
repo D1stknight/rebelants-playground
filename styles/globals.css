@@ -2,41 +2,19 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { 
-  color-scheme: dark; 
-}
+/* ---------- Base ---------- */
+:root { color-scheme: dark; }
+body { @apply bg-slate-950 text-slate-100; }
+.ant-card { @apply bg-slate-900/70 border border-slate-800 rounded-xl p-6 shadow; }
+.btn { @apply px-4 py-2 rounded-lg border border-slate-700 hover:bg-slate-800 active:scale-[.98] transition; }
+.title { @apply text-3xl font-bold tracking-tight; }
+.subtitle { @apply text-slate-400; }
+.tab { @apply inline-flex items-center gap-2 rounded-full border border-slate-700 px-3 py-1 text-sm; }
+.tab-active { @apply bg-slate-800; }
 
-body { 
-  @apply bg-slate-950 text-slate-100; 
-}
-
-.ant-card { 
-  @apply bg-slate-900/70 border border-slate-800 rounded-xl p-6 shadow; 
-}
-
-.btn { 
-  @apply px-4 py-2 rounded-lg border border-slate-700 hover:bg-slate-800 active:scale-[.98] transition; 
-}
-
-.title { 
-  @apply text-3xl font-bold tracking-tight; 
-}
-
-.subtitle { 
-  @apply text-slate-400; 
-}
-
-.tab { 
-  @apply inline-flex items-center gap-2 rounded-full border border-slate-700 px-3 py-1 text-sm; 
-}
-
-.tab-active { 
-  @apply bg-slate-800; 
-}
-
-/* === Rebel Ants small animations & UI helpers === */
+/* ---------- Tiny helpers ---------- */
 @keyframes wobble {
-  15%, 100% { transform: rotate(0deg) }
+  15%,100% { transform: rotate(0) }
   25% { transform: rotate(-6deg) }
   35% { transform: rotate(6deg) }
   45% { transform: rotate(-4deg) }
@@ -44,55 +22,125 @@ body {
   75% { transform: rotate(-2deg) }
   90% { transform: rotate(2deg) }
 }
+.wobble { animation: wobble .7s ease-in-out; }
 
-.wobble { 
-  animation: wobble .7s ease-in-out; 
+@keyframes pop { 0%{ transform:scale(.9); opacity:0 } 100%{ transform:scale(1); opacity:1 } }
+.pop-in { animation: pop .25s ease-out; }
+
+/* ---------- Expedition Scene ---------- */
+.ant-scene{
+  position: relative;              /* <-- keeps the ant inside the box */
+  height: 260px;
+  overflow: hidden;
+  background: radial-gradient(120% 80% at 50% 0%, #0b1b31 0%, #091225 55%, #070e1d 100%);
+  border-radius: 12px;
+  border: 1px solid rgb(30 41 59);
 }
 
-@keyframes pop {
-  0% { transform: scale(.9); opacity: 0 }
-  100% { transform: scale(1); opacity: 1 }
+/* sky / ambience */
+.ant-scene .sky{ position:absolute; inset:0; overflow:hidden; }
+.ant-scene .stars{
+  position:absolute; inset:0;
+  background-image:
+    radial-gradient(2px 2px at 10% 15%, #ffffff22 50%, transparent 51%),
+    radial-gradient(1px 1px at 40% 35%, #ffffff22 50%, transparent 51%),
+    radial-gradient(2px 2px at 70% 25%, #ffffff18 50%, transparent 51%),
+    radial-gradient(1px 1px at 85% 10%, #ffffff20 50%, transparent 51%),
+    radial-gradient(1px 1px at 25% 60%, #ffffff18 50%, transparent 51%),
+    radial-gradient(2px 2px at 80% 70%, #ffffff18 50%, transparent 51%);
+  opacity:.35;
+}
+.ant-scene .aurora{
+  position:absolute; left:-20%; right:-20%; top:-30%;
+  height:220%;
+  background: radial-gradient(60% 30% at 50% 30%, rgba(99,102,241,.25) 0%, transparent 60%),
+              radial-gradient(45% 25% at 60% 10%, rgba(16,185,129,.18) 0%, transparent 60%);
+  filter: blur(24px);
+  transform: translateY(-8px);
+}
+.ant-scene .clouds{
+  position:absolute; inset:0;
+  background: radial-gradient(50% 20% at 30% 10%, rgba(255,255,255,.04), transparent 60%),
+              radial-gradient(40% 20% at 70% 12%, rgba(255,255,255,.05), transparent 60%);
 }
 
-.pop-in { 
-  animation: pop .25s ease-out; 
+/* parallax hills / ground */
+.ant-scene .hills{
+  position:absolute; left:-10%; right:-10%; bottom:84px; height:120px;
+  background:
+    radial-gradient(380px 120px at 20% 100%, #0c1a2e, transparent 70%),
+    radial-gradient(420px 140px at 60% 100%, #0a1730, transparent 72%),
+    radial-gradient(360px 120px at 90% 100%, #0c1a33, transparent 70%);
+  opacity:.9;
+}
+.ant-scene .ground{
+  position:absolute; left:0; right:0; bottom:0; height:96px;
+  background: linear-gradient(180deg, #0c1323 0%, #0a0f1d 100%);
+  box-shadow: 0 -1px 0 0 #1e293b inset;
+}
+.ant-scene .grass.fg{
+  position:absolute; left:-2%; right:-2%; bottom:54px; height:14px;
+  background:
+    radial-gradient(10px 6px at 10% 50%, #1f3d2a 50%, transparent 51%),
+    radial-gradient(12px 6px at 30% 50%, #18432b 50%, transparent 51%),
+    radial-gradient(10px 6px at 50% 50%, #1a3f29 50%, transparent 51%),
+    radial-gradient(12px 6px at 70% 50%, #18432b 50%, transparent 51%),
+    radial-gradient(10px 6px at 90% 50%, #1f3d2a 50%, transparent 51%);
+  opacity:.7;
 }
 
-/* Expedition progress bar fill */
-@keyframes barfill { 
-  from { width: 0 } 
-  to { width: 100% } 
+/* trail + progress bar */
+.ant-scene .trail{
+  position:absolute; left:16px; right:16px; bottom:64px; height:14px;
+  border-radius:999px;
+  background: linear-gradient(180deg, #23324a, #141e30);
+  box-shadow: 0 1px 0 #0a1020 inset, 0 0 0 1px #0f1a2d inset;
+}
+.ant-scene .trail::before{               /* ticks */
+  content:""; position:absolute; inset:2px 4px;
+  background:
+    repeating-linear-gradient(90deg, #22314a 0 8px, transparent 8px 14px);
+  border-radius:999px;
+  opacity:.6;
 }
 
-.bar-fill { 
-  animation: barfill 5s linear forwards; 
-}
+/* progress bar fill driven by class ".fill" (added/removed in TS) */
+@keyframes barfill { from{ width:0 } to{ width:100% } }
 
-/* Simple modal */
-.modal { 
-  position: fixed; 
-  inset: 0; 
-  background: rgba(0,0,0,.5); 
-  display: grid; 
-  place-items: center; 
-  z-index: 50; 
+.ant-scene .exp-bar{
+  position:absolute; left:6px; top:3px; height:8px; width:0;
+  border-radius:999px;
+  background: linear-gradient(90deg, #22d3ee, #22c55e, #f59e0b);
+  box-shadow: 0 0 12px rgba(34, 211, 238, .5);
 }
+.ant-scene .exp-bar.fill{ animation: barfill 5s linear forwards; }
 
-.modal-card { 
-  background: #0b1222; 
-  border: 1px solid #1f2937; 
-  padding: 18px; 
-  border-radius: 12px; 
-  width: 320px; 
-  text-align: center; 
+/* reward aura glow */
+.reward-aura{
+  position:absolute; width:88px; height:88px; bottom:20px; right:20px;
+  border-radius:999px; filter: blur(16px); opacity:.0; transition: opacity .35s ease-out;
 }
+.ant-scene.running .reward-aura{ opacity:.2; }
+.reward-aura.common{ background: radial-gradient(circle, rgba(34,197,94,.45), transparent 60%); }
+.reward-aura.rare{ background: radial-gradient(circle, rgba(56,189,248,.55), transparent 60%); }
+.reward-aura.ultra{ background: radial-gradient(circle, rgba(245,158,11,.55), transparent 60%); }
 
-/* === Expedition Ant Animation === */
-.ant {
-  position: absolute;
-  left: 16px;
-  bottom: 64px;
-  width: 84px;
-  height: 84px;
+/* ---------- Samurai Ant ---------- */
+.ant{
+  position:absolute;
+  left:16px;
+  bottom:64px;          /* sits ON the trail */
+  width:84px;
+  height:84px;
   transition: transform 5s linear; /* smooth walk across trail */
 }
+.ant .ant-img{ width:84px; height:84px; display:block; image-rendering:auto; }
+.ant .shadow{
+  position:absolute; left:10px; right:10px; bottom:6px; height:10px;
+  background: radial-gradient(50% 50% at 50% 50%, rgba(0,0,0,.5), transparent 60%);
+  filter: blur(4px); z-index:-1;
+}
+
+/* modal */
+.modal{ position:fixed; inset:0; background:rgba(0,0,0,.65); display:grid; place-items:center; z-index:50; }
+.modal-card{ background:#0b1222; border:1px solid #1f2937; padding:18px; border-radius:12px; width:320px; text-align:center; }
