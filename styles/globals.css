@@ -5,16 +5,17 @@
 /* ---------- Base ---------- */
 :root { color-scheme: dark; }
 body { @apply bg-slate-950 text-slate-100; }
+
 .ant-card { @apply bg-slate-900/70 border border-slate-800 rounded-xl p-6 shadow; }
-.btn { @apply px-4 py-2 rounded-lg border border-slate-700 hover:bg-slate-800 active:scale-[.98] transition; }
-.title { @apply text-3xl font-bold tracking-tight; }
-.subtitle { @apply text-slate-400; }
-.tab { @apply inline-flex items-center gap-2 rounded-full border border-slate-700 px-3 py-1 text-sm; }
-.tab-active { @apply bg-slate-800; }
+.btn       { @apply px-4 py-2 rounded-lg border border-slate-700 hover:bg-slate-800 active:scale-[.98] transition; }
+.title     { @apply text-3xl font-bold tracking-tight; }
+.subtitle  { @apply text-slate-400; }
+.tab       { @apply inline-flex items-center gap-2 rounded-full border border-slate-700 px-3 py-1 text-sm; }
+.tab-active{ @apply bg-slate-800; }
 
 /* ---------- Tiny helpers ---------- */
 @keyframes wobble {
-  15%,100% { transform: rotate(0) }
+  15%,100% { transform: rotate(0deg) }
   25% { transform: rotate(-6deg) }
   35% { transform: rotate(6deg) }
   45% { transform: rotate(-4deg) }
@@ -22,17 +23,23 @@ body { @apply bg-slate-950 text-slate-100; }
   75% { transform: rotate(-2deg) }
   90% { transform: rotate(2deg) }
 }
+/* keep your original class name AND add the one components use */
 .wobble { animation: wobble .7s ease-in-out; }
+.animate-wobble { animation: wobble .7s ease-in-out; }
 
-@keyframes pop { 0%{ transform:scale(.9); opacity:0 } 100%{ transform:scale(1); opacity:1 } }
+@keyframes pop { 0% { transform:scale(.9); opacity:0 } 100% { transform:scale(1); opacity:1 } }
 .pop-in { animation: pop .25s ease-out; }
+
+/* ---------- Modal (used by PrizeModal) ---------- */
+.modal { position: fixed; inset:0; background: rgba(0,0,0,.55); display:grid; place-items:center; z-index:50; }
+.modal-card { background:#0b1220; border:1px solid #172937; padding:18px; border-radius:12px; width:320px; }
 
 /* ---------- Expedition Scene ---------- */
 .ant-scene{
-  position: relative;              /* <-- keeps the ant inside the box */
+  position: relative;            /* keeps the ant inside the box */
   height: 260px;
   overflow: hidden;
-  background: radial-gradient(120% 80% at 50% 0%, #0b1b31 0%, #091225 55%, #070e1d 100%);
+  background: radial-gradient(120% 80% at 50% 0%, #0b1b31 0%, #091225 55%, #060b17 100%);
   border-radius: 12px;
   border: 1px solid rgb(30 41 59);
 }
@@ -41,154 +48,37 @@ body { @apply bg-slate-950 text-slate-100; }
 .ant-scene .sky{ position:absolute; inset:0; overflow:hidden; }
 .ant-scene .stars{
   position:absolute; inset:0;
-  background-image:
-    radial-gradient(2px 2px at 10% 15%, #ffffff22 50%, transparent 51%),
-    radial-gradient(1px 1px at 40% 35%, #ffffff22 50%, transparent 51%),
-    radial-gradient(2px 2px at 70% 25%, #ffffff18 50%, transparent 51%),
-    radial-gradient(1px 1px at 85% 10%, #ffffff20 50%, transparent 51%),
-    radial-gradient(1px 1px at 25% 60%, #ffffff18 50%, transparent 51%),
-    radial-gradient(2px 2px at 80% 70%, #ffffff18 50%, transparent 51%);
-  opacity:.35;
+  background:
+    radial-gradient(2px 2px at 20% 30%, rgba(255,255,255,.4) 50%, transparent 51%) 0 0/120px 120px,
+    radial-gradient(2px 2px at 70% 60%, rgba(255,255,255,.35) 50%, transparent 51%) 0 0/160px 160px,
+    radial-gradient(1px 1px at 40% 80%, rgba(255,255,255,.25) 50%, transparent 51%) 0 0/140px 140px;
+  opacity:.5;
 }
 .ant-scene .aurora{
-  position:absolute; left:-20%; right:-20%; top:-30%;
-  height:220%;
-  background: radial-gradient(60% 30% at 50% 30%, rgba(99,102,241,.25) 0%, transparent 60%),
-              radial-gradient(45% 25% at 60% 10%, rgba(16,185,129,.18) 0%, transparent 60%);
-  filter: blur(24px);
-  transform: translateY(-8px);
-}
-.ant-scene .clouds{
-  position:absolute; inset:0;
-  background: radial-gradient(50% 20% at 30% 10%, rgba(255,255,255,.04), transparent 60%),
-              radial-gradient(40% 20% at 70% 12%, rgba(255,255,255,.05), transparent 60%);
-}
-
-/* parallax hills / ground */
-.ant-scene .hills{
-  position:absolute; left:-10%; right:-10%; bottom:84px; height:120px;
+  position:absolute; inset:0; mix-blend-mode:screen; opacity:.35;
   background:
-    radial-gradient(380px 120px at 20% 100%, #0c1a2e, transparent 70%),
-    radial-gradient(420px 140px at 60% 100%, #0a1730, transparent 72%),
-    radial-gradient(360px 120px at 90% 100%, #0c1a33, transparent 70%);
-  opacity:.9;
-}
-.ant-scene .ground{
-  position:absolute; left:0; right:0; bottom:0; height:96px;
-  background: linear-gradient(180deg, #0c1323 0%, #0a0f1d 100%);
-  box-shadow: 0 -1px 0 0 #1e293b inset;
-}
-.ant-scene .grass.fg{
-  position:absolute; left:-2%; right:-2%; bottom:54px; height:14px;
-  background:
-    radial-gradient(10px 6px at 10% 50%, #1f3d2a 50%, transparent 51%),
-    radial-gradient(12px 6px at 30% 50%, #18432b 50%, transparent 51%),
-    radial-gradient(10px 6px at 50% 50%, #1a3f29 50%, transparent 51%),
-    radial-gradient(12px 6px at 70% 50%, #18432b 50%, transparent 51%),
-    radial-gradient(10px 6px at 90% 50%, #1f3d2a 50%, transparent 51%);
-  opacity:.7;
+    radial-gradient(60% 40% at 45% 0%, rgba(56,189,248,.25), transparent 60%),
+    radial-gradient(50% 35% at 60% 10%, rgba(167,139,250,.2), transparent 60%);
 }
 
-/* trail + progress bar */
-.ant-scene .trail{
-  position:absolute; left:16px; right:16px; bottom:64px; height:14px;
-  border-radius:999px;
-  background: linear-gradient(180deg, #23324a, #141e30);
-  box-shadow: 0 1px 0 #0a1020 inset, 0 0 0 1px #0f1a2d inset;
+/* road / progress */
+.ant-road{
+  position:absolute; left:6%; right:6%; top:46%;
+  height: 70px; border-radius:12px;
+  transform: perspective(700px) rotateX(50deg);
+  background: linear-gradient(to right, #1f2a44, #2c3a64);
+  box-shadow: 0 10px 30px rgba(0,0,0,.45) inset, 0 1px 0 rgba(255,255,255,.06);
 }
-.ant-scene .trail::before{               /* ticks */
-  content:""; position:absolute; inset:2px 4px;
-  background:
-    repeating-linear-gradient(90deg, #22314a 0 8px, transparent 8px 14px);
-  border-radius:999px;
-  opacity:.6;
-}
-
-/* progress bar fill driven by class ".fill" (added/removed in TS) */
-@keyframes barfill { from{ width:0 } to{ width:100% } }
-
-.ant-scene .exp-bar{
-  position:absolute; left:6px; top:3px; height:8px; width:0;
-  border-radius:999px;
-  background: linear-gradient(90deg, #22d3ee, #22c55e, #f59e0b);
-  box-shadow: 0 0 12px rgba(34, 211, 238, .5);
-}
-.ant-scene .exp-bar.fill{ animation: barfill 5s linear forwards; }
-
-/* reward aura glow */
-.reward-aura{
-  position:absolute; width:88px; height:88px; bottom:20px; right:20px;
-  border-radius:999px; filter: blur(16px); opacity:.0; transition: opacity .35s ease-out;
-}
-.ant-scene.running .reward-aura{ opacity:.2; }
-.reward-aura.common{ background: radial-gradient(circle, rgba(34,197,94,.45), transparent 60%); }
-.reward-aura.rare{ background: radial-gradient(circle, rgba(56,189,248,.55), transparent 60%); }
-.reward-aura.ultra{ background: radial-gradient(circle, rgba(245,158,11,.55), transparent 60%); }
-
-/* ---------- Samurai Ant ---------- */
-.ant{
-  position:absolute;
-  left:16px;
-  bottom:64px;          /* sits ON the trail */
-  width:84px;
-  height:84px;
-  transition: transform 5s linear; /* smooth walk across trail */
-}
-.ant .ant-img{ width:84px; height:84px; display:block; image-rendering:auto; }
-.ant .shadow{
-  position:absolute; left:10px; right:10px; bottom:6px; height:10px;
-  background: radial-gradient(50% 50% at 50% 50%, rgba(0,0,0,.5), transparent 60%);
-  filter: blur(4px); z-index:-1;
+.ant-road .rail{
+  position:absolute; left:8%; right:8%; top:50%; height:6px; transform:translateY(-50%);
+  background: linear-gradient(90deg, #38bdf8, #34d399, #fbbf24);
+  border-radius:9999px; box-shadow: 0 0 10px rgba(56,189,248,.35);
 }
 
-/* modal */
-.modal{ position:fixed; inset:0; background:rgba(0,0,0,.65); display:grid; place-items:center; z-index:50; }
-.modal-card{ background:#0b1222; border:1px solid #1f2937; padding:18px; border-radius:12px; width:320px; text-align:center; }
+/* optional little tick marks */
+.ant-road .tick{
+  position:absolute; top:calc(50% - 10px); width:6px; height:20px; background:#0ea5e9; opacity:.2; border-radius:3px;
+}
 
-/* 3D card sizing */
-.exp-card canvas { width: 100% !important; height: 340px !important; border-radius: 12px; }
-
-/* ===== Expedition 3D layout ===== */
-.exp-wrap { padding: 12px 12px 18px; }
-.exp-stage {
-  position: relative;
-  height: 260px;           /* stage height */
-  border-radius: 10px;
-  background: linear-gradient(180deg, #0f1a2b 0%, #0a1220 100%);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
-  overflow: hidden;
-}
-.exp-canvas {
-  position: absolute;
-  inset: 0;               /* fill the stage */
-}
-.exp-ui {
-  position: absolute;
-  left: 0; right: 0; bottom: 14px;
-  display: flex; align-items: center; gap: 10px;
-  justify-content: center;
-  pointer-events: none;   /* clicks pass through */
-}
-.exp-bar {
-  width: 72%;
-  height: 8px;
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 999px;
-  overflow: hidden;
-}
-.exp-bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #22d3ee, #60a5fa, #f59e0b);
-  box-shadow: 0 0 12px rgba(34,211,238,0.5);
-  transition: width 120ms linear;
-}
-.exp-pct {
-  min-width: 44px;
-  text-align: right;
-  color: #cbd5e1;
-  font-size: 12px;
-}
-@media (min-width: 900px) {
-  .exp-stage { height: 300px; }
-}
+/* 3D canvas container (when using @react-three/fiber) */
+.ant-canvas { position:absolute; inset:0; pointer-events:none; }
