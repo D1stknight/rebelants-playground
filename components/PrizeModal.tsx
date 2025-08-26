@@ -1,3 +1,4 @@
+// components/PrizeModal.tsx
 import React from 'react';
 
 type Props = {
@@ -5,21 +6,19 @@ type Props = {
   onClose: () => void;
   label: string;
   sub?: string;
-  children?: React.ReactNode; // <— allow optional content
+  children?: React.ReactNode;
 };
 
 export default function PrizeModal({ open, onClose, label, sub, children }: Props) {
   if (!open) return null;
+
   return (
     <div className="modal" onClick={onClose}>
-      <div className="modal-card ant-card" onClick={(e) => e.stopPropagation()}>
-        <h3 className="title text-center mb-1">You found:</h3>
-        <p className="text-center font-semibold">{label}</p>
-        {sub && <p className="text-center text-slate-400 text-sm mt-1">{sub}</p>}
-        {children ? <div className="mt-4">{children}</div> : null}
-        <div className="text-center mt-5">
-          <button className="btn" onClick={onClose}>Close</button>
-        </div>
+      <div className="modal-card pop-in" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-lg font-semibold">{label}</h3>
+        {sub && <p className="mt-1 text-slate-400">{sub}</p>}
+        {children && <div className="mt-4">{children}</div>}
+        <button className="btn mt-4 w-full" onClick={onClose}>Close</button>
       </div>
     </div>
   );
