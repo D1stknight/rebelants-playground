@@ -55,3 +55,65 @@ body { @apply bg-slate-950 text-slate-100; }
 /* ---------- Simple modal ---------- */
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,.55); display:grid; place-items:center; z-index: 50; }
 .modal-card { background:#0b122e; border:1px solid #172937; padding: 18px; border-radius:12px; width: 320px; text-align:left; }
+
+/* ---------- Shuffle visuals ---------- */
+.shuffle-box {
+  position: relative;
+  height: 220px;
+  border-radius: 12px;
+  border: 1px solid rgb(36 41 59 / 80%);
+  background: radial-gradient(120% 90% at 50% 0%, #0b1b31 0%, #0f1a2a 55%, #0b1220 85%);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.shuffle-floor {
+  position: absolute;
+  inset: auto 8% 22% 8%;
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #2c354d, #6be6ff 40%, #9dff7a 80%, #ffd966);
+  box-shadow: 0 0 0 1px rgba(255,255,255,.06) inset, 0 6px 22px rgba(0,0,0,.5);
+}
+
+.egg-card {
+  position: absolute;
+  bottom: 34%;
+  transform: translateX(-50%);
+  width: 84px;
+  height: 118px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  outline: none;
+  border: 1px solid rgba(255,255,255,.06);
+  background: rgba(11, 20, 34, .4);
+  box-shadow: 0 6px 20px rgba(0,0,0,.35);
+}
+
+.egg-card.can-pick { cursor: pointer; }
+.egg-card:disabled { opacity: .8; cursor: not-allowed; }
+
+/* the egg */
+.egg {
+  width: 56px; height: 72px;
+  border-radius: 50% 50% 46% 46%;
+  background:
+    radial-gradient(120% 80% at 30% 20%, rgba(255,255,255,.85), rgba(255,255,255,0) 35%),
+    radial-gradient(80% 100% at 50% 60%, #ffde59, #ffb74d 70%, #c77b2d 100%);
+  box-shadow: 0 2px 8px rgba(0,0,0,.35) inset, 0 0 0 1px rgba(255,255,255,.08);
+  transition: transform .2s ease;
+}
+
+/* hover wobble */
+.egg-card.can-pick .egg:hover { animation: wobble .7s ease-in-out; }
+
+/* click shake comes from adding .wobble on the card */
+.egg-shadow{
+  position: absolute;
+  bottom: -12px; width: 60px; height: 10px;
+  background: radial-gradient(60% 80% at 50% 50%, rgba(0,0,0,.45), rgba(0,0,0,0) 70%);
+  filter: blur(2px);
+  border-radius: 999px;
+}
