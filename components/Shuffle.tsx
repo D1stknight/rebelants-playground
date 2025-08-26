@@ -4,13 +4,23 @@ import PrizeModal from './PrizeModal'
 type Result = { ok:boolean; prizeLabel?:string; rarity?: 'common'|'rare'|'ultra'|null }
 
 function EggCard({ index, onPick }:{ index:number; onPick:(i:number)=>void }) {
+  const [shake, setShake] = useState(false)
+
+  function handleClick() {
+    setShake(true)
+    onPick(index)
+    setTimeout(() => setShake(false), 700) // reset after wobble
+  }
+
   return (
-    <button onClick={() => onPick(index)} className="egg-card group">
-      <div className="egg group-hover:wobble" aria-hidden />
+    <button
+      onClick={handleClick}
+      className={`egg-card group ${shake ? 'wobble' : ''}`}
+    >
+      <div className="egg group-hover:wobble pop-in" aria-hidden />
     </button>
   )
 }
-
 export default function Shuffle() {
   const [busy, setBusy] = useState(false)
   const [modal, setModal] = useState({ open:false, label:'', sub:'' })
