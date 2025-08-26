@@ -19,23 +19,23 @@ export default function Shuffle() {
   const progTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const pickingLock = useRef(false);
 
-  // layout centers
+  // layout: compute 3 card centers
   useEffect(() => {
     const layout = () => {
       const el = sceneRef.current;
       if (!el) return;
       const w = el.clientWidth;
       const cardW = 120;
-      const sidePad = 32;
-      const usable = Math.max(0, w - sidePad * 2);
+      const pad = 32;
+      const usable = Math.max(0, w - pad * 2);
       const gap = (usable - cardW * 3) / 2;
-      const firstCenter = sidePad + cardW / 2;
-      setSlotCenters([firstCenter, firstCenter + cardW + gap, firstCenter + (cardW + gap) * 2]);
+      const first = pad + cardW / 2;
+      setSlotCenters([first, first + cardW + gap, first + (cardW + gap) * 2]);
     };
     layout();
-    const onR = () => layout();
-    window.addEventListener('resize', onR);
-    return () => window.removeEventListener('resize', onR);
+    const r = () => layout();
+    window.addEventListener('resize', r);
+    return () => window.removeEventListener('resize', r);
   }, []);
 
   function clearTimers() {
@@ -45,10 +45,12 @@ export default function Shuffle() {
 
   function start() {
     if (phase !== 'idle') return;
+
     setPhase('shuffling');
     setProgress(0);
     pickingLock.current = false;
 
+    // random start permutation
     setPositions([0, 1, 2].sort(() => Math.random() - 0.5));
 
     progTimer.current && clearInterval(progTimer.current);
@@ -62,7 +64,6 @@ export default function Shuffle() {
         const a = Math.floor(Math.random() * 3);
         let b = Math.floor(Math.random() * 3);
         if (b === a) b = (b + 1) % 3;
-
         const next = [...prev];
         const ai = next.indexOf(a);
         const bi = next.indexOf(b);
@@ -71,6 +72,7 @@ export default function Shuffle() {
       });
 
       swapsLeft--;
+      // ease in/out speed
       if (swapsLeft > 12) speed = Math.max(70, speed - 6);
       else speed = Math.min(220, speed + 14);
 
@@ -89,9 +91,9 @@ export default function Shuffle() {
 
   async function pick(slotChosen: number) {
     if (phase !== 'pick' || pickingLock.current) return;
-    pickingLock.current = true;            // ignore double clicks
+    pickingLock.current = true;
     setPhase('reveal');
-    clearTimers();                          // super safety
+    clearTimers(); // belt & suspenders
 
     try {
       const r = await fetch('/api/spin', { method: 'POST' });
@@ -114,7 +116,7 @@ export default function Shuffle() {
 
   function onEggClick(e: React.MouseEvent, eggIdx: number) {
     e.preventDefault();
-    e.stopPropagation();        // <- block bubbling to anything behind/around
+    e.stopPropagation();                // stop bubbling
     if (phase !== 'pick') return;
     pick(positions[eggIdx]);
   }
@@ -123,7 +125,7 @@ export default function Shuffle() {
   const eggTransforms = useMemo(() => {
     return positions.map((slotIdx) => {
       const cx = slotCenters[slotIdx] ?? 0;
-      const left = cx - cardW / 2; // center alignment
+      const left = cx - cardW / 2;
       return `translate3d(${left}px,0,0)`;
     });
   }, [positions, slotCenters]);
@@ -131,10 +133,12 @@ export default function Shuffle() {
   const canPick = phase === 'pick';
 
   return (
-    <div className="ant-card">
-      <div className="shuffle-scene" ref={sceneRef}>
-        <div className={`sweep ${phase === 'shuffling' ? 'run' : ''}`} />
-        <div className={`sweep delay ${phase === 'shuffling' ? 'run' : ''}`} />
+    <div className="ant-card shuffle-wrap">
+      {/* Scene sits ABOVE the button in stacking order */}
+      <div className="shuffle-scene" ref={sceneRef} aria-live="polite">
+        {/* decorative sweeps, ignore pointer events */}
+        <div className={`sweep ${phase === 'shuffling' ? 'run' : ''}`} aria-hidden />
+        <div className={`sweep delay ${phase === 'shuffling' ? 'run' : ''}`} aria-hidden />
 
         {[0, 1, 2].map((eggIdx) => (
           <button
@@ -153,10 +157,11 @@ export default function Shuffle() {
           </button>
         ))}
 
-        <div className="rail"><div className="rail-fill" style={{ width: `${progress}%` }} /></div>
+        <div className="rail" aria-hidden><div className="rail-fill" style={{ width: `${progress}%` }} /></div>
       </div>
 
-      <div className="mt-4">
+      {/* Button stays UNDER the scene */}
+      <div className="mt-4 shuffle-cta">
         <button
           type="button"
           onClick={start}
