@@ -938,18 +938,22 @@ body { @apply bg-slate-950 text-slate-100; }
 @keyframes ra-pop { 0% { transform: scale(.92); opacity: 0 } 100% { transform: scale(1); opacity: 1 } }
 .pop-in { animation: ra-pop .22s ease-out; }
 
-/* Queen behind eggs */
 .ra-shuffle2 .queen {
   position: absolute;
   left: 50%;
-  top: 40%;                  /* move her up (was 64%) */
+  top: 40%;                       /* move her up */
   transform: translate(-50%, -50%);
-  width: 200px;              /* shrink (was 360px) */
+  width: 200px;                   /* shrink size */
   height: 200px;
-  background: url('/queen.png') center/contain no-repeat;
-  opacity: 0.9;
-  z-index: 12; /* below eggs (z:25), above rails */
+  z-index: 12;                     /* below eggs */
   pointer-events: none;
+}
+
+/* make the SVG inside scale properly */
+.ra-shuffle2 .queen svg {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 /* Queen aura */
