@@ -116,6 +116,9 @@ const lanes = useMemo(() => [21.5, 50, 78.5], []);
         <div className="rail rail-top" />
         <div className="rail rail-bottom" />
 
+       {/* Queen (behind eggs). Glows while shuffling */}
+        <div className={`queen ${phase === 'shuffling' ? 'is-active' : ''}`} aria-hidden="true" />         
+       
         {/* Progress */}
         <div className="shuffle-progress"><div style={{ width: `${progress}%` }} /></div>
 
