@@ -112,10 +112,14 @@ const lanes = useMemo(() => [21.5, 50, 78.5], []);
       </button>
 
       {/* Scene */}
-      <div className="shuffle-scene ant-scene">
-        <div className="strip" />
-        <div className="rail rail-top" />
-        <div className="rail rail-bottom" />
+<div className="shuffle-scene ant-scene">
+  <div className="strip" />
+
+  {/* Queen Ant sitting in the background */}
+  <Queen />
+
+  <div className="rail rail-top" />
+  <div className="rail rail-bottom" />
 
         {/* Queen (behind eggs). Glows while shuffling */}
         <div className={`queen ${phase === 'shuffling' ? 'is-active' : ''}`} aria-hidden="true" />         
