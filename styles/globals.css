@@ -952,6 +952,22 @@ body { @apply bg-slate-950 text-slate-100; }
   pointer-events: none;
 }
 
+/* Queen aura */
+.ra-shuffle2 .queen::before {
+  content: '';
+  position: absolute;
+  inset: -25%; /* makes aura larger than queen */
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,220,120,0.45) 0%, rgba(255,120,80,0.2) 40%, rgba(0,0,0,0) 80%);
+  filter: blur(25px);
+  z-index: -1; /* sits behind the queen image */
+  animation: queenAuraPulse 3s ease-in-out infinite;
+}
+
+@keyframes queenAuraPulse {
+  0%,100% { transform: scale(1); opacity: 0.75; }
+  50%     { transform: scale(1.1); opacity: 1; }
+}
 .ra-shuffle2 .queen.is-active {
   transform: translate(-50%, -50%) scale(1.05);
   filter: drop-shadow(0 0 28px rgba(255, 220, 120, 0.75));
