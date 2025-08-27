@@ -1,43 +1,56 @@
 // components/PrizeModalHost.tsx
-import React, { createContext, useContext, useState } from 'react';
-import PrizeModal from './PrizeModal';
+import React, { useEffect, useState } from 'react';
 
-type ModalState = {
-  open: boolean;
+type Rarity = 'common' | 'rare' | 'ultra' | null;
+type PrizeDetail = {
   label: string;
-  sub?: string;
-  content?: React.ReactNode;
+  type: 'crate' | 'none';
+  rarity: Rarity;
+  sub?: string | null;
 };
 
-type Ctx = {
-  show: (opts: { label: string; sub?: string; content?: React.ReactNode }) => void;
-  hide: () => void;
-};
+export default function PrizeModalProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<PrizeDetail>({
+    label: '',
+    type: 'none',
+    rarity: null,
+  });
 
-const PrizeModalCtx = createContext<Ctx | null>(null);
-
-export function usePrizeModal() {
-  const ctx = useContext(PrizeModalCtx);
-  if (!ctx) throw new Error('usePrizeModal must be used within <PrizeModalProvider>');
-  return ctx;
-}
-
-type ProviderProps = { children: React.ReactNode };
-
-export default function PrizeModalProvider({ children }: ProviderProps) {
-  const [m, setM] = useState<ModalState>({ open: false, label: '' });
-
-  const show: Ctx['show'] = ({ label, sub, content }) =>
-    setM({ open: true, label, sub, content });
-
-  const hide = () => setM((s) => ({ ...s, open: false }));
+  useEffect(() => {
+    const onPrize = (e: Event) => {
+      const d = (e as CustomEvent).detail || {};
+      setDetail({
+        label: d.label ?? 'Nothing this time',
+        type: d.type ?? 'none',
+        rarity: (d.rarity ?? null) as Rarity,
+        sub: d.sub ?? null,
+      });
+      setOpen(true);
+    };
+    window.addEventListener('rebelants:prize', onPrize as EventListener);
+    return () =>
+      window.removeEventListener('rebelants:prize', onPrize as EventListener);
+  }, []);
 
   return (
-    <PrizeModalCtx.Provider value={{ show, hide }}>
+    <>
       {children}
-      <PrizeModal open={m.open} onClose={hide} label={m.label} sub={m.sub}>
-        {m.content}
-      </PrizeModal>
-    </PrizeModalCtx.Provider>
+
+      {open && (
+        <div className="prize-modal">
+          <div className="prize-modal__card">
+            <div className="prize-modal__title">{detail.label}</div>
+            <button className="btn" onClick={() => setOpen(false)}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
