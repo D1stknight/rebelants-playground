@@ -1,4 +1,6 @@
-// RA: Shuffle v1.4 — button hard-pinned + centered lanes + working pick -> modal
+// components/Shuffle.tsx
+// RA: Shuffle v1.4 — button pinned, centered lanes, wobble-on-pick, prize modal event
+
 import React, { useEffect, useMemo, useState } from 'react';
 
 type Phase = 'idle' | 'shuffling' | 'pick' | 'revealed';
@@ -11,7 +13,7 @@ export default function Shuffle() {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
 
-  // lanes are centered via translateX(-50%) in CSS
+  // lanes are x-positions as percentages; CSS will center via translateX(-50%)
   const lanes = useMemo(() => [18, 50, 82], []);
 
   useEffect(() => {
@@ -27,8 +29,7 @@ export default function Shuffle() {
     setPhase('shuffling');
     setProgress(0);
 
-    // 22–28 swaps with easing
-    const swaps = 22 + Math.floor(Math.random() * 7);
+    const swaps = 22 + Math.floor(Math.random() * 7); // 22–28 swaps
     for (let i = 0; i < swaps; i++) {
       setOrder(prev => {
         let a = Math.floor(Math.random() * 3);
@@ -40,7 +41,7 @@ export default function Shuffle() {
       });
 
       const t = i / (swaps - 1);
-      const eased = t < 0.6 ? 2 * t * t : -1 + (4 - 2 * t) * t; // in-out
+      const eased = t < 0.6 ? 2 * t * t : -1 + (4 - 2 * t) * t; // easeInQuad → easeOutQuad
       setProgress(Math.min(99, Math.floor(eased * 100)));
       // eslint-disable-next-line no-await-in-loop
       await wait(120 + Math.floor(140 * eased));
@@ -60,7 +61,6 @@ export default function Shuffle() {
     try {
       const res = await fetch('/api/spin', { method: 'POST' });
       const data = await res.json();
-
       window.dispatchEvent(
         new CustomEvent('rebelants:prize', {
           detail: {
@@ -80,67 +80,73 @@ export default function Shuffle() {
     }
 
     setPhase('revealed');
-    await wait(400);
+    await wait(350);
     setBusy(false);
   }
 
-  const label =
-    phase === 'shuffling' ? 'Shuffling…' : phase === 'pick' ? 'Pick an egg' : 'Shuffle';
-  const disabled = phase === 'shuffling' || phase === 'pick' || busy;
+  const ctaBelow =
+    phase === 'idle' || phase === 'revealed'
+      ? 'Shuffle'
+      : phase === 'shuffling'
+      ? 'Shuffling…'
+      : 'Pick an egg';
+
+  const disableCtaBelow = phase === 'shuffling' || phase === 'pick' || busy;
 
   return (
-    <div className="ant-card">
+    <div className="ant-card ra-shuffle">
       <div className="title">Queen&apos;s Egg Shuffle</div>
       <p className="subtitle">Three eggs. We shuffle. You pick one for a prize.</p>
 
-      {/* Safety CTA pinned so it never disappears */}
+      {/* SAFETY CTA pinned inside scene so it never “disappears” */}
       <button
         className="btn btn-safety"
-        disabled={disabled}
         onClick={() => {
           if (phase === 'idle' || phase === 'revealed') runShuffle();
         }}
+        disabled={phase === 'shuffling' || phase === 'pick' || busy}
       >
-        {label}
+        Shuffle
       </button>
 
       {/* Scene */}
       <div className="shuffle-scene ant-scene">
         <div className="strip" />
         <div className="rail rail-top" />
-        <div className="rail rail-mid" />
         <div className="rail rail-bottom" />
 
+        {/* Progress */}
+        <div className="shuffle-progress">
+          <div className="bar" style={{ width: `${progress}%` }} />
+        </div>
+
+        {/* Eggs */}
         {order.map((eggId, pos) => (
           <button
             key={eggId}
             className={`egg-card ${canPick ? 'can-pick' : ''}`}
-            style={{ left: `${lanes[pos]}%`, top: '58%' }}
+            style={{ left: `${lanes[pos]}%`, top: '56%' }}
             onClick={onPick}
             disabled={!canPick || busy}
             aria-label="Pick egg"
           >
-            <div className={`egg-body ${canPick ? 'always-wobble' : ''}`} />
-            <div className="egg-speckle" />
+            <div className={`egg-body ${canPick ? 'wobble-on-pick' : ''}`} />
             <div className="egg-shadow" />
+            <div className="egg-speckle" />
           </button>
         ))}
       </div>
 
-      {/* Progress + bottom CTA (normal button) */}
-      <div className="shuffle-progress">
-        <div style={{ width: `${progress}%` }} />
-      </div>
-
+      {/* Normal CTA under the scene (nice UX) */}
       <div className="shuffle-cta">
         <button
           className="btn"
-          disabled={disabled}
+          disabled={disableCtaBelow}
           onClick={() => {
             if (phase === 'idle' || phase === 'revealed') runShuffle();
           }}
         >
-          {label}
+          {ctaBelow}
         </button>
       </div>
     </div>
