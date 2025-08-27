@@ -997,3 +997,43 @@ body { @apply bg-slate-950 text-slate-100; }
   60%  { transform: scale(0.8) rotate(90deg); opacity: 0.8; }
   100% { transform: scale(0.3) rotate(180deg); opacity: 0; }
 }
+
+/* ==== RA Prize Sparkles (rarity-based) ==== */
+/* ensure the card is positioned for absolute sparkles */
+.prize-card { position: relative; overflow: visible; }
+
+.sparkle {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  filter: blur(.2px) drop-shadow(0 0 6px rgba(255,255,255,.35));
+}
+
+.sparkle-common {
+  background: radial-gradient(circle, rgba(147,197,253,1) 0%, rgba(147,197,253,0) 70%);
+}
+.sparkle-rare {
+  background: radial-gradient(circle, rgba(34,211,238,1) 0%, rgba(34,211,238,0) 70%);
+}
+.sparkle-ultra {
+  /* rainbow-ish core for ultra */
+  background:
+    radial-gradient(circle at 40% 40%, rgba(244,114,182,1) 0%, rgba(244,114,182,0) 55%),
+    radial-gradient(circle at 60% 60%, rgba(250,204,21,0.9) 0%, rgba(250,204,21,0) 70%);
+  filter: blur(.2px) drop-shadow(0 0 10px rgba(244,63,94,.55));
+}
+
+.animate {
+  animation: sparkleAnim 1.2s ease-out forwards;
+}
+
+@keyframes sparkleAnim {
+  0%   { transform: scale(0.4) rotate(0deg); opacity: 0; }
+  15%  { opacity: 1; }
+  40%  { transform: scale(1) rotate(45deg); opacity: 1; }
+  80%  { transform: scale(0.7) rotate(110deg); opacity: .8; }
+  100% { transform: scale(0.3) rotate(180deg); opacity: 0; }
+}
