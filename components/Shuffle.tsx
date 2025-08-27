@@ -119,6 +119,9 @@ const lanes = useMemo(() => [21.5, 50, 78.5], []);
         {/* Progress */}
         <div className="shuffle-progress"><div style={{ width: `${progress}%` }} /></div>
 
+        {/* Queen (behind eggs). Glows while shuffling */}
+        <div className={`queen ${phase === 'shuffling' ? 'is-active' : ''}`} aria-hidden="true" />  
+        
         {/* Render fixed cards [0,1,2]; position by lanes[order[i]] */}
         {[0, 1, 2].map((i) => (
           <button
