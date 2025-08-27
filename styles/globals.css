@@ -977,9 +977,6 @@ body { @apply bg-slate-950 text-slate-100; }
   filter: drop-shadow(0 0 28px rgba(255, 220, 120, 0.75));
 }
 
-.ra-shuffle2 .queen.is-active {
-  transform: translateX(-50%) scale(1.05);
-  filter: drop-shadow(0 0 24px rgba(255, 220, 100, 0.9));
 }
 /* ==== RA Shuffle v1.5 — mobile polish ==== */
 @media (max-width: 480px) {
