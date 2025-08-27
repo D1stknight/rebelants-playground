@@ -1,5 +1,5 @@
 // components/Shuffle.tsx
-// RA: Shuffle v1.4 — button pinned, centered lanes, wobble-on-pick, prize modal event
+// RA: Shuffle v1.5 — FIX: correct positioning (lanes[order[i]]), clean phases, prize event
 
 import React, { useEffect, useMemo, useState } from 'react';
 
@@ -8,55 +8,54 @@ const wait = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 export default function Shuffle() {
   const [phase, setPhase] = useState<Phase>('idle');
-  const [order, setOrder] = useState<number[]>([0, 1, 2]);
-  const [canPick, setCanPick] = useState(false);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
 
-  // lanes are x-positions as percentages; CSS will center via translateX(-50%)
+  // order[i] = lane index (0..2) where card i should sit
+  const [order, setOrder] = useState<number[]>([0, 1, 2]);
+
+  // lanes in %, centered via CSS translateX(-50%)
   const lanes = useMemo(() => [18, 50, 82], []);
 
   useEffect(() => {
     setPhase('idle');
-    setCanPick(false);
+    setBusy(false);
     setProgress(0);
+    setOrder([0, 1, 2]);
   }, []);
 
   async function runShuffle() {
     if (busy) return;
     setBusy(true);
-    setCanPick(false);
     setPhase('shuffling');
     setProgress(0);
 
-    const swaps = 22 + Math.floor(Math.random() * 7); // 22–28 swaps
+    // 22–28 swaps with easing
+    const swaps = 22 + Math.floor(Math.random() * 7);
     for (let i = 0; i < swaps; i++) {
       setOrder(prev => {
+        const next = [...prev];
         let a = Math.floor(Math.random() * 3);
         let b = Math.floor(Math.random() * 3);
         while (b === a) b = Math.floor(Math.random() * 3);
-        const next = [...prev];
         [next[a], next[b]] = [next[b], next[a]];
         return next;
       });
-
-      const t = i / (swaps - 1);
-      const eased = t < 0.6 ? 2 * t * t : -1 + (4 - 2 * t) * t; // easeInQuad → easeOutQuad
-      setProgress(Math.min(99, Math.floor(eased * 100)));
+      const t = i / swaps;
+      const dur = 80 + Math.floor(220 * (t * t)); // ease-in
       // eslint-disable-next-line no-await-in-loop
-      await wait(120 + Math.floor(140 * eased));
+      await wait(dur);
+      setProgress(Math.min(99, Math.floor((i / (swaps - 1)) * 100)));
     }
 
     setProgress(100);
     setPhase('pick');
-    setCanPick(true);
     setBusy(false);
   }
 
   async function onPick() {
-    if (!canPick || busy || phase !== 'pick') return;
+    if (busy || phase !== 'pick') return;
     setBusy(true);
-    setCanPick(false);
 
     try {
       const res = await fetch('/api/spin', { method: 'POST' });
@@ -69,42 +68,44 @@ export default function Shuffle() {
             rarity: data?.rarity ?? null,
             sub: data?.sub ?? undefined,
           },
-        })
+        }),
       );
     } catch {
       window.dispatchEvent(
         new CustomEvent('rebelants:prize', {
           detail: { label: 'Nothing this time', type: 'none', rarity: null },
-        })
+        }),
       );
     }
 
     setPhase('revealed');
-    await wait(350);
-    setBusy(false);
+    // soft reset so CTA comes back to Shuffle
+    setTimeout(() => {
+      setPhase('idle');
+      setProgress(0);
+      setBusy(false);
+    }, 800);
   }
 
-  const ctaBelow =
+  const ctaLabel =
     phase === 'idle' || phase === 'revealed'
       ? 'Shuffle'
       : phase === 'shuffling'
       ? 'Shuffling…'
       : 'Pick an egg';
 
-  const disableCtaBelow = phase === 'shuffling' || phase === 'pick' || busy;
+  const ctaDisabled = phase === 'shuffling' || busy;
 
   return (
-    <div className="ant-card ra-shuffle">
+    <div className="ant-card ra-shuffle2">
       <div className="title">Queen&apos;s Egg Shuffle</div>
       <p className="subtitle">Three eggs. We shuffle. You pick one for a prize.</p>
 
-      {/* SAFETY CTA pinned inside scene so it never “disappears” */}
+      {/* Safety CTA pinned in-scene */}
       <button
-        className="btn btn-safety"
-        onClick={() => {
-          if (phase === 'idle' || phase === 'revealed') runShuffle();
-        }}
-        disabled={phase === 'shuffling' || phase === 'pick' || busy}
+        className="btn ra-safety"
+        disabled={ctaDisabled || phase === 'pick'}
+        onClick={() => (phase === 'idle' || phase === 'revealed') && runShuffle()}
       >
         Shuffle
       </button>
@@ -116,37 +117,33 @@ export default function Shuffle() {
         <div className="rail rail-bottom" />
 
         {/* Progress */}
-        <div className="shuffle-progress">
-          <div className="bar" style={{ width: `${progress}%` }} />
-        </div>
+        <div className="shuffle-progress"><div style={{ width: `${progress}%` }} /></div>
 
-        {/* Eggs */}
-        {order.map((eggId, pos) => (
+        {/* Render fixed cards [0,1,2]; position by lanes[order[i]] */}
+        {[0, 1, 2].map((i) => (
           <button
-            key={eggId}
-            className={`egg-card ${canPick ? 'can-pick' : ''}`}
-            style={{ left: `${lanes[pos]}%`, top: '56%' }}
+            key={i}
+            className={`egg-card ${phase === 'pick' ? 'can-pick' : ''}`}
+            style={{ left: `${lanes[order[i]]}%` }}
             onClick={onPick}
-            disabled={!canPick || busy}
+            disabled={phase !== 'pick' || busy}
             aria-label="Pick egg"
           >
-            <div className={`egg-body ${canPick ? 'wobble-on-pick' : ''}`} />
+            <div className={`egg-body ${phase === 'pick' ? 'wobble-on-pick' : ''}`} />
             <div className="egg-shadow" />
             <div className="egg-speckle" />
           </button>
         ))}
       </div>
 
-      {/* Normal CTA under the scene (nice UX) */}
+      {/* Normal CTA below scene */}
       <div className="shuffle-cta">
         <button
           className="btn"
-          disabled={disableCtaBelow}
-          onClick={() => {
-            if (phase === 'idle' || phase === 'revealed') runShuffle();
-          }}
+          disabled={ctaDisabled || phase === 'pick'}
+          onClick={() => (phase === 'idle' || phase === 'revealed') && runShuffle()}
         >
-          {ctaBelow}
+          {ctaLabel}
         </button>
       </div>
     </div>
