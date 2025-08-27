@@ -1,5 +1,5 @@
 // components/PrizeModalHost.tsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 type Rarity = 'common' | 'rare' | 'ultra' | null;
 type Prize = { label: string; type: 'crate' | 'none'; rarity: Rarity; sub?: string | null };
@@ -7,6 +7,7 @@ type Prize = { label: string; type: 'crate' | 'none'; rarity: Rarity; sub?: stri
 export default function PrizeModalProvider({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const [p, setP] = useState<Prize>({ label: '', type: 'none', rarity: null });
+  const cardRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const onPrize = (e: Event) => {
@@ -22,6 +23,44 @@ export default function PrizeModalProvider({ children }: { children: React.React
     window.addEventListener('rebelants:prize' as any, onPrize);
     return () => window.removeEventListener('rebelants:prize' as any, onPrize);
   }, []);
+
+  // Spawn rarity-based sparkles when the modal opens for a CRATE
+  useEffect(() => {
+    if (!open || p.type !== 'crate' || !cardRef.current) return;
+
+    const node = cardRef.current;
+    const count = p.rarity === 'ultra' ? 16 : p.rarity === 'rare' ? 12 : 8;
+    const cls =
+      p.rarity === 'ultra' ? 'sparkle-ultra' :
+      p.rarity === 'rare'  ? 'sparkle-rare'  :
+      'sparkle-common';
+
+    const created: HTMLElement[] = [];
+
+    for (let i = 0; i < count; i++) {
+      const s = document.createElement('div');
+      s.className = `sparkle ${cls} animate`;
+      // random ring around center
+      const angle = Math.random() * Math.PI * 2;
+      const radiusPx = 70 + Math.random() * 50; // ring size
+      const x = 50 + (Math.cos(angle) * radiusPx) / (node.clientWidth / 100);
+      const y = 50 + (Math.sin(angle) * radiusPx) / (node.clientHeight / 100);
+
+      s.style.left = `${x}%`;
+      s.style.top = `${y}%`;
+      // slight per-sparkle variation
+      s.style.animationDuration = `${0.9 + Math.random() * 0.8}s`;
+      s.style.transform = `scale(${0.7 + Math.random() * 0.6})`;
+      node.appendChild(s);
+      created.push(s);
+    }
+
+    // cleanup after animations
+    const t = setTimeout(() => {
+      created.forEach(el => el.remove());
+    }, 1800);
+    return () => clearTimeout(t);
+  }, [open, p.type, p.rarity]);
 
   const rarityClass =
     p.type !== 'crate'
@@ -47,8 +86,7 @@ export default function PrizeModalProvider({ children }: { children: React.React
 
       {open && (
         <div className="prize-modal">
-          <div className={`prize-card pop-in ${rarityClass}`}>
-            {/* If there is an image, show it. Otherwise, show a CSS crate block as fallback */}
+          <div ref={cardRef} className={`prize-card pop-in ${rarityClass}`}>
             {imgSrc ? (
               <img className="prize-art" src={imgSrc} alt={p.label} />
             ) : (
