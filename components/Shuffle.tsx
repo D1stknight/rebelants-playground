@@ -14,8 +14,8 @@ export default function Shuffle() {
   // order[i] = lane index (0..2) where card i should sit
   const [order, setOrder] = useState<number[]>([0, 1, 2]);
 
-  // lanes in %, centered via CSS translateX(-50%)
-  const lanes = useMemo(() => [18, 50, 82], []);
+// centered over the inner 86% strip: 7% + 86% * (1/6, 3/6, 5/6)
+const lanes = useMemo(() => [21.5, 50, 78.5], []);
 
   useEffect(() => {
     setPhase('idle');
@@ -124,7 +124,7 @@ export default function Shuffle() {
           <button
             key={i}
             className={`egg-card ${phase === 'pick' ? 'can-pick' : ''}`}
-            style={{ left: `${lanes[order[i]]}%` }}
+            style={{ left: `${lanes[order[i]]}%`, top: '58%' }}
             onClick={onPick}
             disabled={phase !== 'pick' || busy}
             aria-label="Pick egg"
