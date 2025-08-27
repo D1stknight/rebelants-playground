@@ -24,7 +24,7 @@ export default function PrizeModalProvider({ children }: { children: React.React
     return () => window.removeEventListener('rebelants:prize' as any, onPrize);
   }, []);
 
-  // Spawn rarity-based sparkles when the modal opens for a CRATE
+  // Rarity sparkles (already in your version)
   useEffect(() => {
     if (!open || p.type !== 'crate' || !cardRef.current) return;
 
@@ -36,31 +36,33 @@ export default function PrizeModalProvider({ children }: { children: React.React
       'sparkle-common';
 
     const created: HTMLElement[] = [];
-
     for (let i = 0; i < count; i++) {
       const s = document.createElement('div');
       s.className = `sparkle ${cls} animate`;
-      // random ring around center
       const angle = Math.random() * Math.PI * 2;
-      const radiusPx = 70 + Math.random() * 50; // ring size
+      const radiusPx = 70 + Math.random() * 50;
       const x = 50 + (Math.cos(angle) * radiusPx) / (node.clientWidth / 100);
       const y = 50 + (Math.sin(angle) * radiusPx) / (node.clientHeight / 100);
-
       s.style.left = `${x}%`;
       s.style.top = `${y}%`;
-      // slight per-sparkle variation
       s.style.animationDuration = `${0.9 + Math.random() * 0.8}s`;
       s.style.transform = `scale(${0.7 + Math.random() * 0.6})`;
       node.appendChild(s);
       created.push(s);
     }
-
-    // cleanup after animations
-    const t = setTimeout(() => {
-      created.forEach(el => el.remove());
-    }, 1800);
+    const t = setTimeout(() => { created.forEach(el => el.remove()); }, 1800);
     return () => clearTimeout(t);
   }, [open, p.type, p.rarity]);
+
+  // Close on ESC
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
 
   const rarityClass =
     p.type !== 'crate'
@@ -85,8 +87,15 @@ export default function PrizeModalProvider({ children }: { children: React.React
       {children}
 
       {open && (
-        <div className="prize-modal">
-          <div ref={cardRef} className={`prize-card pop-in ${rarityClass}`}>
+        <div className="prize-modal" onClick={() => setOpen(false)}>
+          <div
+            ref={cardRef}
+            className={`prize-card pop-in ${rarityClass}`}
+            onClick={(e) => e.stopPropagation()} // don't close when clicking the card itself
+          >
+            {/* Aura glow behind the crate */}
+            {p.type === 'crate' && <div className="prize-aura" data-rarity={p.rarity ?? 'common'} />}
+
             {imgSrc ? (
               <img className="prize-art" src={imgSrc} alt={p.label} />
             ) : (
