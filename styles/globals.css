@@ -938,6 +938,25 @@ body { @apply bg-slate-950 text-slate-100; }
 @keyframes ra-pop { 0% { transform: scale(.92); opacity: 0 } 100% { transform: scale(1); opacity: 1 } }
 .pop-in { animation: ra-pop .22s ease-out; }
 
+/* Queen behind eggs */
+.ra-shuffle2 .queen {
+  position: absolute;
+  top: 8%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 180px;
+  height: 180px;
+  background: url('/queen.png') center/contain no-repeat;
+  opacity: 0.85;
+  filter: drop-shadow(0 0 14px rgba(255, 220, 100, 0.5));
+  transition: transform 0.3s ease, filter 0.3s ease;
+  z-index: 1; /* behind eggs */
+}
+
+.ra-shuffle2 .queen.is-active {
+  transform: translateX(-50%) scale(1.05);
+  filter: drop-shadow(0 0 24px rgba(255, 220, 100, 0.9));
+}
 /* ==== RA Shuffle v1.5 — mobile polish ==== */
 @media (max-width: 480px) {
   .ra-shuffle2 .shuffle-scene {
