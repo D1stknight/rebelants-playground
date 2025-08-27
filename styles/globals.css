@@ -937,3 +937,41 @@ body { @apply bg-slate-950 text-slate-100; }
 /* Simple pop-in animation */
 @keyframes ra-pop { 0% { transform: scale(.92); opacity: 0 } 100% { transform: scale(1); opacity: 1 } }
 .pop-in { animation: ra-pop .22s ease-out; }
+
+/* ==== RA Shuffle v1.5 — mobile polish ==== */
+@media (max-width: 480px) {
+  .ra-shuffle2 .shuffle-scene {
+    height: 240px;
+  }
+
+  /* slightly smaller cards on narrow screens */
+  .ra-shuffle2 .egg-card {
+    width: 130px;
+    height: 102px;
+    top: 58% !important;              /* keep them visually centered */
+    transform: translate(-50%, -50%) !important;
+  }
+
+  .ra-shuffle2 .egg-body {
+    width: 68px;
+    height: 86px;
+  }
+
+  /* tighten the track a bit so cards sit perfectly */
+  .ra-shuffle2 .strip {
+    width: 88%;
+    height: 72px;
+    top: 53%;
+  }
+  .ra-shuffle2 .rail {
+    width: 88%;
+  }
+  .ra-shuffle2 .rail-top { top: 47%; }
+  .ra-shuffle2 .rail-bottom { top: 66%; }
+
+  /* progress bar spacing */
+  .ra-shuffle2 .shuffle-progress {
+    bottom: 10px;
+    height: 7px;
+  }
+}
