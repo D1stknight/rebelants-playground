@@ -905,3 +905,35 @@ body { @apply bg-slate-950 text-slate-100; }
 .ra-shuffle2 .rail{ position: absolute; left: 50%; transform: translateX(-50%); width: 86%; height: 8px; border-radius: 999px; }
 .ra-shuffle2 .rail-top{ top: 46%; background: linear-gradient(90deg,#4ee0de,#7ad1ff,#a1ff70); opacity:.55; }
 .ra-shuffle2 .rail-bottom{ top: 66%; background: linear-gradient(90deg,#a1ff70,#f7e65d,#ffbf4a); opacity:.55; }
+
+/* ==== RA Prize v1.1 — crate art + rarity glow ==== */
+.prize-modal { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.55); z-index: 1000; }
+.prize-card  { min-width: 320px; padding: 20px; border-radius: 12px; text-align: center;
+  background: rgba(15,23,42,.95); border: 1px solid rgba(148,163,184,.25);
+  box-shadow: 0 24px 40px rgba(0,0,0,.5);
+}
+.prize-title { font-weight: 800; font-size: 20px; margin: 10px 0; }
+.prize-sub   { opacity: .8; margin-bottom: 12px; }
+
+.prize-art { display: block; width: 240px; max-width: 80vw; height: auto; margin: 0 auto 12px; }
+
+/* Fallback crate shape (when no images uploaded yet) */
+.prize-crate{
+  width: 200px; height: 130px; margin: 0 auto 12px; border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(0,0,0,.2), transparent 35%),
+    repeating-linear-gradient(90deg, rgba(0,0,0,.15) 0 6px, rgba(255,255,255,.06) 6px 12px);
+  box-shadow: inset 0 8px 14px rgba(0,0,0,.45), 0 12px 26px rgba(0,0,0,.35);
+}
+
+/* Rarity glows (applied to the whole card and the image) */
+.pm-common .prize-card,
+.pm-common .prize-art { filter: drop-shadow(0 0 10px rgba(147,197,253,.25)); }
+.pm-rare   .prize-card,
+.pm-rare   .prize-art { filter: drop-shadow(0 0 14px rgba(59,130,246,.45)); }
+.pm-ultra  .prize-card,
+.pm-ultra  .prize-art { filter: drop-shadow(0 0 16px rgba(244,63,94,.55)); }
+
+/* Simple pop-in animation */
+@keyframes ra-pop { 0% { transform: scale(.92); opacity: 0 } 100% { transform: scale(1); opacity: 1 } }
+.pop-in { animation: ra-pop .22s ease-out; }
