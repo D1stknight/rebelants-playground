@@ -1093,3 +1093,33 @@ body { @apply bg-slate-950 text-slate-100; }
 
 /* ensure the art/text sit above the aura */
 .prize-art, .prize-title, .prize-sub, .btn { position: relative; z-index: 1; }
+
+/* Queen base */
+.queen {
+  position: absolute;
+  left: 50%;
+  top: 25%;
+  transform: translateX(-50%);
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 30%, #ff69b4, #b00050 70%);
+  box-shadow: 0 0 30px rgba(255, 105, 180, 0.5);
+  opacity: 0.85;
+  transition: transform 0.6s ease, opacity 0.6s ease, box-shadow 0.6s ease;
+  z-index: 1; /* behind eggs */
+}
+
+/* Queen when shuffling */
+.queen.is-active {
+  transform: translateX(-50%) scale(1.1);
+  opacity: 1;
+  box-shadow: 0 0 40px rgba(255, 105, 180, 0.8), 0 0 60px rgba(255, 20, 147, 0.6);
+  animation: queenGlow 1.5s infinite ease-in-out;
+}
+
+/* Pulse animation for active Queen */
+@keyframes queenGlow {
+  0%, 100% { transform: translateX(-50%) scale(1.05); opacity: 0.9; }
+  50%      { transform: translateX(-50%) scale(1.15); opacity: 1; }
+}
