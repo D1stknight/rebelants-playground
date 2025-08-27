@@ -944,11 +944,11 @@ body { @apply bg-slate-950 text-slate-100; }
 .ra-shuffle2 .queen {
   position: absolute;
   left: 50%;
-  top: 40%;                       /* move her up */
+  top: 30%;                  /* move her higher */
   transform: translate(-50%, -50%);
-  width: 200px;                   /* shrink size */
-  height: 200px;
-  z-index: 12;                     /* below eggs */
+  width: 160px;              /* smaller */
+  height: 160px;
+  z-index: 12;               /* below eggs */
   pointer-events: none;
 }
 
