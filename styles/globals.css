@@ -766,3 +766,68 @@ body { @apply bg-slate-950 text-slate-100; }
 .prize-modal .prize-box { min-width: 320px; padding: 20px; border-radius: 12px; background: rgba(15,23,42,.95); border: 1px solid rgba(148,163,184,.25); box-shadow: 0 24px 40px rgba(0,0,0,.5); }
 .prize-modal .prize-title { font-size: 18px; font-weight: 700; margin-bottom: 10px; }
 .prize-modal .prize-sub { font-size: 14px; opacity: .8; margin-bottom: 12px; }
+
+/* ==== RA Shuffle v1.5 (scoped) =================================== */
+.ra-shuffle2 .shuffle-scene{
+  position: relative; height: 280px; overflow: hidden;
+  background: radial-gradient(120% 80% at 50% 0%, #0b1b31, #0c1830 60%, #081424);
+  border-radius: 12px; border: 1px solid rgba(30,41,59,.7);
+}
+.ra-shuffle2 .strip{ position:absolute; left:6%; right:6%; top:52%; height:66px; border-radius:14px;
+  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(0,0,0,.12));
+  box-shadow: inset 0 6px 16px rgba(0,0,0,.35);
+}
+.ra-shuffle2 .rail{ position:absolute; left:8%; right:8%; height:6px; border-radius:999px;
+  background: linear-gradient(90deg,#7ee9ff,#a3ff6f,#ffe55b); opacity:.6; }
+.ra-shuffle2 .rail-top{ top:46%; } .ra-shuffle2 .rail-bottom{ top:66%; }
+
+.ra-shuffle2 .egg-card{
+  position:absolute; top:56%; transform: translateX(-50%);
+  width:150px; height:116px; border-radius:14px;
+  background: rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.14);
+  box-shadow: 0 10px 24px rgba(0,0,0,.35), inset 0 8px 18px rgba(255,255,255,.06);
+  display:grid; place-items:center;
+  transition: left .28s ease-in-out, transform .18s ease, box-shadow .18s ease;
+  pointer-events:none;
+}
+.ra-shuffle2 .egg-card.can-pick{ pointer-events:auto; cursor:pointer; }
+.ra-shuffle2 .egg-card.can-pick:hover{ transform: translateX(-50%) translateY(-2px); }
+
+.ra-shuffle2 .egg-body{
+  position:relative; width:76px; height:96px; border-radius:46px 46px 40px 40px / 56px 56px 40px 40px;
+  background:
+    radial-gradient(35% 25% at 35% 28%, rgba(255,255,255,.85), rgba(255,255,255,0) 70%),
+    radial-gradient(60% 60% at 60% 65%, #ffb440 0%, #ffa700 70%, #ffd800 100%);
+  filter: saturate(1.12); transform: translateY(-2px);
+}
+.ra-shuffle2 .egg-shadow{ position:absolute; left:50%; top:84%; width:72px; height:12px;
+  transform: translateX(-50%); background: radial-gradient(60% 60% at 50% 50%, rgba(0,0,0,.35), transparent 80%); }
+.ra-shuffle2 .egg-speckle{ position:absolute; right:14px; top:18px; width:12px; height:12px; border-radius:50%;
+  background: radial-gradient(circle at 40% 40%, rgba(255,255,255,.8), transparent 70%); opacity:.65; }
+
+@keyframes ra-wobble2 {
+  0%,100% { transform: translateY(-2px) rotate(0deg); }
+  25% { transform: translateY(-2px) rotate(-6deg); }
+  50% { transform: translateY(-2px) rotate(5deg); }
+  75% { transform: translateY(-2px) rotate(-3deg); }
+}
+.ra-shuffle2 .wobble-on-pick{ animation: ra-wobble2 .95s ease-in-out infinite; }
+
+.ra-shuffle2 .shuffle-progress{
+  position:absolute; left:50%; transform:translateX(-50%); bottom:14px;
+  width:90%; height:8px; border-radius:999px; background: rgba(255,255,255,.08);
+  box-shadow: inset 0 2px 6px rgba(0,0,0,.35);
+}
+.ra-shuffle2 .shuffle-progress > div{
+  height:100%; border-radius:inherit;
+  background: linear-gradient(90deg,#7ee9ff,#a3ff6f,#ffe55b);
+  transition: width .18s linear;
+}
+
+.ra-shuffle2 .shuffle-cta{ margin-top:12px; position:relative; z-index:2; }
+.ra-shuffle2 .ra-safety{
+  position:absolute; top:10px; left:12px; z-index:3;
+  padding:6px 10px; font-size:12px; border-radius:8px;
+  background: rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.2);
+  backdrop-filter: blur(4px);
+}
