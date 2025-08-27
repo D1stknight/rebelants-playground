@@ -861,3 +861,47 @@ body { @apply bg-slate-950 text-slate-100; }
 .pm-rare   .prize-crate{ background-color:#2563eb; outline:2px solid rgba(147,197,253,.55); box-shadow: 0 0 24px rgba(59,130,246,.4); }
 .pm-ultra  .prize-crate{ background-color:#a21caf; outline:2px solid rgba(244,63,94,.55);  box-shadow: 0 0 28px rgba(244,63,94,.5); }
 .pm-none   .prize-crate{ display:none; }
+
+/* ===== RA Shuffle v1.5 hard overrides (scoped) ===== */
+.ra-shuffle2 .shuffle-scene { position: relative; height: 300px; overflow: hidden; }
+
+/* Center each card on its left:% using translate(-50%,-50%),
+   and lock the vertical anchor so hover never slides sideways. */
+.ra-shuffle2 .egg-card{
+  position: absolute;
+  top: 56% !important;
+  left: 50%; /* base (will be overridden per card inline style) */
+  transform: translate(-50%, -50%) !important;
+  z-index: 25;
+  pointer-events: none;
+}
+.ra-shuffle2 .egg-card.can-pick{ pointer-events: auto; cursor: pointer; }
+.ra-shuffle2 .egg-card:hover{
+  transform: translate(-50%, -50%) translateY(-2px) !important;
+}
+
+/* Keep the progress bar looking right */
+.ra-shuffle2 .shuffle-progress{
+  position: relative; margin-top: 12px; height: 8px;
+  border-radius: 999px; background: rgba(255,255,255,.08);
+  box-shadow: inset 0 2px 6px rgba(0,0,0,.35);
+  overflow: hidden;
+}
+.ra-shuffle2 .shuffle-progress > div{
+  height: 100%;
+  background: linear-gradient(90deg,#00ffd0,#9cfffe,#faff9c);
+  transition: width .2s ease;
+}
+
+/* Make the strip and rails truly centered so your lane math (21.5/50/78.5) lines up */
+.ra-shuffle2 .strip{
+  position: absolute;
+  left: 50%; top: 52%;
+  transform: translateX(-50%);
+  width: 86%; height: 84px; border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.06));
+  box-shadow: inset 0 6px 14px rgba(0,0,0,.45), 0 18px 28px rgba(0,0,0,.25);
+}
+.ra-shuffle2 .rail{ position: absolute; left: 50%; transform: translateX(-50%); width: 86%; height: 8px; border-radius: 999px; }
+.ra-shuffle2 .rail-top{ top: 46%; background: linear-gradient(90deg,#4ee0de,#7ad1ff,#a1ff70); opacity:.55; }
+.ra-shuffle2 .rail-bottom{ top: 66%; background: linear-gradient(90deg,#a1ff70,#f7e65d,#ffbf4a); opacity:.55; }
