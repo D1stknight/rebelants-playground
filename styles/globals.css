@@ -1037,3 +1037,40 @@ body { @apply bg-slate-950 text-slate-100; }
   80%  { transform: scale(0.7) rotate(110deg); opacity: .8; }
   100% { transform: scale(0.3) rotate(180deg); opacity: 0; }
 }
+
+/* ==== RA Prize Aura (rarity-colored glow behind crate) ==== */
+.prize-card { position: relative; overflow: visible; }
+
+.prize-aura {
+  position: absolute;
+  inset: -18% -22% -12%;
+  border-radius: 24px;
+  z-index: 0; /* behind the image/text */
+  pointer-events: none;
+  animation: auraPulse 2.2s ease-in-out infinite;
+  filter: blur(12px) saturate(115%);
+  opacity: .9;
+}
+@keyframes auraPulse {
+  0%,100% { transform: scale(1);   opacity: .85; }
+  50%     { transform: scale(1.05); opacity: 1; }
+}
+
+/* colorways by rarity */
+.prize-aura[data-rarity="common"] {
+  background: radial-gradient(60% 60% at 50% 40%, rgba(147,197,253,.35), rgba(147,197,253,0) 70%),
+              radial-gradient(60% 60% at 50% 60%, rgba(148,163,184,.3), rgba(148,163,184,0) 80%);
+}
+.prize-aura[data-rarity="rare"] {
+  background: radial-gradient(60% 60% at 50% 40%, rgba(59,130,246,.45), rgba(59,130,246,0) 70%),
+              radial-gradient(60% 60% at 50% 60%, rgba(34,211,238,.35), rgba(34,211,238,0) 80%);
+}
+.prize-aura[data-rarity="ultra"] {
+  background:
+    radial-gradient(50% 50% at 50% 40%, rgba(244,63,94,.55), rgba(244,63,94,0) 70%),
+    radial-gradient(60% 60% at 50% 60%, rgba(250,204,21,.5), rgba(250,204,21,0) 80%),
+    radial-gradient(70% 70% at 50% 50%, rgba(168,85,247,.45), rgba(168,85,247,0) 85%);
+}
+
+/* ensure the art/text sit above the aura */
+.prize-art, .prize-title, .prize-sub, .btn { position: relative; z-index: 1; }
