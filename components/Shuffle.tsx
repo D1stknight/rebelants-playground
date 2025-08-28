@@ -12,15 +12,15 @@ type Phase = 'idle' | 'shuffling' | 'pick' | 'revealed';
 type Rarity = 'none' | 'common' | 'rare' | 'ultra';
 
 const LANES = [21.5, 50, 78.5];
-const SHUFFLE_MS = 3200;     // total shuffle duration (slower)
-const SWAP_EVERY_MS = 280;   // frequent lane swaps while shuffling
+const SHUFFLE_MS = 3200;     // total shuffle duration
+const SWAP_EVERY_MS = 280;   // lane swap cadence
 
 function rollRarity(): Rarity {
   const r = Math.random();
-  if (r < 0.05) return 'ultra';   // 5%
-  if (r < 0.18) return 'rare';    // 13%
-  if (r < 0.55) return 'common';  // 37%
-  return 'none';                  // 45%
+  if (r < 0.05) return 'ultra';
+  if (r < 0.18) return 'rare';
+  if (r < 0.55) return 'common';
+  return 'none';
 }
 function shuffled3(): number[] {
   const a = [0, 1, 2];
@@ -31,6 +31,7 @@ function shuffled3(): number[] {
   return a;
 }
 
+/* ---------- Ant progress with fill that stays at 100% after shuffle ---------- */
 function AntIcon() {
   return (
     <svg viewBox="0 0 24 12" aria-hidden="true">
@@ -49,12 +50,12 @@ function AntIcon() {
     </svg>
   );
 }
-
 function AntProgress({ progress }: { progress: number }) {
   const ants = useMemo(() => Array.from({ length: 8 }, (_, i) => i), []);
   return (
     <div className="ant-progress" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
       <div className="track" />
+      <div className="fill" style={{ width: `${progress}%` }} />
       {ants.map((i) => (
         <div key={i} className="ant" style={{ left: `calc(${progress}% - ${i * 16}px)` }}>
           <AntIcon />
@@ -66,7 +67,7 @@ function AntProgress({ progress }: { progress: number }) {
           left: 50%;
           transform: translateX(-50%);
           bottom: 14px;
-          width: 90%;
+          width: 92%;
           height: 22px;
           pointer-events: none;
           z-index: 26;
@@ -75,13 +76,19 @@ function AntProgress({ progress }: { progress: number }) {
           position: absolute; left: 0; right: 0;
           top: 50%; height: 7px; transform: translateY(-50%);
           border-radius: 999px;
-          background: linear-gradient(90deg, #2e3b54, #335a64);
+          background: linear-gradient(90deg, #2e3b54, #2a3c46);
           box-shadow: inset 0 2px 6px rgba(0,0,0,.35), 0 0 0 1px rgba(255,255,255,.06);
-          opacity: .85;
+          opacity: .9;
+        }
+        .fill {
+          position: absolute; left: 0; top: 50%; height: 7px; transform: translateY(-50%);
+          border-radius: 999px;
+          background: linear-gradient(90deg, #79d1ff, #f3ff5d, #7effaf);
+          transition: width .2s linear;
+          box-shadow: 0 0 10px rgba(124, 255, 214, .25);
         }
         .ant {
-          position: absolute;
-          top: 50%;
+          position: absolute; top: 50%;
           transform: translate(-50%, -50%);
           filter: drop-shadow(0 0 7px rgba(0,255,170,.35));
           animation: antBob .58s ease-in-out infinite;
@@ -96,7 +103,7 @@ function AntProgress({ progress }: { progress: number }) {
   );
 }
 
-/* ---------- Upgraded Prize Modal with brighter, longer sparkles ---------- */
+/* ---------- Prize Modal (with bright, longer sparkles) ---------- */
 function PrizeModal({ rarity, onClose }: { rarity: Rarity; onClose: () => void }) {
   const title =
     rarity === 'ultra' ? 'ULTRA CRATE!'
@@ -104,7 +111,6 @@ function PrizeModal({ rarity, onClose }: { rarity: Rarity; onClose: () => void }
     : rarity === 'common' ? 'Crate Unlocked'
     : 'No crate this time';
 
-  // make a bunch of sparkles with fixed random-ish positions
   const sparks = useMemo(() => Array.from({ length: 24 }, (_, i) => ({
     left: `${8 + (i * 4.1) % 84}%`,
     top: `${10 + ((i * 7.3) % 62)}%`,
@@ -115,18 +121,13 @@ function PrizeModal({ rarity, onClose }: { rarity: Rarity; onClose: () => void }
   return (
     <div className="prize-modal" role="dialog" aria-modal="true">
       <div className={`prize-card pm-${rarity}`}>
-        {/* Sparkles (brighter + longer) */}
         {rarity !== 'none' && (
           <div className="sparkle-layer" aria-hidden="true">
             {sparks.map((s, i) => (
               <span
                 key={i}
                 className={`pm-sparkle ${rarity}`}
-                style={{
-                  left: s.left, top: s.top,
-                  width: s.size, height: s.size,
-                  animationDelay: `${s.delay}s`
-                }}
+                style={{ left: s.left, top: s.top, width: s.size, height: s.size, animationDelay: `${s.delay}s` }}
               />
             ))}
           </div>
@@ -155,10 +156,9 @@ function PrizeModal({ rarity, onClose }: { rarity: Rarity; onClose: () => void }
           overflow: visible;
         }
         .prize-title { font-size: 18px; font-weight: 800; margin: 10px 0; }
-        .prize-sub { font-size: 14px; opacity: .85; margin-bottom: 12px; }
-        .prize-art { display: block; width: 240px; max-width: 80vw; height: auto; margin: 0 auto 12px; position: relative; z-index: 1; }
+        .prize-sub   { font-size: 14px; opacity: .85; margin-bottom: 12px; }
+        .prize-art   { display: block; width: 240px; max-width: 80vw; height: auto; margin: 0 auto 12px; position: relative; z-index: 1; }
 
-        /* Sparkles (component-scoped). Brighter + slower fade */
         .sparkle-layer { position: absolute; inset: -8% -10%; pointer-events: none; z-index: 0; }
         .pm-sparkle { position: absolute; border-radius: 50%;
           background: radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.0) 65%);
@@ -207,6 +207,7 @@ export default function Shuffle() {
       if (p < 1) requestAnimationFrame(tick);
       else {
         if (swapTimer) clearInterval(swapTimer);
+        setProgress(100);           // STAY filled instead of jumping back
         setPhase('pick');
         setBusy(false);
       }
@@ -229,14 +230,14 @@ export default function Shuffle() {
   const resetAfterPrize = () => {
     setShowPrize(false);
     setRarity('none');
-    setProgress(0);
+    setProgress(0);            // reset only when the modal closes / next round
     setOrder([0, 1, 2]);
     setPhase('idle');
   };
 
   return (
     <>
-      {/* --- Full-screen Japanese ninja-ant background (fixed) --- */}
+      {/* --- Full-screen Japanese ninja-ant background (outside the card) --- */}
       <div className="ant-colony-bg" aria-hidden="true" />
 
       <div className="ant-card ra-shuffle2">
@@ -249,13 +250,13 @@ export default function Shuffle() {
 
           <div className="strip" />
 
-          {/* Queen 3D — centered better & slightly larger */}
-          <Queen3D active={phase === 'shuffling'} scale={1.1} y={-0.02} />
+          {/* Queen 3D — slightly bigger and lower */}
+          <Queen3D active={phase === 'shuffling'} scale={1.2} y={-0.08} />
 
           <div className="rail rail-top" />
           <div className="rail rail-bottom" />
 
-          <AntProgress progress={phase === 'shuffling' ? progress : 0} />
+          <AntProgress progress={progress} />
 
           {[0, 1, 2].map((i) => (
             <button
@@ -282,47 +283,45 @@ export default function Shuffle() {
         {showPrize && <PrizeModal rarity={rarity} onClose={resetAfterPrize} />}
       </div>
 
-      {/* Component-scoped styles for the two new backgrounds */}
+      {/* Background styles (scoped here so they live only on this page) */}
       <style jsx>{`
-        /* full-screen ninja-ant colony background */
+        /* Full-screen ninja-ant colony background */
         .ant-colony-bg {
-          position: fixed; inset: 0; z-index: 0; pointer-events: none;
+          position: fixed; inset: 0;
+          pointer-events: none;
+          z-index: 0; /* behind the card & header */
           background:
-            radial-gradient(140% 90% at 50% 10%, #0b1b31 0%, #0a1427 55%, #070d1a 100%),
-            /* distant mountains (layer 1) */
-            linear-gradient(to top, rgba(10,20,36,0.0) 0%, rgba(10,20,36,0.0) 58%, rgba(22,34,58,0.35) 59%, rgba(22,34,58,0.0) 70%),
-            /* dojo silhouettes (layer 2 - subtle) */
+            radial-gradient(140% 90% at 50% 8%, #0b1b31 0%, #0a1427 55%, #070d1a 100%),
+            /* silhouettes & hills (SVG) */
             url("data:image/svg+xml;utf8,\
               <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 600'>\
                 <g fill='rgba(24,36,64,0.55)'>\
                   <rect x='120' y='380' width='220' height='14'/>\
                   <rect x='170' y='340' width='120' height='16'/>\
                   <rect x='200' y='300' width='60' height='20'/>\
-                  <rect x='780' y='390' width='240' height='14'/>\
-                  <rect x='830' y='350' width='130' height='16'/>\
-                  <rect x='860' y='310' width='70' height='20'/>\
+                  <rect x='780'  y='390' width='240' height='14'/>\
+                  <rect x='830'  y='350' width='130' height='16'/>\
+                  <rect x='860'  y='310' width='70'  height='20'/>\
                 </g>\
                 <g fill='rgba(32,48,86,0.45)'>\
                   <path d='M0,470 C180,420 320,480 520,460 C720,440 900,470 1200,430 L1200,600 L0,600 Z'/>\
                 </g>\
               </svg>"),
-            /* faint star/bokeh pattern */
             radial-gradient(1px 1px at 20% 20%, rgba(255,255,255,.08) 0, rgba(255,255,255,0) 60%),
             radial-gradient(1px 1px at 60% 35%, rgba(255,255,255,.05) 0, rgba(255,255,255,0) 60%),
             radial-gradient(1px 1px at 75% 75%, rgba(255,255,255,.06) 0, rgba(255,255,255,0) 60%);
-          background-blend-mode: normal, normal, overlay, normal, normal, normal;
+          background-blend-mode: normal, overlay, normal, normal, normal, normal;
           filter: saturate(1.05);
         }
 
-        /* inside-card dojo background (subtle 3D feel) */
+        /* Stronger in-card dojo background */
         .scene-bg {
           position: absolute; inset: 0; z-index: 1; pointer-events: none; border-radius: 12px;
           background:
-            radial-gradient(60% 80% at 50% 15%, rgba(255,255,255,.06), rgba(0,0,0,0) 70%),
-            linear-gradient(180deg, rgba(17,27,48,.7), rgba(10,18,36,.9)),
-            /* shoji-ish vertical slats */
-            repeating-linear-gradient(90deg, rgba(255,255,255,.06) 0 2px, rgba(255,255,255,0) 2px 22px);
-          box-shadow: inset 0 10px 28px rgba(0,0,0,.35);
+            radial-gradient(60% 80% at 50% 14%, rgba(255,255,255,.10), rgba(0,0,0,0) 70%),
+            linear-gradient(180deg, rgba(17,27,48,.85), rgba(10,18,36,.95)),
+            repeating-linear-gradient(90deg, rgba(255,255,255,.08) 0 2px, rgba(255,255,255,0) 2px 22px);
+          box-shadow: inset 0 12px 30px rgba(0,0,0,.45);
         }
       `}</style>
     </>
