@@ -1,117 +1,176 @@
 // components/Shuffle.tsx
-'use client';
-
-import React, { useMemo, useState, useMemo as _useMemo } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
-const Queen3D = dynamic(() => import('./Queen3D'), { ssr: false });
+
+const Queen3D = dynamic(() => import('@/components/Queen3D'), { ssr: false });
 
 type Phase = 'idle' | 'shuffling' | 'pick' | 'revealed';
 type Rarity = 'none' | 'common' | 'rare' | 'ultra';
 
-const LANES = [21.5, 50, 78.5] as const;
+const LANES = [21.5, 50, 78.5]; // left:% for [0,1,2]
 
-const PRIZE_IMG: Record<Exclude<Rarity, 'none'>, string> = {
-  common: '/crates/common.png',
-  rare: '/crates/rare.png',
-  ultra: '/crates/ultra.png',
-};
+/* ---------- tiny ant icon (SVG) ---------- */
+function AntIcon() {
+  return (
+    <svg viewBox="0 0 24 12" aria-hidden="true">
+      {/* abdomen, thorax, head */}
+      <circle cx="8" cy="6" r="3.2" />
+      <circle cx="14" cy="6" r="2.4" />
+      <circle cx="19" cy="6" r="2.1" />
+      {/* legs + antenna */}
+      <line x1="14" y1="4.4" x2="11" y2="2.4" />
+      <line x1="14" y1="7.6" x2="11" y2="9.6" />
+      <line x1="19" y1="4.4" x2="22" y2="2.4" />
+      <line x1="19" y1="7.6" x2="22" y2="9.6" />
+      <line x1="20.2" y1="4.8" x2="22.4" y2="1.8" />
+      <style jsx>{`
+        svg { width: 16px; height: 16px; }
+        circle, line {
+          stroke: none;
+          fill: #a7f3d0;
+        }
+        line {
+          stroke: #a7f3d0;
+          stroke-width: 1.2;
+          stroke-linecap: round;
+          fill: none;
+        }
+      `}</style>
+    </svg>
+  );
+}
 
-const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/* ---------- marching-ants progress ---------- */
+function AntProgress({ progress }: { progress: number }) {
+  const ants = useMemo(() => Array.from({ length: 8 }, (_, i) => i), []);
+  return (
+    <div className="ant-progress" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
+      <div className="track" />
+      {ants.map((i) => (
+        <div
+          key={i}
+          className="ant"
+          style={{ left: `calc(${progress}% - ${i * 16}px)` }}
+        >
+          <AntIcon />
+        </div>
+      ))}
+      <style jsx>{`
+        .ant-progress {
+          position: absolute;
+          left: 50%;
+          transform: translateX(-50%);
+          bottom: 14px;
+          width: 90%;
+          height: 22px;
+          pointer-events: none;
+          z-index: 26; /* above rails, under eggs is fine */
+        }
+        .track {
+          position: absolute;
+          left: 0; right: 0;
+          top: 50%;
+          height: 7px;
+          transform: translateY(-50%);
+          border-radius: 999px;
+          background: linear-gradient(90deg, #2e3b54, #335a64);
+          box-shadow: inset 0 2px 6px rgba(0,0,0,.35), 0 0 0 1px rgba(255,255,255,.06);
+          opacity: .8;
+        }
+        .ant {
+          position: absolute;
+          top: 50%;
+          transform: translate(-50%, -50%);
+          filter: drop-shadow(0 0 6px rgba(0,255,170,.28));
+          animation: antBob .55s ease-in-out infinite;
+        }
+        .ant:nth-child(2n) { animation-duration: .62s; }
+        @keyframes antBob {
+          0%,100% { transform: translate(-50%, -50%) }
+          50%     { transform: translate(-50%, -56%) }
+        }
+      `}</style>
+    </div>
+  );
+}
 
+/* ---------- main game ---------- */
 export default function Shuffle() {
   const [phase, setPhase] = useState<Phase>('idle');
-  const [busy, setBusy] = useState(false);
+  const [order, setOrder] = useState<number[]>([0, 1, 2]);
   const [progress, setProgress] = useState(0);
-  const [order, setOrder] = useState<[number, number, number]>([0, 1, 2]);
+  const [busy, setBusy] = useState(false);
 
-  const ctaDisabled = busy || phase === 'shuffling';
-  const lanes = useMemo(() => LANES, []);
-
-  // 40% none, 40% common, 18% rare, 2% ultra
-  const rollPrize = (): Rarity => {
-    const r = Math.random();
-    if (r < 0.4) return 'none';
-    if (r < 0.8) return 'common';
-    if (r < 0.98) return 'rare';
-    return 'ultra';
+  // simple utility to shuffle [0,1,2]
+  const shuffleOrder = () => {
+    const arr = [0, 1, 2];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
   };
 
-  async function runShuffle() {
+  const runShuffle = () => {
     if (busy) return;
     setBusy(true);
     setPhase('shuffling');
+    setOrder(shuffleOrder());
     setProgress(0);
-    setOrder([0, 1, 2]);
 
-    const steps = 12 + Math.floor(Math.random() * 6);
-    for (let i = 0; i < steps; i++) {
-      setOrder((prev) => {
-        let a = Math.floor(Math.random() * 3);
-        let b = Math.floor(Math.random() * 3);
-        while (b === a) b = Math.floor(Math.random() * 3);
-        const next = [...prev] as [number, number, number];
-        [next[a], next[b]] = [next[b], next[a]];
-        return next;
-      });
-      setProgress(Math.round(((i + 1) / steps) * 100));
-      await wait(140);
-    }
+    const start = performance.now();
+    const DURATION = 1600; // ms
+    const tick = (t: number) => {
+      const p = Math.min(1, (t - start) / DURATION);
+      setProgress(Math.floor(p * 100));
+      if (p < 1) {
+        requestAnimationFrame(tick);
+      } else {
+        setPhase('pick');
+        setBusy(false);
+      }
+    };
+    requestAnimationFrame(tick);
+  };
 
-    setBusy(false);
-    setPhase('pick');
-  }
-
-  function onPick() {
+  const onPick = () => {
     if (phase !== 'pick' || busy) return;
     setBusy(true);
-    setPhase('revealed');
-    setBusy(false);
-    const r = rollPrize();
-    setPrize(r);
-    setShowPrize(true);
-  }
-
-  // Prize state
-  const [showPrize, setShowPrize] = useState(false);
-  const [prize, setPrize] = useState<Rarity>('none');
+    // simulate reveal delay then reset (you can open your PrizeModal here)
+    setTimeout(() => {
+      setPhase('revealed');
+      setTimeout(() => {
+        setProgress(0);
+        setPhase('idle');
+        setBusy(false);
+      }, 1200);
+    }, 400);
+  };
 
   return (
     <div className="ant-card ra-shuffle2">
       <div className="title">Queen&apos;s Egg Shuffle</div>
       <p className="subtitle">Three eggs. We shuffle. You pick one for a prize.</p>
 
-      {/* Safety CTA pinned in-scene */}
-      <button
-        className="btn ra-safety"
-        disabled={ctaDisabled || phase === 'pick'}
-        onClick={() => (phase === 'idle' || phase === 'revealed') && runShuffle()}
-      >
-        Shuffle
-      </button>
-
       {/* Scene */}
-      <div className="shuffle-scene ant-scene">
+      <div className="shuffle-scene ant-scene" style={{ position: 'relative' }}>
         <div className="strip" />
 
-        {/* Queen 3D (behind eggs) */}
-<div className={`queen3d ${phase === 'shuffling' ? 'is-active' : ''}`} aria-hidden="true">
-  <Queen3D active={phase === 'shuffling'} />
-</div>
+        {/* 3D Queen (behind eggs) */}
+        <Queen3D active={phase === 'shuffling'} />
 
         <div className="rail rail-top" />
         <div className="rail rail-bottom" />
 
-        {/* Progress */}
-        <div className="shuffle-progress">
-          <div style={{ width: `${progress}%` }} />
-        </div>
+        {/* marching-ants progress */}
+        <AntProgress progress={progress} />
 
         {/* Eggs */}
         {[0, 1, 2].map((i) => (
           <button
             key={i}
             className={`egg-card ${phase === 'pick' ? 'can-pick' : ''}`}
-            style={{ left: `${lanes[order[i]]}%`, top: '58%' }}
+            style={{ left: `${LANES[order[i]]}%`, top: '58%' }}
             onClick={onPick}
             disabled={phase !== 'pick' || busy}
             aria-label="Pick egg"
@@ -125,128 +184,36 @@ export default function Shuffle() {
 
       {/* Normal CTA below scene */}
       <div className="shuffle-cta">
-        <button
-          className="btn"
-          disabled={ctaDisabled || phase === 'pick'}
-          onClick={() => (phase === 'idle' || phase === 'revealed') && runShuffle()}
-        >
-          {phase === 'idle' || phase === 'revealed' ? 'Shuffle' : 'Shuffling…'}
+        <button className="btn" onClick={runShuffle} disabled={busy || phase === 'shuffling'}>
+          {phase === 'shuffling' ? 'Shuffling…' : 'Shuffle'}
         </button>
       </div>
 
-      {/* Prize modal */}
-      {showPrize && (
-        <PrizeModal
-          rarity={prize}
-          onClose={() => setShowPrize(false)}
-        />
-      )}
+      {/* If you really want the pinned in-scene button, uncomment below and it will sit bottom-left inside the scene
+      <button
+        className="btn ra-safety"
+        disabled={busy || phase === 'pick'}
+        onClick={runShuffle}
+      >
+        Shuffle
+      </button>
+      */}
+
+      <style jsx>{`
+        /* Ensure the optional pinned button (if used) never overlaps the title */
+        .ra-safety {
+          position: absolute;
+          left: 12px;
+          bottom: 10px; /* bottom-left, not top-left */
+          z-index: 28;
+          padding: 6px 10px;
+          font-size: 12px;
+          border-radius: 8px;
+          background: rgba(255,255,255,.08);
+          border: 1px solid rgba(255,255,255,.15);
+          backdrop-filter: blur(4px);
+        }
+      `}</style>
     </div>
-  );
-}
-
-/* ===================== Prize Modal ===================== */
-
-function PrizeModal({
-  rarity,
-  onClose,
-}: {
-  rarity: Rarity;
-  onClose: () => void;
-}) {
-  const title =
-    rarity === 'ultra'
-      ? 'Ultra Crate!'
-      : rarity === 'rare'
-      ? 'Rare Crate!'
-      : rarity === 'common'
-      ? 'Common Crate'
-      : 'No prize this time';
-
-  const sub =
-    rarity === 'none'
-      ? 'The Queen is amused. Try again!'
-      : 'Tap Continue to claim and play again.';
-
-  // put rarity class on the WRAPPER (this matches your CSS)
-  const wrapperCls =
-    rarity === 'ultra'
-      ? 'pm-ultra'
-      : rarity === 'rare'
-      ? 'pm-rare'
-      : rarity === 'common'
-      ? 'pm-common'
-      : 'pm-none';
-
-  return (
-    <div className={`prize-modal ${wrapperCls}`} onClick={onClose}>
-      <div className="prize-card pop-in" onClick={(e) => e.stopPropagation()}>
-        {/* Rarity aura */}
-        <div className="prize-aura" data-rarity={rarity} />
-
-        {/* Sparkles for wins */}
-        {rarity !== 'none' && <Sparkles rarity={rarity} />}
-
-        {rarity === 'none' ? (
-          <div className="prize-crate" />
-        ) : (
-          <img
-            src={
-              rarity === 'ultra'
-                ? PRIZE_IMG.ultra
-                : rarity === 'rare'
-                ? PRIZE_IMG.rare
-                : PRIZE_IMG.common
-            }
-            alt={`${rarity} crate`}
-            className="prize-art"
-            draggable={false}
-          />
-        )}
-
-        <div className="prize-title">{title}</div>
-        <div className="prize-sub">{sub}</div>
-
-        <button className="btn" onClick={onClose}>
-          Continue
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/* ===================== Sparkles ===================== */
-
-function Sparkles({ rarity, count = 12 }: { rarity: Exclude<Rarity, 'none'>; count?: number }) {
-  const cls =
-    rarity === 'ultra' ? 'sparkle-ultra' : rarity === 'rare' ? 'sparkle-rare' : 'sparkle-common';
-
-  // stable random positions for the life of the modal
-  const dots = _useMemo(
-    () =>
-      Array.from({ length: count }).map((_, i) => {
-        const left = 10 + Math.random() * 80; // %
-        const top = 6 + Math.random() * 44;   // %
-        const delay = (Math.random() * 0.6).toFixed(2); // seconds
-        return { id: i, left, top, delay };
-      }),
-    [count]
-  );
-
-  return (
-    <>
-      {dots.map(({ id, left, top, delay }) => (
-        <span
-          key={id}
-          className={`sparkle ${cls} animate`}
-          style={{
-            left: `${left}%`,
-            top: `${top}%`,
-            position: 'absolute',
-            animationDelay: `${delay}s`,
-          }}
-        />
-      ))}
-    </>
   );
 }
