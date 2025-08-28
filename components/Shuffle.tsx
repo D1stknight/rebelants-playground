@@ -1,8 +1,9 @@
 // components/Shuffle.tsx
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 
-const Queen3D = dynamic(() => import('@/components/Queen3D'), { ssr: false });
+// ✅ Import the 3D queen with a RELATIVE path
+const Queen3D = dynamic(() => import('./Queen3D'), { ssr: false });
 
 type Phase = 'idle' | 'shuffling' | 'pick' | 'revealed';
 type Rarity = 'none' | 'common' | 'rare' | 'ultra';
@@ -13,11 +14,9 @@ const LANES = [21.5, 50, 78.5]; // left:% for [0,1,2]
 function AntIcon() {
   return (
     <svg viewBox="0 0 24 12" aria-hidden="true">
-      {/* abdomen, thorax, head */}
       <circle cx="8" cy="6" r="3.2" />
       <circle cx="14" cy="6" r="2.4" />
       <circle cx="19" cy="6" r="2.1" />
-      {/* legs + antenna */}
       <line x1="14" y1="4.4" x2="11" y2="2.4" />
       <line x1="14" y1="7.6" x2="11" y2="9.6" />
       <line x1="19" y1="4.4" x2="22" y2="2.4" />
@@ -25,16 +24,8 @@ function AntIcon() {
       <line x1="20.2" y1="4.8" x2="22.4" y2="1.8" />
       <style jsx>{`
         svg { width: 16px; height: 16px; }
-        circle, line {
-          stroke: none;
-          fill: #a7f3d0;
-        }
-        line {
-          stroke: #a7f3d0;
-          stroke-width: 1.2;
-          stroke-linecap: round;
-          fill: none;
-        }
+        circle, line { stroke: none; fill: #a7f3d0; }
+        line { stroke: #a7f3d0; stroke-width: 1.2; stroke-linecap: round; fill: none; }
       `}</style>
     </svg>
   );
@@ -47,11 +38,7 @@ function AntProgress({ progress }: { progress: number }) {
     <div className="ant-progress" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
       <div className="track" />
       {ants.map((i) => (
-        <div
-          key={i}
-          className="ant"
-          style={{ left: `calc(${progress}% - ${i * 16}px)` }}
-        >
+        <div key={i} className="ant" style={{ left: `calc(${progress}% - ${i * 16}px)` }}>
           <AntIcon />
         </div>
       ))}
@@ -64,14 +51,11 @@ function AntProgress({ progress }: { progress: number }) {
           width: 90%;
           height: 22px;
           pointer-events: none;
-          z-index: 26; /* above rails, under eggs is fine */
+          z-index: 26;
         }
         .track {
-          position: absolute;
-          left: 0; right: 0;
-          top: 50%;
-          height: 7px;
-          transform: translateY(-50%);
+          position: absolute; left: 0; right: 0;
+          top: 50%; height: 7px; transform: translateY(-50%);
           border-radius: 999px;
           background: linear-gradient(90deg, #2e3b54, #335a64);
           box-shadow: inset 0 2px 6px rgba(0,0,0,.35), 0 0 0 1px rgba(255,255,255,.06);
@@ -101,7 +85,6 @@ export default function Shuffle() {
   const [progress, setProgress] = useState(0);
   const [busy, setBusy] = useState(false);
 
-  // simple utility to shuffle [0,1,2]
   const shuffleOrder = () => {
     const arr = [0, 1, 2];
     for (let i = arr.length - 1; i > 0; i--) {
@@ -123,12 +106,8 @@ export default function Shuffle() {
     const tick = (t: number) => {
       const p = Math.min(1, (t - start) / DURATION);
       setProgress(Math.floor(p * 100));
-      if (p < 1) {
-        requestAnimationFrame(tick);
-      } else {
-        setPhase('pick');
-        setBusy(false);
-      }
+      if (p < 1) requestAnimationFrame(tick);
+      else { setPhase('pick'); setBusy(false); }
     };
     requestAnimationFrame(tick);
   };
@@ -136,7 +115,6 @@ export default function Shuffle() {
   const onPick = () => {
     if (phase !== 'pick' || busy) return;
     setBusy(true);
-    // simulate reveal delay then reset (you can open your PrizeModal here)
     setTimeout(() => {
       setPhase('revealed');
       setTimeout(() => {
@@ -189,22 +167,18 @@ export default function Shuffle() {
         </button>
       </div>
 
-      {/* If you really want the pinned in-scene button, uncomment below and it will sit bottom-left inside the scene
-      <button
-        className="btn ra-safety"
-        disabled={busy || phase === 'pick'}
-        onClick={runShuffle}
-      >
+      {/* If you want a pinned button INSIDE the scene, uncomment below.
+          It's bottom-left so it won't cover the title.
+      <button className="btn ra-safety" disabled={busy || phase === 'pick'} onClick={runShuffle}>
         Shuffle
       </button>
       */}
 
       <style jsx>{`
-        /* Ensure the optional pinned button (if used) never overlaps the title */
         .ra-safety {
           position: absolute;
           left: 12px;
-          bottom: 10px; /* bottom-left, not top-left */
+          bottom: 10px;
           z-index: 28;
           padding: 6px 10px;
           font-size: 12px;
