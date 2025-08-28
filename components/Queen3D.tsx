@@ -2,6 +2,7 @@
 import React, { Suspense, memo, useMemo, useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { ContactShadows, Environment, useGLTF } from '@react-three/drei';
+import type { Group } from 'three'; // <-- add the THREE type
 
 type Queen3DProps = {
   /** When true (during shuffling), do a slightly snappier idle animation */
@@ -15,7 +16,7 @@ function QueenModel({
 }: Queen3DProps & JSX.IntrinsicElements['group']) {
   // Path is from the web root because it lives under /public
   const { scene } = useGLTF('/models/queen/queen.glb');
-  const ref = useRef<THREE.Group>(null!);
+  const ref = useRef<Group>(null!); // <-- use the imported Group type
 
   // Turn on shadows for all meshes in the scene
   useMemo(() => {
@@ -60,7 +61,7 @@ function Queen3DCanvas({ active = false }: Queen3DProps) {
       shadows
       camera={{ fov: 28, position: [0, 1.1, 4.2] }}
     >
-      {/* Lighting (kept simple/typesafe) */}
+      {/* Lighting */}
       <ambientLight intensity={0.5} />
       <directionalLight
         position={[2.5, 3.5, 2.5]}
@@ -84,13 +85,6 @@ function Queen3DCanvas({ active = false }: Queen3DProps) {
   );
 }
 
-/**
- * Usage:
- *  import dynamic from 'next/dynamic';
- *  const Queen3D = dynamic(() => import('./Queen3D'), { ssr: false });
- *  ...
- *  <Queen3D active={phase === 'shuffling'} />
- */
 export default memo(function Queen3D(props: Queen3DProps) {
   return (
     <div className="queen-3d" aria-hidden="true">
