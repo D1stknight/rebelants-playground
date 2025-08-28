@@ -1117,3 +1117,24 @@ body { @apply bg-slate-950 text-slate-100; }
 
 /* ensure the art/text sit above the aura */
 .prize-art, .prize-title, .prize-sub, .btn { position: relative; z-index: 1; }
+
+/* === Queen 3D container (canvas) ===================================== */
+.ra-shuffle2 .queen3d{
+  position: absolute;
+  left: 50%;
+  top: 43%;
+  transform: translate(-50%, -50%);
+  width: min(52%, 560px);
+  height: min(62%, 420px);
+  z-index: 12;             /* eggs are z:25, so queen stays behind */
+  pointer-events: none;    /* don’t block egg clicks */
+}
+
+/* Make it a bit smaller on phones */
+@media (max-width: 480px){
+  .ra-shuffle2 .queen3d{
+    top: 42%;
+    width: 80vw;
+    height: 56vw;
+  }
+}
