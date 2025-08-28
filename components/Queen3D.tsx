@@ -6,8 +6,8 @@ import * as THREE from 'three';
 
 type Props = {
   active?: boolean;
-  scale?: number; // visual size (1 = default)
-  y?: number;     // vertical nudge in 3D units (negative = lower)
+  scale?: number; // 1 = default size
+  y?: number;     // vertical nudge (negative = lower)
 };
 
 function QueenModel({ active = false, scale = 1, y = 0 }: Props) {
@@ -38,14 +38,10 @@ function QueenModel({ active = false, scale = 1, y = 0 }: Props) {
   return <primitive ref={ref} object={scene} />;
 }
 
-export default function Queen3D({ active, scale = 1, y = 0 }: Props) {
+export default function Queen3D({ active, scale = 1.3, y = -0.28 }: Props) {
   return (
     <div className="queen3d" aria-hidden="true">
-      <Canvas
-        dpr={[1, 2]}
-        shadows
-        camera={{ position: [0, 0.95, 2.1], fov: 30 }}
-      >
+      <Canvas dpr={[1, 2]} shadows camera={{ position: [0, 1.05, 2.15], fov: 30 }}>
         <ambientLight intensity={0.38} />
         <hemisphereLight color={'#8fb2ff'} groundColor={'#21324f'} intensity={0.55} />
         <spotLight position={[2.6, 3.4, 3.1]} angle={0.4} penumbra={0.35} intensity={1.15} castShadow />
@@ -54,14 +50,7 @@ export default function Queen3D({ active, scale = 1, y = 0 }: Props) {
           <QueenModel active={!!active} scale={scale} y={y} />
         </group>
 
-        <ContactShadows
-          opacity={0.35}
-          scale={4.2}
-          blur={2.4}
-          far={4}
-          resolution={768}
-          position={[0, -0.1, 0]}
-        />
+        <ContactShadows opacity={0.35} scale={4.2} blur={2.4} far={4} resolution={768} position={[0, -0.1, 0]} />
         <Environment preset="city" />
       </Canvas>
 
@@ -70,18 +59,18 @@ export default function Queen3D({ active, scale = 1, y = 0 }: Props) {
           position: absolute;
           left: 50%;
           top: 50%;
-          /* Lower and center more than before */
-          transform: translate(-50%, -44%);
-          width: 600px;   /* bigger viewport so the model reads larger */
-          height: 340px;
+          /* bring her DOWN considerably and keep centered */
+          transform: translate(-50%, -30%);
+          width: 680px;
+          height: 360px;
           pointer-events: none;
-          z-index: 12; /* below eggs (z:25) */
+          z-index: 12; /* eggs are z:25 */
         }
         @media (max-width: 480px) {
           .queen3d {
-            width: 420px;
-            height: 260px;
-            transform: translate(-50%, -46%);
+            width: 440px;
+            height: 270px;
+            transform: translate(-50%, -32%);
           }
         }
       `}</style>
