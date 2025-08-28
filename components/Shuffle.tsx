@@ -93,8 +93,10 @@ export default function Shuffle() {
       <div className="shuffle-scene ant-scene">
         <div className="strip" />
 
-        {/* Queen in background */}
-        <Queen className={`queen ${phase === 'shuffling' ? 'is-active' : ''}`} />
+        {/* Queen 3D (behind eggs) */}
+<div className={`queen3d ${phase === 'shuffling' ? 'is-active' : ''}`} aria-hidden="true">
+  <Queen3D active={phase === 'shuffling'} />
+</div>
 
         <div className="rail rail-top" />
         <div className="rail rail-bottom" />
