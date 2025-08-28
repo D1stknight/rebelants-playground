@@ -116,34 +116,33 @@ const lanes = useMemo(() => [21.5, 50, 78.5], []);
 <div className="shuffle-scene ant-scene">
   <div className="strip" />
 
-  {/* Queen Ant sitting in the background */}
-  <Queen />
+  {/* Queen (behind eggs). Glows while shuffling */}
+  <Queen className={`queen ${phase === 'shuffling' ? 'is-active' : ''}`} aria-hidden="true" />
 
   <div className="rail rail-top" />
   <div className="rail rail-bottom" />
 
-        {/* Queen (behind eggs). Glows while shuffling */}
-        <div className={`queen ${phase === 'shuffling' ? 'is-active' : ''}`} aria-hidden="true" />         
-       
-        {/* Progress */}
-        <div className="shuffle-progress"><div style={{ width: `${progress}%` }} /></div>  
-        
-        {/* Render fixed cards [0,1,2]; position by lanes[order[i]] */}
-        {[0, 1, 2].map((i) => (
-          <button
-            key={i}
-            className={`egg-card ${phase === 'pick' ? 'can-pick' : ''}`}
-            style={{ left: `${lanes[order[i]]}%`, top: '58%' }}
-            onClick={onPick}
-            disabled={phase !== 'pick' || busy}
-            aria-label="Pick egg"
-          >
-            <div className={`egg-body ${phase === 'pick' ? 'wobble-on-pick' : ''}`} />
-            <div className="egg-shadow" />
-            <div className="egg-speckle" />
-          </button>
-        ))}
-      </div>
+  {/* Progress */}
+  <div className="shuffle-progress">
+    <div style={{ width: `${progress}%` }} />
+  </div>
+
+  {/* Render fixed cards [0,1,2]; position by lanes[order[i]] */}
+  {[0, 1, 2].map((i) => (
+    <button
+      key={i}
+      className={`egg-card ${phase === 'pick' ? 'can-pick' : ''}`}
+      style={{ left: `${lanes[order[i]]}%`, top: '58%' }}
+      onClick={onPick}
+      disabled={phase !== 'pick' || busy}
+      aria-label="Pick egg"
+    >
+      <div className={`egg-body ${phase === 'pick' ? 'wobble-on-pick' : ''}`} />
+      <div className="egg-shadow" />
+      <div className="egg-speckle" />
+    </button>
+  ))}
+</div>
 
       {/* Normal CTA below scene */}
       <div className="shuffle-cta">
