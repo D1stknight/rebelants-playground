@@ -1161,3 +1161,38 @@ body { @apply bg-slate-950 text-slate-100; }
 @media (max-width: 520px){
   .ra-shuffle2 .queen-3d{ width: 360px; height: 240px; top: 44%; }
 }
+
+/* === Site background: ant tunnels + subtle ant pattern === */
+html, body {
+  background: radial-gradient(140% 120% at 50% -20%, #0c1730 0%, #0a1326 55%, #060b14 100%) fixed;
+}
+
+/* soft vignette/light pools */
+body::before{
+  content: '';
+  position: fixed; inset: 0;
+  background:
+    radial-gradient(60% 40% at 30% 12%, rgba(25,55,110,.25), transparent 60%),
+    radial-gradient(50% 35% at 72% 18%, rgba(15,40,90,.22), transparent 65%),
+    radial-gradient(70% 60% at 50% 92%, rgba(10,25,60,.30), transparent 70%);
+  filter: blur(70px);
+  opacity: .7;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* tiny repeating "ant segment" icons, very faint */
+body::after{
+  content: '';
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='rgba(255,255,255,0.03)'%3E%3Ccircle cx='40' cy='38' r='5'/%3E%3Ccircle cx='28' cy='40' r='4'/%3E%3Ccircle cx='52' cy='40' r='4'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 120px 120px;
+  background-position: 0 0, 60px 60px;
+  background-repeat: repeat;
+  opacity: .35;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* keep your content above the decorative layers */
+#___next, body > div, .ant-card, .shuffle-wrap { position: relative; z-index: 1; }
