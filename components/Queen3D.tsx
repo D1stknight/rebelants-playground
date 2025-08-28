@@ -1,129 +1,111 @@
 // components/Queen3D.tsx
-import React, { Suspense, memo, useMemo, useRef } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { ContactShadows, Environment, GradientTexture, useGLTF } from '@react-three/drei';
-import type { Group } from 'three';
+import { ContactShadows, Environment, useGLTF } from '@react-three/drei';
+import * as THREE from 'three';
 
-type Queen3DProps = { active?: boolean };
+type Props = {
+  active?: boolean;
+  /** visual size of the model; 1 = default. We'll pass 0.9 from Shuffle.tsx */
+  scale?: number;
+  /** vertical nudge of the model in 3D space */
+  y?: number;
+};
 
-/* ---------------- Model ---------------- */
-function QueenModel({
-  active = false,
-  ...props
-}: Queen3DProps & JSX.IntrinsicElements['group']) {
-  // GLB lives under /public/models/queen/queen.glb
+function QueenModel({ active = false, scale = 1, y = 0 }: Props) {
+  // Path is from the web root because the file lives under /public
   const { scene } = useGLTF('/models/queen/queen.glb');
-  const ref = useRef<Group>(null!);
+  const ref = useRef<THREE.Group>(null!);
 
-  // Cast/receive shadows on all meshes
+  // turn on basic shadows for all meshes inside the GLB
   useMemo(() => {
-    scene.traverse((o: any) => {
-      if (o.isMesh) {
-        o.castShadow = true;
-        o.receiveShadow = true;
+    scene.traverse((obj) => {
+      if ((obj as THREE.Mesh).isMesh) {
+        const m = obj as THREE.Mesh;
+        m.castShadow = true;
+        m.receiveShadow = true;
+        if (Array.isArray(m.material)) {
+          m.material.forEach((mat) => (mat as any).envMapIntensity = 0.6);
+        } else if (m.material) {
+          (m.material as any).envMapIntensity = 0.6;
+        }
       }
     });
   }, [scene]);
 
-  // --- placement + subtle animation ---
-  // Lower baseY to push the character DOWN in the frame
-  const BASE_Y = -0.58;        // lower value => further down
-  const BOB_IDLE = 0.025;
-  const BOB_ACTIVE = 0.055;
-  const SWAY_IDLE = 0.04;
-  const SWAY_ACTIVE = 0.08;
-
+  // subtle idle motion; pulse a bit when shuffling
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
-    const bob = (active ? BOB_ACTIVE : BOB_IDLE) * Math.sin(t * (active ? 3.0 : 1.6));
-    const sway = (active ? SWAY_ACTIVE : SWAY_IDLE) * Math.sin(t * (active ? 1.3 : 0.75));
-    if (ref.current) {
-      ref.current.position.y = BASE_Y + bob;      // ↓ sits lower now
-      ref.current.rotation.y = Math.PI + sway;
-    }
+    if (!ref.current) return;
+    const sPulse = active ? 1 + Math.sin(t * 4) * 0.03 : 1;
+    ref.current.scale.set(scale * sPulse, scale * sPulse, scale * sPulse);
+    ref.current.position.y = y + (active ? Math.sin(t * 3) * 0.03 : Math.sin(t * 2) * 0.02);
+    ref.current.rotation.y = Math.sin(t * 0.6) * 0.2;
   });
 
-  return (
-    <group ref={ref} {...props}>
-      {/* Soft gradient “backdrop” behind the queen */}
-      <mesh position={[0, 0.05, -0.55]} scale={[5.6, 2.8, 1]}>
-        <planeGeometry args={[4, 2.2]} />
-        <meshBasicMaterial toneMapped={false}>
-          <GradientTexture
-            // top → middle → bottom
-            stops={[0, 0.55, 1]}
-            colors={['#0b1b31', '#152a46', '#0b1630']}
-            size={1024}
-          />
-        </meshBasicMaterial>
-      </mesh>
-
-      {/* The model */}
-      <primitive
-        object={scene}
-        position={[0, 0, 0]}
-        rotation={[0, Math.PI, 0]}
-        scale={0.9}   // You said you like ~0.90; tweak here if needed
-      />
-    </group>
-  );
+  return <primitive ref={ref} object={scene} />;
 }
-useGLTF.preload('/models/queen/queen.glb');
 
-/* ---------------- Canvas Shell ---------------- */
-function Queen3DCanvas({ active = false }: Queen3DProps) {
+export default function Queen3D({ active, scale = 1, y = 0 }: Props) {
   return (
-    <Canvas
-      dpr={[1, 2]}
-      shadows
-      camera={{
-        fov: 26,
-        position: [0, 0.95, 3.2],
-      }}
-    >
-      {/* lighting */}
-      <ambientLight intensity={0.55} />
-      <directionalLight
-        position={[2.2, 3.2, 2.2]}
-        intensity={1.2}
-        castShadow
-        shadow-mapSize={[1024, 1024]}
-      />
+    <div className="queen3d" aria-hidden="true">
+      <Canvas
+        dpr={[1, 2]}
+        shadows
+        camera={{ position: [0, 0.9, 2.4], fov: 30 }}
+      >
+        {/* lighting */}
+        <ambientLight intensity={0.35} />
+        {/* hemisphereLight typing prefers color/groundColor */}
+        <hemisphereLight color={'#89a3ff'} groundColor={'#223355'} intensity={0.5} />
 
-      <Suspense fallback={null}>
-        <QueenModel active={active} />
-        <ContactShadows
-          position={[0, -0.9, 0]}
-          opacity={0.35}
-          scale={6}
-          blur={2.2}
-          far={4}
+        {/* a gentle spotlight from above */}
+        <spotLight
+          position={[2.8, 3.5, 3.1]}
+          angle={0.4}
+          penumbra={0.35}
+          intensity={1.15}
+          castShadow
         />
-        <Environment preset="city" />
-      </Suspense>
-    </Canvas>
-  );
-}
 
-export default memo(function Queen3D({ active }: Queen3DProps) {
-  return (
-    <div className="queen-3d" aria-hidden="true">
-      <Queen3DCanvas active={active} />
+        <group position={[0, 0, 0]}>
+          <QueenModel active={!!active} scale={scale} y={y} />
+        </group>
+
+        <ContactShadows
+          opacity={0.35}
+          scale={4.2}
+          blur={2.4}
+          far={4}
+          resolution={768}
+          position={[0, -0.1, 0]}
+        />
+
+        <Environment preset="city" />
+      </Canvas>
+
       <style jsx>{`
-        .queen-3d {
+        .queen3d {
           position: absolute;
           left: 50%;
-          top: 40%;
-          transform: translate(-50%, -50%);
-          width: 320px;
-          height: 220px;
+          top: 50%;
+          transform: translate(-50%, -58%); /* sits behind the middle egg */
+          width: 460px;
+          height: 260px;
           pointer-events: none;
-          z-index: 12; /* under eggs (z:25), above rails */
+          z-index: 12; /* below eggs (z:25 in your CSS), above rails */
         }
+
         @media (max-width: 480px) {
-          .queen-3d { width: 260px; height: 180px; top: 42%; }
+          .queen3d {
+            width: 360px;
+            height: 220px;
+            transform: translate(-50%, -56%);
+          }
         }
       `}</style>
     </div>
   );
-});
+}
+
+useGLTF.preload('/models/queen/queen.glb');
