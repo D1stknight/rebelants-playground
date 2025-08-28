@@ -6,14 +6,15 @@ import * as THREE from 'three';
 
 type Props = {
   active?: boolean;
-  scale?: number; // 1 = default size
-  y?: number;     // vertical nudge (negative = lower)
+  scale?: number; // visual size of the queen model
+  y?: number;     // small vertical nudge in scene space (negative => lower)
 };
 
 function QueenModel({ active = false, scale = 1, y = 0 }: Props) {
   const { scene } = useGLTF('/models/queen/queen.glb');
   const ref = useRef<THREE.Group>(null!);
 
+  // enable shadows + a touch of env lighting on materials
   useMemo(() => {
     scene.traverse((obj) => {
       if ((obj as THREE.Mesh).isMesh) {
@@ -38,10 +39,11 @@ function QueenModel({ active = false, scale = 1, y = 0 }: Props) {
   return <primitive ref={ref} object={scene} />;
 }
 
-export default function Queen3D({ active, scale = .9, y = -0.28 }: Props) {
+export default function Queen3D({ active, scale = .7, y = -0.36 }: Props) {
   return (
     <div className="queen3d" aria-hidden="true">
-      <Canvas dpr={[1, 2]} shadows camera={{ position: [0, 1.05, 2.15], fov: 30 }}>
+      <Canvas dpr={[1, 2]} shadows camera={{ position: [0, 1.05, 2.05], fov: 30 }}>
+        {/* lighting */}
         <ambientLight intensity={0.38} />
         <hemisphereLight color={'#8fb2ff'} groundColor={'#21324f'} intensity={0.55} />
         <spotLight position={[2.6, 3.4, 3.1]} angle={0.4} penumbra={0.35} intensity={1.15} castShadow />
@@ -59,17 +61,17 @@ export default function Queen3D({ active, scale = .9, y = -0.28 }: Props) {
           position: absolute;
           left: 50%;
           top: 50%;
-          /* bring her DOWN considerably and keep centered */
-          transform: translate(-50%, -30%);
-          width: 680px;
-          height: 360px;
+          /* lower than center and big */
+          transform: translate(-50%, -28%);
+          width: 760px;
+          height: 420px;
           pointer-events: none;
           z-index: 12; /* eggs are z:25 */
         }
         @media (max-width: 480px) {
           .queen3d {
-            width: 440px;
-            height: 270px;
+            width: 520px;
+            height: 300px;
             transform: translate(-50%, -32%);
           }
         }
