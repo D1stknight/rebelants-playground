@@ -242,7 +242,7 @@ export default function Shuffle() {
           <div className="strip" />
 
           {/* Queen 3D — bigger & low */}
-          <Queen3D active={phase === 'shuffling'} scale={1.6} y={-0.36} />
+          <Queen3D active={phase === 'shuffling'} scale={.7} y={-0.36} />
 
           <div className="rail rail-top" />
           <div className="rail rail-bottom" />
