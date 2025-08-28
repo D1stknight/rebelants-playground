@@ -5,17 +5,21 @@ import { ContactShadows, Environment, useGLTF } from '@react-three/drei';
 import type { Group } from 'three';
 
 type Queen3DProps = {
-  active?: boolean; // wobble a bit faster when shuffling
+  /** When true (during shuffling) the idle motion is a bit livelier */
+  active?: boolean;
 };
 
+/* ---------------- Model ---------------- */
 function QueenModel({
   active = false,
   ...props
 }: Queen3DProps & JSX.IntrinsicElements['group']) {
+  // GLB lives under /public/models/queen/queen.glb
   const { scene } = useGLTF('/models/queen/queen.glb');
+
   const ref = useRef<Group>(null!);
 
-  // enable shadows on all meshes
+  // Make sure all meshes cast/receive shadows
   useMemo(() => {
     scene.traverse((o: any) => {
       if (o.isMesh) {
@@ -25,13 +29,20 @@ function QueenModel({
     });
   }, [scene]);
 
-  // gentle idle animation (faster when active)
-  useFrame((state) => {
-    const t = state.clock.getElapsedTime();
-    const bob = (active ? 0.05 : 0.025) * Math.sin(t * (active ? 3 : 1.6));
-    const sway = (active ? 0.08 : 0.04) * Math.sin(t * (active ? 1.3 : 0.75));
+  // --- placement + subtle animation ---
+  // Lower baseY to push the character DOWN in the frame
+  const BASE_Y = -0.58;        // ⬅️ lower = further down (we had ~ -0.30 before)
+  const BOB_IDLE = 0.025;
+  const BOB_ACTIVE = 0.055;
+  const SWAY_IDLE = 0.04;
+  const SWAY_ACTIVE = 0.08;
+
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    const bob = (active ? BOB_ACTIVE : BOB_IDLE) * Math.sin(t * (active ? 3.0 : 1.6));
+    const sway = (active ? SWAY_ACTIVE : SWAY_IDLE) * Math.sin(t * (active ? 1.3 : 0.75));
     if (ref.current) {
-      ref.current.position.y = -0.3 + bob;
+      ref.current.position.y = BASE_Y + bob; // move whole model lower
       ref.current.rotation.y = Math.PI + sway;
     }
   });
@@ -42,19 +53,23 @@ function QueenModel({
         object={scene}
         position={[0, 0, 0]}
         rotation={[0, Math.PI, 0]}
-        scale={1.8}
+        scale={1.8}     // bump to 2.0 if you want larger
       />
     </group>
   );
 }
 useGLTF.preload('/models/queen/queen.glb');
 
+/* ---------------- Canvas Shell ---------------- */
 function Queen3DCanvas({ active = false }: Queen3DProps) {
   return (
     <Canvas
       dpr={[1, 2]}
       shadows
-      camera={{ fov: 26, position: [0, 0.95, 3.2] }} // closer camera => larger queen
+      camera={{
+        fov: 26,
+        position: [0, 0.95, 3.2], // you can pull back slightly if you want more headroom
+      }}
     >
       {/* lighting */}
       <ambientLight intensity={0.55} />
@@ -68,7 +83,7 @@ function Queen3DCanvas({ active = false }: Queen3DProps) {
       <Suspense fallback={null}>
         <QueenModel active={active} />
         <ContactShadows
-          position={[0, -0.58, 0]}
+          position={[0, -0.9, 0]}
           opacity={0.35}
           scale={6}
           blur={2.2}
@@ -80,6 +95,7 @@ function Queen3DCanvas({ active = false }: Queen3DProps) {
   );
 }
 
+/* ---------------- Exported component ---------------- */
 export default memo(function Queen3D(props: Queen3DProps) {
   return (
     <div className="queen-3d" aria-hidden="true">
