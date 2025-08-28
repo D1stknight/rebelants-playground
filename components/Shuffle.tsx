@@ -3,7 +3,7 @@
 
 import React, { useMemo, useState, useMemo as _useMemo } from 'react';
 import dynamic from 'next/dynamic';
-const Queen3D = dynamic(() => import('@/components/Queen3D'), { ssr: false });
+const Queen3D = dynamic(() => import('./Queen3D'), { ssr: false });
 
 type Phase = 'idle' | 'shuffling' | 'pick' | 'revealed';
 type Rarity = 'none' | 'common' | 'rare' | 'ultra';
