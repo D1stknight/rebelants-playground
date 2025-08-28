@@ -2,19 +2,19 @@
 import React, { useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 
-// 3D queen (client-only)
-const Queen3D = dynamic(() => import('./Queen3D'), {
-  ssr: false,
-}) as React.ComponentType<{ active?: boolean; scale?: number; y?: number }>;
+const Queen3D = dynamic(() => import('./Queen3D'), { ssr: false }) as React.ComponentType<{
+  active?: boolean;
+  scale?: number;
+  y?: number;
+}>;
 
 type Phase = 'idle' | 'shuffling' | 'pick' | 'revealed';
 type Rarity = 'none' | 'common' | 'rare' | 'ultra';
 
-const LANES = [21.5, 50, 78.5];         // left:% for the three lanes
-const SHUFFLE_MS = 3200;                // ⏱ total shuffle duration (slower now)
-const SWAP_EVERY_MS = 280;              // do lots of swaps during the shuffle
+const LANES = [21.5, 50, 78.5];
+const SHUFFLE_MS = 3200;     // total shuffle duration (slower)
+const SWAP_EVERY_MS = 280;   // frequent lane swaps while shuffling
 
-/* ------------ helper: random rarity -------------- */
 function rollRarity(): Rarity {
   const r = Math.random();
   if (r < 0.05) return 'ultra';   // 5%
@@ -22,18 +22,15 @@ function rollRarity(): Rarity {
   if (r < 0.55) return 'common';  // 37%
   return 'none';                  // 45%
 }
-
-/* ------------ helper: fisher–yates --------------- */
 function shuffled3(): number[] {
-  const arr = [0, 1, 2];
-  for (let i = arr.length - 1; i > 0; i--) {
+  const a = [0, 1, 2];
+  for (let i = a.length - 1; i > 0; i--) {
     const j = (Math.random() * (i + 1)) | 0;
-    [arr[i], arr[j]] = [arr[j], arr[i]];
+    [a[i], a[j]] = [a[j], a[i]];
   }
-  return arr;
+  return a;
 }
 
-/* ------------ tiny marching ant icon -------------- */
 function AntIcon() {
   return (
     <svg viewBox="0 0 24 12" aria-hidden="true">
@@ -53,7 +50,6 @@ function AntIcon() {
   );
 }
 
-/* ------------ progress with marching ants --------- */
 function AntProgress({ progress }: { progress: number }) {
   const ants = useMemo(() => Array.from({ length: 8 }, (_, i) => i), []);
   return (
@@ -87,7 +83,7 @@ function AntProgress({ progress }: { progress: number }) {
           position: absolute;
           top: 50%;
           transform: translate(-50%, -50%);
-          filter: drop-shadow(0 0 6px rgba(0,255,170,.28));
+          filter: drop-shadow(0 0 7px rgba(0,255,170,.35));
           animation: antBob .58s ease-in-out infinite;
         }
         .ant:nth-child(2n) { animation-duration: .66s; }
@@ -100,24 +96,44 @@ function AntProgress({ progress }: { progress: number }) {
   );
 }
 
-/* -------- local prize modal (uses your CSS classes) -------- */
-function PrizeModal({
-  rarity,
-  onClose,
-}: {
-  rarity: Rarity;
-  onClose: () => void;
-}) {
+/* ---------- Upgraded Prize Modal with brighter, longer sparkles ---------- */
+function PrizeModal({ rarity, onClose }: { rarity: Rarity; onClose: () => void }) {
   const title =
     rarity === 'ultra' ? 'ULTRA CRATE!'
     : rarity === 'rare' ? 'Rare Crate!'
     : rarity === 'common' ? 'Crate Unlocked'
     : 'No crate this time';
 
+  // make a bunch of sparkles with fixed random-ish positions
+  const sparks = useMemo(() => Array.from({ length: 24 }, (_, i) => ({
+    left: `${8 + (i * 4.1) % 84}%`,
+    top: `${10 + ((i * 7.3) % 62)}%`,
+    size: 10 + ((i * 3) % 14),
+    delay: (i * 0.18) % 3.2
+  })), []);
+
   return (
     <div className="prize-modal" role="dialog" aria-modal="true">
       <div className={`prize-card pm-${rarity}`}>
+        {/* Sparkles (brighter + longer) */}
+        {rarity !== 'none' && (
+          <div className="sparkle-layer" aria-hidden="true">
+            {sparks.map((s, i) => (
+              <span
+                key={i}
+                className={`pm-sparkle ${rarity}`}
+                style={{
+                  left: s.left, top: s.top,
+                  width: s.size, height: s.size,
+                  animationDelay: `${s.delay}s`
+                }}
+              />
+            ))}
+          </div>
+        )}
+
         <div className="prize-title">{title}</div>
+
         {rarity !== 'none' ? (
           <>
             <div className="prize-aura" data-rarity={rarity} />
@@ -125,17 +141,47 @@ function PrizeModal({
             <div className="prize-sub">Tap continue to play again.</div>
           </>
         ) : (
-          <div className="prize-sub" style={{ marginBottom: 12 }}>
-            Bummer! Try another egg.
-          </div>
+          <div className="prize-sub" style={{ marginBottom: 12 }}>Bummer! Try another egg.</div>
         )}
+
         <button className="btn" onClick={onClose}>Continue</button>
       </div>
+
+      <style jsx>{`
+        .prize-modal { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.5); z-index: 1000; }
+        .prize-card { position: relative; min-width: 320px; padding: 20px; border-radius: 12px; text-align: center;
+          background: rgba(15,23,42,.95); border: 1px solid rgba(148,163,184,.25);
+          box-shadow: 0 24px 40px rgba(0,0,0,.55);
+          overflow: visible;
+        }
+        .prize-title { font-size: 18px; font-weight: 800; margin: 10px 0; }
+        .prize-sub { font-size: 14px; opacity: .85; margin-bottom: 12px; }
+        .prize-art { display: block; width: 240px; max-width: 80vw; height: auto; margin: 0 auto 12px; position: relative; z-index: 1; }
+
+        /* Sparkles (component-scoped). Brighter + slower fade */
+        .sparkle-layer { position: absolute; inset: -8% -10%; pointer-events: none; z-index: 0; }
+        .pm-sparkle { position: absolute; border-radius: 50%;
+          background: radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.0) 65%);
+          filter: blur(.3px) drop-shadow(0 0 12px rgba(255,255,255,.65));
+          opacity: 0;
+          animation: pmSpark 2.6s ease-in-out infinite;
+        }
+        .pm-sparkle.common { filter: blur(.3px) drop-shadow(0 0 14px rgba(147,197,253,.85)); }
+        .pm-sparkle.rare   { filter: blur(.3px) drop-shadow(0 0 14px rgba(59,130,246,.95)); }
+        .pm-sparkle.ultra  { filter: blur(.3px) drop-shadow(0 0 16px rgba(244,63,94,1)); }
+        @keyframes pmSpark {
+          0%   { transform: scale(0.4); opacity: 0; }
+          20%  { opacity: 1; }
+          55%  { transform: scale(1.1); opacity: 0.9; }
+          85%  { transform: scale(0.7); opacity: 0.7; }
+          100% { transform: scale(0.3); opacity: 0; }
+        }
+      `}</style>
     </div>
   );
 }
 
-/* ===================== main game ====================== */
+/* ====================== main game ====================== */
 export default function Shuffle() {
   const [phase, setPhase] = useState<Phase>('idle');
   const [order, setOrder] = useState<number[]>([0, 1, 2]);
@@ -151,7 +197,6 @@ export default function Shuffle() {
     setProgress(0);
     setShowPrize(false);
 
-    // multiple swaps during the shuffle window
     let swapTimer: NodeJS.Timeout | null = null;
     swapTimer = setInterval(() => setOrder(shuffled3()), SWAP_EVERY_MS);
 
@@ -172,7 +217,6 @@ export default function Shuffle() {
   const onPick = () => {
     if (phase !== 'pick' || busy) return;
     setBusy(true);
-    // tiny pause for click feedback, then "reveal"
     setTimeout(() => {
       const r = rollRarity();
       setRarity(r);
@@ -191,49 +235,96 @@ export default function Shuffle() {
   };
 
   return (
-    <div className="ant-card ra-shuffle2">
-      <div className="title">Queen&apos;s Egg Shuffle</div>
-      <p className="subtitle">Three eggs. We shuffle. You pick one for a prize.</p>
+    <>
+      {/* --- Full-screen Japanese ninja-ant background (fixed) --- */}
+      <div className="ant-colony-bg" aria-hidden="true" />
 
-      {/* Scene */}
-      <div className="shuffle-scene ant-scene" style={{ position: 'relative' }}>
-        <div className="strip" />
+      <div className="ant-card ra-shuffle2">
+        <div className="title">Queen&apos;s Egg Shuffle</div>
+        <p className="subtitle">Three eggs. We shuffle. You pick one for a prize.</p>
 
-        {/* 3D Queen — scale 0.9 like you asked */}
-        <Queen3D active={phase === 'shuffling'} scale={0.9} y={0} />
+        <div className="shuffle-scene ant-scene" style={{ position: 'relative' }}>
+          {/* In-card Japanese dojo background */}
+          <div className="scene-bg" aria-hidden="true" />
 
-        <div className="rail rail-top" />
-        <div className="rail rail-bottom" />
+          <div className="strip" />
 
-        {/* marching-ants progress (slower) */}
-        <AntProgress progress={phase === 'shuffling' ? progress : 0} />
+          {/* Queen 3D — centered better & slightly larger */}
+          <Queen3D active={phase === 'shuffling'} scale={1.1} y={-0.02} />
 
-        {/* Eggs */}
-        {[0, 1, 2].map((i) => (
-          <button
-            key={i}
-            className={`egg-card ${phase === 'pick' ? 'can-pick' : ''}`}
-            style={{ left: `${LANES[order[i]]}%`, top: '58%' }}
-            onClick={onPick}
-            disabled={phase !== 'pick' || busy}
-            aria-label="Pick egg"
-          >
-            <div className={`egg-body ${phase === 'pick' ? 'wobble-on-pick' : ''}`} />
-            <div className="egg-shadow" />
-            <div className="egg-speckle" />
+          <div className="rail rail-top" />
+          <div className="rail rail-bottom" />
+
+          <AntProgress progress={phase === 'shuffling' ? progress : 0} />
+
+          {[0, 1, 2].map((i) => (
+            <button
+              key={i}
+              className={`egg-card ${phase === 'pick' ? 'can-pick' : ''}`}
+              style={{ left: `${LANES[order[i]]}%`, top: '58%' }}
+              onClick={onPick}
+              disabled={phase !== 'pick' || busy}
+              aria-label="Pick egg"
+            >
+              <div className={`egg-body ${phase === 'pick' ? 'wobble-on-pick' : ''}`} />
+              <div className="egg-shadow" />
+              <div className="egg-speckle" />
+            </button>
+          ))}
+        </div>
+
+        <div className="shuffle-cta">
+          <button className="btn" onClick={runShuffle} disabled={busy || phase === 'shuffling'}>
+            {phase === 'shuffling' ? 'Shuffling…' : 'Shuffle'}
           </button>
-        ))}
+        </div>
+
+        {showPrize && <PrizeModal rarity={rarity} onClose={resetAfterPrize} />}
       </div>
 
-      {/* CTA below scene */}
-      <div className="shuffle-cta">
-        <button className="btn" onClick={runShuffle} disabled={busy || phase === 'shuffling'}>
-          {phase === 'shuffling' ? 'Shuffling…' : 'Shuffle'}
-        </button>
-      </div>
+      {/* Component-scoped styles for the two new backgrounds */}
+      <style jsx>{`
+        /* full-screen ninja-ant colony background */
+        .ant-colony-bg {
+          position: fixed; inset: 0; z-index: 0; pointer-events: none;
+          background:
+            radial-gradient(140% 90% at 50% 10%, #0b1b31 0%, #0a1427 55%, #070d1a 100%),
+            /* distant mountains (layer 1) */
+            linear-gradient(to top, rgba(10,20,36,0.0) 0%, rgba(10,20,36,0.0) 58%, rgba(22,34,58,0.35) 59%, rgba(22,34,58,0.0) 70%),
+            /* dojo silhouettes (layer 2 - subtle) */
+            url("data:image/svg+xml;utf8,\
+              <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 600'>\
+                <g fill='rgba(24,36,64,0.55)'>\
+                  <rect x='120' y='380' width='220' height='14'/>\
+                  <rect x='170' y='340' width='120' height='16'/>\
+                  <rect x='200' y='300' width='60' height='20'/>\
+                  <rect x='780' y='390' width='240' height='14'/>\
+                  <rect x='830' y='350' width='130' height='16'/>\
+                  <rect x='860' y='310' width='70' height='20'/>\
+                </g>\
+                <g fill='rgba(32,48,86,0.45)'>\
+                  <path d='M0,470 C180,420 320,480 520,460 C720,440 900,470 1200,430 L1200,600 L0,600 Z'/>\
+                </g>\
+              </svg>"),
+            /* faint star/bokeh pattern */
+            radial-gradient(1px 1px at 20% 20%, rgba(255,255,255,.08) 0, rgba(255,255,255,0) 60%),
+            radial-gradient(1px 1px at 60% 35%, rgba(255,255,255,.05) 0, rgba(255,255,255,0) 60%),
+            radial-gradient(1px 1px at 75% 75%, rgba(255,255,255,.06) 0, rgba(255,255,255,0) 60%);
+          background-blend-mode: normal, normal, overlay, normal, normal, normal;
+          filter: saturate(1.05);
+        }
 
-      {/* Prize modal (uses your existing global CSS look) */}
-      {showPrize && <PrizeModal rarity={rarity} onClose={resetAfterPrize} />}
-    </div>
+        /* inside-card dojo background (subtle 3D feel) */
+        .scene-bg {
+          position: absolute; inset: 0; z-index: 1; pointer-events: none; border-radius: 12px;
+          background:
+            radial-gradient(60% 80% at 50% 15%, rgba(255,255,255,.06), rgba(0,0,0,0) 70%),
+            linear-gradient(180deg, rgba(17,27,48,.7), rgba(10,18,36,.9)),
+            /* shoji-ish vertical slats */
+            repeating-linear-gradient(90deg, rgba(255,255,255,.06) 0 2px, rgba(255,255,255,0) 2px 22px);
+          box-shadow: inset 0 10px 28px rgba(0,0,0,.35);
+        }
+      `}</style>
+    </>
   );
 }
