@@ -5,8 +5,7 @@ import { ContactShadows, Environment, useGLTF } from '@react-three/drei';
 import type { Group } from 'three';
 
 type Queen3DProps = {
-  /** When true (during shuffling), do a slightly snappier idle animation */
-  active?: boolean;
+  active?: boolean; // wobble a bit faster when shuffling
 };
 
 function QueenModel({
@@ -16,7 +15,7 @@ function QueenModel({
   const { scene } = useGLTF('/models/queen/queen.glb');
   const ref = useRef<Group>(null!);
 
-  // turn on shadows
+  // enable shadows on all meshes
   useMemo(() => {
     scene.traverse((o: any) => {
       if (o.isMesh) {
@@ -26,7 +25,7 @@ function QueenModel({
     });
   }, [scene]);
 
-  // idle bob + sway; faster when active
+  // gentle idle animation (faster when active)
   useFrame((state) => {
     const t = state.clock.getElapsedTime();
     const bob = (active ? 0.05 : 0.025) * Math.sin(t * (active ? 3 : 1.6));
@@ -43,7 +42,7 @@ function QueenModel({
         object={scene}
         position={[0, 0, 0]}
         rotation={[0, Math.PI, 0]}
-        scale={1.8}               {/* <— bigger */}
+        scale={1.8}
       />
     </group>
   );
@@ -55,8 +54,7 @@ function Queen3DCanvas({ active = false }: Queen3DProps) {
     <Canvas
       dpr={[1, 2]}
       shadows
-      // closer camera so the queen fills the area
-      camera={{ fov: 26, position: [0, 0.95, 3.2] }}
+      camera={{ fov: 26, position: [0, 0.95, 3.2] }} // closer camera => larger queen
     >
       {/* lighting */}
       <ambientLight intensity={0.55} />
