@@ -53,7 +53,7 @@ function QueenModel({
         object={scene}
         position={[0, 0, 0]}
         rotation={[0, Math.PI, 0]}
-        scale={1.3}     // bump to 2.0 if you want larger
+        scale={1.0}     // bump to 2.0 if you want larger
       />
     </group>
   );
