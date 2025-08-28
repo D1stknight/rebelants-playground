@@ -2,7 +2,8 @@
 // RA: Shuffle v1.5 — FIX: correct positioning (lanes[order[i]]), clean phases, prize event
 
 import React, { useEffect, useMemo, useState } from 'react';
-import Queen from './Queen';
+import Queen from '@/components/Queen';
+
 
 type Phase = 'idle' | 'shuffling' | 'pick' | 'revealed';
 const wait = (ms: number) => new Promise(r => setTimeout(r, ms));
