@@ -31,7 +31,7 @@ function shuffled3(): number[] {
   return a;
 }
 
-/* ---------- Ant progress (ants only; removed glowing fill bar) ---------- */
+/* ---------- Ant progress (ants only) ---------- */
 function AntIcon() {
   return (
     <svg viewBox="0 0 24 12" aria-hidden="true">
@@ -97,7 +97,7 @@ function AntProgress({ progress }: { progress: number }) {
   );
 }
 
-/* ---------- Prize Modal with bright, longer sparkles ---------- */
+/* ---------- Prize Modal (unchanged behavior, brighter sparkles kept) ---------- */
 function PrizeModal({ rarity, onClose }: { rarity: Rarity; onClose: () => void }) {
   const title =
     rarity === 'ultra' ? 'ULTRA CRATE!'
@@ -241,8 +241,8 @@ export default function Shuffle() {
 
           <div className="strip" />
 
-          {/* Queen 3D — bigger & much lower */}
-          <Queen3D active={phase === 'shuffling'} scale={1.3} y={-0.30} />
+          {/* Queen 3D — bigger & low */}
+          <Queen3D active={phase === 'shuffling'} scale={1.6} y={-0.36} />
 
           <div className="rail rail-top" />
           <div className="rail rail-bottom" />
@@ -276,8 +276,8 @@ export default function Shuffle() {
 
       {/* Background CSS (scoped) */}
       <style jsx>{`
-        /* OUTSIDE background. If you upload /public/bg/colony.webp it will show.
-           If not, the gradient/SVG fallback still renders. */
+        /* OUTSIDE background.
+           If /bg/colony.webp exists, it shows; otherwise gradient/SVG fallback renders. */
         .ant-colony-bg {
           position: fixed; inset: 0; pointer-events: none; z-index: 0;
           background:
@@ -301,12 +301,12 @@ export default function Shuffle() {
           filter: saturate(1.05);
         }
 
-        /* IN-SCENE background. Upload /public/bg/dojo.webp for a 3D dojo;
-           otherwise you’ll see a nice lined-panel fallback. */
+        /* IN-SCENE background. If /bg/dojo.webp exists it shows;
+           else we show a lined glossy panel as a fallback. */
         .scene-bg {
           position: absolute; inset: 0; z-index: 1; pointer-events: none; border-radius: 12px;
           background:
-            linear-gradient(180deg, rgba(0,0,0,.25), rgba(0,0,0,.25)), /* darken overlay */
+            linear-gradient(180deg, rgba(0,0,0,.28), rgba(0,0,0,.28)),
             url('/bg/dojo.webp') center/cover no-repeat,
             radial-gradient(60% 80% at 50% 14%, rgba(255,255,255,.10), rgba(0,0,0,0) 70%),
             linear-gradient(180deg, rgba(17,27,48,.85), rgba(10,18,36,.95)),
