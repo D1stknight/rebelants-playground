@@ -119,7 +119,7 @@ function Scene({ active }: { active: boolean }) {
     <>
       {/* lighting */}
       <ambientLight intensity={0.35} />
-      <hemisphereLight skyColor={'#89a3ff'} groundColor={'#223355'} intensity={0.5} />
+      <hemisphereLight color={'#89a3ff'} groundColor={'#223355'} intensity={0.5} />
       <spotLight position={[2.5, 3.5, 3]} angle={0.4} penumbra={0.3} intensity={1.2} castShadow />
       <QueenModel active={active} />
       <ContactShadows opacity={0.35} scale={5} blur={2.2} far={4} resolution={1024} />
