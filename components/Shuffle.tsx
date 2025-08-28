@@ -12,8 +12,8 @@ type Phase = 'idle' | 'shuffling' | 'pick' | 'revealed';
 type Rarity = 'none' | 'common' | 'rare' | 'ultra';
 
 const LANES = [21.5, 50, 78.5];
-const SHUFFLE_MS = 3200;     // total shuffle duration
-const SWAP_EVERY_MS = 280;   // lane swap cadence
+const SHUFFLE_MS = 3200;
+const SWAP_EVERY_MS = 280;
 
 function rollRarity(): Rarity {
   const r = Math.random();
@@ -31,7 +31,7 @@ function shuffled3(): number[] {
   return a;
 }
 
-/* ---------- Ant progress with fill that stays at 100% after shuffle ---------- */
+/* ---------- Ant progress (ants only; removed glowing fill bar) ---------- */
 function AntIcon() {
   return (
     <svg viewBox="0 0 24 12" aria-hidden="true">
@@ -55,7 +55,6 @@ function AntProgress({ progress }: { progress: number }) {
   return (
     <div className="ant-progress" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
       <div className="track" />
-      <div className="fill" style={{ width: `${progress}%` }} />
       {ants.map((i) => (
         <div key={i} className="ant" style={{ left: `calc(${progress}% - ${i * 16}px)` }}>
           <AntIcon />
@@ -73,19 +72,14 @@ function AntProgress({ progress }: { progress: number }) {
           z-index: 26;
         }
         .track {
-          position: absolute; left: 0; right: 0;
-          top: 50%; height: 7px; transform: translateY(-50%);
-          border-radius: 999px;
-          background: linear-gradient(90deg, #2e3b54, #2a3c46);
+          position: absolute; left: 0; right: 0; top: 50%;
+          height: 7px; transform: translateY(-50%); border-radius: 999px;
+          background:
+            linear-gradient(90deg, rgba(255,255,255,.08) 0 2px, transparent 2px) repeat-x,
+            linear-gradient(90deg, #22324a, #1a2a3f);
+          background-size: 14px 7px, auto;
           box-shadow: inset 0 2px 6px rgba(0,0,0,.35), 0 0 0 1px rgba(255,255,255,.06);
           opacity: .9;
-        }
-        .fill {
-          position: absolute; left: 0; top: 50%; height: 7px; transform: translateY(-50%);
-          border-radius: 999px;
-          background: linear-gradient(90deg, #79d1ff, #f3ff5d, #7effaf);
-          transition: width .2s linear;
-          box-shadow: 0 0 10px rgba(124, 255, 214, .25);
         }
         .ant {
           position: absolute; top: 50%;
@@ -103,7 +97,7 @@ function AntProgress({ progress }: { progress: number }) {
   );
 }
 
-/* ---------- Prize Modal (with bright, longer sparkles) ---------- */
+/* ---------- Prize Modal with bright, longer sparkles ---------- */
 function PrizeModal({ rarity, onClose }: { rarity: Rarity; onClose: () => void }) {
   const title =
     rarity === 'ultra' ? 'ULTRA CRATE!'
@@ -152,8 +146,7 @@ function PrizeModal({ rarity, onClose }: { rarity: Rarity; onClose: () => void }
         .prize-modal { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.5); z-index: 1000; }
         .prize-card { position: relative; min-width: 320px; padding: 20px; border-radius: 12px; text-align: center;
           background: rgba(15,23,42,.95); border: 1px solid rgba(148,163,184,.25);
-          box-shadow: 0 24px 40px rgba(0,0,0,.55);
-          overflow: visible;
+          box-shadow: 0 24px 40px rgba(0,0,0,.55); overflow: visible;
         }
         .prize-title { font-size: 18px; font-weight: 800; margin: 10px 0; }
         .prize-sub   { font-size: 14px; opacity: .85; margin-bottom: 12px; }
@@ -163,8 +156,7 @@ function PrizeModal({ rarity, onClose }: { rarity: Rarity; onClose: () => void }
         .pm-sparkle { position: absolute; border-radius: 50%;
           background: radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.0) 65%);
           filter: blur(.3px) drop-shadow(0 0 12px rgba(255,255,255,.65));
-          opacity: 0;
-          animation: pmSpark 2.6s ease-in-out infinite;
+          opacity: 0; animation: pmSpark 2.6s ease-in-out infinite;
         }
         .pm-sparkle.common { filter: blur(.3px) drop-shadow(0 0 14px rgba(147,197,253,.85)); }
         .pm-sparkle.rare   { filter: blur(.3px) drop-shadow(0 0 14px rgba(59,130,246,.95)); }
@@ -181,7 +173,6 @@ function PrizeModal({ rarity, onClose }: { rarity: Rarity; onClose: () => void }
   );
 }
 
-/* ====================== main game ====================== */
 export default function Shuffle() {
   const [phase, setPhase] = useState<Phase>('idle');
   const [order, setOrder] = useState<number[]>([0, 1, 2]);
@@ -207,7 +198,7 @@ export default function Shuffle() {
       if (p < 1) requestAnimationFrame(tick);
       else {
         if (swapTimer) clearInterval(swapTimer);
-        setProgress(100);           // STAY filled instead of jumping back
+        setProgress(100);
         setPhase('pick');
         setBusy(false);
       }
@@ -230,14 +221,14 @@ export default function Shuffle() {
   const resetAfterPrize = () => {
     setShowPrize(false);
     setRarity('none');
-    setProgress(0);            // reset only when the modal closes / next round
+    setProgress(0);
     setOrder([0, 1, 2]);
     setPhase('idle');
   };
 
   return (
     <>
-      {/* --- Full-screen Japanese ninja-ant background (outside the card) --- */}
+      {/* ===== Full‑screen ninja ant colony background (outside the card) ===== */}
       <div className="ant-colony-bg" aria-hidden="true" />
 
       <div className="ant-card ra-shuffle2">
@@ -245,13 +236,13 @@ export default function Shuffle() {
         <p className="subtitle">Three eggs. We shuffle. You pick one for a prize.</p>
 
         <div className="shuffle-scene ant-scene" style={{ position: 'relative' }}>
-          {/* In-card Japanese dojo background */}
+          {/* Dojo background inside the scene */}
           <div className="scene-bg" aria-hidden="true" />
 
           <div className="strip" />
 
-          {/* Queen 3D — slightly bigger and lower */}
-          <Queen3D active={phase === 'shuffling'} scale={1.2} y={-0.08} />
+          {/* Queen 3D — bigger & much lower */}
+          <Queen3D active={phase === 'shuffling'} scale={1.3} y={-0.30} />
 
           <div className="rail rail-top" />
           <div className="rail rail-bottom" />
@@ -283,16 +274,15 @@ export default function Shuffle() {
         {showPrize && <PrizeModal rarity={rarity} onClose={resetAfterPrize} />}
       </div>
 
-      {/* Background styles (scoped here so they live only on this page) */}
+      {/* Background CSS (scoped) */}
       <style jsx>{`
-        /* Full-screen ninja-ant colony background */
+        /* OUTSIDE background. If you upload /public/bg/colony.webp it will show.
+           If not, the gradient/SVG fallback still renders. */
         .ant-colony-bg {
-          position: fixed; inset: 0;
-          pointer-events: none;
-          z-index: 0; /* behind the card & header */
+          position: fixed; inset: 0; pointer-events: none; z-index: 0;
           background:
+            url('/bg/colony.webp') center/cover no-repeat,
             radial-gradient(140% 90% at 50% 8%, #0b1b31 0%, #0a1427 55%, #070d1a 100%),
-            /* silhouettes & hills (SVG) */
             url("data:image/svg+xml;utf8,\
               <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 600'>\
                 <g fill='rgba(24,36,64,0.55)'>\
@@ -306,18 +296,18 @@ export default function Shuffle() {
                 <g fill='rgba(32,48,86,0.45)'>\
                   <path d='M0,470 C180,420 320,480 520,460 C720,440 900,470 1200,430 L1200,600 L0,600 Z'/>\
                 </g>\
-              </svg>"),
-            radial-gradient(1px 1px at 20% 20%, rgba(255,255,255,.08) 0, rgba(255,255,255,0) 60%),
-            radial-gradient(1px 1px at 60% 35%, rgba(255,255,255,.05) 0, rgba(255,255,255,0) 60%),
-            radial-gradient(1px 1px at 75% 75%, rgba(255,255,255,.06) 0, rgba(255,255,255,0) 60%);
-          background-blend-mode: normal, overlay, normal, normal, normal, normal;
+              </svg>") center/cover no-repeat;
+          background-blend-mode: normal, overlay, normal;
           filter: saturate(1.05);
         }
 
-        /* Stronger in-card dojo background */
+        /* IN-SCENE background. Upload /public/bg/dojo.webp for a 3D dojo;
+           otherwise you’ll see a nice lined-panel fallback. */
         .scene-bg {
           position: absolute; inset: 0; z-index: 1; pointer-events: none; border-radius: 12px;
           background:
+            linear-gradient(180deg, rgba(0,0,0,.25), rgba(0,0,0,.25)), /* darken overlay */
+            url('/bg/dojo.webp') center/cover no-repeat,
             radial-gradient(60% 80% at 50% 14%, rgba(255,255,255,.10), rgba(0,0,0,0) 70%),
             linear-gradient(180deg, rgba(17,27,48,.85), rgba(10,18,36,.95)),
             repeating-linear-gradient(90deg, rgba(255,255,255,.08) 0 2px, rgba(255,255,255,0) 2px 22px);
