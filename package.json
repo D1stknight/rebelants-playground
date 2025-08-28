@@ -16,7 +16,8 @@
     "@react-three/drei": "9.97.1",
     "@react-three/fiber": "8.15.19",
     "three": "0.160.0",
-
+    "@react-three/postprocessing": "^2.16.4",
+    "postprocessing": "^6.35.3",
     "classnames": "2.5.1"
   },
   "devDependencies": {
