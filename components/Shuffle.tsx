@@ -97,7 +97,7 @@ function AntProgress({ progress }: { progress: number }) {
   );
 }
 
-/* ---------- Prize Modal (bright sparkles) ---------- */
+/* ---------- Prize Modal (with bright sparkles) ---------- */
 function PrizeModal({ rarity, onClose }: { rarity: Rarity; onClose: () => void }) {
   const title =
     rarity === 'ultra' ? 'ULTRA CRATE!'
@@ -227,17 +227,6 @@ export default function Shuffle() {
 
   return (
     <>
-      {/* simple header so chips are always visible */}
-      <div className="playground-header">
-        <div className="title">Rebel Ants Playground</div>
-        <div className="tabs">
-          <span className="tab">Ant Tunnel</span>
-          <span className="tab">Queen’s Egg Hatch</span>
-          <span className="tab">Expedition</span>
-          <span className="tab tab-active">Shuffle</span>
-        </div>
-      </div>
-
       {/* full-screen background (PNG) */}
       <div className="ant-colony-bg" aria-hidden="true" />
 
@@ -251,8 +240,8 @@ export default function Shuffle() {
 
           <div className="strip" />
 
-          {/* queen 3D — centered and lowered slightly (scale 0.9 already) */}
-          <Queen3D active={phase === 'shuffling'} scale={0.9} y={-0.12} />
+          {/* Queen 3D — scale 0.7 and a small downward nudge */}
+          <Queen3D active={phase === 'shuffling'} scale={0.7} y={-0.10} />
 
           <div className="rail rail-top" />
           <div className="rail rail-bottom" />
@@ -284,50 +273,28 @@ export default function Shuffle() {
         {showPrize && <PrizeModal rarity={rarity} onClose={resetAfterPrize} />}
       </div>
 
-      {/* backgrounds (forced PNG) */}
+      {/* background styles – PNGs first, clean fallbacks */}
       <style jsx>{`
-        .playground-header { position: relative; z-index: 5; margin: 10px 0 8px; }
-        .playground-header .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
-
-        /* OUTSIDE background — PNG first, with a clean fallback vector if PNG missing */
         .ant-colony-bg {
           position: fixed; inset: 0; pointer-events: none; z-index: 0;
           background-image:
-            linear-gradient(140deg, rgba(11,27,49,0.35), rgba(7,13,26,0.6)),
-            url('/bg/colony.png'),
-            url("data:image/svg+xml;utf8,\
-              <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 600'>\
-                <g fill='rgba(24,36,64,0.55)'>\
-                  <rect x='120' y='380' width='220' height='14'/>\
-                  <rect x='170' y='340' width='120' height='16'/>\
-                  <rect x='200' y='300' width='60' height='20'/>\
-                  <rect x='780'  y='390' width='240' height='14'/>\
-                  <rect x='830'  y='350' width='130' height='16'/>\
-                  <rect x='860'  y='310' width='70'  height='20'/>\
-                </g>\
-                <g fill='rgba(32,48,86,0.45)'>\
-                  <path d='M0,470 C180,420 320,480 520,460 C720,440 900,470 1200,430 L1200,600 L0,600 Z'/>\
-                </g>\
-              </svg>");
-          background-position: center, center, center;
-          background-size: cover, cover, cover;
-          background-repeat: no-repeat, no-repeat, no-repeat;
+            linear-gradient(140deg, rgba(11,27,49,0.18), rgba(7,13,26,0.5)),
+            url('/bg/colony.png');
+          background-position: center, center;
+          background-size: cover, cover;
+          background-repeat: no-repeat, no-repeat;
           filter: saturate(1.05);
         }
 
-        /* IN-SCENE background — PNG first, with gradient/scanline fallbacks */
         .scene-bg {
           position: absolute; inset: 0; z-index: 1; pointer-events: none; border-radius: 12px;
           background-image:
-            linear-gradient(180deg, rgba(0,0,0,.28), rgba(0,0,0,.28)),
-            url('/bg/dojo.png'),
-            radial-gradient(60% 80% at 50% 14%, rgba(255,255,255,.10), rgba(0,0,0,0) 70%),
-            linear-gradient(180deg, rgba(17,27,48,.85), rgba(10,18,36,.95)),
-            repeating-linear-gradient(90deg, rgba(255,255,255,.08) 0 2px, rgba(255,255,255,0) 2px 22px);
-          background-position: center, center, center, center, center;
-          background-size: cover, cover, cover, cover, cover;
-          background-repeat: no-repeat;
-          box-shadow: inset 0 12px 30px rgba(0,0,0,.45);
+            linear-gradient(180deg, rgba(0,0,0,.18), rgba(0,0,0,.18)),
+            url('/bg/dojo.png');
+          background-position: center, center;
+          background-size: cover, cover;
+          background-repeat: no-repeat, no-repeat;
+          box-shadow: inset 0 12px 30px rgba(0,0,0,.35);
         }
       `}</style>
     </>
