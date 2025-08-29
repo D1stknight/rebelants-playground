@@ -1,6 +1,7 @@
 // components/Shuffle.tsx
 import React, { useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
+import Link from 'next/link'; // <-- NEW: real navigation for header tabs
 
 // lazy‑load queen so 3D never blocks SSR
 const Queen3D = dynamic(() => import('./Queen3D'), { ssr: false }) as React.ComponentType<{
@@ -208,14 +209,16 @@ export default function Shuffle() {
       {/* full-screen ant colony BG */}
       <div className="ant-colony-bg" aria-hidden="true" />
 
-      {/* LOCAL HEADER (tabs). If your page already renders a global header, you can delete this block. */}
-      <header className="page-head">
-        <div className="site-title">Rebel Ants Playground</div>
-        <nav className="tabs">
-          <a className="tab" href="#">Ant Tunnel</a>
-          <a className="tab" href="#">Queen&apos;s Egg Hatch</a>
-          <a className="tab" href="#">Expedition</a>
-          <a className="tab tab-active" href="#">Shuffle</a>
+      {/* HEADER with real links (edit hrefs to your actual routes if different) */}
+      <header className="page-head" role="banner">
+        <div className="site-title">
+          <Link href="/">Rebel Ants Playground</Link>
+        </div>
+        <nav className="tabs" aria-label="Main">
+          <Link href="/ant-tunnel" className="tab">Ant Tunnel</Link>
+          <Link href="/queens-egg-hatch" className="tab">Queen&apos;s Egg Hatch</Link>
+          <Link href="/expedition" className="tab">Expedition</Link>
+          <Link href="/shuffle" className="tab tab-active">Shuffle</Link>
         </nav>
       </header>
 
@@ -229,7 +232,7 @@ export default function Shuffle() {
           <div className="scene-bg" aria-hidden="true" />
           <div className="strip" />
 
-          {/* Queen 3D — size 0.7, tiny downward nudge kept */}
+          {/* Queen 3D — size 0.7 and centered; tiny downward nudge kept */}
           <Queen3D active={phase === 'shuffling'} scale={0.7} y={-0.10} />
 
           <div className="rail rail-top" />
@@ -259,6 +262,11 @@ export default function Shuffle() {
           </button>
         </div>
 
+        {/* Official Rules link (restored) */}
+        <div className="rules-row">
+          <a className="rules-link" href="/rules">Official Rules</a>
+        </div>
+
         {showPrize && <PrizeModal rarity={rarity} onClose={resetAfterPrize} />}
       </div>
 
@@ -276,10 +284,11 @@ export default function Shuffle() {
         }
 
         .page-head {
-          position: relative; z-index: 5; max-width: 980px; margin: 24px auto 14px;
+          position: relative; z-index: 50; max-width: 980px; margin: 24px auto 14px;
           padding: 4px 2px;
         }
         .site-title { font-size: 22px; font-weight: 800; margin-bottom: 8px; }
+        .site-title :global(a) { color: inherit; text-decoration: none; }
         .tabs { display: flex; gap: 8px; flex-wrap: wrap; }
         .tab {
           display: inline-flex; align-items: center; gap: 6px;
@@ -300,6 +309,13 @@ export default function Shuffle() {
           background-repeat: no-repeat, no-repeat;
           box-shadow: inset 0 12px 30px rgba(0,0,0,.35);
         }
+
+        .rules-row { margin-top: 10px; }
+        .rules-link {
+          display: inline-block; font-size: 13px; text-decoration: underline;
+          opacity: .85; transition: opacity .15s ease;
+        }
+        .rules-link:hover { opacity: 1; }
       `}</style>
     </>
   );
