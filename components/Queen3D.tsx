@@ -7,14 +7,13 @@ import * as THREE from 'three';
 type Props = {
   active?: boolean;
   scale?: number; // visual size of the queen model
-  y?: number;     // small vertical nudge in scene space (negative => lower)
+  y?: number;     // vertical nudge in scene space (negative => lower)
 };
 
 function QueenModel({ active = false, scale = 1, y = 0 }: Props) {
   const { scene } = useGLTF('/models/queen/queen.glb');
   const ref = useRef<THREE.Group>(null!);
 
-  // enable shadows + a touch of env lighting on materials
   useMemo(() => {
     scene.traverse((obj) => {
       if ((obj as THREE.Mesh).isMesh) {
@@ -32,6 +31,7 @@ function QueenModel({ active = false, scale = 1, y = 0 }: Props) {
     const t = clock.getElapsedTime();
     const pulse = active ? 1 + Math.sin(t * 4) * 0.03 : 1;
     ref.current.scale.set(scale * pulse, scale * pulse, scale * pulse);
+    // positive Y is UP in three.js
     ref.current.position.y = y + (active ? Math.sin(t * 3) * 0.03 : Math.sin(t * 2) * 0.02);
     ref.current.rotation.y = Math.sin(t * 0.55) * 0.16;
   });
@@ -39,7 +39,7 @@ function QueenModel({ active = false, scale = 1, y = 0 }: Props) {
   return <primitive ref={ref} object={scene} />;
 }
 
-export default function Queen3D({ active, scale = .7, y = -0.36 }: Props) {
+export default function Queen3D({ active, scale = 0.9, y = -0.08 }: Props) {
   return (
     <div className="queen3d" aria-hidden="true">
       <Canvas dpr={[1, 2]} shadows camera={{ position: [0, 1.05, 2.05], fov: 30 }}>
@@ -61,8 +61,8 @@ export default function Queen3D({ active, scale = .7, y = -0.36 }: Props) {
           position: absolute;
           left: 50%;
           top: 50%;
-          /* lower than center and big */
-          transform: translate(-50%, -28%);
+          /* Move UP by increasing the second value’s magnitude (more negative = more up) */
+          transform: translate(-50%, -34%);
           width: 760px;
           height: 420px;
           pointer-events: none;
@@ -72,7 +72,7 @@ export default function Queen3D({ active, scale = .7, y = -0.36 }: Props) {
           .queen3d {
             width: 520px;
             height: 300px;
-            transform: translate(-50%, -32%);
+            transform: translate(-50%, -36%);
           }
         }
       `}</style>
