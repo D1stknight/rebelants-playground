@@ -151,7 +151,6 @@ function PrizeModal({ rarity, onClose }: { rarity: Rarity; onClose: () => void }
         .prize-title { font-size: 18px; font-weight: 800; margin: 10px 0; }
         .prize-sub   { font-size: 14px; opacity: .85; margin-bottom: 12px; }
         .prize-art   { display: block; width: 240px; max-width: 80vw; height: auto; margin: 0 auto 12px; position: relative; z-index: 1; }
-
         .sparkle-layer { position: absolute; inset: -8% -10%; pointer-events: none; z-index: 0; }
         .pm-sparkle { position: absolute; border-radius: 50%;
           background: radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.0) 65%);
@@ -228,7 +227,7 @@ export default function Shuffle() {
 
   return (
     <>
-      {/* ===== Simple header so your chips are always visible ===== */}
+      {/* simple header so chips are always visible */}
       <div className="playground-header">
         <div className="title">Rebel Ants Playground</div>
         <div className="tabs">
@@ -239,7 +238,7 @@ export default function Shuffle() {
         </div>
       </div>
 
-      {/* ===== Full‑screen ninja ant colony background ===== */}
+      {/* full-screen background (PNG) */}
       <div className="ant-colony-bg" aria-hidden="true" />
 
       <div className="ant-card ra-shuffle2">
@@ -247,13 +246,13 @@ export default function Shuffle() {
         <p className="subtitle">Three eggs. We shuffle. You pick one for a prize.</p>
 
         <div className="shuffle-scene ant-scene" style={{ position: 'relative' }}>
-          {/* Inside‑scene dojo background */}
+          {/* in-scene background (PNG) */}
           <div className="scene-bg" aria-hidden="true" />
 
           <div className="strip" />
 
-          {/* Queen 3D — centered and higher */}
-          <Queen3D active={phase === 'shuffling'} scale={0.9} y={-0.08} />
+          {/* queen 3D — centered and lowered slightly (scale 0.9 already) */}
+          <Queen3D active={phase === 'shuffling'} scale={0.9} y={-0.12} />
 
           <div className="rail rail-top" />
           <div className="rail rail-bottom" />
@@ -285,20 +284,17 @@ export default function Shuffle() {
         {showPrize && <PrizeModal rarity={rarity} onClose={resetAfterPrize} />}
       </div>
 
-      {/* Background CSS (scoped) */}
+      {/* backgrounds (forced PNG) */}
       <style jsx>{`
         .playground-header { position: relative; z-index: 5; margin: 10px 0 8px; }
         .playground-header .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
 
-        /* OUTSIDE background — supports webp and png; gradient & vector fallback */
+        /* OUTSIDE background — PNG first, with a clean fallback vector if PNG missing */
         .ant-colony-bg {
           position: fixed; inset: 0; pointer-events: none; z-index: 0;
           background-image:
             linear-gradient(140deg, rgba(11,27,49,0.35), rgba(7,13,26,0.6)),
-            image-set(
-              url('/bg/colony.webp') type('image/webp'),
-              url('/bg/colony.png') type('image/png')
-            ),
+            url('/bg/colony.png'),
             url("data:image/svg+xml;utf8,\
               <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 600'>\
                 <g fill='rgba(24,36,64,0.55)'>\
@@ -319,15 +315,12 @@ export default function Shuffle() {
           filter: saturate(1.05);
         }
 
-        /* IN-SCENE background — supports webp and png with fallback */
+        /* IN-SCENE background — PNG first, with gradient/scanline fallbacks */
         .scene-bg {
           position: absolute; inset: 0; z-index: 1; pointer-events: none; border-radius: 12px;
           background-image:
             linear-gradient(180deg, rgba(0,0,0,.28), rgba(0,0,0,.28)),
-            image-set(
-              url('/bg/dojo.webp') type('image/webp'),
-              url('/bg/dojo.png')  type('image/png')
-            ),
+            url('/bg/dojo.png'),
             radial-gradient(60% 80% at 50% 14%, rgba(255,255,255,.10), rgba(0,0,0,0) 70%),
             linear-gradient(180deg, rgba(17,27,48,.85), rgba(10,18,36,.95)),
             repeating-linear-gradient(90deg, rgba(255,255,255,.08) 0 2px, rgba(255,255,255,0) 2px 22px);
