@@ -31,7 +31,7 @@ function shuffled3(): number[] {
   return a;
 }
 
-/* ---------- Ant progress (ants only) ---------- */
+/* ---------- Ant progress ---------- */
 function AntIcon() {
   return (
     <svg viewBox="0 0 24 12" aria-hidden="true">
@@ -97,7 +97,7 @@ function AntProgress({ progress }: { progress: number }) {
   );
 }
 
-/* ---------- Prize Modal (unchanged behavior, brighter sparkles kept) ---------- */
+/* ---------- Prize Modal (bright sparkles) ---------- */
 function PrizeModal({ rarity, onClose }: { rarity: Rarity; onClose: () => void }) {
   const title =
     rarity === 'ultra' ? 'ULTRA CRATE!'
@@ -228,7 +228,18 @@ export default function Shuffle() {
 
   return (
     <>
-      {/* ===== Full‑screen ninja ant colony background (outside the card) ===== */}
+      {/* ===== Simple header so your chips are always visible ===== */}
+      <div className="playground-header">
+        <div className="title">Rebel Ants Playground</div>
+        <div className="tabs">
+          <span className="tab">Ant Tunnel</span>
+          <span className="tab">Queen’s Egg Hatch</span>
+          <span className="tab">Expedition</span>
+          <span className="tab tab-active">Shuffle</span>
+        </div>
+      </div>
+
+      {/* ===== Full‑screen ninja ant colony background ===== */}
       <div className="ant-colony-bg" aria-hidden="true" />
 
       <div className="ant-card ra-shuffle2">
@@ -236,13 +247,13 @@ export default function Shuffle() {
         <p className="subtitle">Three eggs. We shuffle. You pick one for a prize.</p>
 
         <div className="shuffle-scene ant-scene" style={{ position: 'relative' }}>
-          {/* Dojo background inside the scene */}
+          {/* Inside‑scene dojo background */}
           <div className="scene-bg" aria-hidden="true" />
 
           <div className="strip" />
 
-          {/* Queen 3D — bigger & low */}
-          <Queen3D active={phase === 'shuffling'} scale={.7} y={-0.36} />
+          {/* Queen 3D — centered and higher */}
+          <Queen3D active={phase === 'shuffling'} scale={0.9} y={-0.08} />
 
           <div className="rail rail-top" />
           <div className="rail rail-bottom" />
@@ -276,13 +287,18 @@ export default function Shuffle() {
 
       {/* Background CSS (scoped) */}
       <style jsx>{`
-        /* OUTSIDE background.
-           If /bg/colony.webp exists, it shows; otherwise gradient/SVG fallback renders. */
+        .playground-header { position: relative; z-index: 5; margin: 10px 0 8px; }
+        .playground-header .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+
+        /* OUTSIDE background — supports webp and png; gradient & vector fallback */
         .ant-colony-bg {
           position: fixed; inset: 0; pointer-events: none; z-index: 0;
-          background:
-            url('/bg/colony.webp') center/cover no-repeat,
-            radial-gradient(140% 90% at 50% 8%, #0b1b31 0%, #0a1427 55%, #070d1a 100%),
+          background-image:
+            linear-gradient(140deg, rgba(11,27,49,0.35), rgba(7,13,26,0.6)),
+            image-set(
+              url('/bg/colony.webp') type('image/webp'),
+              url('/bg/colony.png') type('image/png')
+            ),
             url("data:image/svg+xml;utf8,\
               <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 600'>\
                 <g fill='rgba(24,36,64,0.55)'>\
@@ -296,21 +312,28 @@ export default function Shuffle() {
                 <g fill='rgba(32,48,86,0.45)'>\
                   <path d='M0,470 C180,420 320,480 520,460 C720,440 900,470 1200,430 L1200,600 L0,600 Z'/>\
                 </g>\
-              </svg>") center/cover no-repeat;
-          background-blend-mode: normal, overlay, normal;
+              </svg>");
+          background-position: center, center, center;
+          background-size: cover, cover, cover;
+          background-repeat: no-repeat, no-repeat, no-repeat;
           filter: saturate(1.05);
         }
 
-        /* IN-SCENE background. If /bg/dojo.webp exists it shows;
-           else we show a lined glossy panel as a fallback. */
+        /* IN-SCENE background — supports webp and png with fallback */
         .scene-bg {
           position: absolute; inset: 0; z-index: 1; pointer-events: none; border-radius: 12px;
-          background:
+          background-image:
             linear-gradient(180deg, rgba(0,0,0,.28), rgba(0,0,0,.28)),
-            url('/bg/dojo.webp') center/cover no-repeat,
+            image-set(
+              url('/bg/dojo.webp') type('image/webp'),
+              url('/bg/dojo.png')  type('image/png')
+            ),
             radial-gradient(60% 80% at 50% 14%, rgba(255,255,255,.10), rgba(0,0,0,0) 70%),
             linear-gradient(180deg, rgba(17,27,48,.85), rgba(10,18,36,.95)),
             repeating-linear-gradient(90deg, rgba(255,255,255,.08) 0 2px, rgba(255,255,255,0) 2px 22px);
+          background-position: center, center, center, center, center;
+          background-size: cover, cover, cover, cover, cover;
+          background-repeat: no-repeat;
           box-shadow: inset 0 12px 30px rgba(0,0,0,.45);
         }
       `}</style>
