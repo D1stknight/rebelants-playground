@@ -2,6 +2,7 @@
 import React, { useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 
+// lazy‑load queen so 3D never blocks SSR
 const Queen3D = dynamic(() => import('./Queen3D'), { ssr: false }) as React.ComponentType<{
   active?: boolean;
   scale?: number;
@@ -15,6 +16,7 @@ const LANES = [21.5, 50, 78.5];
 const SHUFFLE_MS = 3200;
 const SWAP_EVERY_MS = 280;
 
+/* ---------------- utils ---------------- */
 function rollRarity(): Rarity {
   const r = Math.random();
   if (r < 0.05) return 'ultra';
@@ -31,7 +33,7 @@ function shuffled3(): number[] {
   return a;
 }
 
-/* ---------- Ant progress ---------- */
+/* -------- progress: ant line -------- */
 function AntIcon() {
   return (
     <svg viewBox="0 0 24 12" aria-hidden="true">
@@ -62,14 +64,8 @@ function AntProgress({ progress }: { progress: number }) {
       ))}
       <style jsx>{`
         .ant-progress {
-          position: absolute;
-          left: 50%;
-          transform: translateX(-50%);
-          bottom: 14px;
-          width: 92%;
-          height: 22px;
-          pointer-events: none;
-          z-index: 26;
+          position: absolute; left: 50%; transform: translateX(-50%);
+          bottom: 14px; width: 92%; height: 22px; pointer-events: none; z-index: 26;
         }
         .track {
           position: absolute; left: 0; right: 0; top: 50%;
@@ -81,23 +77,16 @@ function AntProgress({ progress }: { progress: number }) {
           box-shadow: inset 0 2px 6px rgba(0,0,0,.35), 0 0 0 1px rgba(255,255,255,.06);
           opacity: .9;
         }
-        .ant {
-          position: absolute; top: 50%;
-          transform: translate(-50%, -50%);
-          filter: drop-shadow(0 0 7px rgba(0,255,170,.35));
-          animation: antBob .58s ease-in-out infinite;
-        }
+        .ant { position: absolute; top: 50%; transform: translate(-50%, -50%);
+          filter: drop-shadow(0 0 7px rgba(0,255,170,.35)); animation: antBob .58s ease-in-out infinite; }
         .ant:nth-child(2n) { animation-duration: .66s; }
-        @keyframes antBob {
-          0%,100% { transform: translate(-50%, -50%) }
-          50%     { transform: translate(-50%, -56%) }
-        }
+        @keyframes antBob { 0%,100% { transform: translate(-50%, -50%) } 50% { transform: translate(-50%, -56%) } }
       `}</style>
     </div>
   );
 }
 
-/* ---------- Prize Modal (with bright sparkles) ---------- */
+/* -------- prize modal (bright sparkles) -------- */
 function PrizeModal({ rarity, onClose }: { rarity: Rarity; onClose: () => void }) {
   const title =
     rarity === 'ultra' ? 'ULTRA CRATE!'
@@ -105,12 +94,13 @@ function PrizeModal({ rarity, onClose }: { rarity: Rarity; onClose: () => void }
     : rarity === 'common' ? 'Crate Unlocked'
     : 'No crate this time';
 
-  const sparks = useMemo(() => Array.from({ length: 24 }, (_, i) => ({
-    left: `${8 + (i * 4.1) % 84}%`,
-    top: `${10 + ((i * 7.3) % 62)}%`,
-    size: 10 + ((i * 3) % 14),
-    delay: (i * 0.18) % 3.2
-  })), []);
+  const sparks = useMemo(() =>
+    Array.from({ length: 24 }, (_, i) => ({
+      left: `${8 + (i * 4.1) % 84}%`,
+      top: `${10 + ((i * 7.3) % 62)}%`,
+      size: 10 + ((i * 3) % 14),
+      delay: (i * 0.18) % 3.2
+    })), []);
 
   return (
     <div className="prize-modal" role="dialog" aria-modal="true">
@@ -118,15 +108,11 @@ function PrizeModal({ rarity, onClose }: { rarity: Rarity; onClose: () => void }
         {rarity !== 'none' && (
           <div className="sparkle-layer" aria-hidden="true">
             {sparks.map((s, i) => (
-              <span
-                key={i}
-                className={`pm-sparkle ${rarity}`}
-                style={{ left: s.left, top: s.top, width: s.size, height: s.size, animationDelay: `${s.delay}s` }}
-              />
+              <span key={i} className={`pm-sparkle ${rarity}`}
+                    style={{ left: s.left, top: s.top, width: s.size, height: s.size, animationDelay: `${s.delay}s` }} />
             ))}
           </div>
         )}
-
         <div className="prize-title">{title}</div>
 
         {rarity !== 'none' ? (
@@ -145,9 +131,7 @@ function PrizeModal({ rarity, onClose }: { rarity: Rarity; onClose: () => void }
       <style jsx>{`
         .prize-modal { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.5); z-index: 1000; }
         .prize-card { position: relative; min-width: 320px; padding: 20px; border-radius: 12px; text-align: center;
-          background: rgba(15,23,42,.95); border: 1px solid rgba(148,163,184,.25);
-          box-shadow: 0 24px 40px rgba(0,0,0,.55); overflow: visible;
-        }
+          background: rgba(15,23,42,.95); border: 1px solid rgba(148,163,184,.25); box-shadow: 0 24px 40px rgba(0,0,0,.55); overflow: visible; }
         .prize-title { font-size: 18px; font-weight: 800; margin: 10px 0; }
         .prize-sub   { font-size: 14px; opacity: .85; margin-bottom: 12px; }
         .prize-art   { display: block; width: 240px; max-width: 80vw; height: auto; margin: 0 auto 12px; position: relative; z-index: 1; }
@@ -155,23 +139,17 @@ function PrizeModal({ rarity, onClose }: { rarity: Rarity; onClose: () => void }
         .pm-sparkle { position: absolute; border-radius: 50%;
           background: radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.0) 65%);
           filter: blur(.3px) drop-shadow(0 0 12px rgba(255,255,255,.65));
-          opacity: 0; animation: pmSpark 2.6s ease-in-out infinite;
-        }
+          opacity: 0; animation: pmSpark 2.6s ease-in-out infinite; }
         .pm-sparkle.common { filter: blur(.3px) drop-shadow(0 0 14px rgba(147,197,253,.85)); }
         .pm-sparkle.rare   { filter: blur(.3px) drop-shadow(0 0 14px rgba(59,130,246,.95)); }
         .pm-sparkle.ultra  { filter: blur(.3px) drop-shadow(0 0 16px rgba(244,63,94,1)); }
-        @keyframes pmSpark {
-          0%   { transform: scale(0.4); opacity: 0; }
-          20%  { opacity: 1; }
-          55%  { transform: scale(1.1); opacity: 0.9; }
-          85%  { transform: scale(0.7); opacity: 0.7; }
-          100% { transform: scale(0.3); opacity: 0; }
-        }
+        @keyframes pmSpark { 0%{transform:scale(.4);opacity:0}20%{opacity:1}55%{transform:scale(1.1);opacity:.9}85%{transform:scale(.7);opacity:.7}100%{transform:scale(.3);opacity:0} }
       `}</style>
     </div>
   );
 }
 
+/* ---------------- component ---------------- */
 export default function Shuffle() {
   const [phase, setPhase] = useState<Phase>('idle');
   const [order, setOrder] = useState<number[]>([0, 1, 2]);
@@ -227,20 +205,31 @@ export default function Shuffle() {
 
   return (
     <>
-      {/* full-screen background (PNG) */}
+      {/* full-screen ant colony BG */}
       <div className="ant-colony-bg" aria-hidden="true" />
 
+      {/* LOCAL HEADER (tabs). If your page already renders a global header, you can delete this block. */}
+      <header className="page-head">
+        <div className="site-title">Rebel Ants Playground</div>
+        <nav className="tabs">
+          <a className="tab" href="#">Ant Tunnel</a>
+          <a className="tab" href="#">Queen&apos;s Egg Hatch</a>
+          <a className="tab" href="#">Expedition</a>
+          <a className="tab tab-active" href="#">Shuffle</a>
+        </nav>
+      </header>
+
+      {/* Game card */}
       <div className="ant-card ra-shuffle2">
         <div className="title">Queen&apos;s Egg Shuffle</div>
         <p className="subtitle">Three eggs. We shuffle. You pick one for a prize.</p>
 
         <div className="shuffle-scene ant-scene" style={{ position: 'relative' }}>
-          {/* in-scene background (PNG) */}
+          {/* in-scene dojo BG */}
           <div className="scene-bg" aria-hidden="true" />
-
           <div className="strip" />
 
-          {/* Queen 3D — scale 0.7 and a small downward nudge */}
+          {/* Queen 3D — size 0.7, tiny downward nudge kept */}
           <Queen3D active={phase === 'shuffling'} scale={0.7} y={-0.10} />
 
           <div className="rail rail-top" />
@@ -273,18 +262,33 @@ export default function Shuffle() {
         {showPrize && <PrizeModal rarity={rarity} onClose={resetAfterPrize} />}
       </div>
 
-      {/* background styles – PNGs first, clean fallbacks */}
+      {/* Background + header styles (scoped) */}
       <style jsx>{`
         .ant-colony-bg {
           position: fixed; inset: 0; pointer-events: none; z-index: 0;
           background-image:
-            linear-gradient(140deg, rgba(11,27,49,0.18), rgba(7,13,26,0.5)),
+            linear-gradient(140deg, rgba(11,27,49,0.18), rgba(7,13,26,0.55)),
             url('/bg/colony.png');
           background-position: center, center;
           background-size: cover, cover;
           background-repeat: no-repeat, no-repeat;
           filter: saturate(1.05);
         }
+
+        .page-head {
+          position: relative; z-index: 5; max-width: 980px; margin: 24px auto 14px;
+          padding: 4px 2px;
+        }
+        .site-title { font-size: 22px; font-weight: 800; margin-bottom: 8px; }
+        .tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+        .tab {
+          display: inline-flex; align-items: center; gap: 6px;
+          padding: 6px 10px; border-radius: 999px; font-size: 13px;
+          background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.18);
+          backdrop-filter: blur(4px); transition: transform .06s ease, background .2s ease;
+        }
+        .tab:hover { transform: translateY(-1px); background: rgba(255,255,255,.12); }
+        .tab-active { background: rgba(255,255,255,.16); }
 
         .scene-bg {
           position: absolute; inset: 0; z-index: 1; pointer-events: none; border-radius: 12px;
