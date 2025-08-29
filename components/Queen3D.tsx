@@ -39,7 +39,7 @@ function QueenModel({ active = false, scale = 1, y = 0 }: Props) {
   return <primitive ref={ref} object={scene} />;
 }
 
-export default function Queen3D({ active, scale = 0.9, y = -0.08 }: Props) {
+export default function Queen3D({ active, scale = 0.9, y = -0.12 }: Props) {
   return (
     <div className="queen3d" aria-hidden="true">
       <Canvas dpr={[1, 2]} shadows camera={{ position: [0, 1.05, 2.05], fov: 30 }}>
