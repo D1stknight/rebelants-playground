@@ -6,8 +6,8 @@ import * as THREE from 'three';
 
 type Props = {
   active?: boolean;
-  scale?: number; // visual size of the queen model
-  y?: number;     // vertical nudge in scene space (negative => lower)
+  scale?: number; // visual size
+  y?: number;     // vertical nudge in 3D space (positive = up, negative = down)
 };
 
 function QueenModel({ active = false, scale = 1, y = 0 }: Props) {
@@ -31,7 +31,7 @@ function QueenModel({ active = false, scale = 1, y = 0 }: Props) {
     const t = clock.getElapsedTime();
     const pulse = active ? 1 + Math.sin(t * 4) * 0.03 : 1;
     ref.current.scale.set(scale * pulse, scale * pulse, scale * pulse);
-    // positive Y is UP in three.js
+    // Y up is positive in three.js
     ref.current.position.y = y + (active ? Math.sin(t * 3) * 0.03 : Math.sin(t * 2) * 0.02);
     ref.current.rotation.y = Math.sin(t * 0.55) * 0.16;
   });
@@ -40,10 +40,11 @@ function QueenModel({ active = false, scale = 1, y = 0 }: Props) {
 }
 
 export default function Queen3D({ active, scale = 0.9, y = -0.12 }: Props) {
+  // y = -0.12 lowers her a “hair” so her feet sit just above the progress line
   return (
     <div className="queen3d" aria-hidden="true">
       <Canvas dpr={[1, 2]} shadows camera={{ position: [0, 1.05, 2.05], fov: 30 }}>
-        {/* lighting */}
+        {/* lights */}
         <ambientLight intensity={0.38} />
         <hemisphereLight color={'#8fb2ff'} groundColor={'#21324f'} intensity={0.55} />
         <spotLight position={[2.6, 3.4, 3.1]} angle={0.4} penumbra={0.35} intensity={1.15} castShadow />
@@ -61,7 +62,7 @@ export default function Queen3D({ active, scale = 0.9, y = -0.12 }: Props) {
           position: absolute;
           left: 50%;
           top: 50%;
-          /* Move UP by increasing the second value’s magnitude (more negative = more up) */
+          /* Slightly above center; less negative moves her down, more negative moves her up */
           transform: translate(-50%, -34%);
           width: 760px;
           height: 420px;
