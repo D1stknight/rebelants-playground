@@ -375,10 +375,9 @@ export default function Shuffle() {
 
           <div style={{ marginLeft: 12, fontSize: 13, opacity: 0.9 }}>
             Balance: <b>{balance}</b> {pointsConfig.currency}
-          </div>
-        </div>
+</div>
 
-    {/* Name + Daily Claim */}
+{/* Name + Daily Claim */}
 <div
   style={{
     marginTop: 10,
@@ -422,9 +421,10 @@ export default function Shuffle() {
     Official Rules
   </a>
 </div>
-        <LeaderboardPanel />
 
-        {showPrize && <PrizeModal rarity={rarity} onClose={resetAfterPrize} />}
+<LeaderboardPanel />
+
+{showPrize && <PrizeModal rarity={rarity} onClose={resetAfterPrize} />}
       </div>
 
       {/* Background + header styles (scoped) */}
