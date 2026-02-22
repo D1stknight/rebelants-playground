@@ -3,7 +3,7 @@ import React from 'react';
 import Link from 'next/link';
 import Shuffle from '../components/Shuffle';
 
-export default function ShufflePage() {
+export default function ShufflePage() { 
   return (
     <main className="max-w-5xl mx-auto px-4 py-6">
       <h1 className="title mb-3">Rebel Ants Playground</h1>
