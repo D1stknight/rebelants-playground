@@ -260,26 +260,41 @@ React.useEffect(() => {
     requestAnimationFrame(tick);
   };
 
-  const onPick = () => {
-    if (phase !== 'pick' || busy) return;
-    setBusy(true);
-   setTimeout(() => {
-  const r = rollRarity();
-  setRarity(r);
+ const onPick = () => {
+  if (phase !== 'pick' || busy) return;
+  setBusy(true);
 
-  const reward =
-    r === "ultra" ? pointsConfig.rewards.ultra :
-    r === "rare" ? pointsConfig.rewards.rare :
-    r === "common" ? pointsConfig.rewards.common :
-    pointsConfig.rewards.none;
+  setTimeout(() => {
+    const r = rollRarity();
 
-  if (reward > 0) earn(reward);
+    const reward =
+      r === 'ultra' ? pointsConfig.ultraReward :
+      r === 'rare' ? pointsConfig.rareReward :
+      r === 'common' ? pointsConfig.commonReward :
+      0;
 
-  setPhase('revealed');
-  setShowPrize(true);
-  setBusy(false);
-}, 350);
-  };
+    if (reward > 0) {
+      earn(reward);
+
+      const prof = loadProfile();
+      addWin({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        ts: Date.now(),
+        game: "shuffle",
+        playerId: prof.id,
+        playerName: playerName || prof.name || "guest",
+        rarity: r,
+        pointsAwarded: reward,
+      });
+    }
+
+    setRarity(r);
+    setPhase('revealed');
+    setShowPrize(true);
+    setBusy(false);
+
+  }, 350);
+};
 
   const resetAfterPrize = () => {
     setShowPrize(false);
@@ -341,27 +356,48 @@ React.useEffect(() => {
 ))}
         </div>
 
-        <div className="shuffle-cta">
-         <button
-  className="btn"
-  onClick={runShuffle}
-  disabled={busy || phase === "shuffling" || balance < pointsConfig.shuffleCost}
-  title={balance < pointsConfig.shuffleCost ? "Not enough points" : ""}
->
-  {phase === "shuffling"
-    ? "Shuffling…"
-    : `Shuffle (-${pointsConfig.shuffleCost} ${pointsConfig.currency})`}
-</button>
-
-<div style={{ marginTop: 8, fontSize: 13, opacity: 0.9 }}>
-  Balance: <b>{balance}</b> {pointsConfig.currency}
+      <div className="shuffle-cta">
+  <button className="btn" onClick={runShuffle} disabled={busy || phase === 'shuffling'}>
+    {phase === 'shuffling' ? 'Shuffling…' : 'Shuffle'}
+  </button>
 </div>
-        </div>
 
-        {/* Official Rules link (restored) */}
-        <div className="rules-row">
-          <a className="rules-link" href="/rules">Official Rules</a>
-        </div>
+{/* 👇 ADD THIS RIGHT HERE */}
+<div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+  <label style={{ fontSize: 13, opacity: 0.9 }}>
+    Name:&nbsp;
+    <input
+      value={playerName}
+      onChange={(e) => {
+        const v = e.target.value.slice(0, 18);
+        setPlayerName(v);
+        saveProfile({ name: v });
+      }}
+      style={{
+        padding: "6px 10px",
+        borderRadius: 10,
+        border: "1px solid rgba(255,255,255,.18)",
+        background: "rgba(15,23,42,.55)",
+        color: "inherit",
+      }}
+    />
+  </label>
+
+  <button
+    className="btn"
+    onClick={() => claimDaily(200)}
+    style={{ padding: "8px 12px", fontSize: 13 }}
+  >
+    Claim Daily +200 {pointsConfig.currency}
+  </button>
+</div>
+
+{/* Official Rules link (restored) */}
+<div className="rules-row">
+  <a className="rules-link" href="/rules">Official Rules</a>
+</div>
+
+        <LeaderboardPanel />       
 
         {showPrize && <PrizeModal rarity={rarity} onClose={resetAfterPrize} />}
       </div>
