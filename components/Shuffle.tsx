@@ -52,6 +52,11 @@ function AntIcon() {
       src="/ui/ant-progress.png"
       alt="ant"
       className="ant-img"
+      width={12}
+      height={12}
+      style={{ width: 12, height: 12 }}
+      loading="eager"
+      decoding="async"
     />
   );
 }
@@ -116,11 +121,14 @@ style={{
         }
 
         .ant {
-          position: absolute;
-          top: 50%;
-          transform: translate(-50%, -50%);
-          animation: antBob .58s ease-in-out infinite;
-        }
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  transform: translate(-50%, -50%);
+  animation: antBob .58s ease-in-out infinite;
+  pointer-events: none;
+}
 
         .ant:nth-child(2n) {
           animation-duration: .66s;
