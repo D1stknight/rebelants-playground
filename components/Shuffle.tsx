@@ -47,7 +47,13 @@ function shuffledN(n: number): number[] {
 
 /* -------- progress: ant line -------- */
 function AntIcon() {
-  return <span className="ant-emoji" aria-hidden="true">🐜</span>;
+  return (
+    <img
+      src="/ui/ant-progress.png"
+      alt="ant"
+      className="ant-img"
+    />
+  );
 }
 
 function AntProgress({ progress }: { progress: number }) {
