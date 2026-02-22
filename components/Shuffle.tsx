@@ -495,43 +495,46 @@ export default function Shuffle() {
         </div>
 
         {/* Name + Daily Claim */}
-        <div
-          style={{
-            marginTop: 10,
-            display: "flex",
-            gap: 10,
-            flexWrap: "wrap",
-            alignItems: "center",
-          }}
-        >
-          <label style={{ fontSize: 13, opacity: 0.9 }}>
-            Name:&nbsp;
-            <input
-              value={playerName}
-              onChange={(e) => {
-                const v = e.target.value.slice(0, 18);
-                setPlayerName(v);
-                saveProfile({ name: v });
-              }}
-              style={{
-                padding: "6px 10px",
-                borderRadius: 10,
-                border: "1px solid rgba(255,255,255,.18)",
-                background: "rgba(15,23,42,.55)",
-                color: "inherit",
-              }}
-            />
-          </label>
+       <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+  <label style={{ fontSize: 13, opacity: 0.9 }}>
+    Name:&nbsp;
+    <input
+      value={playerName}
+      onChange={(e) => {
+        const v = e.target.value.slice(0, 18);
+        setPlayerName(v);
+        saveProfile({ name: v });
+      }}
+      style={{
+        padding: "6px 10px",
+        borderRadius: 10,
+        border: "1px solid rgba(255,255,255,.18)",
+        background: "rgba(15,23,42,.55)",
+        color: "inherit",
+      }}
+    />
+  </label>
 
-          <button
-            className="btn"
-            onClick={() => claimDaily(pointsConfig.dailyClaim)}
-            style={{ padding: "8px 12px", fontSize: 13 }}
-          >
-            Claim Daily +{pointsConfig.dailyClaim} {pointsConfig.currency}
-          </button>
-        </div>
+  <button
+    className="btn"
+    onClick={() => claimDaily(pointsConfig.dailyClaim)}
+    style={{ padding: "8px 12px", fontSize: 13 }}
+  >
+    Claim Daily +{pointsConfig.dailyClaim} {pointsConfig.currency}
+  </button>
 
+  {/* DEV ONLY: test credits so we can click Shuffle without changing economy */}
+  {process.env.NODE_ENV !== "production" && (
+    <button
+      className="btn"
+      onClick={() => earn(5000)}
+      style={{ padding: "8px 12px", fontSize: 13, opacity: 0.9 }}
+      title="Dev only"
+    >
+      Dev Grant +5000 {pointsConfig.currency}
+    </button>
+  )}
+</div>
         {/* Official Rules link */}
         <div className="rules-row">
           <a className="rules-link" href="/rules">
