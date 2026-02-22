@@ -523,7 +523,6 @@ const [showHowPointsWork, setShowHowPointsWork] = useState(false);
       How points work
     </button>
   </div>
-</div>
 {showHowPointsWork && (
   <div
     style={{
