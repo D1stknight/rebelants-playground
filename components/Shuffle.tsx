@@ -4,18 +4,7 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { shuffleConfig } from '../lib/shuffleConfig';
 
-// ✅ points + leaderboard
-import {
-  pointsConfig,
-  loadProfile,
-  saveProfile,
-  claimDaily,
-  addWin,
-  earn,
-  spend,
-  getBalance,
-} from '../lib/points';
-import LeaderboardPanel from './LeaderboardPanel';
+// ✅ points + leaderboard (single source of truth)
 import { pointsConfig } from "../lib/pointsConfig";
 import { usePoints } from "../lib/usePoints";
 import { loadProfile, saveProfile } from "../lib/profile";
@@ -409,17 +398,13 @@ export default function Shuffle() {
             />
           </label>
 
-          <button
-            className="btn"
-            onClick={() => {
-              claimDaily(pointsConfig.dailyClaim);
-              setBalance(getBalance());
-            }}
-            style={{ padding: "8px 12px", fontSize: 13 }}
-          >
-            Claim Daily +{pointsConfig.dailyClaim} {pointsConfig.currency}
-          </button>
-        </div>
+         <button
+  className="btn"
+  onClick={() => claimDaily(pointsConfig.dailyClaim)}
+  style={{ padding: "8px 12px", fontSize: 13 }}
+>
+  Claim Daily +{pointsConfig.dailyClaim} {pointsConfig.currency}
+</button>
 
         {/* Official Rules link (restored) */}
         <div className="rules-row">
