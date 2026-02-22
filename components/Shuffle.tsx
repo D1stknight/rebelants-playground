@@ -211,6 +211,8 @@ function PrizeModal({ rarity, onClose }: { rarity: Rarity; onClose: () => void }
 
 /* ---------------- component ---------------- */
 export default function Shuffle() {
+  const { balance, spend, earn } = usePoints();
+
   const [phase, setPhase] = useState<Phase>('idle');
  const [order, setOrder] = useState<number[]>(() => Array.from({ length: EGG_COUNT }, (_, i) => i));
   const [progress, setProgress] = useState(0);
@@ -219,8 +221,14 @@ export default function Shuffle() {
   const [showPrize, setShowPrize] = useState(false);
 
   const runShuffle = () => {
-    if (busy) return;
-    setBusy(true);
+  if (busy) return;
+
+  const cost = pointsConfig.shuffleCost;
+  if (balance < cost) return;
+
+  spend(cost);
+
+  setBusy(true);
     setPhase('shuffling');
     setProgress(0);
     setShowPrize(false);
@@ -246,13 +254,22 @@ export default function Shuffle() {
   const onPick = () => {
     if (phase !== 'pick' || busy) return;
     setBusy(true);
-    setTimeout(() => {
-      const r = rollRarity();
-      setRarity(r);
-      setPhase('revealed');
-      setShowPrize(true);
-      setBusy(false);
-    }, 350);
+   setTimeout(() => {
+  const r = rollRarity();
+  setRarity(r);
+
+  const reward =
+    r === "ultra" ? pointsConfig.rewards.ultra :
+    r === "rare" ? pointsConfig.rewards.rare :
+    r === "common" ? pointsConfig.rewards.common :
+    pointsConfig.rewards.none;
+
+  if (reward > 0) earn(reward);
+
+  setPhase('revealed');
+  setShowPrize(true);
+  setBusy(false);
+}, 350);
   };
 
   const resetAfterPrize = () => {
@@ -316,9 +333,20 @@ export default function Shuffle() {
         </div>
 
         <div className="shuffle-cta">
-          <button className="btn" onClick={runShuffle} disabled={busy || phase === 'shuffling'}>
-            {phase === 'shuffling' ? 'Shuffling…' : 'Shuffle'}
-          </button>
+         <button
+  className="btn"
+  onClick={runShuffle}
+  disabled={busy || phase === "shuffling" || balance < pointsConfig.shuffleCost}
+  title={balance < pointsConfig.shuffleCost ? "Not enough points" : ""}
+>
+  {phase === "shuffling"
+    ? "Shuffling…"
+    : `Shuffle (-${pointsConfig.shuffleCost} ${pointsConfig.currency})`}
+</button>
+
+<div style={{ marginTop: 8, fontSize: 13, opacity: 0.9 }}>
+  Balance: <b>{balance}</b> {pointsConfig.currency}
+</div>
         </div>
 
         {/* Official Rules link (restored) */}
