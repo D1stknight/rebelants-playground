@@ -372,48 +372,61 @@ export default function Shuffle() {
 ))}
         </div>
 
-      <div className="shuffle-cta">
-  <button className="btn" onClick={runShuffle} disabled={busy || phase === 'shuffling'}>
-    {phase === 'shuffling' ? 'Shuffling…' : 'Shuffle'}
-  </button>
-</div>
+          <div className="shuffle-cta">
+          <button
+            className="btn"
+            onClick={runShuffle}
+            disabled={busy || phase === 'shuffling' || balance < pointsConfig.shuffleCost}
+            title={balance < pointsConfig.shuffleCost ? "Not enough points" : ""}
+          >
+            {phase === 'shuffling'
+              ? 'Shuffling…'
+              : `Shuffle (-${pointsConfig.shuffleCost} ${pointsConfig.currency})`}
+          </button>
 
-{/* 👇 ADD THIS RIGHT HERE */}
-<div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-  <label style={{ fontSize: 13, opacity: 0.9 }}>
-    Name:&nbsp;
-    <input
-      value={playerName}
-      onChange={(e) => {
-        const v = e.target.value.slice(0, 18);
-        setPlayerName(v);
-        saveProfile({ name: v });
-      }}
-      style={{
-        padding: "6px 10px",
-        borderRadius: 10,
-        border: "1px solid rgba(255,255,255,.18)",
-        background: "rgba(15,23,42,.55)",
-        color: "inherit",
-      }}
-    />
-  </label>
+          <div style={{ marginLeft: 12, fontSize: 13, opacity: 0.9 }}>
+            Balance: <b>{balance}</b> {pointsConfig.currency}
+          </div>
+        </div>
 
-  <button
-    className="btn"
-    onClick={() => claimDaily(200)}
-    style={{ padding: "8px 12px", fontSize: 13 }}
-  >
-    Claim Daily +200 {pointsConfig.currency}
-  </button>
-</div>
+        <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <label style={{ fontSize: 13, opacity: 0.9 }}>
+            Name:&nbsp;
+            <input
+              value={playerName}
+              onChange={(e) => {
+                const v = e.target.value.slice(0, 18);
+                setPlayerName(v);
+                saveProfile({ name: v });
+              }}
+              style={{
+                padding: "6px 10px",
+                borderRadius: 10,
+                border: "1px solid rgba(255,255,255,.18)",
+                background: "rgba(15,23,42,.55)",
+                color: "inherit",
+              }}
+            />
+          </label>
 
-{/* Official Rules link (restored) */}
-<div className="rules-row">
-  <a className="rules-link" href="/rules">Official Rules</a>
-</div>
+          <button
+            className="btn"
+            onClick={() => {
+              claimDaily(pointsConfig.dailyClaim);
+              setBalance(getBalance());
+            }}
+            style={{ padding: "8px 12px", fontSize: 13 }}
+          >
+            Claim Daily +{pointsConfig.dailyClaim} {pointsConfig.currency}
+          </button>
+        </div>
 
-        <LeaderboardPanel />       
+        {/* Official Rules link (restored) */}
+        <div className="rules-row">
+          <a className="rules-link" href="/rules">Official Rules</a>
+        </div>
+
+        <LeaderboardPanel />
 
         {showPrize && <PrizeModal rarity={rarity} onClose={resetAfterPrize} />}
       </div>
