@@ -82,3 +82,16 @@ export function earn(amount: number): PointsState {
   savePoints(next);
   return next;
 }
+
+export function claimDaily(amount: number): PointsState {
+  const s = loadPoints();
+  const t = new Date().toISOString().slice(0, 10);
+  const claimKey = `ra_daily_claim_${t}`;
+
+  if (typeof window === "undefined") return s;
+  if (window.localStorage.getItem(claimKey)) return s;
+
+  const next = earn(amount); // uses daily cap logic
+  window.localStorage.setItem(claimKey, "1");
+  return next;
+}
