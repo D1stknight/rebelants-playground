@@ -47,49 +47,55 @@ function shuffledN(n: number): number[] {
 
 /* -------- progress: ant line -------- */
 function AntIcon() {
-  return (
-    <span className="ant-emoji" aria-hidden="true">🐜</span>
-      <circle cx="8" cy="6" r="3.2" />
-      <circle cx="14" cy="6" r="2.4" />
-      <circle cx="19" cy="6" r="2.1" />
-      <line x1="14" y1="4.4" x2="11" y2="2.4" />
-      <line x1="14" y1="7.6" x2="11" y2="9.6" />
-      <line x1="19" y1="4.4" x2="22" y2="2.4" />
-      <line x1="19" y1="7.6" x2="22" y2="9.6" />
-      <style jsx>{`
-        svg { width: 16px; height: 16px; }
-        circle, line { stroke: none; fill: #a7f3d0; }
-        line { stroke: #a7f3d0; stroke-width: 1.2; stroke-linecap: round; fill: none; }
-      `}</style>
-    </svg>
-  );
+  return <span className="ant-emoji" aria-hidden="true">🐜</span>;
 }
+
 function AntProgress({ progress }: { progress: number }) {
   const ants = useMemo(() => Array.from({ length: 8 }, (_, i) => i), []);
+
   return (
-    <div className="ant-progress" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
+    <div
+      className="ant-progress"
+      role="progressbar"
+      aria-valuenow={progress}
+      aria-valuemin={0}
+      aria-valuemax={100}
+    >
       <div className="track" />
       {ants.map((i) => (
         <div key={i} className="ant" style={{ left: `calc(${progress}% - ${i * 16}px)` }}>
           <AntIcon />
         </div>
       ))}
-      <style jsx>{`
 
-.ant-emoji {
-  display: inline-block;
-  font-size: 16px;
-  line-height: 1;
-  transform: translateY(1px);
-  filter: drop-shadow(0 0 7px rgba(0,255,170,.35));
-}      
-        .ant-progress {
-          position: absolute; left: 50%; transform: translateX(-50%);
-          bottom: 14px; width: 92%; height: 22px; pointer-events: none; z-index: 26;
+      <style jsx>{`
+        .ant-emoji {
+          display: inline-block;
+          font-size: 16px;
+          line-height: 1;
+          transform: translateY(1px);
+          filter: drop-shadow(0 0 7px rgba(0,255,170,.35));
         }
+
+        .ant-progress {
+          position: absolute;
+          left: 50%;
+          transform: translateX(-50%);
+          bottom: 14px;
+          width: 92%;
+          height: 22px;
+          pointer-events: none;
+          z-index: 26;
+        }
+
         .track {
-          position: absolute; left: 0; right: 0; top: 50%;
-          height: 7px; transform: translateY(-50%); border-radius: 999px;
+          position: absolute;
+          left: 0;
+          right: 0;
+          top: 50%;
+          height: 7px;
+          transform: translateY(-50%);
+          border-radius: 999px;
           background:
             linear-gradient(90deg, rgba(255,255,255,.08) 0 2px, transparent 2px) repeat-x,
             linear-gradient(90deg, #22324a, #1a2a3f);
@@ -97,10 +103,22 @@ function AntProgress({ progress }: { progress: number }) {
           box-shadow: inset 0 2px 6px rgba(0,0,0,.35), 0 0 0 1px rgba(255,255,255,.06);
           opacity: .9;
         }
-        .ant { position: absolute; top: 50%; transform: translate(-50%, -50%);
-          filter: drop-shadow(0 0 7px rgba(0,255,170,.35)); animation: antBob .58s ease-in-out infinite; }
-        .ant:nth-child(2n) { animation-duration: .66s; }
-        @keyframes antBob { 0%,100% { transform: translate(-50%, -50%) } 50% { transform: translate(-50%, -56%) } }
+
+        .ant {
+          position: absolute;
+          top: 50%;
+          transform: translate(-50%, -50%);
+          animation: antBob .58s ease-in-out infinite;
+        }
+
+        .ant:nth-child(2n) {
+          animation-duration: .66s;
+        }
+
+        @keyframes antBob {
+          0%, 100% { transform: translate(-50%, -50%); }
+          50% { transform: translate(-50%, -56%); }
+        }
       `}</style>
     </div>
   );
