@@ -228,15 +228,18 @@ function PrizeModal({ rarity, onClose }: { rarity: Rarity; onClose: () => void }
 /* ---------------- component ---------------- */
 export default function Shuffle() {
   const { balance, spend, earn, claimDaily } = usePoints();
-const [playerName, setPlayerName] = useState("guest");
 
-React.useEffect(() => {
-  const p = loadProfile();
-  setPlayerName(p.name || "guest");
-}, []);
+  const [playerName, setPlayerName] = useState("guest");
+
+  React.useEffect(() => {
+    const p = loadProfile();
+    setPlayerName(p.name || "guest");
+  }, []);
 
   const [phase, setPhase] = useState<Phase>('idle');
- const [order, setOrder] = useState<number[]>(() => Array.from({ length: EGG_COUNT }, (_, i) => i));
+  const [order, setOrder] = useState<number[]>(() =>
+    Array.from({ length: EGG_COUNT }, (_, i) => i)
+  );
   const [progress, setProgress] = useState(0);
   const [busy, setBusy] = useState(false);
   const [rarity, setRarity] = useState<Rarity>('none');
@@ -275,15 +278,16 @@ React.useEffect(() => {
 
  const onPick = () => {
   if (phase !== 'pick' || busy) return;
-  setBusy(true);
+  
+   setBusy(true);
 
   setTimeout(() => {
     const r = rollRarity();
 
     const reward =
-      r === 'ultra' ? pointsConfig.ultraReward :
-      r === 'rare' ? pointsConfig.rareReward :
-      r === 'common' ? pointsConfig.commonReward :
+      r === "ultra" ? pointsConfig.ultraReward :
+      r === "rare" ? pointsConfig.rareReward :
+      r === "common" ? pointsConfig.commonReward :
       0;
 
     if (reward > 0) {
@@ -302,10 +306,9 @@ React.useEffect(() => {
     }
 
     setRarity(r);
-    setPhase('revealed');
+    setPhase("revealed");
     setShowPrize(true);
     setBusy(false);
-
   }, 350);
 };
 
