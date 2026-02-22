@@ -214,7 +214,13 @@ function PrizeModal({ rarity, onClose }: { rarity: Rarity; onClose: () => void }
 
 /* ---------------- component ---------------- */
 export default function Shuffle() {
-  const { balance, spend, earn } = usePoints();
+  const { balance, spend, earn, claimDaily } = usePoints();
+const [playerName, setPlayerName] = useState("guest");
+
+React.useEffect(() => {
+  const p = loadProfile();
+  setPlayerName(p.name || "guest");
+}, []);
 
   const [phase, setPhase] = useState<Phase>('idle');
  const [order, setOrder] = useState<number[]>(() => Array.from({ length: EGG_COUNT }, (_, i) => i));
