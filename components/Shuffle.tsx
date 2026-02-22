@@ -539,7 +539,7 @@ const [showHowPointsWork, setShowHowPointsWork] = useState(false);
       <div style={{ fontSize: 13, opacity: 0.9, lineHeight: 1.4 }}>
         • Shuffle costs <b>{pointsConfig.shuffleCost}</b> {pointsConfig.currency}.<br />
         • Prizes: Common <b>+{pointsConfig.rewards.common}</b>, Rare <b>+{pointsConfig.rewards.rare}</b>, Ultra <b>+{pointsConfig.rewards.ultra}</b>.<br />
-        • Daily claim: <b>+{pointsConfig.dailyClaimAmount}</b> {pointsConfig.currency} (cap: <b>{pointsConfig.dailyEarnCap}</b>/day).<br />
+        • Daily claim: <b>+{pointsConfig.dailyClaim}</b> {pointsConfig.currency} (cap: <b>{pointsConfig.dailyEarnCap}</b>/day).<br />
         • Leaderboards are based on total earned + recent wins (local for now).
       </div>
 
@@ -555,13 +555,7 @@ const [showHowPointsWork, setShowHowPointsWork] = useState(false);
   )}
 </div>
 
-  {balance < pointsConfig.shuffleCost && (
-    <div style={{ fontSize: 13, opacity: 0.85 }}>
-      Need <b>{pointsConfig.shuffleCost - balance}</b> more {pointsConfig.currency}.
-    </div>
-  )}
 </div>
-
         <div style={{ marginTop: 10, fontSize: 13, opacity: 0.9 }}>
   <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
     <span>Cost: <b>{pointsConfig.shuffleCost}</b> {pointsConfig.currency}</span>
