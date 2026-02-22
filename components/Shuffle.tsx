@@ -72,18 +72,18 @@ function AntProgress({ progress }: { progress: number }) {
         <div
   key={i}
   className="ant"
-  style={{
-    left: `${Math.max(0, Math.min(100, progress) - i * 8)}%`,
-  }}
+style={{
+  left: `${Math.max((ants.length - 1) * 6, Math.min(100, progress)) - i * 6}%`,
+}}
 >
           <AntIcon />
         </div>
       ))}
 
       <style jsx>{`
-  .ant-img {
-  width: 14px;
-  height: 14px;
+.ant-img {
+  width: 12px;
+  height: 12px;
   display: block;
   object-fit: contain;
   filter: drop-shadow(0 0 6px rgba(0,255,170,.4));
