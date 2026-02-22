@@ -477,23 +477,38 @@ export default function Shuffle() {
         </div>
 
         {/* Shuffle CTA + Balance (THIS DIV MUST CLOSE before the Name section) */}
-        <div className="shuffle-cta">
-          <button
-            className="btn"
-            onClick={runShuffle}
-            disabled={busy || phase === "shuffling" || balance < pointsConfig.shuffleCost}
-            title={balance < pointsConfig.shuffleCost ? "Not enough points" : ""}
-          >
-            {phase === "shuffling"
-              ? "Shuffling…"
-              : `Shuffle (-${pointsConfig.shuffleCost} ${pointsConfig.currency})`}
-          </button>
+        <div className="shuffle-cta" style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+  <button
+    className="btn"
+    onClick={runShuffle}
+    disabled={busy || phase === "shuffling" || balance < pointsConfig.shuffleCost}
+  >
+    {phase === "shuffling"
+      ? "Shuffling…"
+      : `Shuffle (-${pointsConfig.shuffleCost} ${pointsConfig.currency})`}
+  </button>
 
-          <div style={{ marginLeft: 12, fontSize: 13, opacity: 0.9 }}>
-            Balance: <b>{balance}</b> {pointsConfig.currency}
-          </div>
-        </div>
+  <div style={{ fontSize: 13, opacity: 0.9 }}>
+    Balance: <b>{balance}</b> {pointsConfig.currency}
+  </div>
 
+  {balance < pointsConfig.shuffleCost && (
+    <div style={{ fontSize: 13, opacity: 0.85 }}>
+      Need <b>{pointsConfig.shuffleCost - balance}</b> more {pointsConfig.currency}.
+    </div>
+  )}
+</div>
+
+        <div style={{ marginTop: 10, fontSize: 13, opacity: 0.9 }}>
+  <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+    <span>Cost: <b>{pointsConfig.shuffleCost}</b> {pointsConfig.currency}</span>
+    <span>Common: <b>+{pointsConfig.rewards.common}</b></span>
+    <span>Rare: <b>+{pointsConfig.rewards.rare}</b></span>
+    <span>Ultra: <b>+{pointsConfig.rewards.ultra}</b></span>
+    <span>Daily cap: <b>{pointsConfig.dailyEarnCap}</b></span>
+  </div>
+</div>
+        
         {/* Name + Daily Claim */}
        <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
   <label style={{ fontSize: 13, opacity: 0.9 }}>
@@ -542,7 +557,18 @@ export default function Shuffle() {
           </a>
         </div>
 
-        <LeaderboardPanel />
+       <div
+  style={{
+    marginTop: 14,
+    padding: 12,
+    borderRadius: 14,
+    border: "1px solid rgba(255,255,255,.14)",
+    background: "rgba(15,23,42,.35)",
+    backdropFilter: "blur(6px)",
+  }}
+>
+  <LeaderboardPanel />
+</div>
 
         {showPrize && <PrizeModal rarity={rarity} onClose={resetAfterPrize} />}
       </div>
