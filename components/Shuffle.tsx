@@ -14,9 +14,18 @@ const Queen3D = dynamic(() => import('./Queen3D'), { ssr: false }) as React.Comp
 type Phase = 'idle' | 'shuffling' | 'pick' | 'revealed';
 type Rarity = 'none' | 'common' | 'rare' | 'ultra';
 
-const LANES = [21.5, 50, 78.5];
+const EGG_COUNT = shuffleConfig.eggCount; // ✅ 5 (from lib/shuffleConfig.ts)
 const SHUFFLE_MS = 3200;
 const SWAP_EVERY_MS = 280;
+
+// lane positions across the scene (percent). Works for 3, 5, etc.
+const LANES = Array.from({ length: EGG_COUNT }, (_, i) => {
+  // spread evenly from 12% to 88% so edges have padding
+  const min = 12;
+  const max = 88;
+  if (EGG_COUNT === 1) return 50;
+  return min + (i * (max - min)) / (EGG_COUNT - 1);
+});
 
 /* ---------------- utils ---------------- */
 function rollRarity(): Rarity {
@@ -26,8 +35,9 @@ function rollRarity(): Rarity {
   if (r < 0.55) return 'common';
   return 'none';
 }
-function shuffled3(): number[] {
-  const a = [0, 1, 2];
+
+function shuffledN(n: number): number[] {
+  const a = Array.from({ length: n }, (_, i) => i);
   for (let i = a.length - 1; i > 0; i--) {
     const j = (Math.random() * (i + 1)) | 0;
     [a[i], a[j]] = [a[j], a[i]];
