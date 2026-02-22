@@ -89,6 +89,8 @@ style={{
   height: 14px;
   display: block;
   object-fit: contain;
+  transform: scale(1.6);
+  transform-origin: center;
   filter: drop-shadow(0 0 4px rgba(0,255,170,.35));
 }
         .ant-progress {
@@ -118,7 +120,7 @@ style={{
           opacity: .9;
         }
 
-        .ant {
+      .ant {
   position: absolute;
   top: 50%;
   width: 14px;
@@ -126,6 +128,7 @@ style={{
   transform: translate(-50%, -50%);
   animation: antBob .58s ease-in-out infinite;
   pointer-events: none;
+  overflow: visible;
 }
 
         .ant:nth-child(2n) {
