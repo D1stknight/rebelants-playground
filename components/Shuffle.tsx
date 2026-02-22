@@ -81,10 +81,11 @@ function AntProgress({ progress }: { progress: number }) {
       ))}
 
       <style jsx>{`
-   .ant-img {
-  width: 16px;
-  height: auto;
+  .ant-img {
+  width: 14px;
+  height: 14px;
   display: block;
+  object-fit: contain;
   filter: drop-shadow(0 0 6px rgba(0,255,170,.4));
 }
         .ant-progress {
@@ -126,9 +127,9 @@ function AntProgress({ progress }: { progress: number }) {
         }
 
         @keyframes antBob {
-          0%, 100% { transform: translate(-50%, -50%); }
-          50% { transform: translate(-50%, -56%); }
-        }
+  0%, 100% { transform: translate(-50%, -50%); }
+  50% { transform: translate(-50%, -53%); }
+}
       `}</style>
     </div>
   );
