@@ -63,19 +63,25 @@ function AntProgress({ progress }: { progress: number }) {
     >
       <div className="track" />
       {ants.map((i) => (
-        <div key={i} className="ant" style={{ left: `calc(${progress}% - ${i * 16}px)` }}>
+        <div
+  key={i}
+  className="ant"
+  style={{
+    left: `${Math.max(0, progress - i * 8)}%`,
+  }}
+>
           <AntIcon />
         </div>
       ))}
 
       <style jsx>{`
-        .ant-emoji {
-          display: inline-block;
-          font-size: 16px;
-          line-height: 1;
-          transform: translateY(1px);
-          filter: drop-shadow(0 0 7px rgba(0,255,170,.35));
-        }
+       .ant-emoji {
+  display: inline-block;
+  font-size: 16px;
+  line-height: 1;
+  transform: scaleX(-1) translateY(1px);
+  filter: drop-shadow(0 0 7px rgba(0,255,170,.35));
+}
 
         .ant-progress {
           position: absolute;
