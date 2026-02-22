@@ -1,6 +1,6 @@
 // lib/usePoints.ts
 import { useEffect, useState } from "react";
-import { loadPoints, savePoints, spend as spendStore, earn as earnStore } from "./pointsStore";
+import { loadPoints, savePoints, spend as spendStore, earn as earnStore, claimDaily as claimDailyStore } from "./pointsStore";
 
 export function usePoints() {
   const [balance, setBalance] = useState(0);
@@ -18,6 +18,11 @@ export function usePoints() {
     setEarnedToday(s.earnedToday);
   };
 
+  const claimDaily = (amount: number) => {
+  claimDailyStore(amount);
+  refresh();
+};
+  
   const spend = (cost: number) => {
     spendStore(cost);
     refresh();
@@ -35,5 +40,5 @@ export function usePoints() {
     refresh();
   };
 
-  return { balance, earnedToday, spend, earn, set, refresh };
+  return { balance, earnedToday, spend, earn, claimDaily, set, refresh };
 }
