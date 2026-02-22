@@ -52,7 +52,7 @@ function AntIcon() {
       src="/ui/ant-progress.png"
       alt="ant"
       className="ant-img"
-      style={{ width: 14, height: 14 }}
+      style={{ width: 40, height: 40 }}
       loading="eager"
       decoding="async"
     />
