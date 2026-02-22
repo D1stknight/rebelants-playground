@@ -81,12 +81,11 @@ function AntProgress({ progress }: { progress: number }) {
       ))}
 
       <style jsx>{`
-     .ant-emoji {
-  display: inline-block;
-  font-size: 16px;
-  line-height: 1;
-  transform: rotateY(180deg);
-  filter: drop-shadow(0 0 7px rgba(0,255,170,.35));
+   .ant-img {
+  width: 16px;
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 0 6px rgba(0,255,170,.4));
 }
         .ant-progress {
           position: absolute;
