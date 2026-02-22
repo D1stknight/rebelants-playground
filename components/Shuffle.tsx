@@ -287,7 +287,7 @@ export default function Shuffle() {
           position: fixed; inset: 0; pointer-events: none; z-index: 0;
           background-image:
             linear-gradient(140deg, rgba(11,27,49,0.18), rgba(7,13,26,0.55)),
-            url('/bg/colony.png');
+            url('${shuffleConfig.pageBg}');
           background-position: center, center;
           background-size: cover, cover;
           background-repeat: no-repeat, no-repeat;
@@ -314,7 +314,7 @@ export default function Shuffle() {
           position: absolute; inset: 0; z-index: 1; pointer-events: none; border-radius: 12px;
           background-image:
             linear-gradient(180deg, rgba(0,0,0,.18), rgba(0,0,0,.18)),
-            url('/bg/dojo.png');
+            url('${shuffleConfig.cardBg}');
           background-position: center, center;
           background-size: cover, cover;
           background-repeat: no-repeat, no-repeat;
