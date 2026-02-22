@@ -274,10 +274,10 @@ export default function Shuffle() {
     const r = rollRarity();
 
     const reward =
-      r === "ultra" ? pointsConfig.ultraReward :
-      r === "rare" ? pointsConfig.rareReward :
-      r === "common" ? pointsConfig.commonReward :
-      0;
+  r === "ultra" ? pointsConfig.rewards.ultra :
+  r === "rare" ? pointsConfig.rewards.rare :
+  r === "common" ? pointsConfig.rewards.common :
+  pointsConfig.rewards.none;
 
     if (reward > 0) {
       earn(reward);
