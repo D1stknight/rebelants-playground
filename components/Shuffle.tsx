@@ -328,7 +328,8 @@ export default function Shuffle() {
     setPlayerName(p.name || "guest");
   }, []);
 
-  const [phase, setPhase] = useState<Phase>("idle");
+  const [phase, setPhase] = useState<Phase>('idle');
+const [showHowPointsWork, setShowHowPointsWork] = useState(false);
   const [order, setOrder] = useState<number[]>(() => Array.from({ length: EGG_COUNT }, (_, i) => i));
   const [progress, setProgress] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -488,9 +489,81 @@ export default function Shuffle() {
       : `Shuffle (-${pointsConfig.shuffleCost} ${pointsConfig.currency})`}
   </button>
 
-  <div style={{ fontSize: 13, opacity: 0.9 }}>
+<div style={{ fontSize: 13, opacity: 0.9, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+  <div>
     Balance: <b>{balance}</b> {pointsConfig.currency}
   </div>
+
+  <button
+    type="button"
+    onClick={() => setShowHowPointsWork((v) => !v)}
+    style={{
+      background: "transparent",
+      border: "none",
+      padding: 0,
+      cursor: "pointer",
+      textDecoration: "underline",
+      color: "inherit",
+      opacity: 0.9,
+      fontSize: 13,
+    }}
+  >
+    How points work
+  </button>
+</div>
+
+{showHowPointsWork && (
+  <div
+    style={{
+      marginTop: 10,
+      padding: 12,
+      borderRadius: 14,
+      border: "1px solid rgba(255,255,255,.14)",
+      background: "rgba(15,23,42,.45)",
+      backdropFilter: "blur(6px)",
+      fontSize: 13,
+      lineHeight: 1.35,
+      opacity: 0.95,
+      maxWidth: 520,
+    }}
+  >
+    <div style={{ fontWeight: 800, marginBottom: 6 }}>How points work</div>
+
+    <div style={{ display: "grid", gap: 6 }}>
+      <div>
+        <b>Shuffle costs</b> {pointsConfig.shuffleCost} {pointsConfig.currency}.
+      </div>
+
+      <div>
+        <b>Rewards:</b>{" "}
+        Common +{pointsConfig.rewards.common}, Rare +{pointsConfig.rewards.rare}, Ultra +{pointsConfig.rewards.ultra}.
+      </div>
+
+      <div>
+        <b>Daily claim:</b> +{pointsConfig.dailyClaim} {pointsConfig.currency} (1x per day).
+      </div>
+
+      <div>
+        <b>Daily earn cap:</b> {pointsConfig.dailyEarnCap} {pointsConfig.currency}.
+      </div>
+
+      <div style={{ opacity: 0.85 }}>
+        Tip: earn points from crates, then spend them to keep playing. In Step B we’ll persist this on the server + global leaderboard.
+      </div>
+    </div>
+
+    <div style={{ marginTop: 10 }}>
+      <button
+        type="button"
+        className="btn"
+        onClick={() => setShowHowPointsWork(false)}
+        style={{ padding: "8px 12px", fontSize: 13 }}
+      >
+        Close
+      </button>
+    </div>
+  </div>
+)}
 
   {balance < pointsConfig.shuffleCost && (
     <div style={{ fontSize: 13, opacity: 0.85 }}>
