@@ -478,22 +478,39 @@ const [showHowPointsWork, setShowHowPointsWork] = useState(false);
         </div>
 
         {/* Shuffle CTA + Balance (THIS DIV MUST CLOSE before the Name section) */}
-        <div className="shuffle-cta" style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-  <button
-    className="btn"
-    onClick={runShuffle}
-    disabled={busy || phase === "shuffling" || balance < pointsConfig.shuffleCost}
-  >
-    {phase === "shuffling"
-      ? "Shuffling…"
-      : `Shuffle (-${pointsConfig.shuffleCost} ${pointsConfig.currency})`}
-  </button>
+       <div className="shuffle-cta">
+  {(() => {
+    const cost = pointsConfig.shuffleCost;
+    const needMore = Math.max(0, cost - balance);
 
-<div style={{ fontSize: 13, opacity: 0.9 }}>
-  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-    <div>
-      Balance: <b>{balance}</b> {pointsConfig.currency}
-    </div>
+    return (
+      <>
+        <button
+          className="btn"
+          onClick={runShuffle}
+          disabled={busy || phase === "shuffling" || needMore > 0}
+          title={needMore > 0 ? "Not enough points" : ""}
+        >
+          {phase === "shuffling"
+            ? "Shuffling…"
+            : `Shuffle (-${cost} ${pointsConfig.currency})`}
+        </button>
+
+        <div style={{ marginLeft: 12, fontSize: 13, opacity: 0.9 }}>
+          Balance: <b>{balance}</b> {pointsConfig.currency}
+          {needMore > 0 && (
+            <>
+              {" "}
+              <span style={{ opacity: 0.9 }}>
+                Need {needMore} more {pointsConfig.currency}.
+              </span>
+            </>
+          )}
+        </div>
+      </>
+    );
+  })()}
+</div>
 
     <div>
       Need {Math.max(0, pointsConfig.shuffleCost - balance)} more {pointsConfig.currency}.
