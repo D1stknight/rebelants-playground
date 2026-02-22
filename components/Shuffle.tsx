@@ -554,8 +554,6 @@ const [showHowPointsWork, setShowHowPointsWork] = useState(false);
     </div>
   )}
 </div>
-
-</div>
         <div style={{ marginTop: 10, fontSize: 13, opacity: 0.9 }}>
   <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
     <span>Cost: <b>{pointsConfig.shuffleCost}</b> {pointsConfig.currency}</span>
