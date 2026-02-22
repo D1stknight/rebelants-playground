@@ -276,7 +276,7 @@ export default function Shuffle() {
   <Link href="/hatch" className="tab">Queen&apos;s Egg Hatch</Link>
   <Link href="/expedition" className="tab">Expedition</Link>
   <Link href="/shuffle" className="tab tab-active">Shuffle</Link>
-</nav>
+</nav> 
       </header>
 
       {/* Game card */}
