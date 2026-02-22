@@ -48,7 +48,7 @@ function shuffledN(n: number): number[] {
 /* -------- progress: ant line -------- */
 function AntIcon() {
   return (
-    <svg viewBox="0 0 24 12" aria-hidden="true">
+    <span className="ant-emoji" aria-hidden="true">🐜</span>
       <circle cx="8" cy="6" r="3.2" />
       <circle cx="14" cy="6" r="2.4" />
       <circle cx="19" cy="6" r="2.1" />
@@ -75,6 +75,14 @@ function AntProgress({ progress }: { progress: number }) {
         </div>
       ))}
       <style jsx>{`
+
+.ant-emoji {
+  display: inline-block;
+  font-size: 16px;
+  line-height: 1;
+  transform: translateY(1px);
+  filter: drop-shadow(0 0 7px rgba(0,255,170,.35));
+}      
         .ant-progress {
           position: absolute; left: 50%; transform: translateX(-50%);
           bottom: 14px; width: 92%; height: 22px; pointer-events: none; z-index: 26;
