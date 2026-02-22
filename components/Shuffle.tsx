@@ -272,11 +272,11 @@ export default function Shuffle() {
           <Link href="/">Rebel Ants Playground</Link>
         </div>
         <nav className="tabs" aria-label="Main">
-          <Link href="/ant-tunnel" className="tab">Ant Tunnel</Link>
-          <Link href="/queens-egg-hatch" className="tab">Queen&apos;s Egg Hatch</Link>
-          <Link href="/expedition" className="tab">Expedition</Link>
-          <Link href="/shuffle" className="tab tab-active">Shuffle</Link>
-        </nav>
+  <Link href="/tunnel" className="tab">Ant Tunnel</Link>
+  <Link href="/hatch" className="tab">Queen&apos;s Egg Hatch</Link>
+  <Link href="/expedition" className="tab">Expedition</Link>
+  <Link href="/shuffle" className="tab tab-active">Shuffle</Link>
+</nav>
       </header>
 
       {/* Game card */}
