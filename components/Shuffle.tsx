@@ -52,7 +52,7 @@ function AntIcon() {
       src="/ui/ant-progress.png"
       alt="ant"
       className="ant-img"
-      style={{ width: 20, height: 20 }}
+      style={{ width: 22, height: 22 }}
       loading="eager"
       decoding="async"
     />
@@ -99,7 +99,7 @@ style={{
           transform: translateX(-50%);
           bottom: 14px;
           width: 92%;
-          height: 36px;
+          height: 42px;
           pointer-events: none;
           z-index: 26;
         }
@@ -122,9 +122,9 @@ style={{
 
       .ant {
   position: absolute;
-  top: 65%;
-  width: 20px;
-  height: 20px;
+  top: 70%;
+  width: 22px;
+  height: 22px;
   transform: translate(-50%, -50%);
   animation: antBob .58s ease-in-out infinite;
   pointer-events: none;
