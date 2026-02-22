@@ -16,5 +16,6 @@ export const pointsConfig = {
   },
 
   // Optional: prevent infinite farming in one day (tune anytime)
+  dailyClaim: 200,
   dailyEarnCap: 500,
-};
+} as const;
