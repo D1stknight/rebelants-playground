@@ -75,14 +75,13 @@ function AntProgress({ progress }: { progress: number }) {
       ))}
 
       <style jsx>{`
-       .ant-emoji {
+     .ant-emoji {
   display: inline-block;
   font-size: 16px;
   line-height: 1;
-  transform: scaleX(-1) translateY(1px);
+  transform: rotateY(180deg);
   filter: drop-shadow(0 0 7px rgba(0,255,170,.35));
 }
-
         .ant-progress {
           position: absolute;
           left: 50%;
