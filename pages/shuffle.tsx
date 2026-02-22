@@ -1,3 +1,4 @@
+import { shuffleConfig } from "../lib/shuffleConfig";
 import React from 'react';
 import Link from 'next/link';
 import Shuffle from '../components/Shuffle';
