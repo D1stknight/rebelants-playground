@@ -164,7 +164,7 @@ function PrizeModal({ rarity, onClose }: { rarity: Rarity; onClose: () => void }
 /* ---------------- component ---------------- */
 export default function Shuffle() {
   const [phase, setPhase] = useState<Phase>('idle');
-  const [order, setOrder] = useState<number[]>([0, 1, 2]);
+ const [order, setOrder] = useState<number[]>(() => Array.from({ length: EGG_COUNT }, (_, i) => i));
   const [progress, setProgress] = useState(0);
   const [busy, setBusy] = useState(false);
   const [rarity, setRarity] = useState<Rarity>('none');
@@ -178,7 +178,7 @@ export default function Shuffle() {
     setShowPrize(false);
 
     let swapTimer: NodeJS.Timeout | null = null;
-    swapTimer = setInterval(() => setOrder(shuffled3()), SWAP_EVERY_MS);
+    swapTimer = setInterval(() => setOrder(shuffledN(EGG_COUNT)), SWAP_EVERY_MS);
 
     const t0 = performance.now();
     const tick = (t: number) => {
@@ -211,7 +211,7 @@ export default function Shuffle() {
     setShowPrize(false);
     setRarity('none');
     setProgress(0);
-    setOrder([0, 1, 2]);
+    setOrder(Array.from({ length: EGG_COUNT }, (_, i) => i));
     setPhase('idle');
   };
 
@@ -251,20 +251,20 @@ export default function Shuffle() {
 
           <AntProgress progress={progress} />
 
-          {[0, 1, 2].map((i) => (
-            <button
-              key={i}
-              className={`egg-card ${phase === 'pick' ? 'can-pick' : ''}`}
-              style={{ left: `${LANES[order[i]]}%`, top: '58%' }}
-              onClick={onPick}
-              disabled={phase !== 'pick' || busy}
-              aria-label="Pick egg"
-            >
-              <div className={`egg-body ${phase === 'pick' ? 'wobble-on-pick' : ''}`} />
-              <div className="egg-shadow" />
-              <div className="egg-speckle" />
-            </button>
-          ))}
+          {Array.from({ length: EGG_COUNT }, (_, i) => (
+  <button
+    key={i}
+    className={`egg-card ${phase === 'pick' ? 'can-pick' : ''}`}
+    style={{ left: `${LANES[order[i]]}%`, top: '58%' }}
+    onClick={onPick}
+    disabled={phase !== 'pick' || busy}
+    aria-label="Pick egg"
+  >
+    <div className={`egg-body ${phase === 'pick' ? 'wobble-on-pick' : ''}`} />
+    <div className="egg-shadow" />
+    <div className="egg-speckle" />
+  </button>
+))}
         </div>
 
         <div className="shuffle-cta">
