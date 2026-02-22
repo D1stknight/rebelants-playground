@@ -1,24 +1,31 @@
-import React from 'react';
-import Link from 'next/link';
-import Expedition from '../components/Expedition';
+import React from "react";
+import Link from "next/link";
 
 export default function ExpeditionPage() {
   return (
-    <main className="max-w-5xl mx-auto px-4 py-6">
-      <h1 className="title mb-3">Rebel Ants Playground</h1>
-      <nav className="mb-6 flex items-center gap-2">
-        <Link href="/tunnel" className="tab">Ant Tunnel</Link>
-        <Link href="/hatch" className="tab">Queen&apos;s Egg Hatch</Link>
-        <Link href="/expedition" className="tab tab-active">Expedition</Link>
-        <Link href="/shuffle" className="tab">Shuffle</Link>
-      </nav>
+    <main className="max-w-5xl mx-auto px-4 py-10">
+      <h1 className="text-3xl font-bold mb-3">Expedition</h1>
+      <p className="text-slate-300 mb-6">Coming soon.</p>
 
-      <section className="ant-card">
-        <Expedition />
-      </section>
+      <div className="bg-slate-900/80 backdrop-blur-md border border-white/10 rounded-xl p-6">
+        <div className="text-slate-200 font-semibold mb-2">🚧 Game in development</div>
+        <p className="text-slate-300 mb-4">
+          Expedition missions are being assembled.
+        </p>
 
-      <div className="mt-6">
-        <Link href="/rules" className="text-slate-400 hover:underline">Official Rules</Link>
+        <div className="rounded-xl overflow-hidden border border-white/10 bg-black/20">
+          <img
+            src="/ui/coming-soon.png"
+            alt="Coming soon"
+            style={{ width: "100%", height: "auto", display: "block" }}
+          />
+        </div>
+
+        <div className="mt-6 flex gap-3">
+          <Link href="/shuffle" className="px-4 py-2 bg-blue-600 rounded-lg">
+            Back to Shuffle
+          </Link>
+        </div>
       </div>
     </main>
   );
