@@ -52,6 +52,7 @@ function AntIcon() {
       src="/ui/ant-progress.png"
       alt="ant"
       className="ant-img"
+      style={{ width: 14, height: 14 }}
       loading="eager"
       decoding="async"
     />
@@ -83,7 +84,7 @@ style={{
       ))}
 
       <style jsx>{`
-.ant-img {
+:global(.ant-img) {
   width: 14px;
   height: 14px;
   display: block;
