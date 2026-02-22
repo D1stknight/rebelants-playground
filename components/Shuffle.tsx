@@ -91,7 +91,7 @@ style={{
   height: 12px;
   display: block;
   object-fit: contain;
-  filter: drop-shadow(0 0 6px rgba(0,255,170,.4));
+  filter: drop-shadow(0 0 4px rgba(0,255,170,.35));
 }
         .ant-progress {
           position: absolute;
