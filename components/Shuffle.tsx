@@ -478,8 +478,8 @@ const [showHowPointsWork, setShowHowPointsWork] = useState(false);
           ))}
         </div>
 
-        {/* Shuffle CTA + Balance (THIS DIV MUST CLOSE before the Name section) */}
-      <div className="shuffle-cta">
+      {/* Shuffle button + balance row */}
+<div className="shuffle-cta" style={{ position: "relative" }}>
   <button
     className="btn"
     onClick={runShuffle}
@@ -491,90 +491,69 @@ const [showHowPointsWork, setShowHowPointsWork] = useState(false);
       : `Shuffle (-${cost} ${pointsConfig.currency})`}
   </button>
 
-  <div style={{ marginLeft: 12, fontSize: 13, opacity: 0.9 }}>
-    Balance: <b>{balance}</b> {pointsConfig.currency}
-    {needMore > 0 && (
-      <span style={{ marginLeft: 10, opacity: 0.9 }}>
-        Need {needMore} more {pointsConfig.currency}.
-      </span>
-    )}
-  </div>
-</div>
-    <div>
-      Need {Math.max(0, pointsConfig.shuffleCost - balance)} more {pointsConfig.currency}.
-    </div>
-  </div>
+  <div style={{ marginLeft: 12, fontSize: 13, opacity: 0.9, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+    <span>
+      Balance: <b>{balance}</b> {pointsConfig.currency}
+    </span>
 
-  <div style={{ marginTop: 6 }}>
     <button
       type="button"
       onClick={() => setShowHowPointsWork((v) => !v)}
       style={{
-        background: "transparent",
         border: "none",
-        padding: 0,
-        cursor: "pointer",
-        textDecoration: "underline",
+        background: "transparent",
         color: "inherit",
+        textDecoration: "underline",
+        cursor: "pointer",
+        padding: 0,
+        fontSize: 12,
         opacity: 0.9,
-        fontSize: 13,
       }}
     >
       How points work
     </button>
+
+    {needMore > 0 && (
+      <span style={{ opacity: 0.9 }}>
+        Need {needMore} more {pointsConfig.currency}.
+      </span>
+    )}
   </div>
-{showHowPointsWork && (
-  <div
-    style={{
-      marginTop: 10,
-      padding: 12,
-      borderRadius: 14,
-      border: "1px solid rgba(255,255,255,.14)",
-      background: "rgba(15,23,42,.45)",
-      backdropFilter: "blur(6px)",
-      fontSize: 13,
-      lineHeight: 1.35,
-      opacity: 0.95,
-      maxWidth: 520,
-    }}
-  >
-    <div style={{ fontWeight: 800, marginBottom: 6 }}>How points work</div>
 
-    <div style={{ display: "grid", gap: 6 }}>
-      <div>
-        <b>Shuffle costs</b> {pointsConfig.shuffleCost} {pointsConfig.currency}.
+  {showHowPointsWork && (
+    <div
+      style={{
+        position: "absolute",
+        left: 0,
+        top: "calc(100% + 10px)",
+        width: "min(520px, 92vw)",
+        padding: 12,
+        borderRadius: 12,
+        background: "rgba(15,23,42,.92)",
+        border: "1px solid rgba(255,255,255,.18)",
+        boxShadow: "0 18px 40px rgba(0,0,0,.45)",
+        zIndex: 80,
+      }}
+    >
+      <div style={{ fontWeight: 800, marginBottom: 6 }}>How points work</div>
+      <div style={{ fontSize: 13, opacity: 0.9, lineHeight: 1.4 }}>
+        • Shuffle costs <b>{pointsConfig.shuffleCost}</b> {pointsConfig.currency}.<br />
+        • Prizes: Common <b>+{pointsConfig.rewards.common}</b>, Rare <b>+{pointsConfig.rewards.rare}</b>, Ultra <b>+{pointsConfig.rewards.ultra}</b>.<br />
+        • Daily claim: <b>+{pointsConfig.dailyClaimAmount}</b> {pointsConfig.currency} (cap: <b>{pointsConfig.dailyEarnCap}</b>/day).<br />
+        • Leaderboards are based on total earned + recent wins (local for now).
       </div>
 
-      <div>
-        <b>Rewards:</b>{" "}
-        Common +{pointsConfig.rewards.common}, Rare +{pointsConfig.rewards.rare}, Ultra +{pointsConfig.rewards.ultra}.
-      </div>
-
-      <div>
-        <b>Daily claim:</b> +{pointsConfig.dailyClaim} {pointsConfig.currency} (1x per day).
-      </div>
-
-      <div>
-        <b>Daily earn cap:</b> {pointsConfig.dailyEarnCap} {pointsConfig.currency}.
-      </div>
-
-      <div style={{ opacity: 0.85 }}>
-        Tip: earn points from crates, then spend them to keep playing. In Step B we’ll persist this on the server + global leaderboard.
-      </div>
-    </div>
-
-    <div style={{ marginTop: 10 }}>
       <button
         type="button"
         className="btn"
         onClick={() => setShowHowPointsWork(false)}
-        style={{ padding: "8px 12px", fontSize: 13 }}
+        style={{ marginTop: 10, padding: "8px 12px", fontSize: 13 }}
       >
         Close
       </button>
     </div>
-  </div>
-)}
+  )}
+</div>
 
   {balance < pointsConfig.shuffleCost && (
     <div style={{ fontSize: 13, opacity: 0.85 }}>
