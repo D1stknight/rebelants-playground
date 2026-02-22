@@ -378,38 +378,39 @@ export default function Shuffle() {
           </div>
         </div>
 
-        <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-          <label style={{ fontSize: 13, opacity: 0.9 }}>
-            Name:&nbsp;
-            <input
-              value={playerName}
-              onChange={(e) => {
-                const v = e.target.value.slice(0, 18);
-                setPlayerName(v);
-                saveProfile({ name: v });
-              }}
-              style={{
-                padding: "6px 10px",
-                borderRadius: 10,
-                border: "1px solid rgba(255,255,255,.18)",
-                background: "rgba(15,23,42,.55)",
-                color: "inherit",
-              }}
-            />
-          </label>
+       <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+  <label style={{ fontSize: 13, opacity: 0.9 }}>
+    Name:&nbsp;
+    <input
+      value={playerName}
+      onChange={(e) => {
+        const v = e.target.value.slice(0, 18);
+        setPlayerName(v);
+        saveProfile({ name: v });
+      }}
+      style={{
+        padding: "6px 10px",
+        borderRadius: 10,
+        border: "1px solid rgba(255,255,255,.18)",
+        background: "rgba(15,23,42,.55)",
+        color: "inherit",
+      }}
+    />
+  </label>
 
-         <button
-  className="btn"
-  onClick={() => claimDaily(pointsConfig.dailyClaim)}
-  style={{ padding: "8px 12px", fontSize: 13 }}
->
-  Claim Daily +{pointsConfig.dailyClaim} {pointsConfig.currency}
-</button>
+  <button
+    className="btn"
+    onClick={() => claimDaily(pointsConfig.dailyClaim)}
+    style={{ padding: "8px 12px", fontSize: 13 }}
+  >
+    Claim Daily +{pointsConfig.dailyClaim} {pointsConfig.currency}
+  </button>
+</div>
 
-        {/* Official Rules link (restored) */}
-        <div className="rules-row">
-          <a className="rules-link" href="/rules">Official Rules</a>
-        </div>
+{/* Official Rules link (restored) */}
+<div className="rules-row">
+  <a className="rules-link" href="/rules">Official Rules</a>
+</div>
 
         <LeaderboardPanel />
 
