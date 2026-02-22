@@ -244,7 +244,7 @@ export default function Shuffle() {
           <div className="strip" />
 
           {/* Queen 3D — size 0.7 and centered; tiny downward nudge kept */}
-          <Queen3D active={phase === 'shuffling'} scale={0.7} y={-0.10} />
+         <Queen3D active={phase === 'shuffling'} scale={shuffleConfig.queenScale} y={-0.10} />
 
           <div className="rail rail-top" />
           <div className="rail rail-bottom" />
