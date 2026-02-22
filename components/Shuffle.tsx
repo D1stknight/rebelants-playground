@@ -236,7 +236,7 @@ export default function Shuffle() {
       {/* Game card */}
       <div className="ant-card ra-shuffle2">
         <div className="title">Queen&apos;s Egg Shuffle</div>
-        <p className="subtitle">Three eggs. We shuffle. You pick one for a prize.</p>
+        <p className="subtitle">{EGG_COUNT} eggs. We shuffle. You pick one for a prize.</p>
 
         <div className="shuffle-scene ant-scene" style={{ position: 'relative' }}>
           {/* in-scene dojo BG */}
