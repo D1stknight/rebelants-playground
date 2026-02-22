@@ -378,7 +378,16 @@ export default function Shuffle() {
           </div>
         </div>
 
-       <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+    {/* Name + Daily Claim */}
+<div
+  style={{
+    marginTop: 10,
+    display: "flex",
+    gap: 10,
+    flexWrap: "wrap",
+    alignItems: "center",
+  }}
+>
   <label style={{ fontSize: 13, opacity: 0.9 }}>
     Name:&nbsp;
     <input
@@ -407,11 +416,12 @@ export default function Shuffle() {
   </button>
 </div>
 
-{/* Official Rules link (restored) */}
+{/* Official Rules link */}
 <div className="rules-row">
-  <a className="rules-link" href="/rules">Official Rules</a>
+  <a className="rules-link" href="/rules">
+    Official Rules
+  </a>
 </div>
-
         <LeaderboardPanel />
 
         {showPrize && <PrizeModal rarity={rarity} onClose={resetAfterPrize} />}
