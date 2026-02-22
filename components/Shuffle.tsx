@@ -3,6 +3,8 @@ import React, { useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link'; // <-- NEW: real navigation for header tabs
 import { shuffleConfig } from '../lib/shuffleConfig';
+import { pointsConfig } from "../lib/pointsConfig";
+import { usePoints } from "../lib/usePoints";
 
 // lazy‑load queen so 3D never blocks SSR
 const Queen3D = dynamic(() => import('./Queen3D'), { ssr: false }) as React.ComponentType<{
