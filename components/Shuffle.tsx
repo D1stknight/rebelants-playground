@@ -78,7 +78,7 @@ function AntProgress({ progress }: { progress: number }) {
   key={i}
   className="ant"
 style={{
-  left: `${Math.max((ants.length - 1) * 6, Math.min(100, progress)) - i * 6}%`,
+  left: `${Math.max(0, Math.min(100, progress) - i * 10)}%`,
 }}
 >
           <AntIcon />
