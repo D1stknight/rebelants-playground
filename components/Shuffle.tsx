@@ -489,29 +489,36 @@ const [showHowPointsWork, setShowHowPointsWork] = useState(false);
       : `Shuffle (-${pointsConfig.shuffleCost} ${pointsConfig.currency})`}
   </button>
 
-<div style={{ fontSize: 13, opacity: 0.9, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-  <div>
-    Balance: <b>{balance}</b> {pointsConfig.currency}
+<div style={{ fontSize: 13, opacity: 0.9 }}>
+  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+    <div>
+      Balance: <b>{balance}</b> {pointsConfig.currency}
+    </div>
+
+    <div>
+      Need {Math.max(0, pointsConfig.shuffleCost - balance)} more {pointsConfig.currency}.
+    </div>
   </div>
 
-  <button
-    type="button"
-    onClick={() => setShowHowPointsWork((v) => !v)}
-    style={{
-      background: "transparent",
-      border: "none",
-      padding: 0,
-      cursor: "pointer",
-      textDecoration: "underline",
-      color: "inherit",
-      opacity: 0.9,
-      fontSize: 13,
-    }}
-  >
-    How points work
-  </button>
+  <div style={{ marginTop: 6 }}>
+    <button
+      type="button"
+      onClick={() => setShowHowPointsWork((v) => !v)}
+      style={{
+        background: "transparent",
+        border: "none",
+        padding: 0,
+        cursor: "pointer",
+        textDecoration: "underline",
+        color: "inherit",
+        opacity: 0.9,
+        fontSize: 13,
+      }}
+    >
+      How points work
+    </button>
+  </div>
 </div>
-
 {showHowPointsWork && (
   <div
     style={{
