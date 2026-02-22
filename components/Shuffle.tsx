@@ -1,8 +1,21 @@
 // components/Shuffle.tsx
 import React, { useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
-import Link from 'next/link'; // <-- NEW: real navigation for header tabs
+import Link from 'next/link';
 import { shuffleConfig } from '../lib/shuffleConfig';
+
+// ✅ points + leaderboard
+import {
+  pointsConfig,
+  loadProfile,
+  saveProfile,
+  claimDaily,
+  addWin,
+  earn,
+  spend,
+  getBalance,
+} from '../lib/points';
+import LeaderboardPanel from './LeaderboardPanel';
 import { pointsConfig } from "../lib/pointsConfig";
 import { usePoints } from "../lib/usePoints";
 import { loadProfile, saveProfile } from "../lib/profile";
