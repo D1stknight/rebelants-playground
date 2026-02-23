@@ -594,12 +594,29 @@ const [showHowPointsWork, setShowHowPointsWork] = useState(false);
   </button>
 
   {/* DEV ONLY: test credits so we can click Shuffle without changing economy */}
-  {process.env.NODE_ENV !== "production" && (
+   {process.env.NODE_ENV !== "production" && (
     <button
       className="btn"
-      onClick={() => earn(5000)}
+      onClick={async () => {
+        try {
+          const prof = loadProfile();
+          const playerId = prof?.id || "guest";
+
+          const r = await fetch("/api/points/dev-grant", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ playerId, amount: 5000 }),
+          });
+
+          // refresh UI balance by reloading (simple + reliable)
+          if (r.ok) window.location.reload();
+        } catch (e) {
+          console.error(e);
+        }
+      }}
       style={{ padding: "8px 12px", fontSize: 13, opacity: 0.9 }}
-      title="Dev only"
+      title="Dev only (ignores daily cap)"
+      type="button"
     >
       Dev Grant +5000 {pointsConfig.currency}
     </button>
