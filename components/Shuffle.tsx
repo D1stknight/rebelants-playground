@@ -343,7 +343,7 @@ const [showHowPointsWork, setShowHowPointsWork] = useState(false);
     const cost = pointsConfig.shuffleCost;
     if (balance < cost) return;
 
-    spend(cost);
+    await spend(cost);
 
     setBusy(true);
     setPhase("shuffling");
