@@ -1,92 +1,88 @@
 // lib/usePoints.ts
-import { useEffect, useMemo, useState } from "react";
-import { loadProfile } from "./profile";
+import { useCallback, useEffect, useState } from "react";
 
-type BalanceResponse = {
-  playerId: string;
-  balance: number;
-};
+type BalanceResp = { playerId: string; balance: number };
 
-type SpendResponse = {
-  ok: boolean;
-  playerId: string;
-  spent: number;
-  balance: number;
-};
-
-type EarnResponse = {
-  ok: boolean;
-  playerId: string;
-  added: number;
-  balance: number;
-  // optional (if your API returns it)
-  earnedToday?: number;
-  capped?: boolean;
-};
-
-async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, init);
-  const text = await res.text();
-  let data: any = {};
-  try {
-    data = text ? JSON.parse(text) : {};
-  } catch {
-    // ignore
-  }
-  if (!res.ok) {
-    const msg = data?.message || data?.error || `Request failed: ${res.status}`;
-    throw new Error(msg);
-  }
-  return data as T;
-}
-
-export function usePoints() {
-  const prof = useMemo(() => loadProfile(), []);
-  const playerId = (prof?.id || "guest").slice(0, 64);
+export function usePoints(playerId: string = "guest") {
+  const pid = (playerId || "guest").slice(0, 64);
 
   const [balance, setBalance] = useState(0);
-  const [earnedToday, setEarnedToday] = useState(0);
+  const [earnedToday, setEarnedToday] = useState(0); // optional for now (keep UI compatible)
 
-  const refresh = async () => {
-    const data = await fetchJson<BalanceResponse>(`/api/points/balance?playerId=${encodeURIComponent(playerId)}`);
+  const refresh = useCallback(async () => {
+    const r = await fetch(`/api/points/balance?playerId=${encodeURIComponent(pid)}`);
+    if (!r.ok) throw new Error(`balance fetch failed: ${r.status}`);
+    const data = (await r.json()) as BalanceResp;
     setBalance(Number(data.balance || 0));
-  };
+    // earnedToday is not returned by the API right now; keep at 0 unless you add it later
+    setEarnedToday(0);
+  }, [pid]);
 
   useEffect(() => {
-    refresh().catch(console.error);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    refresh().catch(() => {});
+  }, [refresh]);
 
-  const spend = async (cost: number) => {
-    const data = await fetchJson<SpendResponse>("/api/points/spend", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ playerId, amount: cost }),
-    });
-    setBalance(Number(data.balance || 0));
-  };
+  const spend = useCallback(
+    async (cost: number) => {
+      const r = await fetch("/api/points/spend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerId: pid, amount: cost }),
+      });
+      if (!r.ok) throw new Error(`spend failed: ${r.status}`);
+      await refresh();
+    },
+    [pid, refresh]
+  );
 
-  const earn = async (amount: number) => {
-    const data = await fetchJson<EarnResponse>("/api/points/earn", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ playerId, amount }),
-    });
-    setBalance(Number(data.balance || 0));
-    if (typeof data.earnedToday === "number") setEarnedToday(data.earnedToday);
-  };
+  const earn = useCallback(
+    async (amount: number) => {
+      const r = await fetch("/api/points/earn", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerId: pid, amount }),
+      });
+      if (!r.ok) throw new Error(`earn failed: ${r.status}`);
+      await refresh();
+    },
+    [pid, refresh]
+  );
 
-  // For now: daily claim is just an "earn" call (your server enforces daily cap).
-  // Later we can add true "once per day" logic server-side.
-  const claimDaily = async (amount: number) => {
-    await earn(amount);
-  };
+  // for now we treat "daily claim" as an earn with cap enforcement handled server-side
+  const claimDaily = useCallback(
+    async (amount: number) => {
+      const r = await fetch("/api/points/earn", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerId: pid, amount, reason: "daily" }),
+      });
+      if (!r.ok) throw new Error(`daily claim failed: ${r.status}`);
+      await refresh();
+    },
+    [pid, refresh]
+  );
 
-  // Optional helper (rarely needed)
-  const set = async (newBalance: number) => {
-    // no direct "set" endpoint yet — keep local state in sync by refreshing
-    await refresh();
-  };
+  // ✅ DEV ONLY: bypass cap (hits /api/points/dev-grant)
+  const devGrant = useCallback(
+    async (amount: number) => {
+      const r = await fetch("/api/points/dev-grant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerId: pid, amount }),
+      });
+      if (!r.ok) throw new Error(`dev grant failed: ${r.status}`);
+      await refresh();
+    },
+    [pid, refresh]
+  );
 
-  return { balance, earnedToday, spend, earn, claimDaily, set, refresh };
+  const set = useCallback(
+    async (newBalance: number) => {
+      // optional: if you don't have a /set endpoint, skip using this for now
+      setBalance(newBalance);
+    },
+    []
+  );
+
+  return { balance, earnedToday, spend, earn, claimDaily, devGrant, set, refresh };
 }
