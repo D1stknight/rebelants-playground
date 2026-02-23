@@ -601,22 +601,12 @@ const [showHowPointsWork, setShowHowPointsWork] = useState(false);
     <button
       className="btn"
       onClick={async () => {
-        try {
-          const prof = loadProfile();
-          const playerId = prof?.id || "guest";
-
-          const r = await fetch("/api/points/dev-grant", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ playerId, amount: 5000 }),
-          });
-
-          // refresh UI balance by reloading (simple + reliable)
-          if (r.ok) window.location.reload();
-        } catch (e) {
-          console.error(e);
-        }
-      }}
+  try {
+    await devGrant(5000);
+  } catch (e) {
+    console.error(e);
+  }
+}}
       style={{ padding: "8px 12px", fontSize: 13, opacity: 0.9 }}
       title="Dev only (ignores daily cap)"
       type="button"
