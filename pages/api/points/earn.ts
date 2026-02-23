@@ -18,6 +18,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const key = `points:balance:${playerId}`;
     const newBal = await redis.incrby(key, amount);
+await redis.zincrby("lb:earn", amount, playerId);
 
 // Update global leaderboard (total earned)
 await redis.zincrby("lb:earn", amount, playerId);
