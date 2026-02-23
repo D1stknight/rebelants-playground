@@ -337,38 +337,37 @@ const [showHowPointsWork, setShowHowPointsWork] = useState(false);
   const [rarity, setRarity] = useState<Rarity>("none");
   const [showPrize, setShowPrize] = useState(false);
 
-  const runShuffle = () => {
-    if (busy) return;
+ const runShuffle = async () => {
+  if (busy) return;
 
-    const cost = pointsConfig.shuffleCost;
-    if (balance < cost) return;
+  const cost = pointsConfig.shuffleCost;
+  if (balance < cost) return;
 
-    await spend(cost);
+  await spend(cost);
 
-    setBusy(true);
-    setPhase("shuffling");
-    setProgress(0);
-    setShowPrize(false);
+  setBusy(true);
+  setPhase("shuffling");
+  setProgress(0);
+  setShowPrize(false);
 
-    let swapTimer: NodeJS.Timeout | null = null;
-    swapTimer = setInterval(() => setOrder(shuffledN(EGG_COUNT)), SWAP_EVERY_MS);
+  let swapTimer: NodeJS.Timeout | null = null;
+  swapTimer = setInterval(() => setOrder(shuffledN(EGG_COUNT)), SWAP_EVERY_MS);
 
-    const t0 = performance.now();
-    const tick = (t: number) => {
-      const p = Math.min(1, (t - t0) / SHUFFLE_MS);
-      setProgress(Math.floor(p * 100));
-      if (p < 1) requestAnimationFrame(tick);
-      else {
-        if (swapTimer) clearInterval(swapTimer);
-        setProgress(100);
-        setPhase("pick");
-        setBusy(false);
-      }
-    };
-
-    requestAnimationFrame(tick);
+  const t0 = performance.now();
+  const tick = (t: number) => {
+    const p = Math.min(1, (t - t0) / SHUFFLE_MS);
+    setProgress(Math.floor(p * 100));
+    if (p < 1) requestAnimationFrame(tick);
+    else {
+      if (swapTimer) clearInterval(swapTimer);
+      setProgress(100);
+      setPhase("pick");
+      setBusy(false);
+    }
   };
 
+  requestAnimationFrame(tick);
+};
   const onPick = () => {
     if (phase !== "pick" || busy) return;
 
