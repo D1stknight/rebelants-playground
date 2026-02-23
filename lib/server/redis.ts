@@ -1,14 +1,13 @@
 // lib/server/redis.ts
 import { Redis } from "@upstash/redis";
 
-const url = process.env.UPSTASH_REDIS_REST_URL;
-const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+const url = process.env.KV_REST_API_URL;
+const token = process.env.KV_REST_API_TOKEN;
 
 if (!url || !token) {
   throw new Error(
-    "Missing UPSTASH env vars. Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN."
+    "Missing Upstash env vars. Expected KV_REST_API_URL and KV_REST_API_TOKEN in Vercel Environment Variables."
   );
 }
 
 export const redis = new Redis({ url, token });
-
