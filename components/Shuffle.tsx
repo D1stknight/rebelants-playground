@@ -600,11 +600,31 @@ const [showHowPointsWork, setShowHowPointsWork] = useState(false);
    {process.env.NODE_ENV !== "production" && (
     <button
       className="btn"
-      onClick={async () => {
+     onClick={async () => {
   try {
-    await devGrant(5000);
+    console.log("[DevGrant] clicked");
+
+    const prof = loadProfile();
+    const playerId = prof?.id || "guest";
+    console.log("[DevGrant] playerId =", playerId);
+
+    const r = await fetch("/api/points/dev-grant", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ playerId, amount: 5000 }),
+    });
+
+    const txt = await r.text();
+    console.log("[DevGrant] status =", r.status, "body =", txt);
+
+    // refresh balance after successful grant
+    if (r.ok) {
+      // this forces a fresh balance read even if hook is weird
+      const b = await fetch(`/api/points/balance?playerId=${encodeURIComponent(playerId)}`);
+      console.log("[Balance] status =", b.status, "body =", await b.text());
+    }
   } catch (e) {
-    console.error(e);
+    console.error("[DevGrant] error", e);
   }
 }}
       style={{ padding: "8px 12px", fontSize: 13, opacity: 0.9 }}
