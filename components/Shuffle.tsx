@@ -321,10 +321,7 @@ function PrizeModal({ rarity, onClose }: { rarity: Rarity; onClose: () => void }
 export default function Shuffle() {
   const [playerName, setPlayerName] = useState("guest");
 
-  const prof = loadProfile();
-const playerId = prof?.id || "guest";
-
-const { balance, spend, earn, claimDaily, devGrant } = usePoints(playerId);
+const { balance, spend, earn, claimDaily } = usePoints();
   const cost = pointsConfig.shuffleCost;
   const needMore = Math.max(0, cost - balance);
 
