@@ -597,43 +597,22 @@ const [showHowPointsWork, setShowHowPointsWork] = useState(false);
   </button>
 
   {/* DEV ONLY: test credits so we can click Shuffle without changing economy */}
-   {process.env.NODE_ENV !== "production" && (
-    <button
-      className="btn"
-     onClick={async () => {
-  try {
-    console.log("[DevGrant] clicked");
-
-    const prof = loadProfile();
-    const playerId = prof?.id || "guest";
-    console.log("[DevGrant] playerId =", playerId);
-
-    const r = await fetch("/api/points/dev-grant", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ playerId, amount: 5000 }),
-    });
-
-    const txt = await r.text();
-    console.log("[DevGrant] status =", r.status, "body =", txt);
-
-    // refresh balance after successful grant
-    if (r.ok) {
-      // this forces a fresh balance read even if hook is weird
-      const b = await fetch(`/api/points/balance?playerId=${encodeURIComponent(playerId)}`);
-      console.log("[Balance] status =", b.status, "body =", await b.text());
-    }
-  } catch (e) {
-    console.error("[DevGrant] error", e);
-  }
-}}
-      style={{ padding: "8px 12px", fontSize: 13, opacity: 0.9 }}
-      title="Dev only (ignores daily cap)"
-      type="button"
-    >
-      Dev Grant +5000 {pointsConfig.currency}
-    </button>
-  )}
+   <button
+  className="btn"
+  onClick={() => alert("DEV GRANT CLICKED")}
+  style={{
+    padding: "8px 12px",
+    fontSize: 13,
+    opacity: 0.95,
+    position: "relative",
+    zIndex: 9999,
+    pointerEvents: "auto",
+  }}
+  title="Dev only (test click)"
+  type="button"
+>
+  Dev Grant TEST (click me)
+</button>
 </div>
         {/* Official Rules link */}
         <div className="rules-row">
