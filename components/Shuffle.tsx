@@ -447,7 +447,7 @@ const [showHowPointsWork, setShowHowPointsWork] = useState(false);
 
       {/* Game card */}
       <div className="ant-card ra-shuffle2">
-        <div className="title">Queen&apos;s Egg Shuffle</div>
+        <div className="title">Queen&apos;s Egg Shuffle (TEST)</div>
         <p className="subtitle">
           {EGG_COUNT} eggs. We shuffle. You pick one for a prize.
         </p>
