@@ -447,6 +447,27 @@ const [showHowPointsWork, setShowHowPointsWork] = useState(false);
 
       {/* Game card */}
       <div className="ant-card ra-shuffle2">
+
+<button
+  type="button"
+  onClick={() => alert("TOP TEST CLICK")}
+  style={{
+    position: "relative",
+    zIndex: 99999,
+    pointerEvents: "auto",
+    marginBottom: 12,
+    padding: "10px 14px",
+    borderRadius: 12,
+    border: "1px solid rgba(255,255,255,.25)",
+    background: "rgba(15,23,42,.75)",
+    color: "white",
+    fontWeight: 800,
+    cursor: "pointer",
+  }}
+>
+  TOP TEST BUTTON
+</button>        
+        
         <div className="title">Queen&apos;s Egg Shuffle (TEST)</div>
         <p className="subtitle">
           {EGG_COUNT} eggs. We shuffle. You pick one for a prize.
