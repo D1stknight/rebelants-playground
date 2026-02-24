@@ -1,22 +1,28 @@
 // lib/usePoints.ts
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { loadProfile } from "./profile";
 
-type BalanceResp = { playerId: string; balance: number };
+type BalanceResponse = { playerId: string; balance: number };
 
-export function usePoints(playerId: string = "guest") {
-  const pid = (playerId || "guest").slice(0, 64);
+function getPlayerIdSafe() {
+  try {
+    const p = loadProfile();
+    return (p?.id || "guest").slice(0, 64);
+  } catch {
+    return "guest";
+  }
+}
 
+export function usePoints() {
+  const playerId = useMemo(() => getPlayerIdSafe(), []);
   const [balance, setBalance] = useState(0);
-  const [earnedToday, setEarnedToday] = useState(0); // optional for now (keep UI compatible)
 
   const refresh = useCallback(async () => {
-    const r = await fetch(`/api/points/balance?playerId=${encodeURIComponent(pid)}`);
-    if (!r.ok) throw new Error(`balance fetch failed: ${r.status}`);
-    const data = (await r.json()) as BalanceResp;
+    const r = await fetch(`/api/points/balance?playerId=${encodeURIComponent(playerId)}`);
+    if (!r.ok) throw new Error(`balance_failed_${r.status}`);
+    const data = (await r.json()) as BalanceResponse;
     setBalance(Number(data.balance || 0));
-    // earnedToday is not returned by the API right now; keep at 0 unless you add it later
-    setEarnedToday(0);
-  }, [pid]);
+  }, [playerId]);
 
   useEffect(() => {
     refresh().catch(() => {});
@@ -27,12 +33,12 @@ export function usePoints(playerId: string = "guest") {
       const r = await fetch("/api/points/spend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerId: pid, amount: cost }),
+        body: JSON.stringify({ playerId, cost }),
       });
-      if (!r.ok) throw new Error(`spend failed: ${r.status}`);
+      if (!r.ok) throw new Error(`spend_failed_${r.status}`);
       await refresh();
     },
-    [pid, refresh]
+    [playerId, refresh]
   );
 
   const earn = useCallback(
@@ -40,49 +46,35 @@ export function usePoints(playerId: string = "guest") {
       const r = await fetch("/api/points/earn", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerId: pid, amount }),
+        body: JSON.stringify({ playerId, amount }),
       });
-      if (!r.ok) throw new Error(`earn failed: ${r.status}`);
+      if (!r.ok) throw new Error(`earn_failed_${r.status}`);
       await refresh();
     },
-    [pid, refresh]
+    [playerId, refresh]
   );
 
-  // for now we treat "daily claim" as an earn with cap enforcement handled server-side
   const claimDaily = useCallback(
     async (amount: number) => {
+      // daily is just an earn on the server (server enforces daily cap if implemented there)
       const r = await fetch("/api/points/earn", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerId: pid, amount, reason: "daily" }),
+        body: JSON.stringify({ playerId, amount, reason: "daily" }),
       });
-      if (!r.ok) throw new Error(`daily claim failed: ${r.status}`);
+      if (!r.ok) throw new Error(`daily_failed_${r.status}`);
       await refresh();
     },
-    [pid, refresh]
-  );
-
-  // ✅ DEV ONLY: bypass cap (hits /api/points/dev-grant)
-  const devGrant = useCallback(
-    async (amount: number) => {
-      const r = await fetch("/api/points/dev-grant", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerId: pid, amount }),
-      });
-      if (!r.ok) throw new Error(`dev grant failed: ${r.status}`);
-      await refresh();
-    },
-    [pid, refresh]
+    [playerId, refresh]
   );
 
   const set = useCallback(
     async (newBalance: number) => {
-      // optional: if you don't have a /set endpoint, skip using this for now
-      setBalance(newBalance);
+      // Optional: not used right now. Keep for compatibility.
+      setBalance(Number(newBalance || 0));
     },
     []
   );
 
-  return { balance, earnedToday, spend, earn, claimDaily, devGrant, set, refresh };
+  return { balance, earnedToday: 0, spend, earn, claimDaily, set, refresh };
 }
