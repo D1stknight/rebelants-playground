@@ -329,7 +329,9 @@ export default function Shuffle() {
   }, []);
 
   const { balance, spend, earn, claimDaily, devGrant } = usePoints(playerId);
-
+  const cost = pointsConfig.shuffleCost;
+  const needMore = Math.max(0, cost - balance);
+  
   const [phase, setPhase] = useState<Phase>('idle');
 const [showHowPointsWork, setShowHowPointsWork] = useState(false);
   const [order, setOrder] = useState<number[]>(() => Array.from({ length: EGG_COUNT }, (_, i) => i));
