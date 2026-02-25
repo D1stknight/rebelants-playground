@@ -328,20 +328,19 @@ export default function Shuffle() {
     setPlayerId(p.id || "guest");
   }, []);
 
-  const { balance, spend, earn, claimDaily } = usePoints(playerId);
-  console.log("PLAYER ID =", playerId);
-  return <div style={{ padding: 40, color: "white" }}>SHUFFLE.TSX IS LOADED ✅</div>;
-  const cost = pointsConfig.shuffleCost;
-  const needMore = Math.max(0, cost - balance);
-  
-  const [phase, setPhase] = useState<Phase>('idle');
-const [showHowPointsWork, setShowHowPointsWork] = useState(false);
-  const [order, setOrder] = useState<number[]>(() => Array.from({ length: EGG_COUNT }, (_, i) => i));
-  const [progress, setProgress] = useState(0);
-  const [busy, setBusy] = useState(false);
-  const [rarity, setRarity] = useState<Rarity>("none");
-  const [showPrize, setShowPrize] = useState(false);
+ const { balance, spend, earn, claimDaily, devGrant, refresh } = usePoints(playerId);
+console.log("PLAYER ID =", playerId);
 
+const cost = pointsConfig.shuffleCost;
+const needMore = Math.max(0, cost - balance);
+
+const [phase, setPhase] = useState<Phase>("idle");
+const [showHowPointsWork, setShowHowPointsWork] = useState(false);
+const [order, setOrder] = useState<number[]>(() => Array.from({ length: EGG_COUNT }, (_, i) => i));
+const [progress, setProgress] = useState(0);
+const [busy, setBusy] = useState(false);
+const [rarity, setRarity] = useState<Rarity>("none");
+const [showPrize, setShowPrize] = useState(false);
 const runShuffle = async () => {
   if (busy) return;
 
@@ -592,13 +591,28 @@ setTimeout(async () => {
   </label>
 
   <button
+  className="btn"
+  type="button"
+  onClick={() => claimDaily(pointsConfig.dailyClaim)}
+  style={{ padding: "8px 12px", fontSize: 13 }}
+>
+  Claim Daily +{pointsConfig.dailyClaim} {pointsConfig.currency}
+</button>
+
+{process.env.NODE_ENV !== "production" && (
+  <button
     className="btn"
     type="button"
-    onClick={() => claimDaily(pointsConfig.dailyClaim)}
-    style={{ padding: "8px 12px", fontSize: 13 }}
+    onClick={async () => {
+      await devGrant(5000);
+      await refresh();
+      alert("Dev grant applied ✅");
+    }}
+    style={{ padding: "8px 12px", fontSize: 13, opacity: 0.9 }}
   >
-    Claim Daily +{pointsConfig.dailyClaim} {pointsConfig.currency}
+    Dev Grant +5000 {pointsConfig.currency}
   </button>
+)}
 
   {process.env.NODE_ENV !== "production" && (
     <button
