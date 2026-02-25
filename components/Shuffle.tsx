@@ -446,26 +446,6 @@ setTimeout(async () => {
 
       {/* Game card */}
       <div className="ant-card ra-shuffle2">
-
-<button
-  type="button"
-  onClick={() => alert("TOP TEST CLICK")}
-  style={{
-    position: "relative",
-    zIndex: 99999,
-    pointerEvents: "auto",
-    marginBottom: 12,
-    padding: "10px 14px",
-    borderRadius: 12,
-    border: "1px solid rgba(255,255,255,.25)",
-    background: "rgba(15,23,42,.75)",
-    color: "white",
-    fontWeight: 800,
-    cursor: "pointer",
-  }}
->
-  TOP TEST BUTTON
-</button>        
         
         <div className="title">Queen&apos;s Egg Shuffle (TEST)</div>
         <p className="subtitle">
@@ -594,10 +574,12 @@ setTimeout(async () => {
     <input
       value={playerName}
       onChange={(e) => {
-        const v = e.target.value.slice(0, 18);
-        setPlayerName(v);
-        saveProfile({ name: v });
-      }}
+  const v = e.target.value.slice(0, 18);
+  const id = (v || "guest").toLowerCase().replace(/\s+/g, "-");
+  setPlayerName(v || "guest");
+  setPlayerId(id);
+  saveProfile({ name: v || "guest", id });
+}}
       style={{
         padding: "6px 10px",
         borderRadius: 10,
