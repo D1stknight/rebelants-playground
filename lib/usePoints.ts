@@ -1,7 +1,11 @@
 // lib/usePoints.ts
 import { useCallback, useEffect, useState } from "react";
 
-type BalanceRes = { playerId: string; balance: number };
+async function getJSON<T>(url: string): Promise<T> {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(await r.text());
+  return (await r.json()) as T;
+}
 
 async function postJSON<T>(url: string, body: any): Promise<T> {
   const r = await fetch(url, {
@@ -9,60 +13,85 @@ async function postJSON<T>(url: string, body: any): Promise<T> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!r.ok) {
-    const txt = await r.text().catch(() => "");
-    throw new Error(`${url} ${r.status}: ${txt || "request failed"}`);
-  }
+  if (!r.ok) throw new Error(await r.text());
   return (await r.json()) as T;
 }
 
+/**
+ * Server-backed points hook (Upstash / API routes).
+ * IMPORTANT: This hook expects your API routes:
+ * - GET  /api/points/balance?playerId=...
+ * - POST /api/points/spend
+ * - POST /api/points/earn
+ * - POST /api/points/dev-grant   (dev only)
+ */
 export function usePoints(playerId: string) {
   const pid = (playerId || "guest").slice(0, 64);
 
   const [balance, setBalance] = useState(0);
-  const [earnedToday] = useState(0); // (optional, keep for UI compatibility)
+  const [earnedToday, setEarnedToday] = useState(0); // (optional, keep 0 unless your API returns it)
+  const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    const r = await fetch(`/api/points/balance?playerId=${encodeURIComponent(pid)}`);
-    if (!r.ok) {
-      const txt = await r.text().catch(() => "");
-      throw new Error(`/api/points/balance ${r.status}: ${txt || "failed"}`);
+    setLoading(true);
+    try {
+      const data = await getJSON<{ playerId: string; balance: number; earnedToday?: number }>(
+        `/api/points/balance?playerId=${encodeURIComponent(pid)}`
+      );
+      setBalance(Number(data.balance || 0));
+      setEarnedToday(Number(data.earnedToday || 0));
+    } finally {
+      setLoading(false);
     }
-    const data = (await r.json()) as BalanceRes;
-    setBalance(Number(data.balance || 0));
   }, [pid]);
 
   useEffect(() => {
-    // load current balance when pid is ready
-    refresh().catch(() => {});
+    refresh();
   }, [refresh]);
 
-  const spend = async (cost: number) => {
-    await postJSON(`/api/points/spend`, { playerId: pid, amount: Number(cost) });
-    await refresh();
-  };
+  const spend = useCallback(
+    async (cost: number) => {
+      await postJSON(`/api/points/spend`, { playerId: pid, amount: cost });
+      await refresh();
+    },
+    [pid, refresh]
+  );
 
-  const earn = async (amount: number) => {
-    await postJSON(`/api/points/earn`, { playerId: pid, amount: Number(amount) });
-    await refresh();
-  };
+  const earn = useCallback(
+    async (amount: number) => {
+      await postJSON(`/api/points/earn`, { playerId: pid, amount });
+      await refresh();
+    },
+    [pid, refresh]
+  );
 
-  const claimDaily = async (amount: number) => {
-    // this uses same earn endpoint (your server enforces daily cap)
-    await postJSON(`/api/points/earn`, { playerId: pid, amount: Number(amount), kind: "daily" });
-    await refresh();
-  };
+  // Daily claim is just "earn" through the same rules/cap on the server
+  const claimDaily = useCallback(
+    async (amount: number) => {
+      await postJSON(`/api/points/earn`, { playerId: pid, amount, source: "daily" });
+      await refresh();
+    },
+    [pid, refresh]
+  );
 
-  const devGrant = async (amount: number) => {
-    await postJSON(`/api/points/dev-grant`, { playerId: pid, amount: Number(amount) });
-    await refresh();
-  };
+  // DEV ONLY: bypass daily cap via /api/points/dev-grant
+  const devGrant = useCallback(
+    async (amount: number) => {
+      await postJSON(`/api/points/dev-grant`, { playerId: pid, amount });
+      await refresh();
+    },
+    [pid, refresh]
+  );
 
-  const set = async (newBalance: number) => {
-    // not used right now; keep signature so TS doesn't break.
-    // If you want a real "set", we'd add an API route for it.
-    setBalance(Number(newBalance || 0));
-  };
+  const set = useCallback(
+    async (newBalance: number) => {
+      // Optional helper if you ever create a set endpoint later.
+      // For now just refresh.
+      setBalance(newBalance);
+      await refresh();
+    },
+    [refresh]
+  );
 
-  return { balance, earnedToday, spend, earn, claimDaily, devGrant, set, refresh };
+  return { balance, earnedToday, loading, spend, earn, claimDaily, devGrant, set, refresh };
 }
