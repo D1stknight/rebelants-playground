@@ -320,15 +320,15 @@ function PrizeModal({ rarity, onClose }: { rarity: Rarity; onClose: () => void }
 /* ---------------- component ---------------- */
 export default function Shuffle() {
   const [playerName, setPlayerName] = useState("guest");
-
-const { balance, spend, earn, claimDaily } = usePoints();
-  const cost = pointsConfig.shuffleCost;
-  const needMore = Math.max(0, cost - balance);
+  const [playerId, setPlayerId] = useState("guest");
 
   React.useEffect(() => {
     const p = loadProfile();
     setPlayerName(p.name || "guest");
+    setPlayerId(p.id || "guest");
   }, []);
+
+  const { balance, spend, earn, claimDaily, devGrant } = usePoints(playerId);
 
   const [phase, setPhase] = useState<Phase>('idle');
 const [showHowPointsWork, setShowHowPointsWork] = useState(false);
@@ -338,7 +338,7 @@ const [showHowPointsWork, setShowHowPointsWork] = useState(false);
   const [rarity, setRarity] = useState<Rarity>("none");
   const [showPrize, setShowPrize] = useState(false);
 
- const runShuffle = async () => {
+const runShuffle = async () => {
   if (busy) return;
 
   const cost = pointsConfig.shuffleCost;
@@ -366,6 +366,8 @@ const [showHowPointsWork, setShowHowPointsWork] = useState(false);
       setBusy(false);
     }
   };
+  requestAnimationFrame(tick);
+};
 
   requestAnimationFrame(tick);
 };
@@ -614,24 +616,22 @@ const [showHowPointsWork, setShowHowPointsWork] = useState(false);
     Claim Daily +{pointsConfig.dailyClaim} {pointsConfig.currency}
   </button>
 
-  {/* DEV ONLY: test credits so we can click Shuffle without changing economy */}
-   <button
-  className="btn"
-  onClick={() => alert("DEV GRANT CLICKED")}
-  style={{
-    padding: "8px 12px",
-    fontSize: 13,
-    opacity: 0.95,
-    position: "relative",
-    zIndex: 9999,
-    pointerEvents: "auto",
-  }}
-  title="Dev only (test click)"
-  type="button"
->
-  Dev Grant TEST (click me)
-</button>
-</div>
+{process.env.NODE_ENV !== "production" && (
+    <button
+      className="btn"
+      type="button"
+      onClick={async () => {
+        await devGrant(5000);
+        alert("Dev grant applied ✅");
+      }}
+      style={{ padding: "8px 12px", fontSize: 13, opacity: 0.9 }}
+      title="Dev only (ignores daily cap)"
+    >
+      Dev Grant +5000 {pointsConfig.currency}
+    </button>
+  )}
+</div>         
+
         {/* Official Rules link */}
         <div className="rules-row">
           <a className="rules-link" href="/rules">
