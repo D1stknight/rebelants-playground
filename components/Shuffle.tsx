@@ -329,6 +329,7 @@ export default function Shuffle() {
   }, []);
 
   const { balance, spend, earn, claimDaily, devGrant } = usePoints(playerId);
+  console.log("PLAYER ID =", playerId);
   const cost = pointsConfig.shuffleCost;
   const needMore = Math.max(0, cost - balance);
   
