@@ -599,21 +599,33 @@ setTimeout(async () => {
   </button>
 
 {process.env.NODE_ENV !== "production" && (
-    <button
-      className="btn"
-      type="button"
-      onClick={async () => {
-        await devGrant(5000);
-        alert("Dev grant applied ✅");
-      }}
-      style={{ padding: "8px 12px", fontSize: 13, opacity: 0.9 }}
-      title="Dev only (ignores daily cap)"
-    >
-      Dev Grant +5000 {pointsConfig.currency}
-    </button>
-  )}
-</div>         
+  <button
+    className="btn"
+    type="button"
+    onClick={async () => {
+      const prof = loadProfile();
+      const pid = (prof?.id || "guest").trim() || "guest";
 
+      const r = await fetch("/api/points/dev-grant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerId: pid, amount: 5000 }),
+      });
+
+      const j = await r.json().catch(() => null);
+
+      alert(`STATUS: ${r.status}\n\n${JSON.stringify(j, null, 2)}`);
+
+      // force UI refresh from API
+      const b = await fetch(`/api/points/balance?playerId=${pid}`);
+      const bj = await b.json();
+      alert(`NEW BALANCE:\n${JSON.stringify(bj, null, 2)}`);
+    }}
+    style={{ padding: "8px 12px", fontSize: 13, opacity: 0.9 }}
+  >
+    Dev Grant DEBUG
+  </button>
+)}
         {/* Official Rules link */}
         <div className="rules-row">
           <a className="rules-link" href="/rules">
