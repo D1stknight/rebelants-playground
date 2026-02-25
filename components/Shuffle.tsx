@@ -330,6 +330,7 @@ export default function Shuffle() {
 
   const { balance, spend, earn, claimDaily } = usePoints(playerId);
   console.log("PLAYER ID =", playerId);
+  return <div style={{ padding: 40, color: "white" }}>SHUFFLE.TSX IS LOADED ✅</div>;
   const cost = pointsConfig.shuffleCost;
   const needMore = Math.max(0, cost - balance);
   
