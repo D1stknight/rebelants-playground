@@ -328,7 +328,7 @@ export default function Shuffle() {
     setPlayerId(p.id || "guest");
   }, []);
 
-  const { balance, spend, earn, claimDaily, devGrant } = usePoints(playerId);
+  const { balance, spend, earn, claimDaily } = usePoints(playerId);
   console.log("PLAYER ID =", playerId);
   const cost = pointsConfig.shuffleCost;
   const needMore = Math.max(0, cost - balance);
@@ -567,19 +567,19 @@ setTimeout(async () => {
   </div>
 </div>
         
-        {/* Name + Daily Claim */}
-       <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+       {/* Name + Daily Claim */}
+<div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
   <label style={{ fontSize: 13, opacity: 0.9 }}>
     Name:&nbsp;
     <input
       value={playerName}
       onChange={(e) => {
-  const v = e.target.value.slice(0, 18);
-  const id = (v || "guest").toLowerCase().replace(/\s+/g, "-");
-  setPlayerName(v || "guest");
-  setPlayerId(id);
-  saveProfile({ name: v || "guest", id });
-}}
+        const v = e.target.value.slice(0, 18);
+        const id = (v || "guest").toLowerCase().replace(/\s+/g, "-");
+        setPlayerName(v || "guest");
+        setPlayerId(id);
+        saveProfile({ name: v || "guest", id });
+      }}
       style={{
         padding: "6px 10px",
         borderRadius: 10,
@@ -592,40 +592,44 @@ setTimeout(async () => {
 
   <button
     className="btn"
+    type="button"
     onClick={() => claimDaily(pointsConfig.dailyClaim)}
     style={{ padding: "8px 12px", fontSize: 13 }}
   >
     Claim Daily +{pointsConfig.dailyClaim} {pointsConfig.currency}
   </button>
 
-{process.env.NODE_ENV !== "production" && (
-  <button
-    className="btn"
-    type="button"
-    onClick={async () => {
-      const prof = loadProfile();
-      const pid = (prof?.id || "guest").trim() || "guest";
+  {process.env.NODE_ENV !== "production" && (
+    <button
+      className="btn"
+      type="button"
+      onClick={async () => {
+        const prof = loadProfile();
+        const pid = (prof?.id || playerId || "guest").trim() || "guest";
 
-      const r = await fetch("/api/points/dev-grant", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerId: pid, amount: 5000 }),
-      });
+        const r = await fetch("/api/points/dev-grant", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ playerId: pid, amount: 5000 }),
+        });
 
-      const j = await r.json().catch(() => null);
+        const j = await r.json().catch(() => null);
+        alert(`STATUS: ${r.status}\n\n${JSON.stringify(j, null, 2)}`);
 
-      alert(`STATUS: ${r.status}\n\n${JSON.stringify(j, null, 2)}`);
+        const b = await fetch(`/api/points/balance?playerId=${encodeURIComponent(pid)}`);
+        const bj = await b.json().catch(() => null);
+        alert(`NEW BALANCE:\n${JSON.stringify(bj, null, 2)}`);
 
-      // force UI refresh from API
-      const b = await fetch(`/api/points/balance?playerId=${pid}`);
-      const bj = await b.json();
-      alert(`NEW BALANCE:\n${JSON.stringify(bj, null, 2)}`);
-    }}
-    style={{ padding: "8px 12px", fontSize: 13, opacity: 0.9 }}
-  >
-    Dev Grant DEBUG
-  </button>
-)}
+        // force UI refresh (in case hook cache is stale)
+        window.location.reload();
+      }}
+      style={{ padding: "8px 12px", fontSize: 13, opacity: 0.9 }}
+      title="Dev only (debug)"
+    >
+      Dev Grant DEBUG
+    </button>
+  )}
+</div>
         {/* Official Rules link */}
         <div className="rules-row">
           <a className="rules-link" href="/rules">
