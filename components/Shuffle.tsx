@@ -375,7 +375,7 @@ const runShuffle = async () => {
 
     setBusy(true);
 
-    setTimeout(() => {
+setTimeout(async () => {
       const r = rollRarity();
 
       const reward =
@@ -387,20 +387,20 @@ const runShuffle = async () => {
           ? pointsConfig.rewards.common
           : pointsConfig.rewards.none;
 
-      if (reward > 0) {
-        earn(reward);
+    if (reward > 0) {
+  await earn(reward);
 
-        const prof = loadProfile();
-        addWin({
-          id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-          ts: Date.now(),
-          game: "shuffle",
-          playerId: prof.id,
-          playerName: playerName || prof.name || "guest",
-          rarity: r,
-          pointsAwarded: reward,
-        });
-      }
+  const prof = loadProfile();
+  addWin({
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    ts: Date.now(),
+    game: "shuffle",
+    playerId: prof.id,
+    playerName: playerName || prof.name || "guest",
+    rarity: r,
+    pointsAwarded: reward,
+  });
+}
 
       setRarity(r);
       setPhase("revealed");
