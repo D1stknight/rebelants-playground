@@ -368,9 +368,6 @@ const runShuffle = async () => {
   };
   requestAnimationFrame(tick);
 };
-
-  requestAnimationFrame(tick);
-};
   const onPick = () => {
     if (phase !== "pick" || busy) return;
 
