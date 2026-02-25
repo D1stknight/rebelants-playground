@@ -1,67 +1,68 @@
 // lib/usePoints.ts
 import { useCallback, useEffect, useState } from "react";
 
-type BalanceResp = { playerId: string; balance: number; earnedToday?: number };
+type BalanceRes = { playerId: string; balance: number };
 
-async function fetchJSON<T>(url: string, init?: RequestInit): Promise<T> {
-  const r = await fetch(url, init);
-  const text = await r.text();
-  if (!r.ok) throw new Error(text || `HTTP ${r.status}`);
-  return JSON.parse(text) as T;
+async function postJSON<T>(url: string, body: any): Promise<T> {
+  const r = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) {
+    const txt = await r.text().catch(() => "");
+    throw new Error(`${url} ${r.status}: ${txt || "request failed"}`);
+  }
+  return (await r.json()) as T;
 }
 
-export function usePoints(playerId: string = "guest") {
+export function usePoints(playerId: string) {
+  const pid = (playerId || "guest").slice(0, 64);
+
   const [balance, setBalance] = useState(0);
-  const [earnedToday, setEarnedToday] = useState(0);
+  const [earnedToday] = useState(0); // (optional, keep for UI compatibility)
 
   const refresh = useCallback(async () => {
-    const data = await fetchJSON<BalanceResp>(
-      `/api/points/balance?playerId=${encodeURIComponent(playerId)}`
-    );
-    setBalance(data.balance ?? 0);
-    setEarnedToday(data.earnedToday ?? 0);
-  }, [playerId]);
+    const r = await fetch(`/api/points/balance?playerId=${encodeURIComponent(pid)}`);
+    if (!r.ok) {
+      const txt = await r.text().catch(() => "");
+      throw new Error(`/api/points/balance ${r.status}: ${txt || "failed"}`);
+    }
+    const data = (await r.json()) as BalanceRes;
+    setBalance(Number(data.balance || 0));
+  }, [pid]);
 
   useEffect(() => {
+    // load current balance when pid is ready
     refresh().catch(() => {});
   }, [refresh]);
 
-  const claimDaily = async (amount: number) => {
-    await fetchJSON(`/api/points/earn`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ playerId, amount, kind: "daily" }),
-    });
-    await refresh();
-  };
-
   const spend = async (cost: number) => {
-    await fetchJSON(`/api/points/spend`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ playerId, amount: cost }),
-    });
+    await postJSON(`/api/points/spend`, { playerId: pid, amount: Number(cost) });
     await refresh();
   };
 
   const earn = async (amount: number) => {
-    await fetchJSON(`/api/points/earn`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ playerId, amount, kind: "win" }),
-    });
+    await postJSON(`/api/points/earn`, { playerId: pid, amount: Number(amount) });
     await refresh();
   };
 
-  // DEV ONLY (server ignores daily cap in this endpoint)
+  const claimDaily = async (amount: number) => {
+    // this uses same earn endpoint (your server enforces daily cap)
+    await postJSON(`/api/points/earn`, { playerId: pid, amount: Number(amount), kind: "daily" });
+    await refresh();
+  };
+
   const devGrant = async (amount: number) => {
-    await fetchJSON(`/api/points/dev-grant`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ playerId, amount }),
-    });
+    await postJSON(`/api/points/dev-grant`, { playerId: pid, amount: Number(amount) });
     await refresh();
   };
 
-  return { balance, earnedToday, spend, earn, claimDaily, devGrant, refresh };
+  const set = async (newBalance: number) => {
+    // not used right now; keep signature so TS doesn't break.
+    // If you want a real "set", we'd add an API route for it.
+    setBalance(Number(newBalance || 0));
+  };
+
+  return { balance, earnedToday, spend, earn, claimDaily, devGrant, set, refresh };
 }
