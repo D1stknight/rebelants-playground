@@ -2,10 +2,20 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
 
+function headerValue(v: string | string[] | undefined) {
+  return Array.isArray(v) ? v[0] : v;
+}
+
 function isAdmin(req: NextApiRequest) {
-  const token = req.headers["x-admin-token"];
-  const provided = Array.isArray(token) ? token[0] : token;
-  const expected = process.env.ADMIN_TOKEN;
+  // accept either header name
+  const provided =
+    headerValue(req.headers["x-admin-key"]) ||
+    headerValue(req.headers["x-admin-token"]) ||
+    "";
+
+  // accept either env var name
+  const expected = process.env.ADMIN_KEY || process.env.ADMIN_TOKEN || "";
+
   if (!expected) return false;
   return !!provided && provided === expected;
 }
@@ -27,7 +37,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(405).json({ ok: false, error: "Method not allowed" });
     }
 
-    const { playerId, amount } = (req.body ?? {}) as { playerId?: string; amount?: number };
+    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    const { playerId, amount } = (body ?? {}) as { playerId?: string; amount?: number };
+
     const pid = (playerId || "guest").trim().slice(0, 64) || "guest";
     const amt = Number(amount || 0);
 
@@ -37,7 +49,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const newBalance = await redis.incrby(balKey(pid), amt);
 
-    // keep a balance leaderboard for visibility (NOT "Top Earners", just useful)
+    // balance leaderboard (visibility only; NOT top earners)
     await redis.zadd(lbBalanceKey(), { score: Number(newBalance || 0), member: pid });
 
     return res.status(200).json({
