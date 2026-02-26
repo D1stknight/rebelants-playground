@@ -374,26 +374,6 @@ export default function Shuffle() {
   const cost = pointsConfig.shuffleCost;
   const needMore = Math.max(0, cost - balance);
 
-  // ✅ LIVE economy config (Admin page saves to Redis; this loads it)
-  const [liveCfg, setLiveCfg] = useState<any>(null);
-
-  React.useEffect(() => {
-    (async () => {
-      try {
-        const r = await fetch("/api/config", { cache: "no-store" as any });
-        const j = await r.json().catch(() => null);
-        // your Admin page expects j.pointsConfig
-        if (j?.pointsConfig) setLiveCfg(j.pointsConfig);
-      } catch {
-        // ignore; fallback to defaults
-      }
-    })();
-  }, []);
-
-  const pointsConfig = liveCfg || defaultPointsConfig;
-
-  const cost = pointsConfig.shuffleCost;
-  const needMore = Math.max(0, cost - balance);
 const [phase, setPhase] = useState<Phase>("idle");
 const [showHowPointsWork, setShowHowPointsWork] = useState(false);
 const [order, setOrder] = useState<number[]>(() => Array.from({ length: EGG_COUNT }, (_, i) => i));
@@ -404,7 +384,6 @@ const [showPrize, setShowPrize] = useState(false);
 const runShuffle = async () => {
   if (busy) return;
 
-  const cost = pointsConfig.shuffleCost;
   if (balance < cost) return;
 
   await spend(cost);
