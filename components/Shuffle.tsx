@@ -639,12 +639,7 @@ setTimeout(async () => {
   const id = (p?.id || playerId || "guest").trim() || "guest";
 
   saveProfile({ name: v, id });
-}}
-
-<div style={{ fontSize: 11, opacity: 0.7, marginTop: 6 }}>
-  Player ID: <b>{playerId}</b>
-</div>      
-    
+}}     
       style={{
         padding: "6px 10px",
         borderRadius: 10,
@@ -653,6 +648,9 @@ setTimeout(async () => {
         color: "inherit",
       }}
     />
+    <div style={{ fontSize: 11, opacity: 0.7, marginTop: 6 }}>
+      Player ID: <b>{playerId}</b>
+    </div> 
   </label>
 
 <button
