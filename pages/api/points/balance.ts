@@ -6,10 +6,15 @@ function balKey(playerId: string) {
   return `ra:points:bal:${playerId}`;
 }
 
+function earnedTodayKey(playerId: string) {
+  return `ra:points:earnedToday:${playerId}`;
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // 🚫 never cache balances
+  // 🚫 IMPORTANT: never cache balances (prevents “random 30000”)
   res.setHeader("Cache-Control", "no-store, max-age=0");
   res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
 
   try {
     if (req.method !== "GET") {
@@ -17,11 +22,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(405).json({ error: "Method not allowed" });
     }
 
-    const playerId = String(req.query.playerId || "guest").trim() || "guest";
-    const balRaw = await redis.get<number>(balKey(playerId));
+    const pid = String(req.query.playerId || "guest").trim().slice(0, 64) || "guest";
+
+    const balRaw = await redis.get<number>(balKey(pid));
     const balance = Number(balRaw || 0);
 
-    return res.status(200).json({ playerId, balance });
+    const earnedRaw = await redis.get<number>(earnedTodayKey(pid));
+    const earnedToday = Number(earnedRaw || 0);
+
+    return res.status(200).json({ playerId: pid, balance, earnedToday });
   } catch (err: any) {
     console.error("balance error:", err);
     return res.status(500).json({ error: "Server error" });
