@@ -4,22 +4,10 @@ import { redis } from "../../../lib/server/redis";
 
 const KEY = "ra:config:economy";
 
-function headerValue(v: string | string[] | undefined) {
-  return Array.isArray(v) ? v[0] : v;
-}
-
 function isAuthed(req: NextApiRequest) {
-  // accept either header name
-  const provided =
-    headerValue(req.headers["x-admin-key"]) ||
-    headerValue(req.headers["x-admin-token"]) ||
-    "";
-
-  // accept either env var name
-  const expected = process.env.ADMIN_KEY || process.env.ADMIN_TOKEN || "";
-
-  if (!expected) return false;
-  return !!provided && provided === expected;
+  const key = req.headers["x-admin-key"];
+  const provided = Array.isArray(key) ? key[0] : key;
+  return !!provided && !!process.env.ADMIN_KEY && provided === process.env.ADMIN_KEY;
 }
 
 const DEFAULTS = {
@@ -30,22 +18,9 @@ const DEFAULTS = {
   rewards: { none: 0, common: 50, rare: 100, ultra: 200 },
 };
 
-function normalizeIncoming(body: any) {
-  // accept either {pointsConfig:{...}} or flat {...}
-  const src = body?.pointsConfig ?? body ?? {};
-
-  return {
-    shuffleCost: Number(src?.shuffleCost ?? DEFAULTS.shuffleCost),
-    dailyClaim: Number(src?.dailyClaim ?? DEFAULTS.dailyClaim),
-    dailyEarnCap: Number(src?.dailyEarnCap ?? DEFAULTS.dailyEarnCap),
-    currency: String(src?.currency ?? DEFAULTS.currency),
-    rewards: {
-      none: Number(src?.rewards?.none ?? DEFAULTS.rewards.none),
-      common: Number(src?.rewards?.common ?? DEFAULTS.rewards.common),
-      rare: Number(src?.rewards?.rare ?? DEFAULTS.rewards.rare),
-      ultra: Number(src?.rewards?.ultra ?? DEFAULTS.rewards.ultra),
-    },
-  };
+function safeNum(v: any, fallback: number) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -54,23 +29,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === "GET") {
       const raw = await redis.get(KEY);
-
-      let parsed: any = null;
-      if (raw) {
-        try {
-          parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-        } catch {
-          parsed = null;
-        }
-      }
-
+      const parsed = raw ? (typeof raw === "string" ? JSON.parse(raw) : raw) : {};
       const merged = { ...DEFAULTS, ...(parsed || {}) };
+
       return res.status(200).json({ ok: true, pointsConfig: merged });
     }
 
     if (req.method === "POST") {
       const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
-      const next = normalizeIncoming(body);
+
+      // ✅ accept BOTH shapes:
+      // 1) { pointsConfig: {...} }  (admin.tsx sends this)
+      // 2) { shuffleCost, dailyClaim, ... } (flat)
+      const src = body?.pointsConfig ?? body ?? {};
+
+      const next = {
+        shuffleCost: safeNum(src.shuffleCost, DEFAULTS.shuffleCost),
+        dailyClaim: safeNum(src.dailyClaim, DEFAULTS.dailyClaim),
+        dailyEarnCap: safeNum(src.dailyEarnCap, DEFAULTS.dailyEarnCap),
+        currency: String(src.currency ?? DEFAULTS.currency),
+        rewards: {
+          none: safeNum(src.rewards?.none, DEFAULTS.rewards.none),
+          common: safeNum(src.rewards?.common, DEFAULTS.rewards.common),
+          rare: safeNum(src.rewards?.rare, DEFAULTS.rewards.rare),
+          ultra: safeNum(src.rewards?.ultra, DEFAULTS.rewards.ultra),
+        },
+      };
 
       await redis.set(KEY, JSON.stringify(next));
       return res.status(200).json({ ok: true, pointsConfig: next });
