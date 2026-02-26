@@ -319,28 +319,25 @@ function PrizeModal({ rarity, onClose }: { rarity: Rarity; onClose: () => void }
 
 /* ---------------- component ---------------- */
 export default function Shuffle() {
-  const [playerName, setPlayerName] = useState("guest");
-  const [playerId, setPlayerId] = useState("guest");
+ const [{ name: initialName, id: initialId }] = useState(() => {
+  const p = loadProfile();
+  const name = (p?.name || "guest").trim() || "guest";
+  let id = (p?.id || "").trim();
+
+  if (!id) {
+    const suffix = Math.random().toString(36).slice(2, 7);
+    id = `guest-${suffix}`;
+    saveProfile({ name, id });
+  }
+
+  return { name, id };
+});
+
+const [playerName, setPlayerName] = useState(initialName);
+const [playerId, setPlayerId] = useState(initialId);
 
   // ✅ LIVE economy config (starts with defaults, then loads from /api/config)
   const [pointsConfig, setPointsConfig] = useState(defaultPointsConfig);
-
-  React.useEffect(() => {
-    const p = loadProfile();
-
-    // If no stored id, create one ONCE and persist it
-    const name = (p?.name || "guest").trim() || "guest";
-    let id = (p?.id || "").trim();
-
-    if (!id) {
-      const suffix = Math.random().toString(36).slice(2, 7);
-      id = `guest-${suffix}`;
-      saveProfile({ name, id });
-    }
-
-    setPlayerName(name);
-    setPlayerId(id);
-  }, []);
 
   // ✅ Pull latest config override from Redis
   React.useEffect(() => {
@@ -445,18 +442,20 @@ setTimeout(async () => {
     pointsAwarded: reward,
   });
 
-  // server (source of truth for leaderboards)
-  await fetch("/api/wins/add", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      game: "shuffle",
-      playerId: pid,
-      playerName: pname,
-      rarity: r,
-      pointsAwarded: reward,
-    }),
-  }).catch(() => {});
+ // server (source of truth for leaderboards)
+await fetch("/api/wins/add", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    ts: Date.now(),
+    game: "shuffle",
+    playerId: pid,
+    playerName: pname,
+    rarity: r,
+    pointsAwarded: reward,
+  }),
+}).catch(() => {});
 }
 
       setRarity(r);
