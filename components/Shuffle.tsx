@@ -388,19 +388,36 @@ setTimeout(async () => {
           ? pointsConfig.rewards.common
           : pointsConfig.rewards.none;
 
-    if (reward > 0) {
+   if (reward > 0) {
   await earn(reward);
 
   const prof = loadProfile();
+  const pid = prof.id || playerId || "guest";
+  const pname = playerName || prof.name || "guest";
+
+  // local (keep for now)
   addWin({
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     ts: Date.now(),
     game: "shuffle",
-    playerId: prof.id,
-    playerName: playerName || prof.name || "guest",
+    playerId: pid,
+    playerName: pname,
     rarity: r,
     pointsAwarded: reward,
   });
+
+  // server (source of truth for leaderboards)
+  await fetch("/api/wins/add", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      game: "shuffle",
+      playerId: pid,
+      playerName: pname,
+      rarity: r,
+      pointsAwarded: reward,
+    }),
+  }).catch(() => {});
 }
 
       setRarity(r);
