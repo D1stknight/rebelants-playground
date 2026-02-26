@@ -28,6 +28,14 @@ const DEFAULTS = {
   dailyEarnCap: 500,
   currency: "REBEL",
   rewards: { none: 0, common: 50, rare: 100, ultra: 200 },
+
+  // ✅ NEW: prize pools per rarity (can be points, merch, NFT, APE, or nothing)
+  prizePools: {
+    none: [{ type: "NONE", label: "Nothing this time", points: 0 }],
+    common: [{ type: "POINTS", label: "50 REBEL", points: 50 }],
+    rare: [{ type: "POINTS", label: "100 REBEL", points: 100 }],
+    ultra: [{ type: "POINTS", label: "200 REBEL", points: 200 }],
+  },
 };
 
 function safeNum(v: any, fallback: number) {
@@ -56,17 +64,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const src = body?.pointsConfig ?? body ?? {};
 
       const next = {
-        shuffleCost: safeNum(src.shuffleCost, DEFAULTS.shuffleCost),
-        dailyClaim: safeNum(src.dailyClaim, DEFAULTS.dailyClaim),
-        dailyEarnCap: safeNum(src.dailyEarnCap, DEFAULTS.dailyEarnCap),
-        currency: String(src.currency ?? DEFAULTS.currency),
-        rewards: {
-          none: safeNum(src.rewards?.none, DEFAULTS.rewards.none),
-          common: safeNum(src.rewards?.common, DEFAULTS.rewards.common),
-          rare: safeNum(src.rewards?.rare, DEFAULTS.rewards.rare),
-          ultra: safeNum(src.rewards?.ultra, DEFAULTS.rewards.ultra),
-        },
-      };
+  shuffleCost: Number(body?.shuffleCost ?? DEFAULTS.shuffleCost),
+  dailyClaim: Number(body?.dailyClaim ?? DEFAULTS.dailyClaim),
+  dailyEarnCap: Number(body?.dailyEarnCap ?? DEFAULTS.dailyEarnCap),
+  currency: String(body?.currency ?? DEFAULTS.currency),
+  rewards: {
+    none: Number(body?.rewards?.none ?? DEFAULTS.rewards.none),
+    common: Number(body?.rewards?.common ?? DEFAULTS.rewards.common),
+    rare: Number(body?.rewards?.rare ?? DEFAULTS.rewards.rare),
+    ultra: Number(body?.rewards?.ultra ?? DEFAULTS.rewards.ultra),
+  },
+
+  // ✅ NEW: keep prize pools editable from admin
+  prizePools: {
+    none: Array.isArray(body?.prizePools?.none) ? body.prizePools.none : DEFAULTS.prizePools.none,
+    common: Array.isArray(body?.prizePools?.common) ? body.prizePools.common : DEFAULTS.prizePools.common,
+    rare: Array.isArray(body?.prizePools?.rare) ? body.prizePools.rare : DEFAULTS.prizePools.rare,
+    ultra: Array.isArray(body?.prizePools?.ultra) ? body.prizePools.ultra : DEFAULTS.prizePools.ultra,
+  },
+};
 
       await redis.set(KEY, JSON.stringify(next));
       return res.status(200).json({ ok: true, pointsConfig: next });
