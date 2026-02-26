@@ -4,10 +4,22 @@ import { redis } from "../../../lib/server/redis";
 
 const KEY = "ra:config:economy";
 
+function headerValue(v: string | string[] | undefined) {
+  return Array.isArray(v) ? v[0] : v;
+}
+
 function isAuthed(req: NextApiRequest) {
-  const key = req.headers["x-admin-key"];
-  const provided = Array.isArray(key) ? key[0] : key;
-  return !!provided && !!process.env.ADMIN_KEY && provided === process.env.ADMIN_KEY;
+  // accept either header name
+  const provided =
+    headerValue(req.headers["x-admin-key"]) ||
+    headerValue(req.headers["x-admin-token"]) ||
+    "";
+
+  // accept either env var name
+  const expected = process.env.ADMIN_KEY || process.env.ADMIN_TOKEN || "";
+
+  if (!expected) return false;
+  return !!provided && provided === expected;
 }
 
 const DEFAULTS = {
