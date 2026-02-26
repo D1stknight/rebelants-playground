@@ -623,61 +623,59 @@ setTimeout(async () => {
   </div>
 </div>
         
-       {/* Name + Daily Claim */}
+      {/* Name + Daily Claim */}
 <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-  <div style={{ display: "flex", flexDirection: "column" }}>
-    <label style={{ fontSize: 13, opacity: 0.9, display: "flex", alignItems: "center" }}>
-      Name:&nbsp;
-      <input
-        value={playerName}
-        onChange={(e) => {
-          const v = e.target.value.slice(0, 18) || "guest";
-          setPlayerName(v);
+  <label style={{ fontSize: 13, opacity: 0.9 }}>
+    Name:&nbsp;
+    <input
+      value={playerName}
+      onChange={(e) => {
+        const v = (e.target.value.slice(0, 18) || "guest").trim() || "guest";
+        setPlayerName(v);
 
-          // Keep the existing stored id — never rewrite it from the name
-          const p = loadProfile();
-          const id = (p?.id || playerId || "guest").trim() || "guest";
-          saveProfile({ name: v, id });
-        }}
-        style={{
-          padding: "6px 10px",
-          borderRadius: 10,
-          border: "1px solid rgba(255,255,255,.18)",
-          background: "rgba(15,23,42,.55)",
-          color: "inherit",
-        }}
-      />
-    </label>
+        // Keep the existing stored id — never rewrite it from the name
+        const p = loadProfile();
+        const id = (p?.id || playerId || "guest").trim() || "guest";
 
+        saveProfile({ name: v, id });
+      }}
+      style={{
+        padding: "6px 10px",
+        borderRadius: 10,
+        border: "1px solid rgba(255,255,255,.18)",
+        background: "rgba(15,23,42,.55)",
+        color: "inherit",
+      }}
+    />
     <div style={{ fontSize: 11, opacity: 0.7, marginTop: 6 }}>
       Player ID: <b>{playerId}</b>
     </div>
-  </div>
+  </label>
 
-<button
-  className="btn"
-  type="button"
-  onClick={() => claimDaily(pointsConfig.dailyClaim)}
-  style={{ padding: "8px 12px", fontSize: 13 }}
->
-  Claim Daily +{pointsConfig.dailyClaim} {pointsConfig.currency}
-</button>
-
-{process.env.NODE_ENV !== "production" && (
   <button
     className="btn"
     type="button"
-    onClick={async () => {
-      await devGrant(5000);
-      await refresh();
-      alert("Dev grant applied ✅");
-    }}
-    style={{ padding: "8px 12px", fontSize: 13, opacity: 0.9 }}
-    title="Dev only (ignores daily cap)"
+    onClick={() => claimDaily(pointsConfig.dailyClaim)}
+    style={{ padding: "8px 12px", fontSize: 13 }}
   >
-    Dev Grant +5000 {pointsConfig.currency}
+    Claim Daily +{pointsConfig.dailyClaim} {pointsConfig.currency}
   </button>
-)}
+
+  {process.env.NODE_ENV !== "production" && (
+    <button
+      className="btn"
+      type="button"
+      onClick={async () => {
+        await devGrant(5000);
+        await refresh();
+        alert("Dev grant applied ✅");
+      }}
+      style={{ padding: "8px 12px", fontSize: 13, opacity: 0.9 }}
+      title="Dev only (ignores daily cap)"
+    >
+      Dev Grant +5000 {pointsConfig.currency}
+    </button>
+  )}
 </div>
         {/* Official Rules link */}
         <div className="rules-row">
