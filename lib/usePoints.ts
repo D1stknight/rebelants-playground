@@ -13,7 +13,9 @@ export function usePoints(playerId: string) {
   const [earnedToday, setEarnedToday] = useState(0);
 
   const refresh = useCallback(async () => {
-    const r = await fetch(`/api/points/balance?playerId=${encodeURIComponent(pid)}`);
+    const r = await fetch(`/api/points/balance?playerId=${encodeURIComponent(pid)}`, {
+  cache: "no-store",
+});
     const j = (await r.json()) as BalanceRes;
     setBalance(j.balance ?? 0);
     setEarnedToday(j.earnedToday ?? 0);
