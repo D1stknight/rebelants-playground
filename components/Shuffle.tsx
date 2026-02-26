@@ -322,25 +322,57 @@ export default function Shuffle() {
   const [playerName, setPlayerName] = useState("guest");
   const [playerId, setPlayerId] = useState("guest");
 
-   React.useEffect(() => {
-  const p = loadProfile();
+  // ✅ LIVE economy config (starts with defaults, then loads from /api/config)
+  const [pointsConfig, setPointsConfig] = useState(defaultPointsConfig);
 
-  // If no stored id, create one ONCE and persist it
-  const name = (p?.name || "guest").trim() || "guest";
-  let id = (p?.id || "").trim();
+  React.useEffect(() => {
+    const p = loadProfile();
 
-  if (!id) {
-    const suffix = Math.random().toString(36).slice(2, 7);
-    id = `guest-${suffix}`;
-    saveProfile({ name, id });
-  }
+    // If no stored id, create one ONCE and persist it
+    const name = (p?.name || "guest").trim() || "guest";
+    let id = (p?.id || "").trim();
 
-  setPlayerName(name);
-  setPlayerId(id);
-}, []);
+    if (!id) {
+      const suffix = Math.random().toString(36).slice(2, 7);
+      id = `guest-${suffix}`;
+      saveProfile({ name, id });
+    }
+
+    setPlayerName(name);
+    setPlayerId(id);
+  }, []);
+
+  // ✅ Pull latest config override from Redis
+  React.useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const r = await fetch("/api/config", { cache: "no-store" });
+        const j = await r.json().catch(() => null);
+
+        // expected: { ok: true, pointsConfig: {...} }
+        if (!cancelled && r.ok && j?.pointsConfig) {
+          setPointsConfig((prev) => ({ ...prev, ...j.pointsConfig }));
+          console.log("LIVE POINTS CONFIG =", j.pointsConfig);
+        } else {
+          console.log("LIVE CONFIG NOT LOADED =", r.status, j);
+        }
+      } catch (e) {
+        console.log("LIVE CONFIG ERROR =", e);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const { balance, spend, earn, claimDaily, devGrant, refresh } = usePoints(playerId);
   console.log("PLAYER ID =", playerId);
+
+  const cost = pointsConfig.shuffleCost;
+  const needMore = Math.max(0, cost - balance);
 
   // ✅ LIVE economy config (Admin page saves to Redis; this loads it)
   const [liveCfg, setLiveCfg] = useState<any>(null);
