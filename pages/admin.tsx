@@ -9,6 +9,12 @@ type PointsConfigShape = {
   dailyClaim: number;
   dailyEarnCap: number;
   rewards: { none: number; common: number; rare: number; ultra: number };
+  prizePools?: {
+    none: any[];
+    common: any[];
+    rare: any[];
+    ultra: any[];
+  };
 };
 
 function safeNum(v: any, fallback: number) {
@@ -25,13 +31,19 @@ export default function AdminPage() {
   const [amount, setAmount] = useState(5000);
 
   // config form
-  const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
-    currency: defaultConfig.currency,
-    shuffleCost: defaultConfig.shuffleCost,
-    dailyClaim: defaultConfig.dailyClaim,
-    dailyEarnCap: defaultConfig.dailyEarnCap,
-    rewards: { ...defaultConfig.rewards },
-  }));
+ const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
+  currency: defaultConfig.currency,
+  shuffleCost: defaultConfig.shuffleCost,
+  dailyClaim: defaultConfig.dailyClaim,
+  dailyEarnCap: defaultConfig.dailyEarnCap,
+  rewards: { ...defaultConfig.rewards },
+  prizePools: (defaultConfig as any).prizePools || {
+    none: [],
+    common: [],
+    rare: [],
+    ultra: [],
+  },
+}));
 
   const [log, setLog] = useState<string>("");
 
@@ -260,29 +272,81 @@ export default function AdminPage() {
             </label>
           </div>
 
-          <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10 }}>
-            {(["none", "common", "rare", "ultra"] as const).map((k) => (
-              <label key={k} style={{ fontSize: 12, opacity: 0.9 }}>
-                Reward {k}
-                <input
-                  value={cfg.rewards[k]}
-                  onChange={(e) =>
-                    setCfg((c) => ({ ...c, rewards: { ...c.rewards, [k]: safeNum(e.target.value, c.rewards[k]) } }))
-                  }
-                  style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
-                />
-              </label>
-            ))}
-          </div>
+       <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10 }}>
+  {(["none", "common", "rare", "ultra"] as const).map((k) => (
+    <label key={k} style={{ fontSize: 12, opacity: 0.9 }}>
+      Reward {k}
+      <input
+        value={cfg.rewards[k]}
+        onChange={(e) =>
+          setCfg((c) => ({ ...c, rewards: { ...c.rewards, [k]: safeNum(e.target.value, c.rewards[k]) } }))
+        }
+        style={{
+          width: "100%",
+          marginTop: 6,
+          padding: "10px 12px",
+          borderRadius: 12,
+          border: "1px solid rgba(255,255,255,.18)",
+          background: "rgba(0,0,0,.25)",
+          color: "white",
+        }}
+      />
+    </label>
+  ))}
+</div>
 
-          <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <button className="btn" onClick={loadConfig} style={{ padding: "10px 12px" }}>
-              Load Current
-            </button>
-            <button className="btn" onClick={saveConfig} style={{ padding: "10px 12px" }}>
-              Save
-            </button>
-          </div>
+{/* Prize Pools (JSON) */}
+<div style={{ marginTop: 12 }}>
+  <div style={{ fontWeight: 900, marginBottom: 8 }}>Prize Pools (JSON)</div>
+  <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 10 }}>
+    This is for future “NFT / APE / Merch / Nothing” prizes. (Shuffle does NOT use this yet.)
+    You can safely edit these now and we’ll wire Shuffle next.
+  </div>
+
+  {(["none", "common", "rare", "ultra"] as const).map((k) => (
+    <label key={k} style={{ display: "block", marginBottom: 10, fontSize: 12, opacity: 0.95 }}>
+      Pool: <b>{k}</b>
+      <textarea
+        value={JSON.stringify((cfg as any).prizePools?.[k] ?? [], null, 2)}
+        onChange={(e) => {
+          try {
+            const nextArr = JSON.parse(e.target.value || "[]");
+            setCfg((c: any) => ({
+              ...c,
+              prizePools: {
+                ...(c.prizePools || { none: [], common: [], rare: [], ultra: [] }),
+                [k]: Array.isArray(nextArr) ? nextArr : [],
+              },
+            }));
+          } catch {
+            // ignore parse errors while typing
+          }
+        }}
+        style={{
+          width: "100%",
+          minHeight: 110,
+          marginTop: 6,
+          padding: "10px 12px",
+          borderRadius: 12,
+          border: "1px solid rgba(255,255,255,.18)",
+          background: "rgba(0,0,0,.25)",
+          color: "white",
+          fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+          fontSize: 12,
+        }}
+      />
+    </label>
+  ))}
+</div>
+
+<div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
+  <button className="btn" onClick={loadConfig} style={{ padding: "10px 12px" }}>
+    Load Current
+  </button>
+  <button className="btn" onClick={saveConfig} style={{ padding: "10px 12px" }}>
+    Save
+  </button>
+</div>
         </div>
       </div>
 
