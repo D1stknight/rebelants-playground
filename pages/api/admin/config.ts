@@ -47,46 +47,62 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     if (!isAuthed(req)) return res.status(401).json({ ok: false, error: "Unauthorized" });
 
-    if (req.method === "GET") {
-      const raw = await redis.get(KEY);
-      const parsed = raw ? (typeof raw === "string" ? JSON.parse(raw) : raw) : {};
-      const merged = { ...DEFAULTS, ...(parsed || {}) };
+  if (req.method === "GET") {
+  const raw = await redis.get(KEY);
+  const parsed = raw ? (typeof raw === "string" ? JSON.parse(raw) : raw) : {};
 
-      return res.status(200).json({ ok: true, pointsConfig: merged });
-    }
+  const merged = {
+    ...DEFAULTS,
+    ...(parsed || {}),
+    rewards: {
+      ...DEFAULTS.rewards,
+      ...(parsed as any)?.rewards,
+    },
+    prizePools: {
+      ...DEFAULTS.prizePools,
+      ...(parsed as any)?.prizePools,
+      none: Array.isArray((parsed as any)?.prizePools?.none) ? (parsed as any).prizePools.none : DEFAULTS.prizePools.none,
+      common: Array.isArray((parsed as any)?.prizePools?.common) ? (parsed as any).prizePools.common : DEFAULTS.prizePools.common,
+      rare: Array.isArray((parsed as any)?.prizePools?.rare) ? (parsed as any).prizePools.rare : DEFAULTS.prizePools.rare,
+      ultra: Array.isArray((parsed as any)?.prizePools?.ultra) ? (parsed as any).prizePools.ultra : DEFAULTS.prizePools.ultra,
+    },
+  };
 
-    if (req.method === "POST") {
-      const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+  return res.status(200).json({ ok: true, pointsConfig: merged });
+}
+   if (req.method === "POST") {
+  const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
 
-      // ✅ accept BOTH shapes:
-      // 1) { pointsConfig: {...} }  (admin.tsx sends this)
-      // 2) { shuffleCost, dailyClaim, ... } (flat)
-      const src = body?.pointsConfig ?? body ?? {};
+  // ✅ accept BOTH shapes:
+  // 1) { pointsConfig: {...} }  (admin.tsx sends this)
+  // 2) { shuffleCost, dailyClaim, ... } (flat)
+  const src = body?.pointsConfig ?? body ?? {};
 
-      const next = {
-  shuffleCost: Number(body?.shuffleCost ?? DEFAULTS.shuffleCost),
-  dailyClaim: Number(body?.dailyClaim ?? DEFAULTS.dailyClaim),
-  dailyEarnCap: Number(body?.dailyEarnCap ?? DEFAULTS.dailyEarnCap),
-  currency: String(body?.currency ?? DEFAULTS.currency),
-  rewards: {
-    none: Number(body?.rewards?.none ?? DEFAULTS.rewards.none),
-    common: Number(body?.rewards?.common ?? DEFAULTS.rewards.common),
-    rare: Number(body?.rewards?.rare ?? DEFAULTS.rewards.rare),
-    ultra: Number(body?.rewards?.ultra ?? DEFAULTS.rewards.ultra),
-  },
+  const next = {
+    shuffleCost: safeNum(src?.shuffleCost, DEFAULTS.shuffleCost),
+    dailyClaim: safeNum(src?.dailyClaim, DEFAULTS.dailyClaim),
+    dailyEarnCap: safeNum(src?.dailyEarnCap, DEFAULTS.dailyEarnCap),
+    currency: String(src?.currency ?? DEFAULTS.currency),
 
-  // ✅ NEW: keep prize pools editable from admin
-  prizePools: {
-    none: Array.isArray(body?.prizePools?.none) ? body.prizePools.none : DEFAULTS.prizePools.none,
-    common: Array.isArray(body?.prizePools?.common) ? body.prizePools.common : DEFAULTS.prizePools.common,
-    rare: Array.isArray(body?.prizePools?.rare) ? body.prizePools.rare : DEFAULTS.prizePools.rare,
-    ultra: Array.isArray(body?.prizePools?.ultra) ? body.prizePools.ultra : DEFAULTS.prizePools.ultra,
-  },
-};
+    rewards: {
+      none: safeNum(src?.rewards?.none, DEFAULTS.rewards.none),
+      common: safeNum(src?.rewards?.common, DEFAULTS.rewards.common),
+      rare: safeNum(src?.rewards?.rare, DEFAULTS.rewards.rare),
+      ultra: safeNum(src?.rewards?.ultra, DEFAULTS.rewards.ultra),
+    },
 
-      await redis.set(KEY, JSON.stringify(next));
-      return res.status(200).json({ ok: true, pointsConfig: next });
-    }
+    // ✅ prize pools editable from admin
+    prizePools: {
+      none: Array.isArray(src?.prizePools?.none) ? src.prizePools.none : DEFAULTS.prizePools.none,
+      common: Array.isArray(src?.prizePools?.common) ? src.prizePools.common : DEFAULTS.prizePools.common,
+      rare: Array.isArray(src?.prizePools?.rare) ? src.prizePools.rare : DEFAULTS.prizePools.rare,
+      ultra: Array.isArray(src?.prizePools?.ultra) ? src.prizePools.ultra : DEFAULTS.prizePools.ultra,
+    },
+  };
+
+  await redis.set(KEY, JSON.stringify(next));
+  return res.status(200).json({ ok: true, pointsConfig: next });
+}
 
     res.setHeader("Allow", "GET,POST");
     return res.status(405).json({ ok: false, error: "Method not allowed" });
