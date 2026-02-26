@@ -7,6 +7,10 @@ function balKey(playerId: string) {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // 🚫 never cache balances
+  res.setHeader("Cache-Control", "no-store, max-age=0");
+  res.setHeader("Pragma", "no-cache");
+
   try {
     if (req.method !== "GET") {
       res.setHeader("Allow", "GET");
