@@ -1,21 +1,32 @@
 // pages/api/config.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../lib/server/redis";
-import { pointsConfig as defaults } from "../../lib/pointsConfig";
+import { pointsConfig as DEFAULTS } from "../../lib/pointsConfig";
 
-const CONFIG_KEY = "ra:config:points";
+const KEY = "ra:config:economy";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const raw = await redis.get<string>(CONFIG_KEY);
-    const override = raw ? JSON.parse(raw) : null;
+    if (req.method !== "GET") {
+      res.setHeader("Allow", "GET");
+      return res.status(405).json({ ok: false, error: "Method not allowed" });
+    }
 
-    // “override wins”, fallback to defaults
-    const pointsConfig = override && typeof override === "object" ? override : defaults;
+    const raw = await redis.get(KEY);
+    const parsed = raw ? (typeof raw === "string" ? JSON.parse(raw) : raw) : null;
 
-    return res.status(200).json({ ok: true, pointsConfig });
-  } catch (err: any) {
-    console.error("config error:", err);
+    const merged = {
+      ...DEFAULTS,
+      ...(parsed || {}),
+      rewards: {
+        ...DEFAULTS.rewards,
+        ...(parsed?.rewards || {}),
+      },
+    };
+
+    return res.status(200).json({ ok: true, pointsConfig: merged });
+  } catch (e: any) {
+    console.error("config error", e);
     return res.status(500).json({ ok: false, error: "Server error" });
   }
 }
