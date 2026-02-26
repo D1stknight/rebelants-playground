@@ -39,6 +39,7 @@ export default function AdminPage() {
   return {
     "Content-Type": "application/json",
     "x-admin-key": token,
+    "x-admin-token": token,
   };
 }, [token]);
 
