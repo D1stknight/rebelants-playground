@@ -8,8 +8,11 @@ function balKey(playerId: string) {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    // dev only
-    if (process.env.NODE_ENV === "production") {
+        // dev only (blocked unless explicitly enabled)
+    const allowDevGrant =
+      process.env.NODE_ENV !== "production" || process.env.ENABLE_DEV_GRANT === "true";
+
+    if (!allowDevGrant) {
       return res.status(404).json({ error: "Not found" });
     }
 
