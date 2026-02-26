@@ -630,12 +630,21 @@ setTimeout(async () => {
     <input
       value={playerName}
       onChange={(e) => {
-        const v = e.target.value.slice(0, 18);
-        const id = (v || "guest").toLowerCase().replace(/\s+/g, "-");
-        setPlayerName(v || "guest");
-        setPlayerId(id);
-        saveProfile({ name: v || "guest", id });
-      }}
+  const v = e.target.value.slice(0, 18) || "guest";
+
+  setPlayerName(v);
+
+  // Keep the existing stored id — never rewrite it from the name
+  const p = loadProfile();
+  const id = (p?.id || playerId || "guest").trim() || "guest";
+
+  saveProfile({ name: v, id });
+}}
+
+<div style={{ fontSize: 11, opacity: 0.7, marginTop: 6 }}>
+  Player ID: <b>{playerId}</b>
+</div>      
+    
       style={{
         padding: "6px 10px",
         borderRadius: 10,
