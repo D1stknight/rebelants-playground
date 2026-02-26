@@ -5,7 +5,7 @@ import Link from "next/link";
 import { shuffleConfig } from "../lib/shuffleConfig";
 
 // ✅ points + leaderboard (single source of truth)
-import { pointsConfig } from "../lib/pointsConfig";
+import { pointsConfig as defaultPointsConfig } from "../lib/pointsConfig";
 import { usePoints } from "../lib/usePoints";
 import { loadProfile, saveProfile } from "../lib/profile";
 import { addWin } from "../lib/winsStore";
@@ -322,18 +322,35 @@ export default function Shuffle() {
   const [playerName, setPlayerName] = useState("guest");
   const [playerId, setPlayerId] = useState("guest");
 
-  React.useEffect(() => {
+    React.useEffect(() => {
     const p = loadProfile();
     setPlayerName(p.name || "guest");
     setPlayerId(p.id || "guest");
   }, []);
 
- const { balance, spend, earn, claimDaily, devGrant, refresh } = usePoints(playerId);
-console.log("PLAYER ID =", playerId);
+  const { balance, spend, earn, claimDaily, devGrant, refresh } = usePoints(playerId);
+  console.log("PLAYER ID =", playerId);
 
-const cost = pointsConfig.shuffleCost;
-const needMore = Math.max(0, cost - balance);
+  // ✅ LIVE economy config (Admin page saves to Redis; this loads it)
+  const [liveCfg, setLiveCfg] = useState<any>(null);
 
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch("/api/config", { cache: "no-store" as any });
+        const j = await r.json().catch(() => null);
+        // your Admin page expects j.pointsConfig
+        if (j?.pointsConfig) setLiveCfg(j.pointsConfig);
+      } catch {
+        // ignore; fallback to defaults
+      }
+    })();
+  }, []);
+
+  const pointsConfig = liveCfg || defaultPointsConfig;
+
+  const cost = pointsConfig.shuffleCost;
+  const needMore = Math.max(0, cost - balance);
 const [phase, setPhase] = useState<Phase>("idle");
 const [showHowPointsWork, setShowHowPointsWork] = useState(false);
 const [order, setOrder] = useState<number[]>(() => Array.from({ length: EGG_COUNT }, (_, i) => i));
