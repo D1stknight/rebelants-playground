@@ -322,11 +322,22 @@ export default function Shuffle() {
   const [playerName, setPlayerName] = useState("guest");
   const [playerId, setPlayerId] = useState("guest");
 
-    React.useEffect(() => {
-    const p = loadProfile();
-    setPlayerName(p.name || "guest");
-    setPlayerId(p.id || "guest");
-  }, []);
+   React.useEffect(() => {
+  const p = loadProfile();
+
+  // If no stored id, create one ONCE and persist it
+  const name = (p?.name || "guest").trim() || "guest";
+  let id = (p?.id || "").trim();
+
+  if (!id) {
+    const suffix = Math.random().toString(36).slice(2, 7);
+    id = `guest-${suffix}`;
+    saveProfile({ name, id });
+  }
+
+  setPlayerName(name);
+  setPlayerId(id);
+}, []);
 
   const { balance, spend, earn, claimDaily, devGrant, refresh } = usePoints(playerId);
   console.log("PLAYER ID =", playerId);
