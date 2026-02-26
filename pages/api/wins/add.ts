@@ -20,16 +20,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const rarity = String(body.rarity || "none").trim().slice(0, 16) || "none";
     const pointsAwardedRaw = Number(body.pointsAwarded || 0);
     const pointsAwarded = Number.isFinite(pointsAwardedRaw) ? pointsAwardedRaw : 0;
-
-    const evt = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      ts: Date.now(),
-      game,
-      playerId,
-      playerName,
-      rarity,
-      pointsAwarded,
-    };
+    const prize = body.prize ?? null; // optional: { type, label, ... }
+    
+   const evt = {
+  id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  ts: Date.now(),
+  game,
+  playerId,
+  playerName,
+  rarity,
+  pointsAwarded,
+  prize, // ✅ optional (NFT/APE/merch/none)
+};
 
     // recent wins (keep last 50)
     await redis.lpush(RECENT_WINS, JSON.stringify(evt));
