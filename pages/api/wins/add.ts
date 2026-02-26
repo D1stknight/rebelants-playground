@@ -1,34 +1,48 @@
+// pages/api/wins/add.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
 
-type Win = {
-  id: string;
-  ts: number;
-  game: string;
-  playerId: string;
-  playerName: string;
-  rarity?: string;
-  pointsAwarded?: number;
-};
+const LB_TOTAL_EARNED = "ra:lb:totalEarned";
+const RECENT_WINS = "ra:wins:recent";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
-
-  let win: Win | null = null;
-
   try {
-    win = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
-  } catch {
-    return res.status(400).json({ error: "Invalid JSON" });
+    if (req.method !== "POST") {
+      res.setHeader("Allow", "POST");
+      return res.status(405).json({ ok: false, error: "Method not allowed" });
+    }
+
+    const body = (req.body ?? {}) as any;
+
+    const playerId = String(body.playerId || "guest").trim().slice(0, 64) || "guest";
+    const playerName = String(body.playerName || "guest").trim().slice(0, 32) || "guest";
+    const game = String(body.game || "shuffle").trim().slice(0, 32) || "shuffle";
+    const rarity = String(body.rarity || "none").trim().slice(0, 16) || "none";
+    const pointsAwardedRaw = Number(body.pointsAwarded || 0);
+    const pointsAwarded = Number.isFinite(pointsAwardedRaw) ? pointsAwardedRaw : 0;
+
+    const evt = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      ts: Date.now(),
+      game,
+      playerId,
+      playerName,
+      rarity,
+      pointsAwarded,
+    };
+
+    // recent wins (keep last 50)
+    await redis.lpush(RECENT_WINS, JSON.stringify(evt));
+    await redis.ltrim(RECENT_WINS, 0, 49);
+
+    // total earned leaderboard (only if points > 0)
+    if (evt.pointsAwarded > 0) {
+      await redis.zincrby(LB_TOTAL_EARNED, evt.pointsAwarded, playerId);
+    }
+
+    return res.status(200).json({ ok: true, event: evt });
+  } catch (err: any) {
+    console.error("wins/add error:", err);
+    return res.status(500).json({ ok: false, error: "Server error" });
   }
-
-  if (!win?.id || !win?.playerId || !win?.playerName) {
-    return res.status(400).json({ error: "Missing required fields" });
-  }
-
-  // Keep a rolling list of recent wins
-  await redis.lpush("wins:recent", JSON.stringify(win));
-  await redis.ltrim("wins:recent", 0, 99); // keep last 100
-
-  return res.status(200).json({ ok: true });
 }
