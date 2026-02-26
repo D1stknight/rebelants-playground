@@ -36,11 +36,11 @@ export default function AdminPage() {
   const [log, setLog] = useState<string>("");
 
   const headers = useMemo(() => {
-    return {
-      "Content-Type": "application/json",
-      "x-admin-token": token,
-    };
-  }, [token]);
+  return {
+    "Content-Type": "application/json",
+    "x-admin-key": token,
+  };
+}, [token]);
 
   function append(msg: string) {
     setLog((s) => `${msg}\n\n${s}`.trim());
@@ -65,25 +65,28 @@ export default function AdminPage() {
   }
 
   async function loadConfig() {
-    append("Loading config…");
-    const r = await fetch("/api/config");
-    const j = await r.json().catch(() => null);
-    append(`CONFIG status ${r.status}\n${JSON.stringify(j, null, 2)}`);
+  append("Loading config…");
+  const r = await fetch("/api/admin/config", { method: "GET", headers });
+  const j = await r.json().catch(() => null);
+  append(`CONFIG status ${r.status}\n${JSON.stringify(j, null, 2)}`);
 
-    const merged = j?.pointsConfig as PointsConfigShape | undefined;
-    if (merged) setCfg(merged);
-  }
+  const merged = (j?.config ?? j?.pointsConfig) as PointsConfigShape | undefined;
+  if (merged) setCfg(merged);
+}
 
   async function saveConfig() {
-    append("Saving config…");
-    const r = await fetch("/api/admin/config", {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ pointsConfig: cfg }),
-    });
-    const j = await r.json().catch(() => null);
-    append(`SAVE CONFIG status ${r.status}\n${JSON.stringify(j, null, 2)}`);
-  }
+  append("Saving config…");
+  const r = await fetch("/api/admin/config", {
+    method: "POST",
+    headers,
+    body: JSON.stringify(cfg),
+  });
+  const j = await r.json().catch(() => null);
+  append(`SAVE CONFIG status ${r.status}\n${JSON.stringify(j, null, 2)}`);
+
+  const merged = (j?.config ?? j?.pointsConfig) as PointsConfigShape | undefined;
+  if (merged) setCfg(merged);
+}
 
   async function grantPoints() {
     append("Granting points…");
