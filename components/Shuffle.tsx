@@ -625,33 +625,34 @@ setTimeout(async () => {
         
        {/* Name + Daily Claim */}
 <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-  <label style={{ fontSize: 13, opacity: 0.9 }}>
-    Name:&nbsp;
-    <input
-      value={playerName}
-      onChange={(e) => {
-  const v = e.target.value.slice(0, 18) || "guest";
+  <div style={{ display: "flex", flexDirection: "column" }}>
+    <label style={{ fontSize: 13, opacity: 0.9, display: "flex", alignItems: "center" }}>
+      Name:&nbsp;
+      <input
+        value={playerName}
+        onChange={(e) => {
+          const v = e.target.value.slice(0, 18) || "guest";
+          setPlayerName(v);
 
-  setPlayerName(v);
+          // Keep the existing stored id — never rewrite it from the name
+          const p = loadProfile();
+          const id = (p?.id || playerId || "guest").trim() || "guest";
+          saveProfile({ name: v, id });
+        }}
+        style={{
+          padding: "6px 10px",
+          borderRadius: 10,
+          border: "1px solid rgba(255,255,255,.18)",
+          background: "rgba(15,23,42,.55)",
+          color: "inherit",
+        }}
+      />
+    </label>
 
-  // Keep the existing stored id — never rewrite it from the name
-  const p = loadProfile();
-  const id = (p?.id || playerId || "guest").trim() || "guest";
-
-  saveProfile({ name: v, id });
-}}     
-      style={{
-        padding: "6px 10px",
-        borderRadius: 10,
-        border: "1px solid rgba(255,255,255,.18)",
-        background: "rgba(15,23,42,.55)",
-        color: "inherit",
-      }}
-    />
     <div style={{ fontSize: 11, opacity: 0.7, marginTop: 6 }}>
       Player ID: <b>{playerId}</b>
-    </div> 
-  </label>
+    </div>
+  </div>
 
 <button
   className="btn"
