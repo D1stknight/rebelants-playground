@@ -295,6 +295,88 @@ export default function AdminPage() {
   ))}
 </div>
 
+          {/* Prize Pool Presets */}
+<div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
+  <button
+    className="btn"
+    type="button"
+    onClick={() => {
+      // House Edge: lots of NONE, small points, Ultra always something
+      setCfg((c: any) => ({
+        ...c,
+        prizePools: {
+          none: [{ type: "NONE", label: "Nothing this time", weight: 100 }],
+          common: [
+            { type: "NONE", label: "Nothing", weight: 85 },
+            { type: "POINTS", label: "50 REBEL", points: 50, weight: 15 },
+          ],
+          rare: [
+            { type: "NONE", label: "Nothing", weight: 90 },
+            { type: "POINTS", label: "100 REBEL", points: 100, weight: 9 },
+            { type: "MERCH", label: "Sticker Pack", sku: "STICKERS", qty: 10, weight: 1 },
+          ],
+          ultra: [
+            { type: "POINTS", label: "200 REBEL", points: 200, weight: 92 },
+            { type: "POINTS", label: "500 REBEL", points: 500, weight: 7 },
+            { type: "MERCH", label: "T-Shirt", sku: "TSHIRT", qty: 5, weight: 1 },
+          ],
+        },
+      }));
+    }}
+  >
+    Preset: House Edge
+  </button>
+
+  <button
+    className="btn"
+    type="button"
+    onClick={() => {
+      // Promo Weekend: more points + a few items
+      setCfg((c: any) => ({
+        ...c,
+        prizePools: {
+          none: [{ type: "NONE", label: "Nothing this time", weight: 100 }],
+          common: [
+            { type: "POINTS", label: "50 REBEL", points: 50, weight: 70 },
+            { type: "POINTS", label: "100 REBEL", points: 100, weight: 30 },
+          ],
+          rare: [
+            { type: "POINTS", label: "150 REBEL", points: 150, weight: 75 },
+            { type: "POINTS", label: "250 REBEL", points: 250, weight: 20 },
+            { type: "MERCH", label: "Hat", sku: "HAT", qty: 3, weight: 5 },
+          ],
+          ultra: [
+            { type: "POINTS", label: "500 REBEL", points: 500, weight: 80 },
+            { type: "MERCH", label: "Hoodie", sku: "HOODIE", qty: 2, weight: 15 },
+            { type: "APE", label: "0.25 APE", ape: 0.25, qty: 1, weight: 5 },
+          ],
+        },
+      }));
+    }}
+  >
+    Preset: Promo Weekend
+  </button>
+
+  <button
+    className="btn"
+    type="button"
+    onClick={() => {
+      // Reset: safe defaults (points only)
+      setCfg((c: any) => ({
+        ...c,
+        prizePools: {
+          none: [{ type: "NONE", label: "Nothing this time", weight: 1, points: 0 }],
+          common: [{ type: "POINTS", label: "50 REBEL", points: 50, weight: 1 }],
+          rare: [{ type: "POINTS", label: "100 REBEL", points: 100, weight: 1 }],
+          ultra: [{ type: "POINTS", label: "200 REBEL", points: 200, weight: 1 }],
+        },
+      }));
+    }}
+  >
+    Reset Prize Pools
+  </button>
+</div>
+          
 {/* Prize Pools (JSON) */}
 <div style={{ marginTop: 12 }}>
   <div style={{ fontWeight: 900, marginBottom: 8 }}>Prize Pools (JSON)</div>
