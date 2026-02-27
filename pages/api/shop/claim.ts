@@ -1,6 +1,6 @@
 // pages/api/shop/claim.ts
 import type { NextApiRequest, NextApiResponse } from "next";
-import { createPublicClient, http, parseAbiItem } from "viem";
+import { createPublicClient, http, parseAbiItem, decodeEventLog } from "viem";
 import { redis } from "../../../lib/server/redis";
 
 const RPC_URL = process.env.APECHAIN_RPC_URL || "";
@@ -57,11 +57,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     for (const log of shopLogs) {
       try {
-        const decoded = client.decodeEventLog({
-          abi: [eventAbi],
-          data: log.data,
-          topics: log.topics,
-        });
+      const decoded = decodeEventLog({
+  abi: [eventAbi],
+  data: log.data,
+  topics: log.topics,
+});
 
         if (decoded.eventName === "PointsPurchased") {
           const args = decoded.args as any;
