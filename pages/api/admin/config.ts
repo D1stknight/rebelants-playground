@@ -78,18 +78,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // 2) { shuffleCost, dailyClaim, ... } (flat)
   const src = body?.pointsConfig ?? body ?? {};
 
-  const next = {
-    shuffleCost: safeNum(src?.shuffleCost, DEFAULTS.shuffleCost),
-    dailyClaim: safeNum(src?.dailyClaim, DEFAULTS.dailyClaim),
-    dailyEarnCap: safeNum(src?.dailyEarnCap, DEFAULTS.dailyEarnCap),
-    currency: String(src?.currency ?? DEFAULTS.currency),
+ const next = {
+  shuffleCost: Number(src?.shuffleCost ?? DEFAULTS.shuffleCost),
+  dailyClaim: Number(src?.dailyClaim ?? DEFAULTS.dailyClaim),
+  dailyEarnCap: Number(src?.dailyEarnCap ?? DEFAULTS.dailyEarnCap),
+  currency: String(src?.currency ?? DEFAULTS.currency),
+  rewards: {
+    none: Number(src?.rewards?.none ?? DEFAULTS.rewards.none),
+    common: Number(src?.rewards?.common ?? DEFAULTS.rewards.common),
+    rare: Number(src?.rewards?.rare ?? DEFAULTS.rewards.rare),
+    ultra: Number(src?.rewards?.ultra ?? DEFAULTS.rewards.ultra),
+  },
 
-    rewards: {
-      none: safeNum(src?.rewards?.none, DEFAULTS.rewards.none),
-      common: safeNum(src?.rewards?.common, DEFAULTS.rewards.common),
-      rare: safeNum(src?.rewards?.rare, DEFAULTS.rewards.rare),
-      ultra: safeNum(src?.rewards?.ultra, DEFAULTS.rewards.ultra),
-    },
+  prizePools: {
+    none: Array.isArray(src?.prizePools?.none) ? src.prizePools.none : DEFAULTS.prizePools.none,
+    common: Array.isArray(src?.prizePools?.common) ? src.prizePools.common : DEFAULTS.prizePools.common,
+    rare: Array.isArray(src?.prizePools?.rare) ? src.prizePools.rare : DEFAULTS.prizePools.rare,
+    ultra: Array.isArray(src?.prizePools?.ultra) ? src.prizePools.ultra : DEFAULTS.prizePools.ultra,
+  },
+};
 
     // ✅ prize pools editable from admin
     prizePools: {
