@@ -10,6 +10,7 @@ import { usePoints } from "../lib/usePoints";
 import { loadProfile, saveProfile } from "../lib/profile";
 import { addWin } from "../lib/winsStore";
 import LeaderboardPanel from "./LeaderboardPanel";
+import BuyPointsModal from "./BuyPointsModal";
 
 // lazy-load queen so 3D never blocks SSR
 const Queen3D = dynamic(() => import("./Queen3D"), { ssr: false }) as React.ComponentType<{
@@ -378,6 +379,7 @@ const [progress, setProgress] = useState(0);
 const [busy, setBusy] = useState(false);
 const [rarity, setRarity] = useState<Rarity>("none");
 const [showPrize, setShowPrize] = useState(false);
+const [showBuyPoints, setShowBuyPoints] = useState(false);
 const runShuffle = async () => {
   if (busy) return;
 
@@ -537,7 +539,7 @@ await fetch("/api/wins/add", {
         </div>
 
       {/* Shuffle button + balance row */}
-<div className="shuffle-cta" style={{ position: "relative" }}>
+<div className="shuffle-cta" style={{ position: "relative", display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
   <button
     className="btn"
     onClick={runShuffle}
@@ -547,6 +549,16 @@ await fetch("/api/wins/add", {
     {phase === "shuffling"
       ? "Shuffling…"
       : `Shuffle (-${cost} ${pointsConfig.currency})`}
+  </button>
+
+  <button
+    className="btn"
+    type="button"
+    onClick={() => setShowBuyPoints(true)}
+    style={{ padding: "10px 12px", fontSize: 13, opacity: 0.95 }}
+    title="Buy points with APE"
+  >
+    Buy Points
   </button>
 
   <div style={{ marginLeft: 12, fontSize: 13, opacity: 0.9, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
@@ -697,6 +709,15 @@ await fetch("/api/wins/add", {
 </div>
 
         {showPrize && <PrizeModal rarity={rarity} onClose={resetAfterPrize} />}
+
+<BuyPointsModal
+  open={showBuyPoints}
+  onClose={() => setShowBuyPoints(false)}
+  playerId={playerId}
+  onClaimed={async () => {
+    await refresh();
+  }}
+/>
       </div>
 
       {/* Background + header styles (scoped) */}
