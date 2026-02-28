@@ -2,7 +2,7 @@
 import React, { useMemo, useState } from "react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useAccount, useBalance, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
-import { apechain } from "../lib/apechain";
+import { apeChain } from "../lib/apechain";
 
 const SHOP_ADDRESS = (process.env.NEXT_PUBLIC_APECHAIN_SHOP_ADDRESS || "").toLowerCase();
 
@@ -59,14 +59,14 @@ const {
   isFetching: fetchingBal,
 } = useBalance({
   address,
-  chainId: apechain.id,
+  chainId: apeChain.id,
   query: { enabled: !!address, refetchInterval: 15000 },
 });
 
 // ✅ Track tx confirmation
 const { isLoading: confirmingTx } = useWaitForTransactionReceipt({
   hash: lastTx ?? undefined,
-  chainId: apechain.id,
+  chainId: apeChain.id,
   query: { enabled: !!lastTx },
 });
 
