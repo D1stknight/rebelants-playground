@@ -91,14 +91,15 @@ const { isLoading: confirmingTx } = useWaitForTransactionReceipt({
 
     try {
       setStatus("Sending transaction…");
-      const hash = await writeContractAsync({
-        setLastTx(hash);
+     const hash = await writeContractAsync({
+  address: SHOP_ADDRESS as `0x${string}`,
+  abi: SHOP_ABI,
+  functionName: fnName,
+  value: toWei(apeAmount),
+});
+
+setLastTx(hash);
 await refetchApeBal();
-          address: SHOP_ADDRESS as `0x${string}`,
-        abi: SHOP_ABI,
-        functionName: fnName,
-        value: toWei(apeAmount),
-      });
 
       setStatus("Transaction sent. Claiming points…");
 
@@ -164,6 +165,10 @@ await refetchApeBal();
           Rate locked: <b>1 APE = 100 pts</b>. No refunds.
         </div>
 
+        <div style={{ marginTop: 12 }}>
+  <ConnectButton />
+</div>
+        
 <div style={{ marginTop: 10, fontSize: 13, opacity: 0.9 }}>
   {address ? (
     <>
