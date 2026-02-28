@@ -4,7 +4,6 @@ import type { Chain } from "viem";
 export const apeChain: Chain = {
   id: 33139,
   name: "ApeChain",
-  network: "apechain",
   nativeCurrency: {
     name: "ApeCoin",
     symbol: "APE",
@@ -15,6 +14,9 @@ export const apeChain: Chain = {
     public: { http: ["https://apechain.calderachain.xyz/http"] },
   },
   blockExplorers: {
-    default: { name: "ApeChain Explorer", url: "https://apechain.calderaexplorer.xyz" },
+    default: {
+      name: "ApeChain Explorer",
+      url: "https://apechain.calderaexplorer.xyz",
+    },
   },
 };
