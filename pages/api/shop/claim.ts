@@ -1,6 +1,6 @@
 // pages/api/shop/claim.ts
 import type { NextApiRequest, NextApiResponse } from "next";
-import { createPublicClient, http, parseAbiItem, decodeEventLog } from "viem";
+import { createPublicClient, http } from "viem";
 import { redis } from "../../../lib/server/redis";
 
 const RPC_URL = process.env.APECHAIN_RPC_URL || "";
@@ -13,11 +13,11 @@ const PACK_POINTS: Record<number, number> = {
   3: 60000, // Whale
 };
 
-// Event we expect the shop contract to emit.
-// IMPORTANT: this MUST match your Solidity event name + params exactly.
-const EVENT = parseAbiItem(
-  "event PointsPurchased(address indexed buyer, uint8 packId, uint256 apePaid, uint256 points)"
-);
+// Our deployed contract emits:
+// PointsPurchased(address indexed buyer, uint8 indexed packId, uint256 amountPaidWei)
+// NOTE: buyer + packId are indexed => they live in topics[1] and topics[2].
+const EVENT_SIG =
+  "0x1f32a5903f43801a219f2d82e57bec771e9286fcd8c05b181aa38e09ce0d7930";
 
 // ---------------- Redis keys ----------------
 function balKey(playerId: string) {
@@ -84,41 +84,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ ok: false, error: "No shop logs found for this tx" });
     }
 
-    // Try decode each log until we find PointsPurchased with buyer == walletAddress
-    let found: { logIndex: number; packId: number; points: number } | null = null;
+   // Find PointsPurchased emitted by SHOP_ADDRESS for this wallet
+let found: { logIndex: number; packId: number; points: number } | null = null;
 
-    for (const log of matches) {
-      try {
-        const decoded = decodeEventLog({
-          abi: [EVENT],
-          data: log.data,
-          topics: log.topics,
-        });
+for (const log of matches) {
+  const topics = (log.topics || []) as string[];
 
-        if (decoded.eventName !== "PointsPurchased") continue;
+  // Must be our event signature
+  if (!topics[0] || String(topics[0]).toLowerCase() !== EVENT_SIG) continue;
 
-        const buyer = String((decoded.args as any).buyer || "").toLowerCase();
-        if (buyer !== walletAddress) continue;
+  // buyer is indexed => topics[1] ends with the buyer address (last 40 hex chars)
+  const buyerTopic = String(topics[1] || "");
+  const buyer = ("0x" + buyerTopic.slice(-40)).toLowerCase();
+  if (buyer !== walletAddress) continue;
 
-        const packId = Number((decoded.args as any).packId ?? 0);
-        const pointsFromEvent = Number((decoded.args as any).points ?? 0);
+  // packId is indexed uint8 => topics[2], last byte is the packId
+  const packTopic = String(topics[2] || "0x0");
+  const packId = parseInt(packTopic.slice(-2), 16);
 
-        const points =
-          Number.isFinite(pointsFromEvent) && pointsFromEvent > 0
-            ? pointsFromEvent
-            : (PACK_POINTS[packId] || 0);
+  const points = PACK_POINTS[packId] || 0;
+  if (!points || points <= 0) {
+    return res.status(400).json({ ok: false, error: "Could not determine points for this purchase" });
+  }
 
-        if (!points || points <= 0) {
-          return res.status(400).json({ ok: false, error: "Could not determine points for this purchase" });
-        }
-
-        found = { logIndex: Number(log.logIndex ?? 0), packId, points };
-        break;
-      } catch {
-        // ignore non-matching logs
-      }
-    }
-
+  found = { logIndex: Number(log.logIndex ?? 0), packId, points };
+  break;
+}
     if (!found) {
       return res.status(400).json({ ok: false, error: "No matching PointsPurchased event for this wallet" });
     }
