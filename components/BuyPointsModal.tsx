@@ -1,7 +1,8 @@
 // components/BuyPointsModal.tsx
 import React, { useMemo, useState } from "react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { useAccount, useWriteContract } from "wagmi";
+import { useAccount, useBalance, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { apechain } from "../lib/apechain";
 
 const SHOP_ADDRESS = (process.env.NEXT_PUBLIC_APECHAIN_SHOP_ADDRESS || "").toLowerCase();
 
@@ -46,9 +47,28 @@ export default function BuyPointsModal({
   onClaimed: () => Promise<void> | void;
 }) {
   const { address, isConnected } = useAccount();
-  const { writeContractAsync, isPending } = useWriteContract();
+const { writeContractAsync, isPending } = useWriteContract();
 
-  const [status, setStatus] = useState<string>("");
+const [status, setStatus] = useState<string>("");
+const [lastTx, setLastTx] = useState<`0x${string}` | null>(null);
+
+// ✅ Live ApeChain balance
+const {
+  data: apeBal,
+  refetch: refetchApeBal,
+  isFetching: fetchingBal,
+} = useBalance({
+  address,
+  chainId: apechain.id,
+  query: { enabled: !!address, refetchInterval: 15000 },
+});
+
+// ✅ Track tx confirmation
+const { isLoading: confirmingTx } = useWaitForTransactionReceipt({
+  hash: lastTx ?? undefined,
+  chainId: apechain.id,
+  query: { enabled: !!lastTx },
+});
 
   const packs = useMemo(
     () => [
@@ -72,7 +92,9 @@ export default function BuyPointsModal({
     try {
       setStatus("Sending transaction…");
       const hash = await writeContractAsync({
-        address: SHOP_ADDRESS as `0x${string}`,
+        setLastTx(hash);
+await refetchApeBal();
+          address: SHOP_ADDRESS as `0x${string}`,
         abi: SHOP_ABI,
         functionName: fnName,
         value: toWei(apeAmount),
@@ -142,9 +164,20 @@ export default function BuyPointsModal({
           Rate locked: <b>1 APE = 100 pts</b>. No refunds.
         </div>
 
-        <div style={{ marginTop: 12 }}>
-          <ConnectButton />
-        </div>
+<div style={{ marginTop: 10, fontSize: 13, opacity: 0.9 }}>
+  {address ? (
+    <>
+      APE Balance (live):{" "}
+      <b>
+        {apeBal ? Number(apeBal.formatted).toFixed(4) : "—"} {apeBal?.symbol || "APE"}
+      </b>
+      {fetchingBal ? " (updating…)" : ""}
+      {confirmingTx ? " (confirming tx…)" : ""}
+    </>
+  ) : (
+    "Connect your wallet to see your APE balance."
+  )}
+</div>
 
         <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
           {packs.map((p) => (
