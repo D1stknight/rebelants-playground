@@ -26,8 +26,9 @@ export default function AdminPage() {
   const [token, setToken] = useState("");
   const [authed, setAuthed] = useState(false);
 
-  // grant
+    // grant
   const [playerId, setPlayerId] = useState("guest");
+  const [walletAddress, setWalletAddress] = useState("");
   const [amount, setAmount] = useState(5000);
 
   // config form
@@ -101,18 +102,42 @@ export default function AdminPage() {
   if (merged) setCfg(merged);
 }
 
-  async function grantPoints() {
+    async function grantPoints() {
     append("Granting points…");
+    const payload: any = { amount };
+
+    const w = (walletAddress || "").trim();
+    if (w) payload.walletAddress = w;
+    else payload.playerId = playerId;
+
     const r = await fetch("/api/admin/grant", {
       method: "POST",
       headers,
-      body: JSON.stringify({ playerId, amount }),
+      body: JSON.stringify(payload),
     });
     const j = await r.json().catch(() => null);
     append(`GRANT status ${r.status}\n${JSON.stringify(j, null, 2)}`);
+
+    // if grant-by-wallet returned mapped playerId, keep UI in sync
+    if (r.ok && j?.playerId) setPlayerId(j.playerId);
   }
 
-  async function getBalance() {
+    async function lookupWallet() {
+    append("Looking up wallet…");
+    const w = (walletAddress || "").trim();
+    if (!w) {
+      append("Wallet lookup: missing walletAddress");
+      return;
+    }
+
+    const r = await fetch(`/api/admin/wallet?walletAddress=${encodeURIComponent(w)}`, { headers });
+    const j = await r.json().catch(() => null);
+    append(`WALLET LOOKUP status ${r.status}\n${JSON.stringify(j, null, 2)}`);
+
+    if (r.ok && j?.playerId) {
+      setPlayerId(j.playerId);
+    }
+  }
     append("Getting balance…");
     const r = await fetch(`/api/points/balance?playerId=${encodeURIComponent(playerId)}`);
     const j = await r.json().catch(() => null);
@@ -188,14 +213,36 @@ export default function AdminPage() {
       </div>
 
       <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-        {/* Grant */}
+               {/* Grant */}
         <div style={{ padding: 14, border: "1px solid rgba(255,255,255,.14)", borderRadius: 14, background: "rgba(15,23,42,.55)" }}>
           <div style={{ fontWeight: 900, marginBottom: 10 }}>Grant Points</div>
+
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+            <input
+              value={walletAddress}
+              onChange={(e) => setWalletAddress(e.target.value)}
+              placeholder="walletAddress (optional)"
+              style={{
+                width: 420,
+                maxWidth: "92vw",
+                padding: "10px 12px",
+                borderRadius: 12,
+                border: "1px solid rgba(255,255,255,.18)",
+                background: "rgba(0,0,0,.25)",
+                color: "white",
+              }}
+            />
+
+            <button className="btn" onClick={lookupWallet} style={{ padding: "10px 12px" }}>
+              Lookup Wallet → Player
+            </button>
+          </div>
+
+          <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
             <input
               value={playerId}
               onChange={(e) => setPlayerId(e.target.value)}
-              placeholder="playerId"
+              placeholder="playerId (fallback)"
               style={{
                 width: 240,
                 padding: "10px 12px",
@@ -205,6 +252,7 @@ export default function AdminPage() {
                 color: "white",
               }}
             />
+
             <input
               value={amount}
               onChange={(e) => setAmount(safeNum(e.target.value, 0))}
@@ -218,15 +266,18 @@ export default function AdminPage() {
                 color: "white",
               }}
             />
+
             <button className="btn" onClick={getBalance} style={{ padding: "10px 12px" }}>
               Get Balance
             </button>
+
             <button className="btn" onClick={grantPoints} style={{ padding: "10px 12px" }}>
-              Grant
+              Grant (wallet if provided)
             </button>
           </div>
+
           <div style={{ marginTop: 8, fontSize: 12, opacity: 0.85 }}>
-            Grant affects balance (support/promo). Leaderboards are based on total earned from gameplay (not grants).
+            Tip: If walletAddress is filled, grants go to the linked playerId automatically. If empty, it grants to playerId.
           </div>
         </div>
 
