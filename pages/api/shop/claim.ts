@@ -63,7 +63,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!RPC_URL) return res.status(500).json({ ok: false, error: "Missing APECHAIN_RPC_URL" });
     if (!SHOP_ADDRESS) return res.status(500).json({ ok: false, error: "Missing APECHAIN_SHOP_ADDRESS" });
 
-    const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body ?? {});
+        const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body ?? {});
     const playerId = cleanPlayerId(body.playerId);
     const walletAddress = cleanWallet(body.walletAddress);
     const txHash = asStr(body.txHash).trim();
@@ -71,10 +71,36 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!walletAddress) return res.status(400).json({ ok: false, error: "Missing walletAddress" });
     if (!txHash || !isHexTx(txHash)) return res.status(400).json({ ok: false, error: "Invalid txHash" });
 
+    // ✅ Abuse protection: rate limit by IP + wallet
+    const ip =
+      (asStr(req.headers["x-forwarded-for"]) || "").split(",")[0].trim() ||
+      asStr(req.headers["x-real-ip"]) ||
+      "unknown";
+
+    const rl = await rateLimit({
+      key: `shop-claim:${ip}:${walletAddress}`,
+      limit: 12,        // 12 attempts
+      windowSec: 60,    // per 60 seconds
+    });
+
+    if (!rl.ok) {
+      return res.status(429).json({ ok: false, error: "Too many requests. Try again in a minute." });
+    }
+
     const client = createPublicClient({ transport: http(RPC_URL) });
 
-    // Pull the receipt and decode our event from logs
+        // Pull the receipt and decode our event from logs
     const receipt = await client.getTransactionReceipt({ hash: txHash as `0x${string}` });
+
+    // ✅ Receipt sanity checks
+    if ((receipt as any)?.status && (receipt as any).status !== "success") {
+      return res.status(400).json({ ok: false, error: "Transaction did not succeed" });
+    }
+
+    const toAddr = String((receipt as any)?.to || "").toLowerCase();
+    if (!toAddr || toAddr !== SHOP_ADDRESS) {
+      return res.status(400).json({ ok: false, error: "Transaction was not sent to the Shop contract" });
+    }
 
     // Find matching shop events (address must match)
     const matches = (receipt.logs || []).filter(
