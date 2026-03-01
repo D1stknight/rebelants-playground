@@ -716,7 +716,18 @@ async function migrateDripNow() {
 return (  
     <>
       {/* full-screen ant colony BG */}
-      <div className="ant-colony-bg" aria-hidden="true" />
+     <div
+  className="ant-colony-bg"
+  aria-hidden="true"
+  style={{
+    backgroundImage: `linear-gradient(
+        140deg,
+        rgba(11, 27, 49, 0.18),
+        rgba(7, 13, 26, 0.55)
+      ),
+      url("${shuffleConfig.pageBg}")`,
+  }}
+/>
 
       {/* HEADER */}
       <header className="page-head" role="banner">
@@ -749,7 +760,14 @@ return (
 
         <div className="shuffle-scene ant-scene" style={{ position: "relative" }}>
           {/* in-scene dojo BG */}
-          <div className="scene-bg" aria-hidden="true" />
+         <div
+  className="scene-bg"
+  aria-hidden="true"
+  style={{
+    backgroundImage: `linear-gradient(180deg, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.18)),
+      url("${shuffleConfig.cardBg}")`,
+  }}
+/>
           <div className="strip" />
 
           {/* Queen 3D */}
@@ -1091,22 +1109,16 @@ return (
 
       {/* Background + header styles (scoped) */}
       <style jsx>{`
-        .ant-colony-bg {
-          position: fixed;
-          inset: 0;
-          pointer-events: none;
-          z-index: 0;
-          background-image: linear-gradient(
-              140deg,
-              rgba(11, 27, 49, 0.18),
-              rgba(7, 13, 26, 0.55)
-            ),
-            url("${shuffleConfig.pageBg}");
-          background-position: center, center;
-          background-size: cover, cover;
-          background-repeat: no-repeat, no-repeat;
-          filter: saturate(1.05);
-        }
+      .ant-colony-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-position: center, center;
+  background-size: cover, cover;
+  background-repeat: no-repeat, no-repeat;
+  filter: saturate(1.05);
+}
 
         .page-head {
           position: relative;
@@ -1149,19 +1161,17 @@ return (
           background: rgba(255, 255, 255, 0.16);
         }
 
-        .scene-bg {
-          position: absolute;
-          inset: 0;
-          z-index: 1;
-          pointer-events: none;
-          border-radius: 12px;
-          background-image: linear-gradient(180deg, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.18)),
-            url("${shuffleConfig.cardBg}");
-          background-position: center, center;
-          background-size: cover, cover;
-          background-repeat: no-repeat, no-repeat;
-          box-shadow: inset 0 12px 30px rgba(0, 0, 0, 0.35);
-        }
+       .scene-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  border-radius: 12px;
+  background-position: center, center;
+  background-size: cover, cover;
+  background-repeat: no-repeat, no-repeat;
+  box-shadow: inset 0 12px 30px rgba(0, 0, 0, 0.35);
+}
 
         .rules-row {
           margin-top: 10px;
