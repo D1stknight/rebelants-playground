@@ -10,7 +10,8 @@ import {
   useSwitchChain,
 } from "wagmi";
 import { apeChain } from "../lib/apechain";
-import { saveProfile } from "../lib/profile";
+import { loadProfile, saveProfile } from "../lib/profile";
+import { useSignMessage } from "wagmi";
 
 const SHOP_ADDRESS = (process.env.NEXT_PUBLIC_APECHAIN_SHOP_ADDRESS || "").toLowerCase();
 
@@ -84,7 +85,7 @@ window.dispatchEvent(
   const chainId = useChainId();
   const { switchChainAsync } = useSwitchChain();
   const { writeContractAsync, isPending } = useWriteContract();
-
+const { signMessageAsync } = useSignMessage();
   const [status, setStatus] = useState<string>("");
   const [lastTx, setLastTx] = useState<`0x${string}` | null>(null);
 
@@ -194,6 +195,77 @@ window.dispatchEvent(
     }
   }
 
+async function linkWalletNow() {
+  if (!address) {
+    setStatus("Connect a wallet first.");
+    return;
+  }
+
+  try {
+    const prof = loadProfile();
+    const guestId = String(prof.id || "").trim();
+    const wallet = address.toLowerCase();
+
+    if (!guestId) {
+      setStatus("Missing guest id.");
+      return;
+    }
+
+    setStatus("Preparing link (nonce)…");
+
+    const nr = await fetch(
+      `/api/identity/nonce?guestId=${encodeURIComponent(guestId)}&walletAddress=${encodeURIComponent(wallet)}`,
+      { method: "GET", cache: "no-store" }
+    );
+    const nj = await nr.json().catch(() => null);
+
+    if (!nr.ok || !nj?.nonce) {
+      setStatus(`Nonce error: ${nj?.error || "Unknown error"}`);
+      return;
+    }
+
+    const nonce = String(nj.nonce);
+
+    const message =
+      `Rebel Ants Link Wallet\n` +
+      `Guest: ${guestId}\n` +
+      `Wallet: ${wallet}\n` +
+      `Nonce: ${nonce}`;
+
+    setStatus("Signing message…");
+    const sig = await signMessageAsync({ message });
+
+    setStatus("Linking + migrating points…");
+    const r = await fetch("/api/identity/link-wallet", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ guestId, walletAddress: wallet, nonce, signature: sig }),
+    });
+
+    const j = await r.json().catch(() => null);
+
+    if (!r.ok || !j?.ok) {
+      setStatus(`Link failed: ${j?.error || "Unknown error"}`);
+      return;
+    }
+
+    const newPid = String(j.playerId || `wallet:${wallet}`);
+
+    // ✅ THIS is the big moment: identity becomes stable forever
+    saveProfile({ walletAddress: wallet, primaryId: newPid });
+
+    setStatus(
+      j?.alreadyLinked
+        ? "Wallet already linked ✅"
+        : `Linked ✅ Migrated ${j?.migrated?.balance ?? 0} points`
+    );
+
+    await onClaimed();
+  } catch (e: any) {
+    setStatus(`Link error: ${e?.shortMessage || e?.message || "Unknown error"}`);
+  }
+}
+  
   if (!open) return null;
 
   return (
@@ -238,6 +310,24 @@ window.dispatchEvent(
   <ConnectButton />
 </div>
 
+        {isConnected && address ? (
+  <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+    <button
+      className="btn"
+      type="button"
+      onClick={linkWalletNow}
+      style={{ padding: "10px 12px", fontSize: 13 }}
+      title="One-time link: migrates guest points to wallet identity"
+    >
+      Link Wallet (migrate points)
+    </button>
+
+    <span style={{ fontSize: 12, opacity: 0.85 }}>
+      This is one-time. After linking, your points follow this wallet.
+    </span>
+  </div>
+) : null}
+        
         {/* ✅ INSERT THIS BLOCK RIGHT HERE */}
 <div style={{
   marginTop: 10,
