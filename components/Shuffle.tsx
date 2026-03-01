@@ -541,7 +541,21 @@ if (
 // ✅ Award points if prize is points
 if (pz.type === "points" && pz.points > 0) {
   const earnRes: any = await earn(pz.points);
-  if (earnRes?.ok === false) console.warn("EARN failed:", earnRes);
+
+  if (earnRes?.ok === false) {
+    console.warn("EARN failed:", earnRes);
+  }
+
+  const applied = Number(earnRes?.added ?? earnRes?.applied ?? pz.points);
+
+  // If daily cap limited the reward
+  if (Number.isFinite(applied) && applied < pz.points) {
+    pz = {
+      ...pz,
+      label: `Daily cap reached — prize rolled, but only ${applied} ${pointsConfig.currency} could be credited today.`,
+    };
+  }
+
   await refresh();
 }
 
