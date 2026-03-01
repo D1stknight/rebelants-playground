@@ -206,161 +206,151 @@ function PrizeModal({
     []
   );
 
-  return (
-    <div className="prize-modal" role="dialog" aria-modal="true">
-      <div className={`prize-card pm-${rarity}`}>
-        {rarity !== "none" && (
-          <div className="sparkle-layer" aria-hidden="true">
-            {sparks.map((s, i) => (
-              <span
-                key={i}
-                className={`pm-sparkle ${rarity}`}
-                style={{
-                  left: s.left,
-                  top: s.top,
-                  width: s.size,
-                  height: s.size,
-                  animationDelay: `${s.delay}s`,
-                }}
-              />
-            ))}
+ return (
+  <div className="prize-modal" role="dialog" aria-modal="true">
+    <div className={`prize-card pm-${rarity}`}>
+      {rarity !== "none" && (
+        <div className="sparkle-layer" aria-hidden="true">
+          {sparks.map((s, i) => (
+            <span
+              key={i}
+              className={`pm-sparkle ${rarity}`}
+              style={{
+                left: s.left,
+                top: s.top,
+                width: s.size,
+                height: s.size,
+                animationDelay: `${s.delay}s`,
+              }}
+            />
+          ))}
+        </div>
+      )}
+
+      <div className="prize-title">{title}</div>
+
+      {prize?.label ? (
+        <div className="prize-sub" style={{ marginTop: 6 }}>
+          <b>{prize.label}</b>
+        </div>
+      ) : null}
+
+      {rarity !== "none" ? (
+        <>
+          <div className="prize-aura" data-rarity={rarity} />
+          <img className="prize-art" src={`/crates/${rarity}.png`} alt={`${rarity} crate`} />
+
+          <div className="prize-sub" style={{ marginBottom: 8 }}>
+            You won:{" "}
+            <b>
+{prize?.type === "points" ? `+${prize.points}` : prize?.label || "—"}
+            </b>
           </div>
-        )}
 
-       <div className="prize-title">{title}</div>
+          <div className="prize-sub">Tap continue to play again.</div>
+        </>
+      ) : (
+        <div className="prize-sub" style={{ marginBottom: 12 }}>
+          Bummer! Try another egg.
+        </div>
+      )}
 
-{prize?.label ? (
-  <div className="prize-sub" style={{ marginTop: 6 }}>
-    <b>{prize.label}</b>
-  </div>
-) : null}
-
-{rarity !== "none" ? (
-  <>
-    <div className="prize-aura" data-rarity={rarity} />
-    <img className="prize-art" src={`/crates/${rarity}.png`} alt={`${rarity} crate`} />
-
-    <div className="prize-sub" style={{ marginBottom: 8 }}>
-      You won:{" "}
-      <b>
-        {prize?.type === "points"
-          ? `+${prize.points} ${prize.label.includes("REBEL") || prize.label.includes("RANT") ? "" : ""}`.trim()
-          : prize?.label || "—"}
-      </b>
+      <button className="btn" onClick={onClose}>
+        Continue
+      </button>
     </div>
 
-    <div className="prize-sub">Tap continue to play again.</div>
-  </>
-) : (
-  <div className="prize-sub" style={{ marginBottom: 12 }}>
-    Bummer! Try another egg.
+    <style>{`
+      .prize-modal {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+      }
+      .prize-card {
+        position: relative;
+        min-width: 320px;
+        padding: 20px;
+        border-radius: 12px;
+        text-align: center;
+        background: rgba(15, 23, 42, 0.95);
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        box-shadow: 0 24px 40px rgba(0, 0, 0, 0.55);
+        overflow: visible;
+      }
+      .prize-title {
+        font-size: 18px;
+        font-weight: 800;
+        margin: 10px 0;
+      }
+      .prize-sub {
+        font-size: 14px;
+        opacity: 0.85;
+        margin-bottom: 12px;
+      }
+      .prize-art {
+        display: block;
+        width: 240px;
+        max-width: 80vw;
+        height: auto;
+        margin: 0 auto 12px;
+        position: relative;
+        z-index: 1;
+      }
+      .sparkle-layer {
+        position: absolute;
+        inset: -8% -10%;
+        pointer-events: none;
+        z-index: 0;
+      }
+      .pm-sparkle {
+        position: absolute;
+        border-radius: 50%;
+        background: radial-gradient(
+          circle,
+          rgba(255, 255, 255, 0.95) 0%,
+          rgba(255, 255, 255, 0) 65%
+        );
+        filter: blur(0.3px) drop-shadow(0 0 12px rgba(255, 255, 255, 0.65));
+        opacity: 0;
+        animation: pmSpark 2.6s ease-in-out infinite;
+      }
+      .pm-sparkle.common {
+        filter: blur(0.3px) drop-shadow(0 0 14px rgba(147, 197, 253, 0.85));
+      }
+      .pm-sparkle.rare {
+        filter: blur(0.3px) drop-shadow(0 0 14px rgba(59, 130, 246, 0.95));
+      }
+      .pm-sparkle.ultra {
+        filter: blur(0.3px) drop-shadow(0 0 16px rgba(244, 63, 94, 1));
+      }
+      @keyframes pmSpark {
+        0% {
+          transform: scale(0.4);
+          opacity: 0;
+        }
+        20% {
+          opacity: 1;
+        }
+        55% {
+          transform: scale(1.1);
+          opacity: 0.9;
+        }
+        85% {
+          transform: scale(0.7);
+          opacity: 0.7;
+        }
+        100% {
+          transform: scale(0.3);
+          opacity: 0;
+        }
+      }
+    `}</style>
   </div>
-)}
-
-        <button className="btn" onClick={onClose}>
-          Continue
-        </button>
-      </div>
-
-     <style>{`
-  .prize-modal {
-    position: fixed;
-    inset: 0;
-    display: grid;
-    place-items: center;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 1000;
-  }
-
-  .prize-card {
-    position: relative;
-    min-width: 320px;
-    padding: 20px;
-    border-radius: 12px;
-    text-align: center;
-    background: rgba(15, 23, 42, 0.95);
-    border: 1px solid rgba(148, 163, 184, 0.25);
-    box-shadow: 0 24px 40px rgba(0, 0, 0, 0.55);
-    overflow: visible;
-  }
-
-  .prize-title {
-    font-size: 18px;
-    font-weight: 800;
-    margin: 10px 0;
-  }
-
-  .prize-sub {
-    font-size: 14px;
-    opacity: 0.85;
-    margin-bottom: 12px;
-  }
-
-  .prize-art {
-    display: block;
-    width: 240px;
-    max-width: 80vw;
-    height: auto;
-    margin: 0 auto 12px;
-    position: relative;
-    z-index: 1;
-  }
-
-  .sparkle-layer {
-    position: absolute;
-    inset: -8% -10%;
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  .pm-sparkle {
-    position: absolute;
-    border-radius: 50%;
-    background: radial-gradient(
-      circle,
-      rgba(255, 255, 255, 0.95) 0%,
-      rgba(255, 255, 255, 0) 65%
-    );
-    filter: blur(0.3px) drop-shadow(0 0 12px rgba(255, 255, 255, 0.65));
-    opacity: 0;
-    animation: pmSpark 2.6s ease-in-out infinite;
-  }
-
-  .pm-sparkle.common {
-    filter: blur(0.3px) drop-shadow(0 0 14px rgba(147, 197, 253, 0.85));
-  }
-
-  .pm-sparkle.rare {
-    filter: blur(0.3px) drop-shadow(0 0 14px rgba(59, 130, 246, 0.95));
-  }
-
-  .pm-sparkle.ultra {
-    filter: blur(0.3px) drop-shadow(0 0 16px rgba(244, 63, 94, 1));
-  }
-
-  @keyframes pmSpark {
-    0% {
-      transform: scale(0.4);
-      opacity: 0;
-    }
-    20% {
-      opacity: 1;
-    }
-    55% {
-      transform: scale(1.1);
-      opacity: 0.9;
-    }
-    85% {
-      transform: scale(0.7);
-      opacity: 0.7;
-    }
-    100% {
-      transform: scale(0.3);
-      opacity: 0;
-    }
-  }
-`}</style>
-
+);
+}
 /* ---------------- component ---------------- */
 export default function Shuffle() {
   const [{ name: initialName, id: initialId, effectiveId: initialEffectiveId }] = useState(() => {
