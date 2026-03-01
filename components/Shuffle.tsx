@@ -165,7 +165,15 @@ function AntProgress({ progress }: { progress: number }) {
 }
 
 /* -------- prize modal (bright sparkles) -------- */
-function PrizeModal({ rarity, onClose }: { rarity: Rarity; onClose: () => void }) {
+function PrizeModal({
+  rarity,
+  winText,
+  onClose,
+}: {
+  rarity: Rarity;
+  winText: string;
+  onClose: () => void;
+}) {
   const title =
     rarity === "ultra"
       ? "ULTRA CRATE!"
@@ -208,7 +216,8 @@ function PrizeModal({ rarity, onClose }: { rarity: Rarity; onClose: () => void }
         )}
 
         <div className="prize-title">{title}</div>
-
+        {winText ? <div className="prize-sub" style={{ marginTop: 6 }}>{winText}</div> : null}
+        
         {rarity !== "none" ? (
           <>
             <div className="prize-aura" data-rarity={rarity} />
@@ -380,6 +389,9 @@ const [busy, setBusy] = useState(false);
 const [rarity, setRarity] = useState<Rarity>("none");
 const [showPrize, setShowPrize] = useState(false);
 const [showBuyPoints, setShowBuyPoints] = useState(false);
+
+// ✅ NEW: show what the player actually won
+const [winText, setWinText] = useState<string>("");
 const runShuffle = async () => {
   if (busy) return;
 
@@ -415,57 +427,72 @@ const runShuffle = async () => {
     setBusy(true);
 
 setTimeout(async () => {
-      const r = rollRarity();
+          const r = rollRarity();
 
-        let reward =
-  r === "ultra"
-    ? pointsConfig.rewards.ultra
-    : r === "rare"
-    ? pointsConfig.rewards.rare
-    : r === "common"
-    ? pointsConfig.rewards.common
-    : pointsConfig.rewards.none;
+      // ✅ Always treat reward as a NUMBER (prevents TS union issues)
+      let reward: number =
+        r === "ultra"
+          ? Number(pointsConfig.rewards.ultra)
+          : r === "rare"
+          ? Number(pointsConfig.rewards.rare)
+          : r === "common"
+          ? Number(pointsConfig.rewards.common)
+          : Number(pointsConfig.rewards.none);
 
-// ✅ Enforce: Ultra always awards at least config minimum
-const ultraMin = Number((pointsConfig as any).ultraMinReward ?? 0);
-if (r === "ultra" && (!Number.isFinite(reward) || reward <= 0)) {
-  reward = Number.isFinite(ultraMin) && ultraMin > 0 ? ultraMin : 1;
-}
+      // ✅ Enforce: Ultra always awards at least config minimum
+      const ultraMin = Number((pointsConfig as any).ultraMinReward ?? 0);
+      if (r === "ultra" && (!Number.isFinite(reward) || reward <= 0)) {
+        // IMPORTANT: never use 1 (can break TS + doesn’t match your economy)
+        reward = Number.isFinite(ultraMin) && ultraMin > 0 ? ultraMin : 50;
+      }
 
-   if (reward > 0) {
-  await earn(reward);
+      // ✅ Determine player identity ONCE (so pid/pname always exist)
+      const prof = loadProfile();
+      const pid = (prof?.id || playerId || "guest").trim() || "guest";
+      const pname = (playerName || prof?.name || "guest").trim() || "guest";
 
-  const prof = loadProfile();
-  const pid = prof.id || playerId || "guest";
-  const pname = playerName || prof.name || "guest";
+      // ✅ Set what the user won (shown in the modal)
+      if (reward > 0) setWinText(`You won +${reward} ${pointsConfig.currency}!`);
+      else setWinText("Nothing this time.");
 
-  // local (keep for now)
-  addWin({
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    ts: Date.now(),
-    game: "shuffle",
-    playerId: pid,
-    playerName: pname,
-    rarity: r,
-    pointsAwarded: reward,
-  });
+      // ✅ Credit points + refresh balance (THIS is what you were missing)
+      if (reward > 0) {
+        const earnRes: any = await earn(reward);
 
- // server (source of truth for leaderboards)
-await fetch("/api/wins/add", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    ts: Date.now(),
-    game: "shuffle",
-    playerId: pid,
-    playerName: pname,
-    rarity: r,
-    pointsAwarded: reward,
-  }),
-}).catch(() => {});
-}
+        if (earnRes?.ok === false) {
+          console.warn("EARN failed:", earnRes);
+          setWinText(`Win recorded, but points credit failed: ${earnRes?.error || "Unknown error"}`);
+        }
 
+        // ✅ Force UI balance refresh immediately
+        await refresh();
+      }
+
+      // local (keep for now)
+      addWin({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        ts: Date.now(),
+        game: "shuffle",
+        playerId: pid,
+        playerName: pname,
+        rarity: r,
+        pointsAwarded: reward,
+      });
+
+      // server (source of truth for leaderboards)
+      await fetch("/api/wins/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          ts: Date.now(),
+          game: "shuffle",
+          playerId: pid,
+          playerName: pname,
+          rarity: r,
+          pointsAwarded: reward,
+        }),
+      }).catch(() => {});
       setRarity(r);
       setPhase("revealed");
       setShowPrize(true);
@@ -474,12 +501,13 @@ await fetch("/api/wins/add", {
   };
 
   const resetAfterPrize = () => {
-    setShowPrize(false);
-    setRarity("none");
-    setProgress(0);
-    setOrder(Array.from({ length: EGG_COUNT }, (_, i) => i));
-    setPhase("idle");
-  };
+  setShowPrize(false);
+  setRarity("none");
+  setWinText(""); // ✅ clear display text
+  setProgress(0);
+  setOrder(Array.from({ length: EGG_COUNT }, (_, i) => i));
+  setPhase("idle");
+};
 
   return (
     <>
@@ -714,7 +742,7 @@ await fetch("/api/wins/add", {
   <LeaderboardPanel />
 </div>
 
-        {showPrize && <PrizeModal rarity={rarity} onClose={resetAfterPrize} />}
+        {showPrize && <PrizeModal rarity={rarity} winText={winText} onClose={resetAfterPrize} />}
 
 <BuyPointsModal
   open={showBuyPoints}
