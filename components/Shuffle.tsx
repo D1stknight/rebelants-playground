@@ -172,74 +172,7 @@ function AntProgress({ progress }: { progress: number }) {
         </div>
       ))}
 
-      <style jsx>{`
-        :global(.ant-img) {
-          width: 20px;
-          height: 20px;
-          display: block;
-          object-fit: contain;
-          transform: scale(1.6);
-          transform-origin: center;
-          filter: drop-shadow(0 0 4px rgba(0, 255, 170, 0.35));
-        }
-
-        .ant-progress {
-          position: absolute;
-          left: 50%;
-          transform: translateX(-50%);
-          bottom: 14px;
-          width: 92%;
-          height: 42px;
-          pointer-events: none;
-          z-index: 26;
-        }
-
-        .track {
-          position: absolute;
-          left: 0;
-          right: 0;
-          top: 65%;
-          height: 7px;
-          transform: translateY(-50%);
-          border-radius: 999px;
-          background: linear-gradient(
-                90deg,
-                rgba(255, 255, 255, 0.08) 0 2px,
-                transparent 2px
-              )
-              repeat-x,
-            linear-gradient(90deg, #22324a, #1a2a3f);
-          background-size: 14px 7px, auto;
-          box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.35),
-            0 0 0 1px rgba(255, 255, 255, 0.06);
-          opacity: 0.9;
-        }
-
-        .ant {
-          position: absolute;
-          top: 70%;
-          width: 22px;
-          height: 22px;
-          transform: translate(-50%, -50%);
-          animation: antBob 0.58s ease-in-out infinite;
-          pointer-events: none;
-          overflow: visible;
-        }
-
-        .ant:nth-child(2n) {
-          animation-duration: 0.66s;
-        }
-
-        @keyframes antBob {
-          0%,
-          100% {
-            transform: translate(-50%, -50%);
-          }
-          50% {
-            transform: translate(-50%, -53%);
-          }
-        }
-      `}</style>
+      <style jsx>{``}</style>
     </div>
   );
 }
