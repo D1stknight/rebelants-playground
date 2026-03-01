@@ -451,10 +451,24 @@ export default function Shuffle() {
   const [effectivePlayerId, setEffectivePlayerId] = useState(initialEffectiveId);
 
   // ✅ If profile identity changes (wallet connect / discord connect), refresh effective id
-  React.useEffect(() => {
+ React.useEffect(() => {
+  const updateIdentity = () => {
     const p = loadProfile();
-    setEffectivePlayerId(getEffectivePlayerId(p));
-  }, [playerId, playerName]);
+    const nextId = getEffectivePlayerId(p);
+    setEffectivePlayerId(nextId);
+    console.log("🔁 Identity updated:", nextId);
+  };
+
+  // initial sync
+  updateIdentity();
+
+  // listen for wallet / discord changes
+  window.addEventListener("ra:identity-changed", updateIdentity);
+
+  return () => {
+    window.removeEventListener("ra:identity-changed", updateIdentity);
+  };
+}, []);
 
   // ✅ LIVE economy config (starts with defaults, then loads from /api/config)
   const [pointsConfig, setPointsConfig] = useState(defaultPointsConfig);
@@ -812,8 +826,8 @@ setPrize(null); // ✅ clear actual prize object
       }}
     />
     <div style={{ fontSize: 11, opacity: 0.7, marginTop: 6 }}>
-      Player ID: <b>{playerId}</b>
-    </div>
+  Identity: <b>{effectivePlayerId}</b>
+</div>
   </label>
 
   <button
