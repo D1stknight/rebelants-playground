@@ -7,15 +7,12 @@ function headerValue(v: string | string[] | undefined) {
 }
 
 function isAdmin(req: NextApiRequest) {
-  // accept either header name
   const provided =
     headerValue(req.headers["x-admin-key"]) ||
     headerValue(req.headers["x-admin-token"]) ||
     "";
 
-  // accept either env var name
   const expected = process.env.ADMIN_KEY || process.env.ADMIN_TOKEN || "";
-
   if (!expected) return false;
   return !!provided && provided === expected;
 }
@@ -28,6 +25,14 @@ function lbBalanceKey() {
   return `ra:lb:balance`;
 }
 
+function walletToPlayerKey(wallet: string) {
+  return `ra:shop:walletToPlayer:${wallet.toLowerCase()}`;
+}
+
+function cleanWallet(v: any) {
+  return String(v || "").trim().toLowerCase();
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     if (!isAdmin(req)) return res.status(401).json({ ok: false, error: "Unauthorized" });
@@ -38,14 +43,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
-    const { playerId, amount } = (body ?? {}) as { playerId?: string; amount?: number };
+    const { playerId, walletAddress, amount } = (body ?? {}) as {
+      playerId?: string;
+      walletAddress?: string;
+      amount?: number;
+    };
 
-    const pid = (playerId || "guest").trim().slice(0, 64) || "guest";
     const amt = Number(amount || 0);
-
     if (!Number.isFinite(amt) || amt <= 0) {
       return res.status(400).json({ ok: false, error: "Invalid amount" });
     }
+
+    // ✅ Choose target: walletAddress > playerId
+    let pid = (playerId || "").trim().slice(0, 64);
+
+    const w = cleanWallet(walletAddress);
+    if (w) {
+      const mapped = await redis.get<string>(walletToPlayerKey(w));
+      if (!mapped) {
+        return res.status(400).json({
+          ok: false,
+          error: "Wallet is not linked to a player yet (no purchases claimed).",
+        });
+      }
+      pid = String(mapped).trim().slice(0, 64);
+    }
+
+    pid = pid || "guest";
 
     const newBalance = await redis.incrby(balKey(pid), amt);
 
@@ -55,6 +79,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({
       ok: true,
       playerId: pid,
+      walletAddress: w || undefined,
       added: amt,
       balance: Number(newBalance || 0),
       note: "Grant affects balance. Top Earners uses total earned from gameplay, not grants.",
