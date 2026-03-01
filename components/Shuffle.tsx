@@ -171,8 +171,7 @@ function AntProgress({ progress }: { progress: number }) {
           <AntIcon />
         </div>
       ))}
-
-      <style jsx>{``}</style>
+      
     </div>
   );
 }
