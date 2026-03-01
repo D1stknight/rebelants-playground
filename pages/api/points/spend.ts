@@ -7,31 +7,19 @@ function balKey(playerId: string) {
   return `ra:points:bal:${playerId}`;
 }
 
-// Try a few possible keys (since your project evolved)
-// This makes it robust even if the key name changed.
-const CONFIG_KEYS = ["ra:points:config", "ra:config:points", "ra:pointsConfig", "ra:config"];
+// ✅ Reads the SAME live config that Admin saves, with safe fallbacks
+async function getLivePointsConfig() {
+  // Try the most likely keys (use whichever exists)
+  const keysToTry = ["ra:points:config", "ra:config:points", "ra:pointsConfig"];
 
-async function loadLivePointsConfig(): Promise<any> {
-  for (const k of CONFIG_KEYS) {
+  for (const k of keysToTry) {
     const v = await redis.get<any>(k);
-    if (!v) continue;
-
-    // Upstash can store objects or JSON strings depending on how it was saved
-    if (typeof v === "string") {
-      try {
-        const parsed = JSON.parse(v);
-        // might be {pointsConfig:{...}} or just {...}
-        return parsed?.pointsConfig ?? parsed;
-      } catch {
-        // ignore parse failures
-      }
-    }
-
-    if (typeof v === "object") {
-      return (v as any)?.pointsConfig ?? v;
+    if (v && typeof v === "object") {
+      return { ...defaultPointsConfig, ...v };
     }
   }
-  return null;
+
+  return defaultPointsConfig;
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -43,50 +31,50 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body ?? {});
     const playerId = String(body.playerId || "guest").trim().slice(0, 64) || "guest";
-    const amount = Number(body.amount || 0);
+    const amountRaw = body.amount;
     const reason = String(body.reason || "").trim();
 
-    if (!Number.isFinite(amount) || amount <= 0) {
-      return res.status(400).json({ ok: false, error: "Invalid amount" });
-    }
+    const liveCfg = await getLivePointsConfig();
+    const expectedShuffleCost = Number(liveCfg.shuffleCost || 0);
 
-    // ✅ Load LIVE config from Redis, fallback to defaults
-    const live = await loadLivePointsConfig();
-    const pointsConfig = { ...defaultPointsConfig, ...(live || {}) };
-
-    // ✅ Enforce live shuffle cost if reason=shuffle
+    // ✅ If this is a shuffle spend, enforce live configured cost
     if (reason === "shuffle") {
-      const expected = Number(pointsConfig.shuffleCost || 0);
-      if (!Number.isFinite(expected) || expected <= 0) {
-        return res.status(500).json({ ok: false, error: "Invalid shuffleCost config on server" });
+      const got = Number(amountRaw || 0);
+      if (!Number.isFinite(expectedShuffleCost) || expectedShuffleCost <= 0) {
+        return res.status(500).json({ ok: false, error: "Invalid server shuffleCost config" });
       }
-      if (amount !== expected) {
+      if (!Number.isFinite(got) || got !== expectedShuffleCost) {
         return res.status(400).json({
           ok: false,
-          error: `Invalid shuffle cost. Expected ${expected}, got ${amount}`,
-          expected,
-          got: amount,
+          error: `Invalid shuffle cost. Expected ${expectedShuffleCost}, got ${got}`,
+          expected: expectedShuffleCost,
+          got,
         });
       }
     }
 
-    // ✅ Check balance first
-    const balNowRaw = await redis.get<number>(balKey(playerId));
-    const balNow = Number(balNowRaw || 0);
-
-    if (balNow < amount) {
-      return res.status(400).json({ ok: false, error: "Insufficient balance", balance: balNow });
+    const amt = Number(amountRaw || 0);
+    if (!Number.isFinite(amt) || amt <= 0) {
+      return res.status(400).json({ ok: false, error: "Invalid amount" });
     }
 
-    // ✅ Deduct
-    const newBalance = await redis.incrby(balKey(playerId), -amount);
+    // Current balance
+    const balRaw = await redis.get<number>(balKey(playerId));
+    const bal = Number(balRaw || 0);
+
+    if (bal < amt) {
+      return res.status(400).json({ ok: false, error: "Insufficient balance", balance: bal });
+    }
+
+    // Deduct
+    const newBal = await redis.incrby(balKey(playerId), -amt);
 
     return res.status(200).json({
       ok: true,
       playerId,
-      balance: Number(newBalance || 0),
-      spent: amount,
+      spent: amt,
       reason: reason || undefined,
+      balance: Number(newBal || 0),
     });
   } catch (err: any) {
     console.error("spend error:", err);
