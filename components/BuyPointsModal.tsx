@@ -59,7 +59,7 @@ export default function BuyPointsModal({
   // ✅ Persist connected wallet into profile so the whole app can use it as identity
   useEffect(() => {
     if (!address) return;
-    saveProfile({ walletAddress: address });
+    saveProfile({ walletAddress: address.toLowerCase() });
   }, [address]);
   
   const chainId = useChainId();
