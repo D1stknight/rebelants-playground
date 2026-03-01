@@ -880,7 +880,7 @@ setPrize(null); // ✅ clear actual prize object
 <BuyPointsModal
   open={showBuyPoints}
   onClose={() => setShowBuyPoints(false)}
-  playerId={playerId}
+  playerId={effectivePlayerId}
   onClaimed={async () => {
     await refresh();
   }}
