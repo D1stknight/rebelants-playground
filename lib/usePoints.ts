@@ -30,7 +30,6 @@ export function usePoints(playerId: string) {
     const r = await fetch("/api/points/spend", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      // ✅ reason tells the API to charge the LIVE configured shuffle cost
       body: JSON.stringify({ playerId: pid, amount: cost, reason: "shuffle" }),
     });
 
@@ -39,10 +38,11 @@ export function usePoints(playerId: string) {
     if (r.ok && typeof j.balance === "number") {
       setBalance(j.balance);
       setEarnedToday(j.earnedToday ?? earnedToday);
+      return { ok: true, ...j };
     } else {
-      // show the error in console so we don’t get “silent fail”
       console.warn("spend failed:", r.status, j);
       await refresh();
+      return { ok: false, ...j };
     }
   },
   [pid, refresh, earnedToday]
