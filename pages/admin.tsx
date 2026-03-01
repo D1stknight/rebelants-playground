@@ -9,6 +9,10 @@ type PointsConfigShape = {
   dailyClaim: number;
   dailyEarnCap: number;
   rewards: { none: number; common: number; rare: number; ultra: number };
+
+  // ✅ NEW
+  ultraMinReward: number;
+
   prizePools?: {
     none: any[];
     common: any[];
@@ -38,6 +42,10 @@ export default function AdminPage() {
   dailyClaim: defaultConfig.dailyClaim,
   dailyEarnCap: defaultConfig.dailyEarnCap,
   rewards: { ...defaultConfig.rewards },
+
+  // ✅ NEW (fallback if missing)
+  ultraMinReward: Number((defaultConfig as any).ultraMinReward ?? 50),
+
   prizePools: (defaultConfig as any).prizePools || {
     none: [],
     common: [],
@@ -323,6 +331,25 @@ export default function AdminPage() {
                 style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
               />
             </label>
+
+<label style={{ fontSize: 12, opacity: 0.9 }}>
+  Ultra Min Reward
+  <input
+    value={cfg.ultraMinReward}
+    onChange={(e) =>
+      setCfg((c) => ({ ...c, ultraMinReward: safeNum(e.target.value, c.ultraMinReward) }))
+    }
+    style={{
+      width: "100%",
+      marginTop: 6,
+      padding: "10px 12px",
+      borderRadius: 12,
+      border: "1px solid rgba(255,255,255,.18)",
+      background: "rgba(0,0,0,.25)",
+      color: "white",
+    }}
+  />
+</label>            
           </div>
 
        <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10 }}>
