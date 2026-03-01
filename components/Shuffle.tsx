@@ -582,8 +582,6 @@ if (prize.type === "points" && prize.points > 0) {
   await refresh();
 }
 
-const pointsAwarded = prize.type === "points" ? prize.points : 0;
-
 // local (keep for now)
 addWin({
   id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
