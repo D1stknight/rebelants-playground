@@ -154,6 +154,19 @@ export default function AdminPage() {
     append(`BALANCE status ${r.status}\n${JSON.stringify(j, null, 2)}`);
   }
 
+    async function resetEarnedToday() {
+    append("Resetting earned-today…");
+
+    const r = await fetch("/api/admin/reset-earned", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ playerId }),
+    });
+
+    const j = await r.json().catch(() => null);
+    append(`RESET EARNED status ${r.status}\n${JSON.stringify(j, null, 2)}`);
+  }
+  
   async function clearRecentWins() {
     append("Clearing recent wins…");
     const r = await fetch("/api/admin/reset", {
@@ -277,12 +290,16 @@ export default function AdminPage() {
               }}
             />
 
-            <button className="btn" onClick={getBalance} style={{ padding: "10px 12px" }}>
+                       <button className="btn" onClick={getBalance} style={{ padding: "10px 12px" }}>
               Get Balance
             </button>
 
             <button className="btn" onClick={grantPoints} style={{ padding: "10px 12px" }}>
               Grant (wallet if provided)
+            </button>
+
+            <button className="btn" onClick={resetEarnedToday} style={{ padding: "10px 12px" }}>
+              Reset Earned Today
             </button>
           </div>
 
