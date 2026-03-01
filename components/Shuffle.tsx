@@ -500,7 +500,7 @@ export default function Shuffle() {
   }, []);
 
 const prof = loadProfile();
-const effectivePlayerId = getEffectivePlayerId(prof);
+const computedEffectivePlayerId = getEffectivePlayerId(prof);
 
 const { balance, spend, earn, claimDaily, devGrant, refresh } =
   usePoints(effectivePlayerId);
