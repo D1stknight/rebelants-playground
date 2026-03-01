@@ -22,6 +22,80 @@ const Queen3D = dynamic(() => import("./Queen3D"), { ssr: false }) as React.Comp
 type Phase = "idle" | "shuffling" | "pick" | "revealed";
 type Rarity = "none" | "common" | "rare" | "ultra";
 
+type Prize =
+  | { type: "none"; label: string }
+  | { type: "points"; label: string; points: number }
+  | { type: "merch"; label: string; meta?: any }
+  | { type: "nft"; label: string; meta?: any }
+  | { type: "ape"; label: string; meta?: any };
+
+// Pick a weighted prize from Admin-configured prizePools
+function pickWeightedPrize(pool: any[]): any | null {
+  if (!Array.isArray(pool) || pool.length === 0) return null;
+
+  const items = pool
+    .map((p) => ({ ...p, weight: Number(p?.weight ?? 0) }))
+    .filter((p) => Number.isFinite(p.weight) && p.weight > 0);
+
+  if (!items.length) return null;
+
+  const total = items.reduce((s, p) => s + p.weight, 0);
+  let r = Math.random() * total;
+
+  for (const p of items) {
+    r -= p.weight;
+    if (r <= 0) return p;
+  }
+
+  return items[items.length - 1];
+}
+
+function normalizePrize(rarity: Rarity, pointsConfig: any): Prize {
+  // 1) Try prizePools first (Admin-editable)
+  const pool = pointsConfig?.prizePools?.[rarity];
+  const picked = pickWeightedPrize(pool);
+
+  if (picked) {
+    const t = String(picked?.type || "").toUpperCase();
+    const label = String(picked?.label || "");
+
+    if (t === "POINTS") {
+      const pts = Number(picked?.points ?? picked?.amount ?? 0);
+      return {
+        type: "points",
+        points: Number.isFinite(pts) ? pts : 0,
+        label: label || `${pts} ${pointsConfig?.currency || "REBEL"}`,
+      };
+    }
+    if (t === "NONE") return { type: "none", label: label || "Nothing this time" };
+    if (t === "MERCH") return { type: "merch", label: label || "Merch Prize", meta: picked };
+    if (t === "NFT") return { type: "nft", label: label || "NFT Prize", meta: picked };
+    if (t === "APE") return { type: "ape", label: label || "APE Prize", meta: picked };
+  }
+
+  // 2) Fallback to old rewards map (points only)
+  const reward =
+    rarity === "ultra"
+      ? pointsConfig?.rewards?.ultra
+      : rarity === "rare"
+      ? pointsConfig?.rewards?.rare
+      : rarity === "common"
+      ? pointsConfig?.rewards?.common
+      : 0;
+
+  const pts = Number(reward || 0);
+
+  if (!Number.isFinite(pts) || pts <= 0) {
+    return { type: "none", label: "Nothing this time" };
+  }
+
+  return {
+    type: "points",
+    points: pts,
+    label: `${pts} ${pointsConfig?.currency || "REBEL"}`,
+  };
+}
+
 const EGG_COUNT = shuffleConfig.eggCount; // ✅ 5 (from lib/shuffleConfig.ts)
 const SHUFFLE_MS = 3200;
 const SWAP_EVERY_MS = 280;
@@ -167,11 +241,11 @@ function AntProgress({ progress }: { progress: number }) {
 /* -------- prize modal (bright sparkles) -------- */
 function PrizeModal({
   rarity,
-  winText,
+  prize,
   onClose,
 }: {
   rarity: Rarity;
-  winText: string;
+  prize: Prize | null;
   onClose: () => void;
 }) {
   const title =
@@ -215,20 +289,35 @@ function PrizeModal({
           </div>
         )}
 
-        <div className="prize-title">{title}</div>
-        {winText ? <div className="prize-sub" style={{ marginTop: 6 }}>{winText}</div> : null}
-        
-        {rarity !== "none" ? (
-          <>
-            <div className="prize-aura" data-rarity={rarity} />
-            <img className="prize-art" src={`/crates/${rarity}.png`} alt={`${rarity} crate`} />
-            <div className="prize-sub">Tap continue to play again.</div>
-          </>
-        ) : (
-          <div className="prize-sub" style={{ marginBottom: 12 }}>
-            Bummer! Try another egg.
-          </div>
-        )}
+       <div className="prize-title">{title}</div>
+
+{prize?.label ? (
+  <div className="prize-sub" style={{ marginTop: 6 }}>
+    <b>{prize.label}</b>
+  </div>
+) : null}
+
+{rarity !== "none" ? (
+  <>
+    <div className="prize-aura" data-rarity={rarity} />
+    <img className="prize-art" src={`/crates/${rarity}.png`} alt={`${rarity} crate`} />
+
+    <div className="prize-sub" style={{ marginBottom: 8 }}>
+      You won:{" "}
+      <b>
+        {prize?.type === "points"
+          ? `+${prize.points} ${prize.label.includes("REBEL") || prize.label.includes("RANT") ? "" : ""}`.trim()
+          : prize?.label || "—"}
+      </b>
+    </div>
+
+    <div className="prize-sub">Tap continue to play again.</div>
+  </>
+) : (
+  <div className="prize-sub" style={{ marginBottom: 12 }}>
+    Bummer! Try another egg.
+  </div>
+)}
 
         <button className="btn" onClick={onClose}>
           Continue
@@ -387,6 +476,7 @@ const [order, setOrder] = useState<number[]>(() => Array.from({ length: EGG_COUN
 const [progress, setProgress] = useState(0);
 const [busy, setBusy] = useState(false);
 const [rarity, setRarity] = useState<Rarity>("none");
+const [prize, setPrize] = useState<Prize | null>(null);
 const [showPrize, setShowPrize] = useState(false);
 const [showBuyPoints, setShowBuyPoints] = useState(false);
 
@@ -427,83 +517,111 @@ const runShuffle = async () => {
     setBusy(true);
 
 setTimeout(async () => {
-          const r = rollRarity();
+        const r = rollRarity();
 
-      // ✅ Always treat reward as a NUMBER (prevents TS union issues)
-      let reward: number =
-        r === "ultra"
-          ? Number(pointsConfig.rewards.ultra)
-          : r === "rare"
-          ? Number(pointsConfig.rewards.rare)
-          : r === "common"
-          ? Number(pointsConfig.rewards.common)
-          : Number(pointsConfig.rewards.none);
+// ✅ Pick the actual prize (Admin prizePools first, fallback to rewards)
+let pz = normalizePrize(r, pointsConfig);
 
-      // ✅ Enforce: Ultra always awards at least config minimum
-      const ultraMin = Number((pointsConfig as any).ultraMinReward ?? 0);
-      if (r === "ultra" && (!Number.isFinite(reward) || reward <= 0)) {
-        // IMPORTANT: never use 1 (can break TS + doesn’t match your economy)
-        reward = Number.isFinite(ultraMin) && ultraMin > 0 ? ultraMin : 50;
-      }
+// ✅ Enforce Ultra always awards at least pointsConfig.ultraMinReward (points only)
+const ultraMin = Number((pointsConfig as any).ultraMinReward ?? 0);
+if (
+  r === "ultra" &&
+  (pz.type === "none" || (pz.type === "points" && (!Number.isFinite(pz.points) || pz.points <= 0)))
+) {
+  const min = Number.isFinite(ultraMin) && ultraMin > 0 ? ultraMin : 50;
+  pz = { type: "points", points: min, label: `${min} ${pointsConfig.currency || "REBEL"}` };
+}
 
-      // ✅ Determine player identity ONCE (so pid/pname always exist)
-      const prof = loadProfile();
-      const pid = (prof?.id || playerId || "guest").trim() || "guest";
-      const pname = (playerName || prof?.name || "guest").trim() || "guest";
+// ✅ Award points if prize is points
+if (pz.type === "points" && pz.points > 0) {
+  const earnRes: any = await earn(pz.points);
+  if (earnRes?.ok === false) console.warn("EARN failed:", earnRes);
+  await refresh();
+}
 
-      // ✅ Set what the user won (shown in the modal)
-      if (reward > 0) setWinText(`You won +${reward} ${pointsConfig.currency}!`);
-      else setWinText("Nothing this time.");
+// ✅ Save what the user won so the modal can show it
+setPrize(pz);
 
-      // ✅ Credit points + refresh balance (THIS is what you were missing)
-      if (reward > 0) {
-        const earnRes: any = await earn(reward);
+// For wins tracking, store pointsAwarded only when it’s points
+const pointsAwarded = pz.type === "points" ? pz.points : 0;
 
-        if (earnRes?.ok === false) {
-          console.warn("EARN failed:", earnRes);
-          setWinText(`Win recorded, but points credit failed: ${earnRes?.error || "Unknown error"}`);
-        }
+    // ✅ Determine player identity ONCE (so pid/pname always exist)
+const prof = loadProfile();
+const pid = (prof?.id || playerId || "guest").trim() || "guest";
+const pname = (playerName || prof?.name || "guest").trim() || "guest";
 
-        // ✅ Force UI balance refresh immediately
-        await refresh();
-      }
+// ✅ Build a prize object (future NFT-ready)
+let prize: WinPrize;
 
-      // local (keep for now)
-      addWin({
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        ts: Date.now(),
-        game: "shuffle",
-        playerId: pid,
-        playerName: pname,
-        rarity: r,
-        pointsAwarded: reward,
-      });
+if (reward > 0) {
+  prize = {
+    type: "points",
+    points: reward,
+    label: `You won +${reward} ${pointsConfig.currency}!`,
+  };
+} else {
+  prize = { type: "none", label: "Nothing this time." };
+}
 
-      // server (source of truth for leaderboards)
-      await fetch("/api/wins/add", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-          ts: Date.now(),
-          game: "shuffle",
-          playerId: pid,
-          playerName: pname,
-          rarity: r,
-          pointsAwarded: reward,
-        }),
-      }).catch(() => {});
-      setRarity(r);
-      setPhase("revealed");
-      setShowPrize(true);
-      setBusy(false);
+// ✅ Store prize for the PrizeModal to render
+setWinPrize(prize);
+setWinText(prize.label); // keep your winText for now (optional)
+
+// ✅ Credit points + refresh balance
+if (prize.type === "points" && prize.points > 0) {
+  const earnRes: any = await earn(prize.points);
+
+  if (earnRes?.ok === false) {
+    console.warn("EARN failed:", earnRes);
+    // update prize label so modal shows the truth
+    const msg = `Win recorded, but points credit failed: ${earnRes?.error || "Unknown error"}`;
+    setWinText(msg);
+    setWinPrize({ ...prize, label: msg });
+  }
+
+  await refresh();
+}
+
+const pointsAwarded = prize.type === "points" ? prize.points : 0;
+
+// local (keep for now)
+addWin({
+  id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+  ts: Date.now(),
+  game: "shuffle",
+  playerId: pid,
+  playerName: pname,
+  rarity: r,
+  pointsAwarded,
+});
+
+// server (source of truth for leaderboards)
+await fetch("/api/wins/add", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    ts: Date.now(),
+    game: "shuffle",
+    playerId: pid,
+    playerName: pname,
+    rarity: r,
+    pointsAwarded,
+  }),
+}).catch(() => {});
+
+setRarity(r);
+setPhase("revealed");
+setShowPrize(true);
+setBusy(false);
     }, 350);
   };
 
   const resetAfterPrize = () => {
   setShowPrize(false);
   setRarity("none");
-  setWinText(""); // ✅ clear display text
+setWinText(""); // ✅ clear display text
+setWinPrize(null); // ✅ clear reward object
   setProgress(0);
   setOrder(Array.from({ length: EGG_COUNT }, (_, i) => i));
   setPhase("idle");
@@ -742,8 +860,8 @@ setTimeout(async () => {
   <LeaderboardPanel />
 </div>
 
-        {showPrize && <PrizeModal rarity={rarity} winText={winText} onClose={resetAfterPrize} />}
-
+      {showPrize && <PrizeModal rarity={rarity} winPrize={winPrize} onClose={resetAfterPrize} />}
+        
 <BuyPointsModal
   open={showBuyPoints}
   onClose={() => setShowBuyPoints(false)}
