@@ -417,7 +417,7 @@ const runShuffle = async () => {
 setTimeout(async () => {
       const r = rollRarity();
 
-      const reward =
+            let reward =
         r === "ultra"
           ? pointsConfig.rewards.ultra
           : r === "rare"
@@ -425,6 +425,11 @@ setTimeout(async () => {
           : r === "common"
           ? pointsConfig.rewards.common
           : pointsConfig.rewards.none;
+
+      // ✅ Enforce: Ultra always awards at least something (points)
+      if (r === "ultra" && (!Number.isFinite(reward) || reward <= 0)) {
+        reward = 1;
+      }
 
    if (reward > 0) {
   await earn(reward);
