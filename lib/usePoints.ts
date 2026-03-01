@@ -25,23 +25,28 @@ export function usePoints(playerId: string) {
     refresh().catch(() => {});
   }, [refresh]);
 
-   const spend = useCallback(
-    async (cost: number, reason?: string) => {
-      const r = await fetch("/api/points/spend", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerId: pid, amount: cost, reason }),
-      });
-      const j = (await r.json()) as SpendRes;
-      if (r.ok && typeof j.balance === "number") {
-        setBalance(j.balance);
-        setEarnedToday(j.earnedToday ?? earnedToday);
-      } else {
-        await refresh();
-      }
-    },
-    [pid, refresh, earnedToday]
-  );
+  const spend = useCallback(
+  async (cost: number) => {
+    const r = await fetch("/api/points/spend", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      // ✅ reason tells the API to charge the LIVE configured shuffle cost
+      body: JSON.stringify({ playerId: pid, amount: cost, reason: "shuffle" }),
+    });
+
+    const j = (await r.json()) as SpendRes;
+
+    if (r.ok && typeof j.balance === "number") {
+      setBalance(j.balance);
+      setEarnedToday(j.earnedToday ?? earnedToday);
+    } else {
+      // show the error in console so we don’t get “silent fail”
+      console.warn("spend failed:", r.status, j);
+      await refresh();
+    }
+  },
+  [pid, refresh, earnedToday]
+);
 
   const earn = useCallback(
     async (amount: number) => {
