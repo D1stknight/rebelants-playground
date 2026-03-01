@@ -25,13 +25,28 @@ export function usePoints(playerId: string) {
     refresh().catch(() => {});
   }, [refresh]);
 
-  const spend = useCallback(
-  async (cost: number) => {
+ const spend = useCallback(
+  async (cost: number, reason?: string) => {
     const r = await fetch("/api/points/spend", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ playerId: pid, amount: cost, reason: "shuffle" }),
+      body: JSON.stringify({ playerId: pid, amount: cost, reason }),
     });
+
+    const j = (await r.json()) as SpendRes;
+
+    if (r.ok && typeof j.balance === "number") {
+      setBalance(j.balance);
+      setEarnedToday(j.earnedToday ?? earnedToday);
+      return { ok: true, ...j };
+    } else {
+      console.warn("spend failed:", r.status, j);
+      await refresh();
+      return { ok: false, ...j };
+    }
+  },
+  [pid, refresh, earnedToday]
+);
 
     const j = (await r.json()) as SpendRes;
 
