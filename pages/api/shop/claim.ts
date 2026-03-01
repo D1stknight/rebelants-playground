@@ -2,6 +2,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createPublicClient, http } from "viem";
 import { redis } from "../../../lib/server/redis";
+import { rateLimit } from "../../../lib/server/ratelimit";
 
 const RPC_URL = process.env.APECHAIN_RPC_URL || "";
 const SHOP_ADDRESS = (process.env.APECHAIN_SHOP_ADDRESS || "").toLowerCase();
