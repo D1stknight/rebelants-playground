@@ -71,15 +71,14 @@ export default function BuyPointsModal({
     return;
   }
 
-  // DISCONNECTED
-  // Clear wallet from profile so identity falls back to guest (or discord later)
-  saveProfile({ walletAddress: undefined });
+ // DISCONNECTED
+saveProfile({ walletAddress: "" }); // ✅ clears stored walletAddress
 
-  window.dispatchEvent(
-    new CustomEvent("ra:identity-changed", {
-      detail: { walletAddress: null },
-    })
-  );
+window.dispatchEvent(
+  new CustomEvent("ra:identity-changed", {
+    detail: { walletAddress: null },
+  })
+);
 }, [address]);
   
   const chainId = useChainId();
