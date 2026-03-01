@@ -20,6 +20,12 @@ const Queen3D = dynamic(() => import("./Queen3D"), { ssr: false }) as React.Comp
 }>;
 
 type Phase = "idle" | "shuffling" | "pick" | "revealed";
+type WinPrize = {
+  type: "points" | "nft" | "ape" | "merch" | "none";
+  label: string;
+  amount?: number; // for points/ape
+  meta?: Record<string, any>;
+};
 type Rarity = "none" | "common" | "rare" | "ultra";
 
 type Prize =
