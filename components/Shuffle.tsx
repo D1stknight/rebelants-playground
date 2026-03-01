@@ -578,6 +578,13 @@ const [prize, setPrize] = useState<Prize | null>(null);
 const [showPrize, setShowPrize] = useState(false);
 const [showBuyPoints, setShowBuyPoints] = useState(false);
 
+// ✅ DRIP migrate UI
+const [showDripMigrate, setShowDripMigrate] = useState(false);
+const [dripBalance, setDripBalance] = useState<number | null>(null);
+const [dripAmount, setDripAmount] = useState<number>(0);
+const [dripBusy, setDripBusy] = useState(false);
+const [dripStatus, setDripStatus] = useState("");
+
 // ✅ NEW: show what the player actually won
 const [winText, setWinText] = useState<string>("");
 const runShuffle = async () => {
@@ -705,7 +712,76 @@ setPrize(null); // ✅ clear actual prize object
   setPhase("idle");
 };
 
-  return (
+async function openDripModal() {
+  setDripStatus("");
+  setDripBusy(true);
+  setDripBalance(null);
+
+  try {
+    const r = await fetch("/api/drip/balance", { cache: "no-store" });
+    const j = await r.json().catch(() => null);
+
+    if (!r.ok || !j?.ok) {
+      setDripStatus(j?.error || "Could not load DRIP balance.");
+      setShowDripMigrate(true);
+      return;
+    }
+
+    setDripBalance(Number(j.balance || 0));
+    setDripAmount(0);
+    setShowDripMigrate(true);
+  } catch (e: any) {
+    setDripStatus(e?.message || "DRIP balance error");
+    setShowDripMigrate(true);
+  } finally {
+    setDripBusy(false);
+  }
+}
+
+async function migrateDripNow() {
+  const amt = Math.floor(Number(dripAmount || 0));
+  if (!amt || amt <= 0) {
+    setDripStatus("Enter an amount greater than 0.");
+    return;
+  }
+
+  setDripBusy(true);
+  setDripStatus("Migrating… (deducting from DRIP + crediting game)");
+
+  try {
+    const r = await fetch("/api/drip/migrate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        amount: amt,
+        playerId: effectivePlayerId,
+      }),
+    });
+
+    const j = await r.json().catch(() => null);
+
+    if (!r.ok || !j?.ok) {
+      setDripStatus(j?.error || "Migrate failed.");
+      // refresh balance display if server returned it
+      if (typeof j?.dripBalance === "number") setDripBalance(j.dripBalance);
+      return;
+    }
+
+    setDripStatus(`✅ Migrated ${amt} points into the game.`);
+    await refresh();
+
+    // refresh DRIP balance after migration
+    const br = await fetch("/api/drip/balance", { cache: "no-store" });
+    const bj = await br.json().catch(() => null);
+    if (br.ok && bj?.ok) setDripBalance(Number(bj.balance || 0));
+  } catch (e: any) {
+    setDripStatus(e?.message || "Migrate error");
+  } finally {
+    setDripBusy(false);
+  }
+}
+
+return (  
     <>
       {/* full-screen ant colony BG */}
       <div className="ant-colony-bg" aria-hidden="true" />
@@ -954,11 +1030,131 @@ setPrize(null); // ✅ clear actual prize object
 <BuyPointsModal
   open={showBuyPoints}
   onClose={() => setShowBuyPoints(false)}
-  playerId={effectivePlayerId}
+  playerId={playerId}
   onClaimed={async () => {
     await refresh();
   }}
 />
+
+{/* ✅ DRIP → Game migrate */}
+<div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
+  <button
+    className="btn"
+    type="button"
+    onClick={openDripModal}
+    style={{ padding: "10px 12px", fontSize: 13, opacity: 0.95 }}
+    disabled={dripBusy}
+    title="Move points from Discord (DRIP) into the game (and deduct them from DRIP so no double-dip)."
+  >
+    Migrate from Discord (DRIP)
+  </button>
+
+  {typeof dripBalance === "number" && (
+    <div style={{ fontSize: 12, opacity: 0.9, display: "grid", alignItems: "center" }}>
+      DRIP Balance: <b>{dripBalance}</b>
+    </div>
+  )}
+</div>
+
+{showDripMigrate && (
+  <div
+    style={{
+      position: "fixed",
+      inset: 0,
+      zIndex: 2500,
+      background: "rgba(0,0,0,.55)",
+      display: "grid",
+      placeItems: "center",
+      padding: 16,
+    }}
+    role="dialog"
+    aria-modal="true"
+  >
+    <div
+      style={{
+        width: "min(520px, 95vw)",
+        borderRadius: 16,
+        border: "1px solid rgba(255,255,255,.18)",
+        background: "rgba(15,23,42,.96)",
+        boxShadow: "0 28px 60px rgba(0,0,0,.55)",
+        padding: 16,
+        color: "white",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+        <div style={{ fontWeight: 900, fontSize: 16 }}>Migrate DRIP Points → Game</div>
+        <button className="btn" onClick={() => setShowDripMigrate(false)} style={{ padding: "8px 12px" }}>
+          Close
+        </button>
+      </div>
+
+      <div style={{ marginTop: 10, fontSize: 13, opacity: 0.9, lineHeight: 1.4 }}>
+        This will <b>deduct</b> points from DRIP (Discord) and <b>credit</b> the same amount into the game.
+        <br />
+        No double-dipping.
+      </div>
+
+      <div style={{ marginTop: 12, fontSize: 13, opacity: 0.95 }}>
+        DRIP Balance: <b>{typeof dripBalance === "number" ? dripBalance : "—"}</b>
+      </div>
+
+      <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
+        <label style={{ fontSize: 12, opacity: 0.9 }}>Amount to migrate</label>
+        <input
+          value={dripAmount}
+          onChange={(e) => setDripAmount(Number(e.target.value || 0))}
+          type="number"
+          min={0}
+          step={1}
+          style={{
+            padding: "10px 12px",
+            borderRadius: 12,
+            border: "1px solid rgba(255,255,255,.18)",
+            background: "rgba(15, 23, 42, 0.7)",
+            color: "white",
+            outline: "none",
+            fontWeight: 800,
+          }}
+        />
+
+        <button
+          className="btn"
+          type="button"
+          onClick={migrateDripNow}
+          disabled={dripBusy}
+          style={{ padding: "12px 12px", textAlign: "left" }}
+        >
+          <div style={{ fontWeight: 900 }}>{dripBusy ? "Working…" : "Migrate Now"}</div>
+          <div style={{ fontSize: 12, opacity: 0.9 }}>
+            Deduct from DRIP → Credit to <b>{effectivePlayerId}</b>
+          </div>
+        </button>
+      </div>
+
+      {dripStatus && (
+        <div style={{ marginTop: 12, fontSize: 12, opacity: 0.9, whiteSpace: "pre-wrap" }}>{dripStatus}</div>
+      )}
+
+      <style jsx>{`
+        .btn {
+          border-radius: 12px;
+          border: 1px solid rgba(255, 255, 255, 0.18);
+          background: rgba(15, 23, 42, 0.7);
+          color: white;
+          font-weight: 800;
+          cursor: pointer;
+        }
+        .btn:hover {
+          background: rgba(15, 23, 42, 0.9);
+        }
+        .btn:disabled {
+          opacity: 0.55;
+          cursor: not-allowed;
+        }
+      `}</style>
+    </div>
+  </div>
+)}
       </div>
 
       {/* Background + header styles (scoped) */}
