@@ -31,11 +31,14 @@ const DEFAULTS = {
 
   // ✅ NEW: prize pools per rarity (can be points, merch, NFT, APE, or nothing)
   prizePools: {
-    none: [{ type: "NONE", label: "Nothing this time", points: 0 }],
-    common: [{ type: "POINTS", label: "50 REBEL", points: 50 }],
-    rare: [{ type: "POINTS", label: "100 REBEL", points: 100 }],
-    ultra: [{ type: "POINTS", label: "200 REBEL", points: 200 }],
-  },
+  none: [{ type: "NONE", label: "Nothing this time", points: 0 }],
+  common: [{ type: "POINTS", label: "50 REBEL", points: 50 }],
+  rare: [{ type: "POINTS", label: "100 REBEL", points: 100 }],
+  ultra: [{ type: "POINTS", label: "200 REBEL", points: 200 }],
+},
+
+// ✅ NEW default (top-level)
+ultraMinReward: 50,
 };
 
 function safeNum(v: any, fallback: number) {
@@ -82,13 +85,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   shuffleCost: Number(src?.shuffleCost ?? DEFAULTS.shuffleCost),
   dailyClaim: Number(src?.dailyClaim ?? DEFAULTS.dailyClaim),
   dailyEarnCap: Number(src?.dailyEarnCap ?? DEFAULTS.dailyEarnCap),
-  currency: String(src?.currency ?? DEFAULTS.currency),
-  rewards: {
-    none: Number(src?.rewards?.none ?? DEFAULTS.rewards.none),
-    common: Number(src?.rewards?.common ?? DEFAULTS.rewards.common),
-    rare: Number(src?.rewards?.rare ?? DEFAULTS.rewards.rare),
-    ultra: Number(src?.rewards?.ultra ?? DEFAULTS.rewards.ultra),
-  },
+currency: String(src?.currency ?? DEFAULTS.currency),
+rewards: {
+  none: Number(src?.rewards?.none ?? DEFAULTS.rewards.none),
+  common: Number(src?.rewards?.common ?? DEFAULTS.rewards.common),
+  rare: Number(src?.rewards?.rare ?? DEFAULTS.rewards.rare),
+  ultra: Number(src?.rewards?.ultra ?? DEFAULTS.rewards.ultra),
+},
+
+// ✅ NEW: ultraMinReward (must be >= 1, fallback to defaults)
+ultraMinReward: Math.max(
+  1,
+  Number(src?.ultraMinReward ?? DEFAULTS.ultraMinReward ?? 50)
+),
 
   prizePools: {
     none: Array.isArray(src?.prizePools?.none) ? src.prizePools.none : DEFAULTS.prizePools.none,
