@@ -2,9 +2,9 @@
 import { useCallback, useEffect, useState } from "react";
 
 type BalanceRes = { playerId: string; balance: number; earnedToday?: number };
-type SpendRes = { ok: boolean; playerId: string; balance: number; earnedToday?: number };
-type EarnRes = { ok: boolean; playerId: string; balance: number; earnedToday?: number; applied?: number };
-type DevGrantRes = { ok: boolean; dev: boolean; playerId: string; added: number; balance: number };
+type SpendRes = { ok: boolean; playerId: string; balance: number; earnedToday?: number; error?: string };
+type EarnRes = { ok: boolean; playerId: string; balance: number; earnedToday?: number; added?: number; capped?: boolean; error?: string };
+type DevGrantRes = { ok: boolean; dev: boolean; playerId: string; added: number; balance: number; error?: string };
 
 export function usePoints(playerId: string) {
   const pid = (playerId || "guest").slice(0, 64);
@@ -14,8 +14,8 @@ export function usePoints(playerId: string) {
 
   const refresh = useCallback(async () => {
     const r = await fetch(`/api/points/balance?playerId=${encodeURIComponent(pid)}`, {
-  cache: "no-store",
-});
+      cache: "no-store",
+    });
     const j = (await r.json()) as BalanceRes;
     setBalance(j.balance ?? 0);
     setEarnedToday(j.earnedToday ?? 0);
@@ -25,43 +25,28 @@ export function usePoints(playerId: string) {
     refresh().catch(() => {});
   }, [refresh]);
 
- const spend = useCallback(
-  async (cost: number, reason?: string) => {
-    const r = await fetch("/api/points/spend", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ playerId: pid, amount: cost, reason }),
-    });
+  const spend = useCallback(
+    async (cost: number, reason?: string) => {
+      const r = await fetch("/api/points/spend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerId: pid, amount: cost, reason }),
+      });
 
-    const j = (await r.json()) as SpendRes;
+      const j = (await r.json().catch(() => null)) as SpendRes | null;
 
-    if (r.ok && typeof j.balance === "number") {
-      setBalance(j.balance);
-      setEarnedToday(j.earnedToday ?? earnedToday);
-      return { ok: true, ...j };
-    } else {
-      console.warn("spend failed:", r.status, j);
-      await refresh();
-      return { ok: false, ...j };
-    }
-  },
-  [pid, refresh, earnedToday]
-);
-
-    const j = (await r.json()) as SpendRes;
-
-    if (r.ok && typeof j.balance === "number") {
-      setBalance(j.balance);
-      setEarnedToday(j.earnedToday ?? earnedToday);
-      return { ok: true, ...j };
-    } else {
-      console.warn("spend failed:", r.status, j);
-      await refresh();
-      return { ok: false, ...j };
-    }
-  },
-  [pid, refresh, earnedToday]
-);
+      if (r.ok && j && typeof j.balance === "number") {
+        setBalance(j.balance);
+        setEarnedToday(j.earnedToday ?? earnedToday);
+        return j;
+      } else {
+        console.warn("spend failed:", r.status, j);
+        await refresh();
+        return (j || { ok: false, playerId: pid, balance, earnedToday }) as SpendRes;
+      }
+    },
+    [pid, refresh, earnedToday, balance]
+  );
 
   const earn = useCallback(
     async (amount: number) => {
@@ -70,21 +55,25 @@ export function usePoints(playerId: string) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ playerId: pid, amount }),
       });
-      const j = (await r.json()) as EarnRes;
-      if (r.ok && typeof j.balance === "number") {
+
+      const j = (await r.json().catch(() => null)) as EarnRes | null;
+
+      if (r.ok && j && typeof j.balance === "number") {
         setBalance(j.balance);
         setEarnedToday(j.earnedToday ?? earnedToday);
+        return j;
       } else {
+        console.warn("earn failed:", r.status, j);
         await refresh();
+        return (j || { ok: false, playerId: pid, balance, earnedToday }) as EarnRes;
       }
     },
-    [pid, refresh, earnedToday]
+    [pid, refresh, earnedToday, balance]
   );
 
   const claimDaily = useCallback(
     async (amount: number) => {
-      // daily is just "earn" but capped by your server logic
-      await earn(amount);
+      return await earn(amount);
     },
     [earn]
   );
@@ -96,23 +85,25 @@ export function usePoints(playerId: string) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ playerId: pid, amount }),
       });
-      const j = (await r.json()) as DevGrantRes;
-      if (r.ok && typeof j.balance === "number") {
+
+      const j = (await r.json().catch(() => null)) as DevGrantRes | null;
+
+      if (r.ok && j && typeof j.balance === "number") {
         setBalance(j.balance);
+        return j;
       } else {
+        console.warn("devGrant failed:", r.status, j);
         await refresh();
+        return (j || { ok: false, dev: true, playerId: pid, added: 0, balance }) as DevGrantRes;
       }
     },
-    [pid, refresh]
+    [pid, refresh, balance]
   );
 
-  const set = useCallback(
-    async (newBalance: number) => {
-      // Optional: not used. Keep API as source of truth.
-      setBalance(newBalance);
-    },
-    []
-  );
+  const set = useCallback(async (newBalance: number) => {
+    setBalance(newBalance);
+  }, []);
 
+  // ✅ IMPORTANT: spend is returned here
   return { balance, earnedToday, spend, earn, claimDaily, devGrant, set, refresh };
 }
