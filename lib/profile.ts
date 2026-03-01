@@ -3,10 +3,12 @@ export type Profile = {
   id: string;      // stable guest id fallback (guest-xxxxx)
   name: string;    // display name
 
-  // ✅ future identity (optional)
   walletAddress?: string;     // lowercase
-  discordUserId?: string;     // stable unique id from Discord
-  discordName?: string;       // display name from Discord
+  discordUserId?: string;
+  discordName?: string;
+
+  // ✅ NEW: once linked, this becomes permanent identity
+  primaryId?: string;         // "wallet:0x..." or later "discord:123"
 };
 
 const KEY = "ra_profile_v1";
@@ -36,12 +38,13 @@ export function loadProfile(): Profile {
       const name = String(parsed.name || "").trim() || "guest";
 
       return {
-        id,
-        name,
-        walletAddress: normalizeWallet(parsed.walletAddress),
-        discordUserId: parsed.discordUserId ? String(parsed.discordUserId) : undefined,
-        discordName: parsed.discordName ? String(parsed.discordName) : undefined,
-      };
+  id,
+  name,
+  walletAddress: normalizeWallet(parsed.walletAddress),
+  discordUserId: parsed.discordUserId ? String(parsed.discordUserId) : undefined,
+  discordName: parsed.discordName ? String(parsed.discordName) : undefined,
+  primaryId: parsed.primaryId ? String(parsed.primaryId) : undefined,
+};
     }
   } catch {}
 
@@ -60,6 +63,7 @@ export function saveProfile(next: Partial<Profile>) {
     walletAddress: normalizeWallet(next.walletAddress ?? cur.walletAddress),
     discordUserId: next.discordUserId ?? cur.discordUserId,
     discordName: next.discordName ?? cur.discordName,
+    primaryId: next.primaryId ?? cur.primaryId, // ✅ preserve
   };
 
   localStorage.setItem(KEY, JSON.stringify(merged));
@@ -73,6 +77,12 @@ export function saveProfile(next: Partial<Profile>) {
  */
 export function getEffectivePlayerId(p?: Profile) {
   const prof = p || loadProfile();
+
+  // ✅ If linked, always use primaryId
+  const primary = String(prof.primaryId || "").trim();
+  if (primary) return primary;
+
+  // Before linking:
   const discordId = String(prof.discordUserId || "").trim();
   if (discordId) return `discord:${discordId}`;
 
