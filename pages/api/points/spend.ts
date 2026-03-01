@@ -9,26 +9,42 @@ function balKey(playerId: string) {
 
 // ✅ Reads the SAME live config that Admin saves, with safe fallbacks
 async function getLivePointsConfig() {
-  // ✅ Try a few likely keys + handle wrapped shapes { pointsConfig: {...} }
   const keysToTry = [
     "ra:points:config",
     "ra:config:points",
     "ra:pointsConfig",
-    "ra:config", // some setups store everything here
+    "ra:config",
   ];
 
+  const normalize = (raw: any) => {
+    // ✅ If redis returns JSON as a string, parse it
+    if (typeof raw === "string") {
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return null;
+      }
+    }
+
+    // ✅ If it's already an object, use it
+    if (raw && typeof raw === "object") return raw;
+
+    return null;
+  };
+
   for (const k of keysToTry) {
-    const v = await redis.get<any>(k);
-    if (!v || typeof v !== "object") continue;
+    const raw = await redis.get<any>(k);
+    const v = normalize(raw);
+    if (!v) continue;
 
     // ✅ If stored as wrapper: { ok:true, pointsConfig:{...} }
-    const cfg = (v as any).pointsConfig && typeof (v as any).pointsConfig === "object"
-      ? (v as any).pointsConfig
-      : v;
+    const cfg =
+      (v as any).pointsConfig && typeof (v as any).pointsConfig === "object"
+        ? (v as any).pointsConfig
+        : v;
 
     const merged = { ...defaultPointsConfig, ...cfg };
 
-    // ✅ Only accept if it actually contains a valid shuffleCost
     const sc = Number((merged as any).shuffleCost);
     if (Number.isFinite(sc) && sc > 0) return merged;
   }
