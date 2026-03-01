@@ -592,8 +592,8 @@ setBusy(false);
   const resetAfterPrize = () => {
   setShowPrize(false);
   setRarity("none");
-setWinText(""); // ✅ clear display text
-setWinPrize(null); // ✅ clear reward object
+setWinText(""); // optional (can remove later)
+setPrize(null); // ✅ clear actual prize object
   setProgress(0);
   setOrder(Array.from({ length: EGG_COUNT }, (_, i) => i));
   setPhase("idle");
