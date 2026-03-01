@@ -77,15 +77,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       asStr(req.headers["x-real-ip"]) ||
       "unknown";
 
-    const rl = await rateLimit({
-      key: `shop-claim:${ip}:${walletAddress}`,
-      limit: 12,        // 12 attempts
-      windowSec: 60,    // per 60 seconds
-    });
+   const rl = await rateLimit({
+  key: `shop-claim:${ip}:${walletAddress}`,
+  limit: 12,
+  windowSec: 60,
+});
 
-    if (!rl.ok) {
-      return res.status(429).json({ ok: false, error: "Too many requests. Try again in a minute." });
-    }
+if (!rl.allowed) {
+  return res.status(429).json({
+    ok: false,
+    error: "Too many requests. Try again shortly.",
+  });
+}
 
     const client = createPublicClient({ transport: http(RPC_URL) });
 
