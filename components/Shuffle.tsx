@@ -505,7 +505,13 @@ const computedEffectivePlayerId = getEffectivePlayerId(prof);
 const { balance, spend, earn, claimDaily, devGrant, refresh } =
   usePoints(effectivePlayerId);
 
+// ✅ Run once guard (prevents React crash loops / duplicate linking)
+const didDiscordLinkRef = React.useRef(false);
+
 React.useEffect(() => {
+  if (didDiscordLinkRef.current) return;
+  didDiscordLinkRef.current = true;
+
   let cancelled = false;
 
   (async () => {
@@ -516,9 +522,10 @@ React.useEffect(() => {
       if (!sr.ok || !sj?.ok || !sj?.discordUserId) return;
 
       const prof = loadProfile();
-      const fromId = getEffectivePlayerId(prof);
+      const fromId = getEffectivePlayerId(prof); // current id (wallet or guest)
       const toId = `discord:${sj.discordUserId}`;
 
+      // if already primary, nothing to do
       if (String(prof.primaryId || "") === toId) return;
 
       const lr = await fetch("/api/identity/link-discord", {
@@ -533,6 +540,7 @@ React.useEffect(() => {
         return;
       }
 
+      // ✅ lock identity to Discord (permanent)
       saveProfile({
         discordUserId: sj.discordUserId,
         discordName: sj.discordName,
@@ -541,6 +549,7 @@ React.useEffect(() => {
       });
 
       if (!cancelled) {
+        // force refresh so UI pulls balance under new discord id
         await refresh();
       }
     } catch (e) {
@@ -551,7 +560,8 @@ React.useEffect(() => {
   return () => {
     cancelled = true;
   };
-}, [refresh]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
   
 console.log("PLAYER ID (guest) =", playerId, "| effective =", effectivePlayerId);
 
