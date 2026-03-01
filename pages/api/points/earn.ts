@@ -1,7 +1,7 @@
 // pages/api/points/earn.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
-import { pointsConfig } from "../../../lib/pointsConfig";
+import { pointsConfig as defaultPointsConfig } from "../../../lib/pointsConfig";
 
 function todayKey(playerId: string) {
   const d = new Date();
@@ -13,6 +13,25 @@ function todayKey(playerId: string) {
 
 function balKey(playerId: string) {
   return `ra:points:bal:${playerId}`;
+}
+
+// ✅ get LIVE config (Admin -> Redis) via /api/config, fallback to defaults
+async function getLivePointsConfig(req: NextApiRequest) {
+  try {
+    const proto = (req.headers["x-forwarded-proto"] as string) || "http";
+    const host = req.headers.host;
+    const url = `${proto}://${host}/api/config`;
+
+    const r = await fetch(url, { method: "GET", headers: { "Cache-Control": "no-store" } });
+    const j: any = await r.json().catch(() => null);
+
+    if (r.ok && j?.pointsConfig) {
+      return { ...defaultPointsConfig, ...j.pointsConfig };
+    }
+  } catch (e) {
+    // ignore; fallback below
+  }
+  return defaultPointsConfig;
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -34,10 +53,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: "Invalid amount" });
     }
 
-    // Enforce daily earn cap
-    const cap = Number(pointsConfig.dailyEarnCap || 0);
-    const earnedKey = todayKey(pid);
+    // ✅ Use LIVE cap from Admin/Redis
+    const liveCfg = await getLivePointsConfig(req);
+    const cap = Number((liveCfg as any).dailyEarnCap || 0);
 
+    const earnedKey = todayKey(pid);
     const earnedTodayRaw = await redis.get<number>(earnedKey);
     const earnedToday = Number(earnedTodayRaw || 0);
 
@@ -58,9 +78,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Update earned today + balance
     const newEarnedToday = await redis.incrby(earnedKey, toAdd);
-    // keep the daily key around ~2 days so it naturally rotates
     await redis.expire(earnedKey, 60 * 60 * 48);
 
     const newBalance = await redis.incrby(balKey(pid), toAdd);
