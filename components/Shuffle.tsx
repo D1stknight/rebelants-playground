@@ -556,38 +556,6 @@ const prof = loadProfile();
 const pid = (prof?.id || playerId || "guest").trim() || "guest";
 const pname = (playerName || prof?.name || "guest").trim() || "guest";
 
-// ✅ Build a prize object (future NFT-ready)
-let prize: WinPrize;
-
-if (reward > 0) {
-  prize = {
-    type: "points",
-    points: reward,
-    label: `You won +${reward} ${pointsConfig.currency}!`,
-  };
-} else {
-  prize = { type: "none", label: "Nothing this time." };
-}
-
-// ✅ Store prize for the PrizeModal to render
-setWinPrize(prize);
-setWinText(prize.label); // keep your winText for now (optional)
-
-// ✅ Credit points + refresh balance
-if (prize.type === "points" && prize.points > 0) {
-  const earnRes: any = await earn(prize.points);
-
-  if (earnRes?.ok === false) {
-    console.warn("EARN failed:", earnRes);
-    // update prize label so modal shows the truth
-    const msg = `Win recorded, but points credit failed: ${earnRes?.error || "Unknown error"}`;
-    setWinText(msg);
-    setWinPrize({ ...prize, label: msg });
-  }
-
-  await refresh();
-}
-
 // local (keep for now)
 addWin({
   id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -864,7 +832,7 @@ setWinPrize(null); // ✅ clear reward object
   <LeaderboardPanel />
 </div>
 
-      {showPrize && <PrizeModal rarity={rarity} winPrize={winPrize} onClose={resetAfterPrize} />}
+     {showPrize && <PrizeModal rarity={rarity} prize={prize} onClose={resetAfterPrize} />}
         
 <BuyPointsModal
   open={showBuyPoints}
