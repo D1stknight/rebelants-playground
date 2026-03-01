@@ -200,9 +200,11 @@ export default function BuyPointsModal({
           </button>
         </div>
 
-        <div style={{ marginTop: 10, fontSize: 13, opacity: 0.9 }}>
-          Rate locked: <b>1 APE = 100 pts</b>. No refunds.
-        </div>
+       <div style={{ marginTop: 10, fontSize: 13, opacity: 0.9, lineHeight: 1.4 }}>
+  You are buying <b>REBEL Points</b> with <b>APE</b>.<br />
+  APE is sent to the Rebel Ants treasury wallet.<br />
+  Rate locked: <b>1 APE = 100 pts</b>. No refunds.
+</div>
 
         <div style={{ marginTop: 12 }}>
   <ConnectButton />
