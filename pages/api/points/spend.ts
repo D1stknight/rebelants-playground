@@ -9,12 +9,13 @@ function balKey(playerId: string) {
 
 // ✅ Reads the SAME live config that Admin saves, with safe fallbacks
 async function getLivePointsConfig() {
-  const keysToTry = [
-    "ra:points:config",
-    "ra:config:points",
-    "ra:pointsConfig",
-    "ra:config",
-  ];
+ const keysToTry = [
+  "ra:config:economy", // ✅ the key Admin actually writes
+  "ra:points:config",
+  "ra:config:points",
+  "ra:pointsConfig",
+  "ra:config",
+];
 
   const normalize = (raw: any) => {
     // ✅ If redis returns JSON as a string, parse it
