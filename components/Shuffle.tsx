@@ -7,7 +7,7 @@ import { shuffleConfig } from "../lib/shuffleConfig";
 // ✅ points + leaderboard (single source of truth)
 import { pointsConfig as defaultPointsConfig } from "../lib/pointsConfig";
 import { usePoints } from "../lib/usePoints";
-import { loadProfile, saveProfile } from "../lib/profile";
+import { loadProfile, saveProfile, getEffectivePlayerId } from "../lib/profile";
 import { addWin } from "../lib/winsStore";
 import LeaderboardPanel from "./LeaderboardPanel";
 import BuyPointsModal from "./BuyPointsModal";
@@ -424,22 +424,37 @@ function PrizeModal({
 
 /* ---------------- component ---------------- */
 export default function Shuffle() {
- const [{ name: initialName, id: initialId }] = useState(() => {
-  const p = loadProfile();
-  const name = (p?.name || "guest").trim() || "guest";
-  let id = (p?.id || "").trim();
+  const [{ name: initialName, id: initialId, effectiveId: initialEffectiveId }] = useState(() => {
+    const p = loadProfile();
 
-  if (!id) {
-    const suffix = Math.random().toString(36).slice(2, 7);
-    id = `guest-${suffix}`;
-    saveProfile({ name, id });
-  }
+    const name = (p?.name || "guest").trim() || "guest";
+    let id = (p?.id || "").trim();
 
-  return { name, id };
-});
+    if (!id) {
+      const suffix = Math.random().toString(36).slice(2, 7);
+      id = `guest-${suffix}`;
+      saveProfile({ name, id });
+    }
 
-const [playerName, setPlayerName] = useState(initialName);
-const [playerId, setPlayerId] = useState(initialId);
+    // ✅ NEW: Discord > Wallet > Guest (uses your profile.ts helper)
+    const effectiveId = getEffectivePlayerId({ ...p, id, name } as any);
+
+    return { name, id, effectiveId };
+  });
+
+  const [playerName, setPlayerName] = useState(initialName);
+
+  // ✅ Keep showing guest id in UI (for now)
+  const [playerId, setPlayerId] = useState(initialId);
+
+  // ✅ NEW: this is what points + wins should use going forward
+  const [effectivePlayerId, setEffectivePlayerId] = useState(initialEffectiveId);
+
+  // ✅ If profile identity changes (wallet connect / discord connect), refresh effective id
+  React.useEffect(() => {
+    const p = loadProfile();
+    setEffectivePlayerId(getEffectivePlayerId(p));
+  }, [playerId, playerName]);
 
   // ✅ LIVE economy config (starts with defaults, then loads from /api/config)
   const [pointsConfig, setPointsConfig] = useState(defaultPointsConfig);
@@ -470,8 +485,8 @@ const [playerId, setPlayerId] = useState(initialId);
     };
   }, []);
 
-  const { balance, spend, earn, claimDaily, devGrant, refresh } = usePoints(playerId);
-  console.log("PLAYER ID =", playerId);
+  const { balance, spend, earn, claimDaily, devGrant, refresh } = usePoints(effectivePlayerId);
+console.log("PLAYER ID (effective) =", effectivePlayerId, "| guest =", playerId);
 
   const cost = pointsConfig.shuffleCost;
   const needMore = Math.max(0, cost - balance);
