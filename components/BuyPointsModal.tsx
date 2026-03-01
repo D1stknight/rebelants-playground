@@ -10,6 +10,8 @@ import {
   useSwitchChain,
 } from "wagmi";
 import { apeChain } from "../lib/apechain";
+import { saveProfile } from "../lib/profile";
+
 const SHOP_ADDRESS = (process.env.NEXT_PUBLIC_APECHAIN_SHOP_ADDRESS || "").toLowerCase();
 
 const SHOP_ABI = [
@@ -53,6 +55,13 @@ export default function BuyPointsModal({
   onClaimed: () => Promise<void> | void;
 }) {
   const { address, isConnected } = useAccount();
+
+  // ✅ Persist connected wallet into profile so the whole app can use it as identity
+  useEffect(() => {
+    if (!address) return;
+    saveProfile({ walletAddress: address });
+  }, [address]);
+  
   const chainId = useChainId();
   const { switchChainAsync } = useSwitchChain();
   const { writeContractAsync, isPending } = useWriteContract();
