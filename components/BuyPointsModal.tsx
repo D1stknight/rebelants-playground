@@ -139,7 +139,7 @@ export default function BuyPointsModal({
     []
   );
 
-  async function buyPack(fnName: "buyStarter" | "buyValue" | "buyWhale", apeAmount: number) {
+   async function buyPack(fnName: "buyStarter" | "buyValue" | "buyWhale", apeAmount: number) {
     if (!SHOP_ADDRESS) {
       setStatus("Missing NEXT_PUBLIC_APECHAIN_SHOP_ADDRESS (set it in Vercel env vars).");
       return;
@@ -151,18 +151,16 @@ export default function BuyPointsModal({
 
     try {
       setStatus("Sending transaction…");
-     const hash = await writeContractAsync({
-  address: SHOP_ADDRESS as `0x${string}`,
-  abi: SHOP_ABI,
-  functionName: fnName,
-  value: toWei(apeAmount),
-});
 
-setLastTx(hash);
-await refetchApeBal();
+      const hash = await writeContractAsync({
+        address: SHOP_ADDRESS as `0x${string}`,
+        abi: SHOP_ABI,
+        functionName: fnName,
+        value: toWei(apeAmount),
+      });
 
-           setStatus("Transaction sent. Waiting for confirmation…");
       setLastTx(hash);
+      setStatus("Transaction sent. Waiting for confirmation…");
     } catch (e: any) {
       setStatus(`Error: ${e?.shortMessage || e?.message || "Unknown error"}`);
     }
