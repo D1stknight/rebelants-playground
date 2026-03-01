@@ -504,6 +504,55 @@ const computedEffectivePlayerId = getEffectivePlayerId(prof);
 
 const { balance, spend, earn, claimDaily, devGrant, refresh } =
   usePoints(effectivePlayerId);
+
+React.useEffect(() => {
+  let cancelled = false;
+
+  (async () => {
+    try {
+      const sr = await fetch("/api/auth/discord/session", { cache: "no-store" });
+      const sj = await sr.json().catch(() => null);
+
+      if (!sr.ok || !sj?.ok || !sj?.discordUserId) return;
+
+      const prof = loadProfile();
+      const fromId = getEffectivePlayerId(prof);
+      const toId = `discord:${sj.discordUserId}`;
+
+      if (String(prof.primaryId || "") === toId) return;
+
+      const lr = await fetch("/api/identity/link-discord", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fromId }),
+      });
+
+      const lj = await lr.json().catch(() => null);
+      if (!lr.ok || !lj?.ok) {
+        console.warn("Discord link failed:", lr.status, lj);
+        return;
+      }
+
+      saveProfile({
+        discordUserId: sj.discordUserId,
+        discordName: sj.discordName,
+        primaryId: toId,
+        name: sj.discordName || prof.name,
+      });
+
+      if (!cancelled) {
+        await refresh();
+      }
+    } catch (e) {
+      console.warn("Discord session check error:", e);
+    }
+  })();
+
+  return () => {
+    cancelled = true;
+  };
+}, [refresh]);
+  
 console.log("PLAYER ID (guest) =", playerId, "| effective =", effectivePlayerId);
 
   const cost = pointsConfig.shuffleCost;
@@ -732,6 +781,17 @@ setPrize(null); // ✅ clear actual prize object
     Buy Points
   </button>
 
+  <button
+  className="btn"
+  type="button"
+  onClick={() => {
+    window.location.href = "/api/auth/discord/login";
+  }}
+  style={{ padding: "10px 12px", fontSize: 13, opacity: 0.95 }}
+>
+  Connect Discord
+</button>
+  
   <div style={{ marginLeft: 12, fontSize: 13, opacity: 0.9, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
     <span>
       Balance: <b>{balance}</b> {pointsConfig.currency}
