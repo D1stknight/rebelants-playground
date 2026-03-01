@@ -262,97 +262,104 @@ function PrizeModal({
         </button>
       </div>
 
-      <style jsx>{`
-        .prize-modal {
-          position: fixed;
-          inset: 0;
-          display: grid;
-          place-items: center;
-          background: rgba(0, 0, 0, 0.5);
-          z-index: 1000;
-        }
-        .prize-card {
-          position: relative;
-          min-width: 320px;
-          padding: 20px;
-          border-radius: 12px;
-          text-align: center;
-          background: rgba(15, 23, 42, 0.95);
-          border: 1px solid rgba(148, 163, 184, 0.25);
-          box-shadow: 0 24px 40px rgba(0, 0, 0, 0.55);
-          overflow: visible;
-        }
-        .prize-title {
-          font-size: 18px;
-          font-weight: 800;
-          margin: 10px 0;
-        }
-        .prize-sub {
-          font-size: 14px;
-          opacity: 0.85;
-          margin-bottom: 12px;
-        }
-        .prize-art {
-          display: block;
-          width: 240px;
-          max-width: 80vw;
-          height: auto;
-          margin: 0 auto 12px;
-          position: relative;
-          z-index: 1;
-        }
-        .sparkle-layer {
-          position: absolute;
-          inset: -8% -10%;
-          pointer-events: none;
-          z-index: 0;
-        }
-        .pm-sparkle {
-          position: absolute;
-          border-radius: 50%;
-          background: radial-gradient(
-            circle,
-            rgba(255, 255, 255, 0.95) 0%,
-            rgba(255, 255, 255, 0) 65%
-          );
-          filter: blur(0.3px) drop-shadow(0 0 12px rgba(255, 255, 255, 0.65));
-          opacity: 0;
-          animation: pmSpark 2.6s ease-in-out infinite;
-        }
-        .pm-sparkle.common {
-          filter: blur(0.3px) drop-shadow(0 0 14px rgba(147, 197, 253, 0.85));
-        }
-        .pm-sparkle.rare {
-          filter: blur(0.3px) drop-shadow(0 0 14px rgba(59, 130, 246, 0.95));
-        }
-        .pm-sparkle.ultra {
-          filter: blur(0.3px) drop-shadow(0 0 16px rgba(244, 63, 94, 1));
-        }
-        @keyframes pmSpark {
-          0% {
-            transform: scale(0.4);
-            opacity: 0;
-          }
-          20% {
-            opacity: 1;
-          }
-          55% {
-            transform: scale(1.1);
-            opacity: 0.9;
-          }
-          85% {
-            transform: scale(0.7);
-            opacity: 0.7;
-          }
-          100% {
-            transform: scale(0.3);
-            opacity: 0;
-          }
-        }
-      `}</style>
-    </div>
-  );
-}
+     <style>{`
+  .prize-modal {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+  }
+
+  .prize-card {
+    position: relative;
+    min-width: 320px;
+    padding: 20px;
+    border-radius: 12px;
+    text-align: center;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    box-shadow: 0 24px 40px rgba(0, 0, 0, 0.55);
+    overflow: visible;
+  }
+
+  .prize-title {
+    font-size: 18px;
+    font-weight: 800;
+    margin: 10px 0;
+  }
+
+  .prize-sub {
+    font-size: 14px;
+    opacity: 0.85;
+    margin-bottom: 12px;
+  }
+
+  .prize-art {
+    display: block;
+    width: 240px;
+    max-width: 80vw;
+    height: auto;
+    margin: 0 auto 12px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .sparkle-layer {
+    position: absolute;
+    inset: -8% -10%;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .pm-sparkle {
+    position: absolute;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle,
+      rgba(255, 255, 255, 0.95) 0%,
+      rgba(255, 255, 255, 0) 65%
+    );
+    filter: blur(0.3px) drop-shadow(0 0 12px rgba(255, 255, 255, 0.65));
+    opacity: 0;
+    animation: pmSpark 2.6s ease-in-out infinite;
+  }
+
+  .pm-sparkle.common {
+    filter: blur(0.3px) drop-shadow(0 0 14px rgba(147, 197, 253, 0.85));
+  }
+
+  .pm-sparkle.rare {
+    filter: blur(0.3px) drop-shadow(0 0 14px rgba(59, 130, 246, 0.95));
+  }
+
+  .pm-sparkle.ultra {
+    filter: blur(0.3px) drop-shadow(0 0 16px rgba(244, 63, 94, 1));
+  }
+
+  @keyframes pmSpark {
+    0% {
+      transform: scale(0.4);
+      opacity: 0;
+    }
+    20% {
+      opacity: 1;
+    }
+    55% {
+      transform: scale(1.1);
+      opacity: 0.9;
+    }
+    85% {
+      transform: scale(0.7);
+      opacity: 0.7;
+    }
+    100% {
+      transform: scale(0.3);
+      opacity: 0;
+    }
+  }
+`}</style>
 
 /* ---------------- component ---------------- */
 export default function Shuffle() {
@@ -1085,30 +1092,30 @@ return (
         <div style={{ marginTop: 12, fontSize: 12, opacity: 0.9, whiteSpace: "pre-wrap" }}>{dripStatus}</div>
       )}
 
-      <style jsx>{`
-        .btn {
-          border-radius: 12px;
-          border: 1px solid rgba(255, 255, 255, 0.18);
-          background: rgba(15, 23, 42, 0.7);
-          color: white;
-          font-weight: 800;
-          cursor: pointer;
-        }
-        .btn:hover {
-          background: rgba(15, 23, 42, 0.9);
-        }
-        .btn:disabled {
-          opacity: 0.55;
-          cursor: not-allowed;
-        }
-      `}</style>
+    <style>{`
+  .btn {
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(15, 23, 42, 0.7);
+    color: white;
+    font-weight: 800;
+    cursor: pointer;
+  }
+  .btn:hover {
+    background: rgba(15, 23, 42, 0.9);
+  }
+  .btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+`}</style>
     </div>
   </div>
 )}
       </div>
 
       {/* Background + header styles (scoped) */}
-      <style jsx>{`
+      <style>{`
       .ant-colony-bg {
   position: fixed;
   inset: 0;
