@@ -499,7 +499,11 @@ export default function Shuffle() {
     };
   }, []);
 
- const { balance, spend, earn, claimDaily, devGrant, refresh } = usePoints(playerId);
+const prof = loadProfile();
+const effectivePlayerId = getEffectivePlayerId(prof);
+
+const { balance, spend, earn, claimDaily, devGrant, refresh } =
+  usePoints(effectivePlayerId);
 console.log("PLAYER ID (guest) =", playerId, "| effective =", effectivePlayerId);
 
   const cost = pointsConfig.shuffleCost;
@@ -880,7 +884,7 @@ setPrize(null); // ✅ clear actual prize object
 <BuyPointsModal
   open={showBuyPoints}
   onClose={() => setShowBuyPoints(false)}
-  playerId={playerId}
+  playerId={effectivePlayerId}
   onClaimed={async () => {
     await refresh();
   }}
