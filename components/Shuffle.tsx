@@ -427,8 +427,8 @@ setTimeout(async () => {
           : pointsConfig.rewards.none;
 
       // ✅ Enforce: Ultra always awards at least something (points)
-      if (r === "ultra" && (!Number.isFinite(reward) || reward <= 0)) {
-        reward = 1;
+           if (r === "ultra" && (!Number.isFinite(reward) || reward <= 0)) {
+        reward = 50;
       }
 
    if (reward > 0) {
