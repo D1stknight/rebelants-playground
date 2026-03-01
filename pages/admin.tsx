@@ -48,13 +48,13 @@ export default function AdminPage() {
 
   const [log, setLog] = useState<string>("");
 
-  const headers = useMemo(() => {
-  return {
-    "Content-Type": "application/json",
-    "x-admin-key": token,
-    "x-admin-token": token,
-  };
-}, [token]);
+   const headers = useMemo(() => {
+    return {
+      "Content-Type": "application/json",
+      "x-admin-key": token,
+      "x-admin-token": token,
+    };
+  }, [token]);
 
   function append(msg: string) {
     setLog((s) => `${msg}\n\n${s}`.trim());
@@ -122,7 +122,7 @@ export default function AdminPage() {
     if (r.ok && j?.playerId) setPlayerId(j.playerId);
   }
 
-    async function lookupWallet() {
+      async function lookupWallet() {
     append("Looking up wallet…");
     const w = (walletAddress || "").trim();
     if (!w) {
@@ -138,6 +138,8 @@ export default function AdminPage() {
       setPlayerId(j.playerId);
     }
   }
+
+  async function getBalance() {
     append("Getting balance…");
     const r = await fetch(`/api/points/balance?playerId=${encodeURIComponent(playerId)}`);
     const j = await r.json().catch(() => null);
