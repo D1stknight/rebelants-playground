@@ -397,7 +397,7 @@ const runShuffle = async () => {
 
   if (balance < cost) return;
 
-  await spend(cost);
+    await spend(cost, "shuffle");
 
   setBusy(true);
   setPhase("shuffling");
