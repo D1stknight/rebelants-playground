@@ -1,9 +1,15 @@
 // components/BuyPointsModal.tsx
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { useAccount, useBalance, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import {
+  useAccount,
+  useBalance,
+  useWriteContract,
+  useWaitForTransactionReceipt,
+  useChainId,
+  useSwitchChain,
+} from "wagmi";
 import { apeChain } from "../lib/apechain";
-
 const SHOP_ADDRESS = (process.env.NEXT_PUBLIC_APECHAIN_SHOP_ADDRESS || "").toLowerCase();
 
 const SHOP_ABI = [
@@ -47,29 +53,83 @@ export default function BuyPointsModal({
   onClaimed: () => Promise<void> | void;
 }) {
   const { address, isConnected } = useAccount();
-const { writeContractAsync, isPending } = useWriteContract();
+  const chainId = useChainId();
+  const { switchChainAsync } = useSwitchChain();
+  const { writeContractAsync, isPending } = useWriteContract();
 
-const [status, setStatus] = useState<string>("");
-const [lastTx, setLastTx] = useState<`0x${string}` | null>(null);
+  const [status, setStatus] = useState<string>("");
+  const [lastTx, setLastTx] = useState<`0x${string}` | null>(null);
 
-// ✅ Live ApeChain balance
-const {
-  data: apeBal,
-  refetch: refetchApeBal,
-  isFetching: fetchingBal,
-} = useBalance({
-  address,
-  chainId: apeChain.id,
-  query: { enabled: !!address, refetchInterval: 15000 },
-});
+  // when a tx is mined, we claim exactly once
+  const claimOnceRef = useRef<Record<string, boolean>>({});
 
-// ✅ Track tx confirmation
-const { isLoading: confirmingTx } = useWaitForTransactionReceipt({
-  hash: lastTx ?? undefined,
-  chainId: apeChain.id,
-  query: { enabled: !!lastTx },
-});
+  // ✅ Live ApeChain balance
+  const {
+    data: apeBal,
+    refetch: refetchApeBal,
+    isFetching: fetchingBal,
+  } = useBalance({
+    address,
+    chainId: apeChain.id,
+    query: { enabled: !!address, refetchInterval: 15000 },
+  });
 
+  const isOnApeChain = chainId === apeChain.id;
+
+  // ✅ Track tx confirmation
+  const {
+    isLoading: confirmingTx,
+    isSuccess: txMined,
+  } = useWaitForTransactionReceipt({
+    hash: lastTx ?? undefined,
+    chainId: apeChain.id,
+    query: { enabled: !!lastTx },
+  });
+
+  // ✅ When mined, claim points (prevents “no logs yet” race)
+  useEffect(() => {
+    if (!lastTx) return;
+    if (!txMined) return;
+    if (!address) return;
+
+    const key = lastTx.toLowerCase();
+    if (claimOnceRef.current[key]) return;
+    claimOnceRef.current[key] = true;
+
+    (async () => {
+      try {
+        setStatus("Confirmed ✅ Claiming points…");
+
+        const r = await fetch("/api/shop/claim", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            txHash: lastTx,
+            playerId,
+            walletAddress: address,
+          }),
+        });
+
+        const j = await r.json().catch(() => null);
+
+        if (!r.ok) {
+          setStatus(`Claim failed: ${j?.error || "Unknown error"}`);
+          return;
+        }
+
+        if (j?.alreadyClaimed) {
+          setStatus("Already claimed ✅ Balance refreshed.");
+        } else {
+          setStatus("Success ✅ Points credited!");
+        }
+
+        await refetchApeBal();
+        await onClaimed();
+      } catch (e: any) {
+        setStatus(`Claim error: ${e?.message || "Unknown error"}`);
+      }
+    })();
+  }, [txMined, lastTx, address, playerId, onClaimed, refetchApeBal]);
   const packs = useMemo(
     () => [
       { id: 1, name: "Starter Pack", ape: 50, points: 2500, fn: "buyStarter" as const },
@@ -101,27 +161,8 @@ const { isLoading: confirmingTx } = useWaitForTransactionReceipt({
 setLastTx(hash);
 await refetchApeBal();
 
-      setStatus("Transaction sent. Claiming points…");
-
-      const r = await fetch("/api/shop/claim", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          txHash: hash,
-          playerId,
-          walletAddress: address,
-        }),
-      });
-
-      const j = await r.json().catch(() => null);
-
-      if (!r.ok) {
-        setStatus(`Claim failed: ${j?.error || "Unknown error"}`);
-        return;
-      }
-
-      setStatus("Success ✅ Points credited!");
-      await onClaimed();
+           setStatus("Transaction sent. Waiting for confirmation…");
+      setLastTx(hash);
     } catch (e: any) {
       setStatus(`Error: ${e?.shortMessage || e?.message || "Unknown error"}`);
     }
@@ -168,6 +209,61 @@ await refetchApeBal();
         <div style={{ marginTop: 12 }}>
   <ConnectButton />
 </div>
+
+        {/* ✅ INSERT THIS BLOCK RIGHT HERE */}
+<div style={{
+  marginTop: 10,
+  fontSize: 13,
+  opacity: 0.9,
+  display: "flex",
+  gap: 10,
+  flexWrap: "wrap",
+  alignItems: "center"
+}}>
+  <span>
+    Network:{" "}
+    {isConnected ? (
+      isOnApeChain ? (
+        <b>ApeChain ✅</b>
+      ) : (
+        <b style={{ color: "#fca5a5" }}>Wrong network ❌</b>
+      )
+    ) : (
+      <b>Not connected</b>
+    )}
+  </span>
+
+  {isConnected && !isOnApeChain && (
+    <button
+      className="btn"
+      type="button"
+      onClick={async () => {
+        setStatus("Switching to ApeChain…");
+        await switchChainAsync({ chainId: apeChain.id });
+        setStatus("");
+      }}
+      style={{ padding: "8px 12px", fontSize: 13 }}
+    >
+      Switch to ApeChain
+    </button>
+  )}
+
+  {address && (
+    <button
+      className="btn"
+      type="button"
+      onClick={async () => {
+        await navigator.clipboard.writeText(address);
+        setStatus("Wallet copied ✅");
+        setTimeout(() => setStatus(""), 1200);
+      }}
+      style={{ padding: "8px 12px", fontSize: 13 }}
+      title={address}
+    >
+      Copy Wallet
+    </button>
+  )}
+</div>        
         
 <div style={{ marginTop: 10, fontSize: 13, opacity: 0.9 }}>
   {address ? (
@@ -189,7 +285,7 @@ await refetchApeBal();
             <button
               key={p.id}
               className="btn"
-              disabled={!isConnected || isPending}
+              disabled={!isConnected || !isOnApeChain || isPending || confirmingTx}
               onClick={() => buyPack(p.fn, p.ape)}
               style={{ padding: "12px 12px", textAlign: "left" }}
               title={!isConnected ? "Connect wallet first" : ""}
