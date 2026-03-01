@@ -20,35 +20,33 @@ if (req.method !== "GET") {
     const raw = await redis.get(KEY);
     const parsed = raw ? (typeof raw === "string" ? JSON.parse(raw) : raw) : null;
 
- const merged = {
+const merged = {
   ...DEFAULTS,
   ...(parsed || {}),
   rewards: {
     ...DEFAULTS.rewards,
     ...(parsed?.rewards || {}),
   },
+  // ✅ IMPORTANT: do NOT append arrays (that keeps old default prizes like 50)
+  // If admin saved a pool, that pool is the source of truth.
   prizePools: {
-    ...(DEFAULTS as any).prizePools,
-    ...(parsed?.prizePools || {}),
-    none: [
-      ...(((DEFAULTS as any).prizePools?.none ?? []) as any[]),
-      ...(((parsed as any)?.prizePools?.none ?? []) as any[]),
-    ],
-    common: [
-      ...(((DEFAULTS as any).prizePools?.common ?? []) as any[]),
-      ...(((parsed as any)?.prizePools?.common ?? []) as any[]),
-    ],
-    rare: [
-      ...(((DEFAULTS as any).prizePools?.rare ?? []) as any[]),
-      ...(((parsed as any)?.prizePools?.rare ?? []) as any[]),
-    ],
-    ultra: [
-      ...(((DEFAULTS as any).prizePools?.ultra ?? []) as any[]),
-      ...(((parsed as any)?.prizePools?.ultra ?? []) as any[]),
-    ],
+    none: Array.isArray((parsed as any)?.prizePools?.none)
+      ? (parsed as any).prizePools.none
+      : ((DEFAULTS as any).prizePools?.none ?? []),
+
+    common: Array.isArray((parsed as any)?.prizePools?.common)
+      ? (parsed as any).prizePools.common
+      : ((DEFAULTS as any).prizePools?.common ?? []),
+
+    rare: Array.isArray((parsed as any)?.prizePools?.rare)
+      ? (parsed as any).prizePools.rare
+      : ((DEFAULTS as any).prizePools?.rare ?? []),
+
+    ultra: Array.isArray((parsed as any)?.prizePools?.ultra)
+      ? (parsed as any).prizePools.ultra
+      : ((DEFAULTS as any).prizePools?.ultra ?? []),
   },
 };
-
     return res.status(200).json({ ok: true, pointsConfig: merged });
   } catch (e: any) {
     console.error("config error", e);
