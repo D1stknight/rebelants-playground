@@ -1,15 +1,7 @@
 // pages/api/wins/add.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
-import {
-  recordWinForLeaderboards,
-  addToEarnedTotal,
-  updateBalanceLeaderboard,
-} from "../../../lib/server/leaderboards";
-
-function balKey(playerId: string) {
-  return `ra:points:bal:${playerId}`;
-}
+import { LB_WINS, LB_RECENT_WINS } from "../../../lib/server/leaderboards";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Cache-Control", "no-store, max-age=0");
@@ -25,14 +17,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body ?? {});
 
     const playerId = String(body.playerId || "guest").trim().slice(0, 64) || "guest";
-    const playerName = String(body.playerName || "guest").trim().slice(0, 32) || "guest";
+    const playerName = String(body.playerName || "guest").trim().slice(0, 64) || "guest";
     const game = String(body.game || "shuffle").trim().slice(0, 32) || "shuffle";
     const rarity = String(body.rarity || "none").trim().slice(0, 16) || "none";
 
     const pointsAwardedRaw = Number(body.pointsAwarded || 0);
     const pointsAwarded = Number.isFinite(pointsAwardedRaw) ? pointsAwardedRaw : 0;
 
-    const prize = body.prize ?? null;
+    // Keep prize safe (optional)
+    const prize = body?.prize && typeof body.prize === "object"
+      ? {
+          type: typeof body.prize.type === "string" ? body.prize.type : undefined,
+          label: typeof body.prize.label === "string" ? body.prize.label : undefined,
+          sku: typeof body.prize.sku === "string" ? body.prize.sku : undefined,
+          tokenId:
+            typeof body.prize.tokenId === "string" || typeof body.prize.tokenId === "number"
+              ? String(body.prize.tokenId)
+              : undefined,
+          qty: typeof body.prize.qty === "number" ? body.prize.qty : undefined,
+        }
+      : null;
 
     const evt = {
       id: String(body.id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`),
@@ -45,20 +49,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       prize,
     };
 
-    // ✅ This writes to:
-    // - ra:lb:wins (wins leaderboard)
-    // - ra:wins:recent (recent wins feed)  <-- THIS is what your summary endpoint returns
-    await recordWinForLeaderboards(evt);
+    // ✅ 1) Wins leaderboard (counts ALL plays that call wins/add — even 0 pts)
+    await redis.zincrby(LB_WINS, 1, playerId);
 
-    // ✅ Lifetime earned leaderboard (optional, but keeps Top Earners consistent)
-    if (pointsAwarded > 0) {
-      await addToEarnedTotal(playerId, pointsAwarded);
-    }
+    // ✅ 2) Recent wins feed (THIS is what /api/leaderboard/summary reads)
+    await redis.lpush(LB_RECENT_WINS, JSON.stringify(evt));
+    await redis.ltrim(LB_RECENT_WINS, 0, 49);
 
-    // ✅ Balance leaderboard snapshot (read current balance and update zset)
-    const balRaw = await redis.get<number>(balKey(playerId));
-    const bal = Number(balRaw || 0);
-    await updateBalanceLeaderboard(playerId, bal);
+    // 🚫 IMPORTANT: DO NOT update totalEarned here.
+    // Total earned must ONLY come from /api/points/earn (and claim if you decide).
 
     return res.status(200).json({ ok: true, event: evt });
   } catch (err: any) {
