@@ -251,10 +251,21 @@ async function linkWalletNow() {
       return;
     }
 
-    const newPid = String(j.playerId || `wallet:${wallet}`);
+    const current = loadProfile();
+const currentPrimary = String(current.primaryId || "").trim();
+const newPid = String(j.playerId || `wallet:${wallet}`);
 
-    // ✅ THIS is the big moment: identity becomes stable forever
-    saveProfile({ walletAddress: wallet, primaryId: newPid });
+// ✅ If Discord is already primary, do NOT overwrite it
+if (currentPrimary.startsWith("discord:")) {
+  saveProfile({ walletAddress: wallet });
+} else {
+  saveProfile({ walletAddress: wallet, primaryId: newPid });
+}
+
+// force identity refresh
+if (typeof window !== "undefined") {
+  window.dispatchEvent(new Event("ra:identity-changed"));
+}
 
     setStatus(
       j?.alreadyLinked
