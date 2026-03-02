@@ -682,9 +682,10 @@ async function migrateDripNow() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        amount: amt,
-        playerId: effectivePlayerId,
-      }),
+  amount: amt,
+  playerId: effectivePlayerId,
+  idempotencyKey: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+}),
     });
 
     const j = await r.json().catch(() => null);
