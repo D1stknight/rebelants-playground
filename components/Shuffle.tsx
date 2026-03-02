@@ -895,6 +895,17 @@ return (
 >
   Connect Discord
 </button>
+
+  <button
+  className="btn"
+  type="button"
+  onClick={() => {
+    window.location.href = "/api/auth/discord/logout";
+  }}
+  style={{ padding: "10px 12px", fontSize: 13, opacity: 0.95 }}
+>
+  Disconnect Discord
+</button>  
   
   <div style={{ marginLeft: 12, fontSize: 13, opacity: 0.9, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
     <span>
