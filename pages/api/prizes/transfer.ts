@@ -42,7 +42,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     if (req.method !== "POST") return res.status(405).json({ ok: false, error: "Method not allowed" });
 
-    const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body ?? {});
+    const rawBody = req.body;
+const body =
+  typeof rawBody === "string"
+    ? (rawBody.trim() ? JSON.parse(rawBody) : {})
+    : (rawBody ?? {});
     const claimId = String(body.claimId || "").trim();
 
     if (!claimId) return res.status(400).json({ ok: false, error: "Missing claimId" });
