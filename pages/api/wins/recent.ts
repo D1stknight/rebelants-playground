@@ -1,8 +1,7 @@
 // pages/api/wins/recent.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
-
-const RECENT_WINS_KEY = "ra:wins:recent";
+import { LB_RECENT_WINS } from "../../../lib/server/leaderboards";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") {
@@ -15,10 +14,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const limit = Math.max(1, Math.min(100, Number(limitRaw ?? 20) || 20));
 
-  const list = await redis.lrange(RECENT_WINS_KEY, 0, limit - 1);
+  const list = await redis.lrange(LB_RECENT_WINS, 0, limit - 1);
 
   const wins = (list ?? [])
-    .map((s) => {
+    .map((s: any) => {
       try {
         return JSON.parse(String(s));
       } catch {
