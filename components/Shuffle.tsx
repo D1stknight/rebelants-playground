@@ -514,6 +514,71 @@ const [dripAmount, setDripAmount] = useState<number>(0);
 const [dripBusy, setDripBusy] = useState(false);
 const [dripStatus, setDripStatus] = useState("");
 
+// ==============================
+// ✅ ADD DAILY CLAIM BLOCK HERE
+// ==============================
+
+const [dailyClaimed, setDailyClaimed] = useState(false);
+const [claimStatus, setClaimStatus] = useState("");
+const [claimBusy, setClaimBusy] = useState(false);
+
+async function refreshClaimStatus(pid: string) {
+  try {
+    const r = await fetch(
+      `/api/points/claim?playerId=${encodeURIComponent(pid)}`,
+      { cache: "no-store" }
+    );
+    const j = await r.json().catch(() => null);
+    if (r.ok && j?.ok) setDailyClaimed(!!j.claimed);
+  } catch {}
+}
+
+React.useEffect(() => {
+  if (!effectivePlayerId) return;
+  refreshClaimStatus(effectivePlayerId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [effectivePlayerId]);
+
+async function claimDailyNow() {
+  if (!effectivePlayerId) return;
+  if (claimBusy) return;
+
+  setClaimBusy(true);
+  setClaimStatus("");
+
+  try {
+    const r = await fetch("/api/points/claim", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        playerId: effectivePlayerId,
+        amount: pointsConfig.dailyClaim,
+      }),
+    });
+
+    const j = await r.json().catch(() => null);
+
+    if (!r.ok || !j?.ok) {
+      setClaimStatus(j?.error || "Claim failed.");
+      return;
+    }
+
+    if (j?.alreadyClaimed) {
+      setClaimStatus("Already claimed today ✅");
+    } else {
+      setClaimStatus(
+        `Claimed +${j?.added || pointsConfig.dailyClaim} ${pointsConfig.currency} ✅`
+      );
+    }
+
+    setDailyClaimed(true);
+    await refresh();
+  } catch (e: any) {
+    setClaimStatus(e?.message || "Claim error");
+  } finally {
+    setClaimBusy(false);
+  }
+}
 // ✅ NEW: show what the player actually won
 const [winText, setWinText] = useState<string>("");
 const runShuffle = async () => {
@@ -904,8 +969,16 @@ return (
   </div>
 </div>
         
-      {/* Name + Daily Claim */}
-<div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+     {/* Name + Claim + DRIP (aligned row) */}
+<div
+  style={{
+    marginTop: 10,
+    display: "flex",
+    gap: 10,
+    flexWrap: "wrap",
+    alignItems: "center",
+  }}
+>
   <label style={{ fontSize: 13, opacity: 0.9 }}>
     Name:&nbsp;
     <input
@@ -917,7 +990,6 @@ return (
         // Keep the existing stored id — never rewrite it from the name
         const p = loadProfile();
         const id = (p?.id || playerId || "guest").trim() || "guest";
-
         saveProfile({ name: v, id });
       }}
       style={{
@@ -929,18 +1001,41 @@ return (
       }}
     />
     <div style={{ fontSize: 11, opacity: 0.7, marginTop: 6 }}>
-  Identity: <b>{effectivePlayerId}</b>
-</div>
+      Identity: <b>{effectivePlayerId}</b>
+    </div>
   </label>
 
   <button
     className="btn"
     type="button"
-    onClick={() => claimDaily(pointsConfig.dailyClaim)}
+    onClick={claimDailyNow}
+    disabled={claimBusy || dailyClaimed}
     style={{ padding: "8px 12px", fontSize: 13 }}
+    title={dailyClaimed ? "Already claimed today" : "Claim daily points"}
   >
-    Claim Daily +{pointsConfig.dailyClaim} {pointsConfig.currency}
+    {dailyClaimed
+      ? "Claimed Today ✅"
+      : `Claim Daily +${pointsConfig.dailyClaim} ${pointsConfig.currency}`}
   </button>
+
+  <button
+    className="btn"
+    type="button"
+    onClick={async () => {
+      await openDripModal();
+    }}
+    disabled={dripBusy}
+    style={{ padding: "8px 12px", fontSize: 13 }}
+    title="Move points from Discord (DRIP) into the game (and deduct them from DRIP so no double-dip)."
+  >
+    {dripBusy ? "Loading DRIP…" : "Migrate from Discord (DRIP)"}
+  </button>
+
+  {typeof dripBalance === "number" && (
+    <div style={{ fontSize: 12, opacity: 0.9, display: "grid", alignItems: "center" }}>
+      DRIP: <b>{dripBalance}</b>
+    </div>
+  )}
 
   {process.env.NODE_ENV !== "production" && (
     <button
@@ -956,6 +1051,12 @@ return (
     >
       Dev Grant +5000 {pointsConfig.currency}
     </button>
+  )}
+
+  {claimStatus && (
+    <div style={{ fontSize: 12, opacity: 0.9 }}>
+      {claimStatus}
+    </div>
   )}
 </div>
         {/* Official Rules link */}
@@ -988,26 +1089,6 @@ return (
     await refresh();
   }}
 />
-
-{/* ✅ DRIP → Game migrate */}
-<div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
-  <button
-    className="btn"
-    type="button"
-    onClick={openDripModal}
-    style={{ padding: "10px 12px", fontSize: 13, opacity: 0.95 }}
-    disabled={dripBusy}
-    title="Move points from Discord (DRIP) into the game (and deduct them from DRIP so no double-dip)."
-  >
-    Migrate from Discord (DRIP)
-  </button>
-
-  {typeof dripBalance === "number" && (
-    <div style={{ fontSize: 12, opacity: 0.9, display: "grid", alignItems: "center" }}>
-      DRIP Balance: <b>{dripBalance}</b>
-    </div>
-  )}
-</div>
 
 {showDripMigrate && (
   <div
