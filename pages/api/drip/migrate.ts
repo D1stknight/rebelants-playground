@@ -28,12 +28,15 @@ async function getDiscordSession(req: NextApiRequest) {
       "cache-control": "no-store",
     },
   });
+
   const j: any = await r.json().catch(() => null);
   return { ok: r.ok && j?.ok, session: j };
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Cache-Control", "no-store, max-age=0");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
 
   try {
     if (req.method !== "POST") {
@@ -41,93 +44,75 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(405).json({ ok: false, error: "Method not allowed" });
     }
 
-    const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body ?? {});
-    const amount = Math.floor(Number(body.amount || 0));
-    const playerId = String(body.playerId || "guest").trim().slice(0, 64) || "guest";
-
-    if (!Number.isFinite(amount) || amount <= 0) {
-      return res.status(400).json({ ok: false, error: "Invalid amount" });
-    }
-
     const { ok, session } = await getDiscordSession(req);
     if (!ok || !session?.discordUserId) {
       return res.status(401).json({ ok: false, error: "Discord not connected." });
     }
 
-    const DRIP_API_KEY = mustEnv("DRIP_API_KEY");
-    const DRIP_REALM_ID = mustEnv("DRIP_REALM_ID");
-    const DRIP_REALM_POINT_ID = process.env.DRIP_REALM_POINT_ID || ""; // if you have multiple currencies, set this.
+    const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body ?? {});
+    const amt = Math.floor(Number(body.amount || 0));
+    const playerId = String(body.playerId || "").trim().slice(0, 64);
+
+    if (!playerId) return res.status(400).json({ ok: false, error: "Missing playerId" });
+    if (!Number.isFinite(amt) || amt <= 0) return res.status(400).json({ ok: false, error: "Invalid amount" });
+
+    const realmId = mustEnv("DRIP_REALM_ID");
+    const apiKey = mustEnv("DRIP_API_KEY");
+    const realmPointId = process.env.DRIP_REALM_POINT_ID || ""; // recommended
 
     const discordId = String(session.discordUserId);
 
-    // 1) Find member by discord-id
-    const searchUrl = `https://api.drip.re/api/v1/realm/${DRIP_REALM_ID}/members/search?type=discord-id&values=${encodeURIComponent(
-      discordId
-    )}`;
+    // ✅ DRIP: Deduct points from this discord credential
+    // Docs: PATCH /api/v1/realms/{realmId}/credentials/balance?type=discord-id&value=...  [oai_citation:4‡docs.drip.re](https://docs.drip.re/api-reference/credentials-balances/update-point-balance-for-a-credential-by-its-identifier-email-wallet-discord-id-etc)
+    const patchUrl =
+      `https://api.drip.re/api/v1/realms/${realmId}/credentials/balance` +
+      `?type=discord-id&value=${encodeURIComponent(discordId)}`;
 
-    const sr = await fetch(searchUrl, {
-      headers: {
-        Authorization: `Bearer ${DRIP_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    const sj: any = await sr.json().catch(() => null);
-    if (!sr.ok) {
-      return res.status(sr.status).json({
-        ok: false,
-        error: sj?.error || sj?.message || "DRIP member search failed",
-        detail: sj,
-      });
-    }
-
-    const member = Array.isArray(sj) ? sj[0] : sj?.members?.[0] || sj?.[0];
-    if (!member?.id) {
-      return res.status(404).json({ ok: false, error: "DRIP member not found for this Discord ID." });
-    }
-
-    const memberId = String(member.id);
-
-    // 2) Deduct points in DRIP (negative tokens)
-    const deductUrl = `https://api.drip.re/api/v1/realm/${DRIP_REALM_ID}/members/${memberId}/point-balance`;
-
-    const deductBody: any = { tokens: -amount };
-    if (DRIP_REALM_POINT_ID) deductBody.realmPointId = DRIP_REALM_POINT_ID;
-
-    const dr = await fetch(deductUrl, {
+    const pr = await fetch(patchUrl, {
       method: "PATCH",
       headers: {
-        Authorization: `Bearer ${DRIP_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(deductBody),
+      body: JSON.stringify({
+        amount: -amt, // ✅ negative = deduct
+        ...(realmPointId ? { realmPointId } : {}),
+        initiatorId: `rebelants-playground`,
+      }),
     });
 
-    const dj: any = await dr.json().catch(() => null);
-    if (!dr.ok) {
-      return res.status(dr.status).json({
+    const pj: any = await pr.json().catch(() => null);
+
+    if (!pr.ok) {
+      return res.status(pr.status).json({
         ok: false,
-        error: dj?.error || dj?.message || "DRIP deduction failed",
-        detail: dj,
+        error: pj?.error || "DRIP deduction failed",
+        detail: pj,
       });
     }
 
-    // 3) Credit game balance
-    const newBalance = await redis.incrby(balKey(playerId), amount);
+    // ✅ Credit game balance
+    const newBal = await redis.incrby(balKey(playerId), amt);
 
-    // 4) Keep “Balance leaderboard” accurate
-    await redis.zadd(lbBalanceKey(), { score: Number(newBalance || 0), member: playerId });
+    // ✅ Keep “balance leaderboard” accurate (visibility list)
+    await redis.zadd(lbBalanceKey(), { score: Number(newBal || 0), member: playerId });
 
     return res.status(200).json({
       ok: true,
       discordUserId: discordId,
-      memberId,
       playerId,
-      migrated: amount,
-      balance: Number(newBalance || 0),
+      migrated: amt,
+      balance: Number(newBal || 0),
+      drip: {
+        credentialId: pj?.credentialId,
+        identifier: pj?.identifier,
+        balance: pj?.balance,
+        realmPointId: pj?.realmPointId,
+        linked: pj?.linked,
+      },
     });
-  } catch (err: any) {
-    console.error("drip migrate error:", err);
-    return res.status(500).json({ ok: false, error: err?.message || "Server error" });
+  } catch (e: any) {
+    console.error("drip migrate error:", e);
+    return res.status(500).json({ ok: false, error: e?.message || "Server error" });
   }
 }
