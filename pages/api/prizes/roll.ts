@@ -62,61 +62,52 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // ---------- ULTRA ----------
-    if (rarity === "ultra") {
-      // ✅ Pull from the SAME list admin writes to
-      const raw = await redis.rpop<string>(ULTRA_NFT_INVENTORY_KEY);
+   // ---------- ULTRA ----------
+if (rarity === "ultra") {
+  // 🔥 Try to pull an NFT from inventory (atomic)
+  const nftRaw = await redis.rpop(ULTRA_NFT_INVENTORY_KEY);
 
-      if (raw) {
-        // raw is JSON string written by admin add endpoint
-        let meta: any = null;
-        try {
-          meta = JSON.parse(String(raw));
-        } catch {
-          meta = null;
-        }
-
-        // If parsing failed, still show something, but don't break the game
-        if (meta && meta.contract && meta.tokenId) {
-          return res.status(200).json({
-            ok: true,
-            rarity,
-            prize: {
-              type: "nft",
-              label: meta.label || "NFT Prize",
-              meta: {
-                chain: String(meta.chain || "ETH"),
-                contract: String(meta.contract),
-                tokenId: String(meta.tokenId),
-                label: meta.label || "NFT Prize",
-              },
-            },
-          });
-        }
-
-        return res.status(200).json({
-          ok: true,
-          rarity,
-          prize: {
-            type: "nft",
-            label: "NFT Prize",
-            meta: { raw: String(raw) },
-          },
-        });
-      }
-
-      // fallback points if no NFT available
-      const ptsCfg = Number(cfg?.rewards?.ultra ?? 0);
-      const min = Number(cfg?.ultraMinReward ?? 0);
-      const pts = Math.max(ptsCfg, min, 300);
-
-      return res.status(200).json({
-        ok: true,
-        rarity,
-        prize: { type: "points", points: pts, label: `${pts} ${currency}` },
-      });
+  if (nftRaw) {
+    let nft: any = null;
+    try {
+      nft = JSON.parse(String(nftRaw));
+    } catch {
+      // if inventory somehow contains a plain string, keep it visible for debugging
+      nft = { raw: String(nftRaw) };
     }
 
+    return res.status(200).json({
+      ok: true,
+      rarity,
+      prize: {
+        type: "nft",
+        label: nft?.label || "NFT Prize",
+        // ✅ IMPORTANT: transfer.ts expects meta.chain/meta.contract/meta.tokenId
+        meta: {
+          chain: String(nft?.chain || "ETH"),
+          contract: String(nft?.contract || ""),
+          tokenId: String(nft?.tokenId || ""),
+          label: String(nft?.label || "NFT Prize"),
+        },
+      },
+    });
+  }
+
+  // fallback to points if no NFT available
+  const ptsCfg = Number(cfg.rewards.ultra || 0);
+  const min = Number(cfg.ultraMinReward || 0);
+  const pts = Math.max(ptsCfg, min);
+
+  return res.status(200).json({
+    ok: true,
+    rarity,
+    prize: {
+      type: "points",
+      points: pts,
+      label: `${pts} ${currency}`,
+    },
+  });
+}
     // ---------- NONE ----------
     return res.status(200).json({
       ok: true,
