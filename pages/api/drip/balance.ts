@@ -42,16 +42,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const realmId = mustEnv("DRIP_REALM_ID");
     const apiKey = mustEnv("DRIP_API_KEY");
-    const realmPointId = process.env.DRIP_REALM_POINT_ID || ""; // optional but recommended
-
+    const realmPointId = (process.env.DRIP_REALM_POINT_ID || "").trim(); // recommended
     const discordId = String(session.discordUserId);
 
-    // ✅ DRIP: Find credential by discord-id
-    const findUrl =
-      `https://api.drip.re/api/v1/realms/${realmId}/credentials/find` +
-      `?type=discord-id&value=${encodeURIComponent(discordId)}`;
+    // ✅ Get DRIP balance directly
+    const url =
+      `https://api.drip.re/api/v1/realms/${realmId}/credentials/balance` +
+      `?type=discord-id&value=${encodeURIComponent(discordId)}` +
+      (realmPointId ? `&realmPointId=${encodeURIComponent(realmPointId)}` : "");
 
-    const fr = await fetch(findUrl, {
+    const r = await fetch(url, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -59,34 +59,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
     });
 
-    const fj: any = await fr.json().catch(() => null);
+    const j: any = await r.json().catch(() => null);
 
-    if (!fr.ok) {
-      return res.status(fr.status).json({
+    if (!r.ok) {
+      return res.status(r.status).json({
         ok: false,
-        error: fj?.error || "DRIP credential lookup failed",
-        detail: fj,
+        error: j?.error || "DRIP balance lookup failed",
+        detail: j,
       });
     }
 
-    // If DRIP returns balances, use them. If not present, just return 0.
-    const balances = Array.isArray(fj?.balances) ? fj.balances : [];
-    let balance = 0;
-
-    if (realmPointId) {
-      const hit = balances.find((b: any) => String(b?.realmPointId || b?.pointId || "") === realmPointId);
-      balance = Number(hit?.balance || hit?.amount || 0) || 0;
-    } else {
-      // fallback: take first numeric balance if available
-      const first = balances.find((b: any) => Number.isFinite(Number(b?.balance ?? b?.amount)));
-      balance = Number(first?.balance ?? first?.amount ?? 0) || 0;
-    }
+    const balance = Number(j?.balance ?? j?.amount ?? 0) || 0;
 
     return res.status(200).json({
       ok: true,
       discordUserId: discordId,
       balance,
-      note: realmPointId ? "Using DRIP_REALM_POINT_ID filter." : "No DRIP_REALM_POINT_ID set; using first available balance.",
+      realmPointId: realmPointId || undefined,
     });
   } catch (e: any) {
     console.error("drip balance error:", e);
