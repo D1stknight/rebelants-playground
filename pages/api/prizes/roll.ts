@@ -66,38 +66,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // ---------- ULTRA ----------
-    if (rarity === "ultra") {
-      // 🔥 Try to pull an NFT from inventory (atomic)
-      const nft = await redis.rpop(ULTRA_NFT_INVENTORY_KEY);
+   // ---------- ULTRA ----------
+if (rarity === "ultra") {
+  // ✅ Only CHECK inventory here. Do NOT consume it in roll().
+  const invCount = Number((await redis.llen(ULTRA_NFT_INVENTORY_KEY)) || 0);
 
-      if (nft) {
-        return res.status(200).json({
-          ok: true,
-          rarity,
-          prize: {
-            type: "nft",
-            label: `NFT Prize`,
-            meta: { token: nft },
-          },
-        });
-      }
+  if (invCount > 0) {
+    return res.status(200).json({
+      ok: true,
+      rarity,
+      prize: {
+        type: "nft",
+        label: "NFT Prize",
+        // ✅ Claim endpoint will reserve the actual tokenId
+        meta: { inventoryKey: ULTRA_NFT_INVENTORY_KEY },
+      },
+    });
+  }
 
-      // fallback to points if no NFT available
-      const ptsCfg = Number(cfg.rewards.ultra || 0);
-      const min = Number(cfg.ultraMinReward || 0);
-      const pts = Math.max(ptsCfg, min);
+  // fallback to points if no NFT available
+  const ptsCfg = Number(cfg.rewards.ultra || 0);
+  const min = Number(cfg.ultraMinReward || 0);
+  const pts = Math.max(ptsCfg, min);
 
-      return res.status(200).json({
-        ok: true,
-        rarity,
-        prize: {
-          type: "points",
-          points: pts,
-          label: `${pts} ${currency}`,
-        },
-      });
-    }
+  return res.status(200).json({
+    ok: true,
+    rarity,
+    prize: {
+      type: "points",
+      points: pts,
+      label: `${pts} ${currency}`,
+    },
+  });
+}
 
     // ---------- NONE ----------
     return res.status(200).json({
