@@ -875,15 +875,15 @@ return (
       : `Shuffle (-${cost} ${pointsConfig.currency})`}
   </button>
 
-  <button
-    className="btn"
-    type="button"
-    onClick={() => setShowBuyPoints(true)}
-    style={{ padding: "10px 12px", fontSize: 13, opacity: 0.95 }}
-    title="Buy points with APE"
-  >
-    Buy Points
-  </button>
+ <button
+  className="btn"
+  type="button"
+  onClick={() => setShowBuyPoints(true)}
+  style={{ padding: "10px 12px", fontSize: 13, opacity: 0.95 }}
+  title="Connect Ape wallet and buy points with APE"
+>
+  Buy Points / Connect Ape Wallet
+</button>
 
   <button
   className="btn"
