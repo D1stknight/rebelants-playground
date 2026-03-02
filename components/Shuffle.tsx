@@ -678,15 +678,20 @@ async function migrateDripNow() {
   setDripStatus("Migrating… (deducting from DRIP + crediting game)");
 
   try {
-    const r = await fetch("/api/drip/migrate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-  amount: amt,
-  playerId: effectivePlayerId,
-  idempotencyKey: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-}),
-    });
+    const idem = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+const r = await fetch("/api/drip/migrate", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "x-idempotency-key": idem,
+  },
+  body: JSON.stringify({
+    amount: amt,
+    playerId: effectivePlayerId,
+    idempotencyKey: idem, // backup (optional)
+  }),
+});
 
     const j = await r.json().catch(() => null);
 
