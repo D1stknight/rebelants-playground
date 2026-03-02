@@ -1054,7 +1054,6 @@ return (
       <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
         <label style={{ fontSize: 12, opacity: 0.9 }}>Amount to migrate</label>
         <input
-          <input
   value={dripAmount === 0 ? "" : String(dripAmount)}
   onChange={(e) => {
     const raw = String(e.target.value || "").replace(/^0+/, "");
