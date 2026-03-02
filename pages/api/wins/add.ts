@@ -35,7 +35,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     };
 
     // ✅ wins count
-    await redis.zincrby(LB_WINS, 1, playerId);
+    // Only count REAL wins (points or prize)
+if (pointsAwarded > 0 || body.prize) {
+  await redis.zincrby(LB_WINS, 1, playerId);
+}
 
     // ✅ recent wins feed
     await redis.lpush(LB_RECENT_WINS, JSON.stringify(evt));
