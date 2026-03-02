@@ -655,65 +655,73 @@ const runShuffle = async () => {
     setBusy(true);
 
 setTimeout(async () => {
-        const r = rollRarity();
+  // ✅ Determine player identity ONCE (wins MUST follow effective identity)
+  const prof = loadProfile();
+  const pid =
+    String(effectivePlayerId || getEffectivePlayerId(prof) || prof?.id || "guest")
+      .trim()
+      .slice(0, 64) || "guest";
 
-// ✅ Pick the actual prize (Admin prizePools first, fallback to rewards)
-let pz = normalizePrize(r, pointsConfig);
+  const pname =
+    (prof?.discordName || playerName || prof?.name || "guest").trim() || "guest";
 
-// ✅ Enforce Ultra always awards at least pointsConfig.ultraMinReward (points only)
-const ultraMin = Number((pointsConfig as any).ultraMinReward ?? 0);
-if (
-  r === "ultra" &&
-  (pz.type === "none" || (pz.type === "points" && (!Number.isFinite(pz.points) || pz.points <= 0)))
-) {
-  const min = Number.isFinite(ultraMin) && ultraMin > 0 ? ultraMin : 50;
-  pz = { type: "points", points: min, label: `${min} ${pointsConfig.currency || "REBEL"}` };
-}
+  // ✅ Roll rarity + prize ON THE SERVER (Model C enforced server-side)
+  const rollRes = await fetch("/api/prizes/roll", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId: pid }),
+  });
 
-// ✅ Award points if prize is points
-if (pz.type === "points" && pz.points > 0) {
-  const earnRes: any = await earn(pz.points);
+  const rollJson = await rollRes.json().catch(() => null);
 
-  if (earnRes?.ok === false) {
-    console.warn("EARN failed:", earnRes);
+  if (!rollRes.ok || !rollJson?.ok) {
+    console.warn("Prize roll failed:", rollRes.status, rollJson);
+    setBusy(false);
+    return;
   }
 
-  const applied = Number(earnRes?.added ?? earnRes?.applied ?? pz.points);
+  const r = rollJson.rarity as any;
+  let pz = rollJson.prize as any;
 
-  // If daily cap limited the reward
-  if (Number.isFinite(applied) && applied < pz.points) {
-    pz = {
-      ...pz,
-      label: `Daily cap reached — prize rolled, but only ${applied} ${pointsConfig.currency} could be credited today.`,
-    };
+  // ✅ If prize is points, credit them via /api/points/earn (respects daily cap)
+  if (pz?.type === "points" && Number(pz?.points || 0) > 0) {
+    const earnRes: any = await earn(Number(pz.points || 0));
+
+    if (earnRes?.ok === false) {
+      console.warn("EARN failed:", earnRes);
+    }
+
+    const applied = Number(earnRes?.added ?? earnRes?.applied ?? pz.points);
+
+    // If daily cap limited the reward
+    if (Number.isFinite(applied) && applied < Number(pz.points || 0)) {
+      pz = {
+        ...pz,
+        label: `Daily cap reached — prize rolled, but only ${applied} ${
+          pointsConfig.currency || "REBEL"
+        } could be credited today.`,
+      };
+    }
+
+    await refresh();
   }
 
-  await refresh();
-}
+  // ✅ Save what the user won so the modal can show it
+  setPrize(pz);
 
-// ✅ Save what the user won so the modal can show it
-setPrize(pz);
+  // ✅ Wins tracking: pointsAwarded only if points
+  const pointsAwarded = pz?.type === "points" ? Number(pz?.points || 0) : 0;
 
-// For wins tracking, store pointsAwarded only when it’s points
-const pointsAwarded = pz.type === "points" ? pz.points : 0;
-
-    // ✅ Determine player identity ONCE (wins MUST follow effective identity)
-const prof = loadProfile();
-const pid = String(effectivePlayerId || getEffectivePlayerId(prof) || prof?.id || "guest")
-  .trim()
-  .slice(0, 64) || "guest";
-const pname = (playerName || prof?.name || "guest").trim() || "guest";
-
-// local (keep for now)
-addWin({
-  id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-  ts: Date.now(),
-  game: "shuffle",
-  playerId: pid,
-  playerName: pname,
-  rarity: r,
-  pointsAwarded,
-});
+  // local (keep for now)
+  addWin({
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    ts: Date.now(),
+    game: "shuffle",
+    playerId: pid,
+    playerName: pname,
+    rarity: r,
+    pointsAwarded,
+  });
 
 // server (source of truth for leaderboards)
 await fetch("/api/wins/add", {
