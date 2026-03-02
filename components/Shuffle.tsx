@@ -674,9 +674,11 @@ setPrize(pz);
 // For wins tracking, store pointsAwarded only when it’s points
 const pointsAwarded = pz.type === "points" ? pz.points : 0;
 
-    // ✅ Determine player identity ONCE (so pid/pname always exist)
+    // ✅ Determine player identity ONCE (wins MUST follow effective identity)
 const prof = loadProfile();
-const pid = (prof?.id || playerId || "guest").trim() || "guest";
+const pid = String(effectivePlayerId || getEffectivePlayerId(prof) || prof?.id || "guest")
+  .trim()
+  .slice(0, 64) || "guest";
 const pname = (playerName || prof?.name || "guest").trim() || "guest";
 
 // local (keep for now)
