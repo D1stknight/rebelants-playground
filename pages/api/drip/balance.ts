@@ -1,85 +1,98 @@
 // pages/api/drip/balance.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 
-const DRIP_API = "https://api.drip.re/api/v1";
+const DRIP_API_KEY = process.env.DRIP_API_KEY || "";
+const DRIP_REALM_ID = process.env.DRIP_REALM_ID || "";
+const DRIP_REALM_POINT_ID = process.env.DRIP_REALM_POINT_ID || ""; // optional
 
-function mustEnv(name: string) {
-  const v = process.env[name];
-  if (!v) throw new Error(`Missing env: ${name}`);
-  return v;
-}
-
-// We assume your Discord session endpoint returns { ok:true, discordUserId:string }
-async function getDiscordUserId(req: NextApiRequest) {
+function absUrl(req: NextApiRequest, path: string) {
   const proto = (req.headers["x-forwarded-proto"] as string) || "https";
   const host = req.headers.host;
-  const url = `${proto}://${host}/api/auth/discord/session`;
-
-  const r = await fetch(url, {
-  method: "GET",
-  headers: {
-    "Cache-Control": "no-store",
-    // ✅ forward cookies so the session endpoint can read them
-    cookie: req.headers.cookie || "",
-  },
-});
-const j: any = await r.json().catch(() => null);
-  if (!r.ok || !j?.ok || !j?.discordUserId) return null;
-  return String(j.discordUserId);
+  return `${proto}://${host}${path}`;
 }
 
-// Tries multiple credential types to be safe.
-// (Drip docs show twitter-id, wallet, email, etc.)  [oai_citation:1‡docs.drip.re](https://docs.drip.re/developer/credentials)
-const CRED_TYPES_TO_TRY = ["discord-id", "discord", "social:discord", "email"];
-
-async function findCredential(realmId: string, apiKey: string, type: string, value: string) {
-  const params = new URLSearchParams({ type, value });
-  const url = `${DRIP_API}/realms/${realmId}/credentials/find?${params.toString()}`;
-
-  const r = await fetch(url, {
-    headers: { Authorization: `Bearer ${apiKey}` },
+async function getDiscordSession(req: NextApiRequest) {
+  // IMPORTANT: forward cookies so the session endpoint can read the user session
+  const r = await fetch(absUrl(req, "/api/auth/discord/session"), {
+    method: "GET",
+    headers: {
+      Cookie: req.headers.cookie || "",
+      "Cache-Control": "no-store",
+    },
   });
 
+  const j: any = await r.json().catch(() => null);
+  if (!r.ok || !j?.ok || !j?.discordUserId) return null;
+  return {
+    discordUserId: String(j.discordUserId),
+    discordName: String(j.discordName || ""),
+  };
+}
+
+async function dripFetch(path: string, init?: RequestInit) {
+  if (!DRIP_API_KEY) throw new Error("Missing DRIP_API_KEY");
+  const r = await fetch(`https://api.drip.re${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${DRIP_API_KEY}`,
+      "Content-Type": "application/json",
+      ...(init?.headers || {}),
+    },
+  });
+  return r;
+}
+
+// Find ghost credential by type/value
+async function findDiscordCredential(discordUserId: string) {
+  const params = new URLSearchParams({ type: "discord-id", value: discordUserId });
+  const r = await dripFetch(`/api/v1/realms/${DRIP_REALM_ID}/credentials/find?${params}`);
   if (r.status === 404) return null;
-  const j = await r.json().catch(() => null);
-  if (!r.ok) throw new Error(j?.error || j?.message || `DRIP find failed (${r.status})`);
+  const j: any = await r.json().catch(() => null);
+  if (!r.ok) throw new Error(j?.error || `DRIP find failed (${r.status})`);
+  return j;
+}
+
+// Create ghost credential for Discord (if missing)
+async function createDiscordCredential(discordUserId: string, discordName: string) {
+  const r = await dripFetch(`/api/v1/realms/${DRIP_REALM_ID}/credentials/social`, {
+    method: "POST",
+    body: JSON.stringify({
+      provider: "discord",
+      providerId: discordUserId,
+      username: discordName || `discord:${discordUserId}`,
+    }),
+  });
+
+  // If it already exists, DRIP may return 409 — just find it after.
+  if (r.status === 409) return null;
+
+  const j: any = await r.json().catch(() => null);
+  if (!r.ok) throw new Error(j?.error || `DRIP create failed (${r.status})`);
   return j;
 }
 
 function extractBalance(cred: any) {
-  // Drip credential objects often include balances or pointBalances; keep this defensive.
-  const realmPointId = process.env.DRIP_REALM_POINT_ID || null;
-
-  const candidates = [
-    cred?.balance,
-    cred?.points,
-    cred?.pointBalance,
-    cred?.balances?.[realmPointId || ""],
-    cred?.balances?.default,
-  ];
-
-  for (const c of candidates) {
-    const n = Number(c);
-    if (Number.isFinite(n)) return n;
-  }
-
-  // common pattern: balances array objects
-  const arr = cred?.balances || cred?.pointBalances;
-  if (Array.isArray(arr)) {
-    if (realmPointId) {
-      const hit = arr.find((x: any) => String(x?.realmPointId) === String(realmPointId));
-      const n = Number(hit?.balance ?? hit?.amount ?? hit?.points);
-      if (Number.isFinite(n)) return n;
+  // DRIP responses can vary; common patterns:
+  // - cred.balances = [{ amount, realmPointId, ... }]
+  // - cred.balance / cred.amount
+  const balances = Array.isArray(cred?.balances) ? cred.balances : [];
+  if (balances.length) {
+    // If you have multiple currencies, prefer DRIP_REALM_POINT_ID if set
+    if (DRIP_REALM_POINT_ID) {
+      const hit = balances.find((b: any) => String(b?.realmPointId || "") === DRIP_REALM_POINT_ID);
+      if (hit && Number.isFinite(Number(hit?.amount))) return Number(hit.amount);
     }
-    const first = arr[0];
-    const n = Number(first?.balance ?? first?.amount ?? first?.points);
-    if (Number.isFinite(n)) return n;
+    const first = balances[0];
+    if (Number.isFinite(Number(first?.amount))) return Number(first.amount);
   }
 
+  if (Number.isFinite(Number(cred?.balance))) return Number(cred.balance);
+  if (Number.isFinite(Number(cred?.amount))) return Number(cred.amount);
   return 0;
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // never cache
   res.setHeader("Cache-Control", "no-store, max-age=0");
 
   try {
@@ -88,45 +101,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(405).json({ ok: false, error: "Method not allowed" });
     }
 
-    const realmId = mustEnv("DRIP_REALM_ID");
-    const apiKey = mustEnv("DRIP_API_KEY");
+    if (!DRIP_API_KEY || !DRIP_REALM_ID) {
+      return res.status(500).json({ ok: false, error: "Missing DRIP env vars (DRIP_API_KEY / DRIP_REALM_ID)" });
+    }
 
-    const discordUserId = await getDiscordUserId(req);
-    if (!discordUserId) {
+    const sess = await getDiscordSession(req);
+    if (!sess) {
       return res.status(401).json({ ok: false, error: "Discord not connected." });
     }
 
-    // Try to find their credential
-    let cred: any = null;
-    let usedType: string | null = null;
+    // Find or create the ghost credential
+    let cred = await findDiscordCredential(sess.discordUserId);
 
-    for (const t of CRED_TYPES_TO_TRY) {
-      try {
-        const c = await findCredential(realmId, apiKey, t, discordUserId);
-        if (c) {
-          cred = c;
-          usedType = t;
-          break;
-        }
-      } catch {
-        // ignore and keep trying types
-      }
+    if (!cred) {
+      await createDiscordCredential(sess.discordUserId, sess.discordName);
+      cred = await findDiscordCredential(sess.discordUserId);
     }
 
     if (!cred) {
-      return res.status(404).json({
-        ok: false,
-        error: "No DRIP credential found for this Discord user yet.",
-      });
+      return res.status(500).json({ ok: false, error: "Could not create/find DRIP credential for this Discord user." });
     }
 
     const balance = extractBalance(cred);
 
     return res.status(200).json({
       ok: true,
-      discordUserId,
-      credentialType: usedType,
-      balance: Number(balance || 0),
+      discordUserId: sess.discordUserId,
+      balance,
     });
   } catch (err: any) {
     console.error("drip/balance error:", err);
