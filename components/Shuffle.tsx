@@ -1084,7 +1084,7 @@ return (
 <BuyPointsModal
   open={showBuyPoints}
   onClose={() => setShowBuyPoints(false)}
-  playerId={playerId}
+  playerId={effectivePlayerId} // ✅ IMPORTANT: credit the same id the UI is showing
   onClaimed={async () => {
     await refresh();
   }}
