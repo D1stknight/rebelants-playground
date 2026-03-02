@@ -57,51 +57,67 @@ function pickWeightedPrize(pool: any[]): any | null {
 }
 
 function normalizePrize(rarity: Rarity, pointsConfig: any): Prize {
-  // 1) Try prizePools first (Admin-editable)
-  const pool = pointsConfig?.prizePools?.[rarity];
-  const picked = pickWeightedPrize(pool);
+  const currency = pointsConfig?.currency || "REBEL";
 
-  if (picked) {
-    const t = String(picked?.type || "").toUpperCase();
-    const label = String(picked?.label || "");
+  // ✅ Default points for C (safe fallback)
+  const defaultPts =
+    rarity === "ultra" ? 300 :
+    rarity === "rare" ? 100 :
+    rarity === "common" ? 50 : 0;
 
-    if (t === "POINTS") {
-      const pts = Number(picked?.points ?? picked?.amount ?? 0);
-      return {
-        type: "points",
-        points: Number.isFinite(pts) ? pts : 0,
-        label: label || `${pts} ${pointsConfig?.currency || "REBEL"}`,
-      };
-    }
-    if (t === "NONE") return { type: "none", label: label || "Nothing this time" };
-    if (t === "MERCH") return { type: "merch", label: label || "Merch Prize", meta: picked };
-    if (t === "NFT") return { type: "nft", label: label || "NFT Prize", meta: picked };
-    if (t === "APE") return { type: "ape", label: label || "APE Prize", meta: picked };
-  }
-
-  // 2) Fallback to old rewards map (points only)
-  const reward =
-    rarity === "ultra"
-      ? pointsConfig?.rewards?.ultra
-      : rarity === "rare"
-      ? pointsConfig?.rewards?.rare
-      : rarity === "common"
-      ? pointsConfig?.rewards?.common
-      : 0;
-
-  const pts = Number(reward || 0);
-
-  if (!Number.isFinite(pts) || pts <= 0) {
-    return { type: "none", label: "Nothing this time" };
-  }
-
-  return {
+  // Helper: make a points prize
+  const pointsPrize = (pts: number, label?: string): Prize => ({
     type: "points",
     points: pts,
-    label: `${pts} ${pointsConfig?.currency || "REBEL"}`,
-  };
-}
+    label: label || `${pts} ${currency}`,
+  });
 
+  // ✅ Rule C enforcement:
+  // Common = points only (ignore prizePools)
+  if (rarity === "common") {
+    const pts = Number(pointsConfig?.rewards?.common ?? defaultPts);
+    return Number.isFinite(pts) && pts > 0 ? pointsPrize(pts) : { type: "none", label: "Nothing this time" };
+  }
+
+  // Rare = points only (bigger) AND very occasionally merch
+  if (rarity === "rare") {
+    // optional: 1% chance to try merch from prizePools.rare (only merch entries)
+    const merchChance = Number(pointsConfig?.rareMerchChance ?? 0.01); // default 1%
+    const roll = Math.random();
+
+    if (roll < merchChance) {
+      const pool = (pointsConfig?.prizePools?.rare || []) as any[];
+      const merchOnly = pool.filter((p) => String(p?.type || "").toUpperCase() === "MERCH");
+      const picked = pickWeightedPrize(merchOnly);
+
+      if (picked) {
+        return { type: "merch", label: String(picked?.label || "Merch Prize"), meta: picked };
+      }
+      // if no merch available, fall back to points
+    }
+
+    const pts = Number(pointsConfig?.rewards?.rare ?? defaultPts);
+    return Number.isFinite(pts) && pts > 0 ? pointsPrize(pts) : { type: "none", label: "Nothing this time" };
+  }
+
+  // Ultra = try NFT first; if none available -> points fallback higher than rare
+  if (rarity === "ultra") {
+    const pool = (pointsConfig?.prizePools?.ultra || []) as any[];
+    const nftOnly = pool.filter((p) => String(p?.type || "").toUpperCase() === "NFT");
+    const picked = pickWeightedPrize(nftOnly);
+
+    if (picked) {
+      return { type: "nft", label: String(picked?.label || "NFT Prize"), meta: picked };
+    }
+
+    // fallback points (higher than rare)
+    const pts = Number(pointsConfig?.rewards?.ultra ?? defaultPts);
+    return Number.isFinite(pts) && pts > 0 ? pointsPrize(pts) : pointsPrize(defaultPts);
+  }
+
+  // none
+  return { type: "none", label: "Nothing this time" };
+}
 const EGG_COUNT = shuffleConfig.eggCount; // ✅ 5 (from lib/shuffleConfig.ts)
 const SHUFFLE_MS = 3200;
 const SWAP_EVERY_MS = 280;
@@ -118,10 +134,10 @@ const LANES = Array.from({ length: EGG_COUNT }, (_, i) => {
 /* ---------------- utils ---------------- */
 function rollRarity(): Rarity {
   const r = Math.random();
-  if (r < 0.05) return "ultra";
-  if (r < 0.18) return "rare";
-  if (r < 0.55) return "common";
-  return "none";
+  if (r < 0.01) return "ultra";   // 1%
+  if (r < 0.15) return "rare";    // 15%
+  if (r < 0.55) return "common";  // 37%
+  return "none";                  // 45%
 }
 
 function shuffledN(n: number): number[] {
