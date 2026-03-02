@@ -62,32 +62,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
- // ---------- ULTRA ----------
+// ---------- ULTRA ----------
 if (rarity === "ultra") {
   // 🔥 Try to pull an NFT from inventory (atomic)
-  const raw = await redis.rpop(ULTRA_NFT_INVENTORY_KEY);
+  const nftRaw = await redis.rpop(ULTRA_NFT_INVENTORY_KEY);
 
-  // Upstash can return either a JSON string OR an already-parsed object depending on client usage.
-  let nft: any = null;
-
-  if (raw) {
-    if (typeof raw === "string") {
-      try {
-        nft = JSON.parse(raw);
-      } catch {
-        nft = null;
-      }
-    } else if (typeof raw === "object") {
-      nft = raw;
+  if (nftRaw) {
+    let item: any = null;
+    try {
+      item = JSON.parse(String(nftRaw));
+    } catch {
+      item = null;
     }
-  }
 
-  const chain = String(nft?.chain || "ETH").trim().toUpperCase();
-  const contract = String(nft?.contract || "").trim();
-  const tokenId = String(nft?.tokenId ?? "").trim();
-  const label = String(nft?.label || "NFT Prize").trim();
+    const chain = String(item?.chain || "ETH").toUpperCase();
+    const contract = String(item?.contract || "").trim();
+    const tokenId = String(item?.tokenId ?? "").trim();
+    const label = String(item?.label || "NFT Prize").trim();
 
-  if (contract && tokenId) {
+    // ✅ REQUIRED by /api/prizes/claim
+    const inventoryKey =
+      String(item?.inventoryKey || "").trim() ||
+      `ultra:${chain}:${contract}:${tokenId}`;
+
     return res.status(200).json({
       ok: true,
       rarity,
@@ -99,12 +96,13 @@ if (rarity === "ultra") {
           contract,
           tokenId,
           label,
+          inventoryKey,
         },
       },
     });
   }
 
-  // fallback to points if no NFT available (or inventory item was malformed)
+  // fallback to points if no NFT available
   const ptsCfg = Number(cfg.rewards.ultra || 0);
   const min = Number(cfg.ultraMinReward || 0);
   const pts = Math.max(ptsCfg, min);
