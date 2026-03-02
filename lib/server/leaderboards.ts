@@ -28,6 +28,33 @@ export async function addToWinsTotal(playerId: string, amount: number = 1) {
   await redis.zincrby(LB_WINS, amt, pid);
 }
 
+function safeWinPayload(win: any) {
+  // ✅ Only keep fields that will ALWAYS JSON.stringify cleanly
+  const prize = win?.prize;
+
+  const safePrize =
+    prize && typeof prize === "object"
+      ? {
+          type: typeof prize.type === "string" ? prize.type : undefined,
+          label: typeof prize.label === "string" ? prize.label : undefined,
+          sku: typeof prize.sku === "string" ? prize.sku : undefined,
+          tokenId: typeof prize.tokenId === "string" || typeof prize.tokenId === "number" ? String(prize.tokenId) : undefined,
+          qty: typeof prize.qty === "number" ? prize.qty : undefined,
+        }
+      : null;
+
+  return {
+    id: String(win?.id || ""),
+    ts: Number(win?.ts || Date.now()),
+    game: String(win?.game || "shuffle"),
+    playerId: String(win?.playerId || ""),
+    playerName: String(win?.playerName || ""),
+    rarity: String(win?.rarity || "none"),
+    pointsAwarded: Number(win?.pointsAwarded || 0) || 0,
+    prize: safePrize,
+  };
+}
+
 export async function recordWinForLeaderboards(win: any) {
   const pid = String(win?.playerId || "").trim().slice(0, 64);
   if (!pid) return;
@@ -36,11 +63,25 @@ export async function recordWinForLeaderboards(win: any) {
   await addToWinsTotal(pid, 1);
 
   // ✅ recent wins feed (store JSON)
-  const payload = JSON.stringify({
-    ...win,
-    ts: Number(win?.ts || Date.now()),
-  });
+  const payloadObj = safeWinPayload(win);
 
-  await redis.lpush(LB_RECENT_WINS, payload);
+  let payloadStr = "";
+  try {
+    payloadStr = JSON.stringify(payloadObj);
+  } catch {
+    // ultra-safe fallback
+    payloadStr = JSON.stringify({
+      id: String(payloadObj.id || ""),
+      ts: Number(payloadObj.ts || Date.now()),
+      game: String(payloadObj.game || "shuffle"),
+      playerId: String(payloadObj.playerId || pid),
+      playerName: String(payloadObj.playerName || ""),
+      rarity: String(payloadObj.rarity || "none"),
+      pointsAwarded: Number(payloadObj.pointsAwarded || 0) || 0,
+      prize: null,
+    });
+  }
+
+  await redis.lpush(LB_RECENT_WINS, payloadStr);
   await redis.ltrim(LB_RECENT_WINS, 0, 49); // keep last 50
 }
