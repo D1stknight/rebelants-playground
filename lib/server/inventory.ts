@@ -110,7 +110,7 @@ export async function reserveMerch(sku: string, qty: number = 1) {
 
 export async function getMerchSummary() {
   const regKey = "ra:inv:merch:skus";
-  const skus = (await redis.smembers<string>(regKey)) || [];
+  const skus = (await redis.smembers<string[]>(regKey)) || [];
   const out: any[] = [];
   for (const sku of skus) {
     const qty = Number((await redis.get<number>(keyMerchStock(sku))) || 0);
