@@ -30,7 +30,11 @@ export type PointsConfig = {
     ultra: number;
   };
 
-  // ✅ NEW: Ultra must always award at least this many points
+  // ✅ Rare “very occasionally merch” chance (Model C)
+  // example: 0.01 = 1%
+  rareMerchChance: number;
+
+  // ✅ Ultra must always award at least this many points (Model C fallback safety)
   ultraMinReward: number;
 
   prizePools: PrizePools;
@@ -45,39 +49,48 @@ export const pointsConfig: PointsConfig = {
   // COST to play 1 shuffle
   shuffleCost: 500,
 
-  // CURRENT POINTS REWARDS (keep working for now)
+  // ✅ Model C default points (you can override in Admin anytime)
   rewards: {
     none: 0,
     common: 50,
     rare: 100,
-    ultra: 200,
+    ultra: 300,
   },
 
-  // ✅ NEW: config-driven Ultra minimum
-  ultraMinReward: 50,
+  // ✅ 1% rare merch attempt
+  rareMerchChance: 0.01,
 
-  // NEW: future prize pools (Admin-editable)
-  // NOTE: Shuffle will NOT use these yet — we’re only wiring Admin + storage first.
+  // ✅ Ultra fallback floor (should be >= rare)
+  ultraMinReward: 300,
+
+  // ✅ Prize pools are Admin-editable.
+  // We keep them aligned with Model C to avoid confusion:
+  // - common: points only
+  // - rare: points + merch
+  // - ultra: NFTs only (points fallback handled by code)
   prizePools: {
     none: [{ id: "none-1", type: "none", label: "Nothing", weight: 1 }],
+
     common: [
       { id: "c-pts-50", type: "points", label: "50 REBEL", amount: 50, weight: 100 },
-      { id: "c-none-1", type: "none", label: "Nothing", weight: 20 },
     ],
+
     rare: [
       { id: "r-pts-100", type: "points", label: "100 REBEL", amount: 100, weight: 100 },
-      { id: "r-merch-tee", type: "merch", label: "Rebel Ants Tee", weight: 5, meta: { sizes: ["S","M","L","XL","2XL"] } },
-      { id: "r-none-1", type: "none", label: "Nothing", weight: 10 },
+      {
+        id: "r-merch-tee",
+        type: "merch",
+        label: "Rebel Ants Tee",
+        weight: 5,
+        meta: { sizes: ["S", "M", "L", "XL", "2XL"] },
+      },
     ],
+
     ultra: [
-      { id: "u-pts-200", type: "points", label: "200 REBEL", amount: 200, weight: 100 },
       { id: "u-nft-1", type: "nft", label: "NFT Prize (manual delivery)", weight: 3, meta: { note: "Deliver manually for now" } },
-      { id: "u-ape-1", type: "ape", label: "APE Prize (manual delivery)", weight: 2, meta: { note: "Deliver manually for now" } },
-      { id: "u-merch-hat", type: "merch", label: "Rebel Ants Hat", weight: 6 },
     ],
   },
 
-  // Optional: prevent infinite farming in one day (tune anytime)
   dailyClaim: 200,
   dailyEarnCap: 500,
 };
