@@ -1074,9 +1074,9 @@ return (
         color: "inherit",
       }}
     />
-    <div style={{ fontSize: 11, opacity: 0.7, marginTop: 6 }}>
-      Identity: <b>{effectivePlayerId}</b>
-    </div>
+   <div style={{ fontSize: 11, opacity: 0.7, marginTop: 6 }}>
+  Identity: <b>{playerName || effectivePlayerId}</b>
+</div>
   </label>
 
   <button
