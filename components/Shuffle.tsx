@@ -100,20 +100,27 @@ function normalizePrize(rarity: Rarity, pointsConfig: any): Prize {
     return Number.isFinite(pts) && pts > 0 ? pointsPrize(pts) : { type: "none", label: "Nothing this time" };
   }
 
-  // Ultra = try NFT first; if none available -> points fallback higher than rare
-  if (rarity === "ultra") {
-    const pool = (pointsConfig?.prizePools?.ultra || []) as any[];
-    const nftOnly = pool.filter((p) => String(p?.type || "").toUpperCase() === "NFT");
-    const picked = pickWeightedPrize(nftOnly);
+ // Ultra = try NFT first; if none available -> points fallback higher than rare
+if (rarity === "ultra") {
+  const pool = (pointsConfig?.prizePools?.ultra || []) as any[];
+  const nftOnly = pool.filter((p) => String(p?.type || "").toUpperCase() === "NFT");
+  const picked = pickWeightedPrize(nftOnly);
 
-    if (picked) {
-      return { type: "nft", label: String(picked?.label || "NFT Prize"), meta: picked };
-    }
-
-    // fallback points (higher than rare)
-    const pts = Number(pointsConfig?.rewards?.ultra ?? defaultPts);
-    return Number.isFinite(pts) && pts > 0 ? pointsPrize(pts) : pointsPrize(defaultPts);
+  if (picked) {
+    return { type: "nft", label: String(picked?.label || "NFT Prize"), meta: picked };
   }
+
+  // fallback points (higher than rare) + enforce ultraMinReward
+  const ptsCfg = Number(pointsConfig?.rewards?.ultra ?? defaultPts);
+  const min = Number(pointsConfig?.ultraMinReward ?? defaultPts);
+
+  const pts = Math.max(
+    Number.isFinite(ptsCfg) ? ptsCfg : defaultPts,
+    Number.isFinite(min) ? min : defaultPts
+  );
+
+  return pointsPrize(pts);
+}
 
   // none
   return { type: "none", label: "Nothing this time" };
