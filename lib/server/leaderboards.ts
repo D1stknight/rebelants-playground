@@ -1,37 +1,39 @@
 // lib/server/leaderboards.ts
 import { redis } from "./redis";
 
-export const LB_BALANCE = "ra:lb:balance";
-export const LB_EARNED = "ra:lb:earned";
-export const LB_WINS = "ra:lb:wins";
-export const LB_RECENT_WINS = "ra:lb:recentWins";
+// ✅ Canonical leaderboard keys (single source of truth)
+export const LB_BALANCE = "ra:lb:balance";        // current balance visibility
+export const LB_EARNED  = "ra:lb:totalEarned";    // lifetime earned from gameplay
+export const LB_WINS    = "ra:lb:wins";           // lifetime wins count
+export const LB_RECENT_WINS = "ra:wins:recent";   // recent wins feed list (JSON strings)
 
-// Total earned store (not daily; lifetime total)
-export function earnedTotalKey(playerId: string) {
-  return `ra:points:earnedTotal:${playerId}`;
-}
-
+// ✅ helpers used by multiple APIs
 export async function updateBalanceLeaderboard(playerId: string, newBalance: number) {
-  await redis.zadd(LB_BALANCE, { score: Number(newBalance || 0), member: playerId });
+  const pid = String(playerId || "").trim().slice(0, 64);
+  if (!pid) return;
+  await redis.zadd(LB_BALANCE, { score: Number(newBalance || 0), member: pid });
 }
 
-export async function addToEarnedTotal(playerId: string, delta: number) {
-  const d = Math.floor(Number(delta || 0));
-  if (!Number.isFinite(d) || d <= 0) return { total: 0, added: 0 };
+export async function addToEarnedTotal(playerId: string, amount: number) {
+  const pid = String(playerId || "").trim().slice(0, 64);
+  const amt = Number(amount || 0);
+  if (!pid || !Number.isFinite(amt) || amt <= 0) return;
+  await redis.zincrby(LB_EARNED, amt, pid);
+}
 
-  const total = await redis.incrby(earnedTotalKey(playerId), d);
-  await redis.zadd(LB_EARNED, { score: Number(total || 0), member: playerId });
-
-  return { total: Number(total || 0), added: d };
+export async function addToWinsTotal(playerId: string, amount: number = 1) {
+  const pid = String(playerId || "").trim().slice(0, 64);
+  const amt = Number(amount || 0);
+  if (!pid || !Number.isFinite(amt) || amt <= 0) return;
+  await redis.zincrby(LB_WINS, amt, pid);
 }
 
 export async function recordWinForLeaderboards(win: any) {
-  // win should include: playerId, playerName, rarity, pointsAwarded, ts, game
-  const pid = String(win?.playerId || "").trim();
+  const pid = String(win?.playerId || "").trim().slice(0, 64);
   if (!pid) return;
 
   // ✅ wins count leaderboard
-  await redis.zincrby(LB_WINS, 1, pid);
+  await addToWinsTotal(pid, 1);
 
   // ✅ recent wins feed (store JSON)
   const payload = JSON.stringify({
