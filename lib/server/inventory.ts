@@ -64,8 +64,7 @@ export async function getNftInventorySummary() {
   // This is “best effort” (Upstash doesn’t support scanning keys cheaply in all setups).
   // We keep a simple registry of collections.
   const regKey = "ra:inv:nft:collections";
-  const collections = (await redis.smembers<string>(regKey)) || [];
-
+  const collections = (await redis.smembers<string[]>(regKey)) || [];
   const out: any[] = [];
   for (const c of collections) {
     // c is "ETH|0xabc..." or "APECHAIN|0xabc..."
