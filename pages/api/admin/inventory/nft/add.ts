@@ -1,6 +1,6 @@
 // pages/api/admin/inventory/nft/add.ts
 import type { NextApiRequest, NextApiResponse } from "next";
-import { redis } from "../../../../lib/server/redis";
+import { redis } from "../../../../../lib/server/redis";
 
 function headerValue(v: string | string[] | undefined) {
   return Array.isArray(v) ? v[0] : v;
