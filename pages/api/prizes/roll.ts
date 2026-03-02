@@ -62,38 +62,49 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-   // ---------- ULTRA ----------
+ // ---------- ULTRA ----------
 if (rarity === "ultra") {
   // 🔥 Try to pull an NFT from inventory (atomic)
-  const nftRaw = await redis.rpop(ULTRA_NFT_INVENTORY_KEY);
+  const raw = await redis.rpop(ULTRA_NFT_INVENTORY_KEY);
 
-  if (nftRaw) {
-    let nft: any = null;
-    try {
-      nft = JSON.parse(String(nftRaw));
-    } catch {
-      // if inventory somehow contains a plain string, keep it visible for debugging
-      nft = { raw: String(nftRaw) };
+  // Upstash can return either a JSON string OR an already-parsed object depending on client usage.
+  let nft: any = null;
+
+  if (raw) {
+    if (typeof raw === "string") {
+      try {
+        nft = JSON.parse(raw);
+      } catch {
+        nft = null;
+      }
+    } else if (typeof raw === "object") {
+      nft = raw;
     }
+  }
 
+  const chain = String(nft?.chain || "ETH").trim().toUpperCase();
+  const contract = String(nft?.contract || "").trim();
+  const tokenId = String(nft?.tokenId ?? "").trim();
+  const label = String(nft?.label || "NFT Prize").trim();
+
+  if (contract && tokenId) {
     return res.status(200).json({
       ok: true,
       rarity,
       prize: {
         type: "nft",
-        label: nft?.label || "NFT Prize",
-        // ✅ IMPORTANT: transfer.ts expects meta.chain/meta.contract/meta.tokenId
+        label,
         meta: {
-          chain: String(nft?.chain || "ETH"),
-          contract: String(nft?.contract || ""),
-          tokenId: String(nft?.tokenId || ""),
-          label: String(nft?.label || "NFT Prize"),
+          chain,
+          contract,
+          tokenId,
+          label,
         },
       },
     });
   }
 
-  // fallback to points if no NFT available
+  // fallback to points if no NFT available (or inventory item was malformed)
   const ptsCfg = Number(cfg.rewards.ultra || 0);
   const min = Number(cfg.ultraMinReward || 0);
   const pts = Math.max(ptsCfg, min);
