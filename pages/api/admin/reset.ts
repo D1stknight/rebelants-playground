@@ -18,13 +18,19 @@ function isAdmin(req: NextApiRequest) {
   return !!provided && provided === expected;
 }
 
-// ✅ match your actual keys used elsewhere
-const CONFIG_KEY = "ra:config:economy";   // from pages/api/admin/config.ts
-const LB_TOTAL_EARNED = "lb:earn";        // from pages/api/leaderboard/top.ts
-const LB_BALANCE = "ra:lb:balance";       // from pages/api/admin/grant.ts
-const RECENT_WINS = "wins:recent";        // from pages/api/wins/recent.ts + wins/add.ts
+// ✅ match the keys your current app is using (leaderboard/summary + lib/server/leaderboards.ts)
+const CONFIG_KEY = "ra:config:economy";
+const LB_TOTAL_EARNED = "ra:lb:totalEarned";
+const LB_BALANCE = "ra:lb:balance";
+const LB_WINS = "ra:lb:wins";
+const RECENT_WINS = "ra:wins:recent";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // never cache admin responses
+  res.setHeader("Cache-Control", "no-store, max-age=0");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+
   try {
     if (!isAdmin(req)) return res.status(401).json({ ok: false, error: "Unauthorized" });
 
@@ -42,16 +48,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (what === "leaderboards") {
-      await redis.del(LB_TOTAL_EARNED, LB_BALANCE);
-      return res.status(200).json({ ok: true, cleared: "leaderboards", keys: [LB_TOTAL_EARNED, LB_BALANCE] });
+      await redis.del(LB_TOTAL_EARNED, LB_BALANCE, LB_WINS);
+      return res.status(200).json({
+        ok: true,
+        cleared: "leaderboards",
+        keys: [LB_TOTAL_EARNED, LB_BALANCE, LB_WINS],
+      });
     }
 
     if (what === "all") {
-      await redis.del(RECENT_WINS, LB_TOTAL_EARNED, LB_BALANCE, CONFIG_KEY);
+      await redis.del(RECENT_WINS, LB_TOTAL_EARNED, LB_BALANCE, LB_WINS, CONFIG_KEY);
       return res.status(200).json({
         ok: true,
         cleared: "all (wins + leaderboards + config override)",
-        keys: [RECENT_WINS, LB_TOTAL_EARNED, LB_BALANCE, CONFIG_KEY],
+        keys: [RECENT_WINS, LB_TOTAL_EARNED, LB_BALANCE, LB_WINS, CONFIG_KEY],
       });
     }
 
