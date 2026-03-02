@@ -19,9 +19,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(405).json({ ok: false, error: "Method not allowed" });
     }
 
-    const body = typeof req.body === "string"
-      ? JSON.parse(req.body)
-      : (req.body ?? {});
+   const rawBody = req.body;
+const body =
+  typeof rawBody === "string"
+    ? (rawBody.trim() ? JSON.parse(rawBody) : {})
+    : (rawBody ?? {});
 
     const rarity = rollRarity();
     const cfg = defaultConfig;
