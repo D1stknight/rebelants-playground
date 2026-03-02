@@ -968,12 +968,13 @@ return (
       }}
     >
       <div style={{ fontWeight: 800, marginBottom: 6 }}>How points work</div>
-    <div style={{ fontSize: 13, opacity: 0.9, lineHeight: 1.4 }}>
+   <div style={{ fontSize: 13, opacity: 0.9, lineHeight: 1.4 }}>
   • Shuffle costs <b>{pointsConfig.shuffleCost}</b> {pointsConfig.currency}.<br />
-  • Daily claim is <b>once per day</b>: <b>+{pointsConfig.dailyClaim}</b> {pointsConfig.currency}.<br />
-  • Gameplay earnings have a daily cap: <b>{pointsConfig.dailyEarnCap}</b>/day.<br />
-  • Buy Points lets you connect an Ape wallet and purchase points with <b>APE</b> (1 APE = 100 pts).<br />
-  • “Migrate from Discord (DRIP)” moves points into the game and <b>deducts them from DRIP</b> to prevent double-dipping.<br />
+  • Crates can award <b>REBEL Points</b> and occasionally <b>collectibles/merch</b> when enabled.<br />
+  • Daily claim: <b>+{pointsConfig.dailyClaim}</b> {pointsConfig.currency} (once per day).<br />
+  • Daily earn cap: <b>{pointsConfig.dailyEarnCap}</b> {pointsConfig.currency}/day (anti-abuse).<br />
+  • Optional: you can buy points with <b>APE</b> (final sale, gas may apply).<br />
+  • See <a href="/rules" style={{ textDecoration: "underline" }}>Official Rules</a> for details.
 </div>
       <button
         type="button"
