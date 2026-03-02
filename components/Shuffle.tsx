@@ -1054,21 +1054,25 @@ return (
       <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
         <label style={{ fontSize: 12, opacity: 0.9 }}>Amount to migrate</label>
         <input
-          value={dripAmount}
-          onChange={(e) => setDripAmount(Number(e.target.value || 0))}
-          type="number"
-          min={0}
-          step={1}
-          style={{
-            padding: "10px 12px",
-            borderRadius: 12,
-            border: "1px solid rgba(255,255,255,.18)",
-            background: "rgba(15, 23, 42, 0.7)",
-            color: "white",
-            outline: "none",
-            fontWeight: 800,
-          }}
-        />
+          <input
+  value={dripAmount === 0 ? "" : String(dripAmount)}
+  onChange={(e) => {
+    const raw = String(e.target.value || "").replace(/^0+/, "");
+    setDripAmount(Number(raw || 0));
+  }}
+  type="number"
+  min={0}
+  step={1}
+  style={{
+    padding: "10px 12px",
+    borderRadius: 12,
+    border: "1px solid rgba(255,255,255,.18)",
+    background: "rgba(15, 23, 42, 0.7)",
+    color: "white",
+    outline: "none",
+    fontWeight: 800,
+  }}
+/>
 
         <button
           className="btn"
