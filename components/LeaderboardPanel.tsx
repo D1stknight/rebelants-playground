@@ -1,5 +1,6 @@
 // components/LeaderboardPanel.tsx
 import React from "react";
+import { loadProfile } from "../lib/profile";
 
 type ZRow = { playerId: string; score: number };
 type WinRow = {
@@ -21,14 +22,33 @@ type Summary = {
   recentWins: WinRow[];
 };
 
-function fmtName(pid: string) {
-  if (!pid) return "unknown";
-  // Keep it readable for wallet ids
-  if (pid.startsWith("wallet:")) {
-    const w = pid.replace("wallet:", "");
-    return `wallet:${w.slice(0, 6)}…${w.slice(-4)}`;
+function shortMid(s: string, left = 6, right = 4) {
+  const v = String(s || "");
+  if (v.length <= left + right + 2) return v;
+  return `${v.slice(0, left)}…${v.slice(-right)}`;
+}
+
+function fmtName(pid: string, my?: { discordUserId?: string; discordName?: string }) {
+  const id = String(pid || "").trim();
+  if (!id) return "unknown";
+
+  // ✅ Wallet: shorten nicely
+  if (id.startsWith("wallet:")) {
+    const w = id.replace("wallet:", "");
+    return `wallet:${shortMid(w, 6, 4)}`;
   }
-  return pid;
+
+  // ✅ Discord: if it's ME, show my Discord name; else shorten the id
+  if (id.startsWith("discord:")) {
+    const did = id.replace("discord:", "");
+    if (my?.discordUserId && String(my.discordUserId) === String(did) && my?.discordName) {
+      return my.discordName;
+    }
+    return `discord:${shortMid(did, 4, 4)}`;
+  }
+
+  // guest / anything else
+  return id;
 }
 
 export default function LeaderboardPanel() {
@@ -42,6 +62,18 @@ export default function LeaderboardPanel() {
 
   const [loading, setLoading] = React.useState(false);
 
+  const my = React.useMemo(() => {
+  try {
+    const p = loadProfile();
+    return {
+      discordUserId: p?.discordUserId ? String(p.discordUserId) : undefined,
+      discordName: p?.discordName ? String(p.discordName) : undefined,
+    };
+  } catch {
+    return {};
+  }
+}, []);
+  
   async function loadLeaderboards() {
     setLoading(true);
     try {
@@ -92,7 +124,7 @@ export default function LeaderboardPanel() {
             {(lb.balance || []).slice(0, 10).map((r, i) => (
               <div key={`${r.playerId}-${i}`} className="lb-row">
                 <div className="lb-rank">#{i + 1}</div>
-                <div className="lb-name">{fmtName(r.playerId)}</div>
+               <div className="lb-name">{fmtName(r.playerId, my)}</div>
                 <div className="lb-score">{Math.floor(r.score || 0)}</div>
               </div>
             ))}
@@ -107,7 +139,7 @@ export default function LeaderboardPanel() {
             {(lb.earned || []).slice(0, 10).map((r, i) => (
               <div key={`${r.playerId}-${i}`} className="lb-row">
                 <div className="lb-rank">#{i + 1}</div>
-                <div className="lb-name">{fmtName(r.playerId)}</div>
+               <div className="lb-name">{fmtName(r.playerId, my)}</div>
                 <div className="lb-score">{Math.floor(r.score || 0)}</div>
               </div>
             ))}
@@ -122,7 +154,7 @@ export default function LeaderboardPanel() {
             {(lb.wins || []).slice(0, 10).map((r, i) => (
               <div key={`${r.playerId}-${i}`} className="lb-row">
                 <div className="lb-rank">#{i + 1}</div>
-                <div className="lb-name">{fmtName(r.playerId)}</div>
+                <div className="lb-name">{fmtName(r.playerId, my)}</div>
                 <div className="lb-score">{Math.floor(r.score || 0)}</div>
               </div>
             ))}
@@ -135,7 +167,7 @@ export default function LeaderboardPanel() {
           <div className="lb-card-title">Recent Wins</div>
           <div className="lb-rows">
             {(lb.recentWins || []).slice(0, 12).map((w, i) => {
-              const name = w?.playerName || fmtName(String(w?.playerId || ""));
+              const name = w?.playerName || fmtName(String(w?.playerId || ""), my);
               const pts = Math.floor(Number(w?.pointsAwarded || 0));
               const rarity = String(w?.rarity || "none");
               const game = String(w?.game || "shuffle");
