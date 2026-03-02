@@ -434,6 +434,22 @@ const computedEffectivePlayerId = getEffectivePlayerId(prof);
 const { balance, spend, earn, claimDaily, devGrant, refresh } =
   usePoints(effectivePlayerId);
 
+// ✅ Whenever identity changes, force the points hook to refetch for the new id
+const lastPidRef = React.useRef<string>("");
+
+React.useEffect(() => {
+  if (!effectivePlayerId) return;
+  if (lastPidRef.current === effectivePlayerId) return;
+  lastPidRef.current = effectivePlayerId;
+
+  (async () => {
+    try {
+      await refresh();
+    } catch {}
+  })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [effectivePlayerId]);
+  
 // ✅ Run once guard (prevents React crash loops / duplicate linking)
 const didDiscordLinkRef = React.useRef(false);
 
