@@ -1,6 +1,7 @@
 // pages/admin.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import Head from "next/head";
 import { pointsConfig as defaultConfig } from "../lib/pointsConfig";
 
 type PointsConfigShape = {
@@ -201,7 +202,12 @@ export default function AdminPage() {
   }
 
   return (
-    <div style={{ padding: 28, color: "white", maxWidth: 1100, margin: "0 auto" }}>
+     <>
+    <Head>
+      <meta name="robots" content="noindex,nofollow" />
+    </Head>  
+       
+       <div style={{ padding: 28, color: "white", maxWidth: 1100, margin: "0 auto" }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
         <div style={{ fontSize: 18, fontWeight: 900 }}>Rebel Ants Admin</div>
         <Link href="/" style={{ color: "white", textDecoration: "underline", opacity: 0.9 }}>
@@ -565,7 +571,8 @@ export default function AdminPage() {
         .btn:hover {
           background: rgba(15, 23, 42, 0.9);
         }
-      `}</style>
+            `}</style>
     </div>
+  </>
   );
 }
