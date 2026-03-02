@@ -2,118 +2,34 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
 
-const DRIP_API_KEY = process.env.DRIP_API_KEY || "";
-const DRIP_REALM_ID = process.env.DRIP_REALM_ID || "";
-const DRIP_REALM_POINT_ID = process.env.DRIP_REALM_POINT_ID || ""; // optional
-
-function absUrl(req: NextApiRequest, path: string) {
-  const proto = (req.headers["x-forwarded-proto"] as string) || "https";
-  const host = req.headers.host;
-  return `${proto}://${host}${path}`;
-}
-
-async function getDiscordSession(req: NextApiRequest) {
-  const r = await fetch(absUrl(req, "/api/auth/discord/session"), {
-    method: "GET",
-    headers: {
-      Cookie: req.headers.cookie || "",
-      "Cache-Control": "no-store",
-    },
-  });
-
-  const j: any = await r.json().catch(() => null);
-  if (!r.ok || !j?.ok || !j?.discordUserId) return null;
-  return {
-    discordUserId: String(j.discordUserId),
-    discordName: String(j.discordName || ""),
-  };
-}
-
-async function dripFetch(path: string, init?: RequestInit) {
-  if (!DRIP_API_KEY) throw new Error("Missing DRIP_API_KEY");
-  const r = await fetch(`https://api.drip.re${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${DRIP_API_KEY}`,
-      "Content-Type": "application/json",
-      ...(init?.headers || {}),
-    },
-  });
-  return r;
-}
-
-async function findDiscordCredential(discordUserId: string) {
-  const params = new URLSearchParams({ type: "discord-id", value: discordUserId });
-  const r = await dripFetch(`/api/v1/realms/${DRIP_REALM_ID}/credentials/find?${params}`);
-  if (r.status === 404) return null;
-  const j: any = await r.json().catch(() => null);
-  if (!r.ok) throw new Error(j?.error || `DRIP find failed (${r.status})`);
-  return j;
-}
-
-async function createDiscordCredential(discordUserId: string, discordName: string) {
-  const r = await dripFetch(`/api/v1/realms/${DRIP_REALM_ID}/credentials/social`, {
-    method: "POST",
-    body: JSON.stringify({
-      provider: "discord",
-      providerId: discordUserId,
-      username: discordName || `discord:${discordUserId}`,
-    }),
-  });
-
-  if (r.status === 409) return null;
-
-  const j: any = await r.json().catch(() => null);
-  if (!r.ok) throw new Error(j?.error || `DRIP create failed (${r.status})`);
-  return j;
-}
-
-function extractBalance(cred: any) {
-  const balances = Array.isArray(cred?.balances) ? cred.balances : [];
-  if (balances.length) {
-    if (DRIP_REALM_POINT_ID) {
-      const hit = balances.find((b: any) => String(b?.realmPointId || "") === DRIP_REALM_POINT_ID);
-      if (hit && Number.isFinite(Number(hit?.amount))) return Number(hit.amount);
-    }
-    const first = balances[0];
-    if (Number.isFinite(Number(first?.amount))) return Number(first.amount);
-  }
-
-  if (Number.isFinite(Number(cred?.balance))) return Number(cred.balance);
-  if (Number.isFinite(Number(cred?.amount))) return Number(cred.amount);
-  return 0;
-}
-
-async function deductFromDrip(discordUserId: string, amount: number) {
-  // PATCH /credentials/balance?type=discord-id&value=... { amount: -X, realmPointId? }
-  const params = new URLSearchParams({ type: "discord-id", value: discordUserId });
-
-  const body: any = { amount: -Math.abs(amount) };
-  if (DRIP_REALM_POINT_ID) body.realmPointId = DRIP_REALM_POINT_ID;
-
-  const r = await dripFetch(`/api/v1/realms/${DRIP_REALM_ID}/credentials/balance?${params}`, {
-    method: "PATCH",
-    body: JSON.stringify(body),
-  });
-
-  const j: any = await r.json().catch(() => null);
-  if (!r.ok) {
-    // DRIP commonly uses 400 INSUFFICIENT_BALANCE for overdraft attempts
-    throw new Error(j?.error || j?.message || `DRIP deduct failed (${r.status})`);
-  }
-  return j;
+function mustEnv(name: string) {
+  const v = process.env[name];
+  if (!v) throw new Error(`Missing env: ${name}`);
+  return v;
 }
 
 function balKey(playerId: string) {
   return `ra:points:bal:${playerId}`;
 }
+
 function lbBalanceKey() {
   return `ra:lb:balance`;
 }
 
-// Idempotency key storage
-function idemKey(discordUserId: string, idem: string) {
-  return `ra:drip:migrate:idem:${discordUserId}:${idem}`.slice(0, 220);
+async function getDiscordSession(req: NextApiRequest) {
+  const proto = (req.headers["x-forwarded-proto"] as string) || "https";
+  const host = req.headers.host;
+  const url = `${proto}://${host}/api/auth/discord/session`;
+
+  const r = await fetch(url, {
+    method: "GET",
+    headers: {
+      cookie: req.headers.cookie || "",
+      "cache-control": "no-store",
+    },
+  });
+  const j: any = await r.json().catch(() => null);
+  return { ok: r.ok && j?.ok, session: j };
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -125,84 +41,93 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(405).json({ ok: false, error: "Method not allowed" });
     }
 
-    if (!DRIP_API_KEY || !DRIP_REALM_ID) {
-      return res.status(500).json({ ok: false, error: "Missing DRIP env vars (DRIP_API_KEY / DRIP_REALM_ID)" });
+    const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body ?? {});
+    const amount = Math.floor(Number(body.amount || 0));
+    const playerId = String(body.playerId || "guest").trim().slice(0, 64) || "guest";
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ ok: false, error: "Invalid amount" });
     }
 
-    const sess = await getDiscordSession(req);
-    if (!sess) {
+    const { ok, session } = await getDiscordSession(req);
+    if (!ok || !session?.discordUserId) {
       return res.status(401).json({ ok: false, error: "Discord not connected." });
     }
 
-    const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body ?? {});
-    const amount = Math.floor(Number(body.amount || 0));
-    const playerId = String(body.playerId || "").trim().slice(0, 64);
+    const DRIP_API_KEY = mustEnv("DRIP_API_KEY");
+    const DRIP_REALM_ID = mustEnv("DRIP_REALM_ID");
+    const DRIP_REALM_POINT_ID = process.env.DRIP_REALM_POINT_ID || ""; // if you have multiple currencies, set this.
 
-    if (!playerId) return res.status(400).json({ ok: false, error: "Missing playerId" });
-    if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ ok: false, error: "Invalid amount" });
+    const discordId = String(session.discordUserId);
 
-    // ✅ Idempotency guard (prevents double-click double-charge)
-    const idem = String(req.headers["x-idempotency-key"] || body.idempotencyKey || "").trim();
-    if (!idem) {
-      return res.status(400).json({ ok: false, error: "Missing idempotency key" });
-    }
+    // 1) Find member by discord-id
+    const searchUrl = `https://api.drip.re/api/v1/realm/${DRIP_REALM_ID}/members/search?type=discord-id&values=${encodeURIComponent(
+      discordId
+    )}`;
 
-    const ik = idemKey(sess.discordUserId, idem);
-    const already = await redis.get<any>(ik);
-    if (already) {
-      // return the same result again
-      return res.status(200).json(already);
-    }
+    const sr = await fetch(searchUrl, {
+      headers: {
+        Authorization: `Bearer ${DRIP_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+    });
 
-    // Create/find ghost credential first
-    let cred = await findDiscordCredential(sess.discordUserId);
-    if (!cred) {
-      await createDiscordCredential(sess.discordUserId, sess.discordName);
-      cred = await findDiscordCredential(sess.discordUserId);
-    }
-    if (!cred) {
-      return res.status(500).json({ ok: false, error: "Could not create/find DRIP credential for this Discord user." });
-    }
-
-    const dripBalBefore = extractBalance(cred);
-    if (dripBalBefore < amount) {
-      const out = {
+    const sj: any = await sr.json().catch(() => null);
+    if (!sr.ok) {
+      return res.status(sr.status).json({
         ok: false,
-        error: "Insufficient DRIP balance",
-        dripBalance: dripBalBefore,
-      };
-      await redis.set(ik, out, { ex: 60 * 10 });
-      return res.status(400).json(out);
+        error: sj?.error || sj?.message || "DRIP member search failed",
+        detail: sj,
+      });
     }
 
-    // 1) Deduct from DRIP first (no double-dipping)
-    await deductFromDrip(sess.discordUserId, amount);
+    const member = Array.isArray(sj) ? sj[0] : sj?.members?.[0] || sj?.[0];
+    if (!member?.id) {
+      return res.status(404).json({ ok: false, error: "DRIP member not found for this Discord ID." });
+    }
 
-    // 2) Credit the game balance (Redis)
+    const memberId = String(member.id);
+
+    // 2) Deduct points in DRIP (negative tokens)
+    const deductUrl = `https://api.drip.re/api/v1/realm/${DRIP_REALM_ID}/members/${memberId}/point-balance`;
+
+    const deductBody: any = { tokens: -amount };
+    if (DRIP_REALM_POINT_ID) deductBody.realmPointId = DRIP_REALM_POINT_ID;
+
+    const dr = await fetch(deductUrl, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${DRIP_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(deductBody),
+    });
+
+    const dj: any = await dr.json().catch(() => null);
+    if (!dr.ok) {
+      return res.status(dr.status).json({
+        ok: false,
+        error: dj?.error || dj?.message || "DRIP deduction failed",
+        detail: dj,
+      });
+    }
+
+    // 3) Credit game balance
     const newBalance = await redis.incrby(balKey(playerId), amount);
 
-    // ✅ update balance leaderboard (same behavior as admin grant)
+    // 4) Keep “Balance leaderboard” accurate
     await redis.zadd(lbBalanceKey(), { score: Number(newBalance || 0), member: playerId });
 
-    // 3) Re-read DRIP balance (best-effort)
-    const credAfter = await findDiscordCredential(sess.discordUserId);
-    const dripBalAfter = credAfter ? extractBalance(credAfter) : null;
-
-    const out = {
+    return res.status(200).json({
       ok: true,
+      discordUserId: discordId,
+      memberId,
       playerId,
-      discordUserId: sess.discordUserId,
       migrated: amount,
       balance: Number(newBalance || 0),
-      dripBalance: typeof dripBalAfter === "number" ? dripBalAfter : undefined,
-    };
-
-    // store idempotent result for 10 minutes
-    await redis.set(ik, out, { ex: 60 * 10 });
-
-    return res.status(200).json(out);
+    });
   } catch (err: any) {
-    console.error("drip/migrate error:", err);
+    console.error("drip migrate error:", err);
     return res.status(500).json({ ok: false, error: err?.message || "Server error" });
   }
 }
