@@ -24,7 +24,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     ]);
 
     const parseZ = (z: any[]) => {
-      // Upstash returns [{member,score}] in some clients, or [member, score, member, score] in others.
       if (!Array.isArray(z)) return [];
       if (z.length && typeof z[0] === "object" && z[0]?.member != null) {
         return z.map((x: any) => ({ playerId: String(x.member), score: Number(x.score || 0) }));
@@ -36,9 +35,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return out;
     };
 
-    const safeJson = (s: string) => {
+    const safeWin = (x: any) => {
+      // Upstash can return list entries as object already
+      if (x == null) return null;
+      if (typeof x === "object") return x;
+      if (typeof x === "string") {
+        try {
+          return JSON.parse(x);
+        } catch {
+          return null;
+        }
+      }
       try {
-        return JSON.parse(s);
+        return JSON.parse(String(x));
       } catch {
         return null;
       }
@@ -49,7 +58,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       balance: parseZ(bal),
       earned: parseZ(earned),
       wins: parseZ(wins),
-      recentWins: (recent || []).map((x: any) => safeJson(String(x))).filter(Boolean),
+      recentWins: (recent || []).map(safeWin).filter(Boolean),
     });
   } catch (e: any) {
     console.error("leaderboard summary error:", e);
