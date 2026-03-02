@@ -4,16 +4,19 @@ import { redis } from "../../../lib/server/redis";
 import { LB_RECENT_WINS } from "../../../lib/server/leaderboards";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  res.setHeader("Cache-Control", "no-store, max-age=0");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+
   if (req.method !== "GET") {
+    res.setHeader("Allow", "GET");
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const limitRaw = Array.isArray(req.query.limit)
-    ? req.query.limit[0]
-    : req.query.limit;
-
+  const limitRaw = Array.isArray(req.query.limit) ? req.query.limit[0] : req.query.limit;
   const limit = Math.max(1, Math.min(100, Number(limitRaw ?? 20) || 20));
 
+  const len = await redis.llen(LB_RECENT_WINS);
   const list = await redis.lrange(LB_RECENT_WINS, 0, limit - 1);
 
   const wins = (list ?? [])
@@ -26,5 +29,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     })
     .filter(Boolean);
 
-  return res.status(200).json({ wins });
+  return res.status(200).json({
+    wins,
+    debug: { LB_RECENT_WINS, recentLen: Number(len || 0) },
+  });
 }
