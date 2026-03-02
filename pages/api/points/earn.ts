@@ -2,6 +2,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
 import { pointsConfig as defaultPointsConfig } from "../../../lib/pointsConfig";
+import { addToEarnedTotal, updateBalanceLeaderboard } from "../../../lib/server/leaderboards";
 
 function todayKey(playerId: string) {
   const d = new Date();
@@ -83,6 +84,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const newBalance = await redis.incrby(balKey(pid), toAdd);
 
+// ✅ lifetime earned leaderboard (gameplay only)
+await addToEarnedTotal(pid, toAdd);
+
+// ✅ keep balance leaderboard accurate
+await updateBalanceLeaderboard(pid, Number(newBalance || 0));
+    
     return res.status(200).json({
       ok: true,
       playerId: pid,
