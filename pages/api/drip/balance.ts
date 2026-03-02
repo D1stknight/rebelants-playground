@@ -77,15 +77,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     let balance = 0;
 
-    if (realmPointId) {
-      // prefer exact currency match
-      const hit = balances.find((b: any) => String(b?.realmPointId || "") === realmPointId);
-      balance = Number(hit?.balance ?? 0) || 0;
-    } else {
-      // fallback to first numeric balance
-      const first = balances.find((b: any) => Number.isFinite(Number(b?.balance)));
-      balance = Number(first?.balance ?? 0) || 0;
-    }
+const readBal = (b: any) =>
+  Number(
+    b?.balance ??
+      b?.amount ??
+      b?.value ??
+      b?.points ??
+      b?.available ??
+      0
+  ) || 0;
+
+if (realmPointId) {
+  const hit = balances.find((b: any) => {
+    const ids = [
+      b?.realmPointId,
+      b?.pointId,
+      b?.id,
+      b?.realmPoint?.id,
+      b?.point?.id,
+    ]
+      .map((x: any) => String(x || "").trim())
+      .filter(Boolean);
+
+    return ids.includes(String(realmPointId).trim());
+  });
+
+  // ✅ If match found, use it. Otherwise fallback to first balance returned.
+  if (hit) balance = readBal(hit);
+  else if (balances.length) balance = readBal(balances[0]);
+} else {
+  if (balances.length) balance = readBal(balances[0]);
+}
 
     return res.status(200).json({
       ok: true,
