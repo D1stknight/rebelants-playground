@@ -6,6 +6,7 @@ export const LB_BALANCE = "ra:lb:balance";        // current balance visibility
 export const LB_EARNED  = "ra:lb:totalEarned";    // lifetime earned from gameplay
 export const LB_WINS    = "ra:lb:wins";           // lifetime wins count
 export const LB_RECENT_WINS = "ra:wins:recent";   // recent wins feed list (JSON strings)
+export const LB_RECENT_WINS_ZSET = "ra:lb:recentWins";
 
 // ✅ helpers used by multiple APIs
 export async function updateBalanceLeaderboard(playerId: string, newBalance: number) {
