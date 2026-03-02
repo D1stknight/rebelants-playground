@@ -20,7 +20,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       redis.zrange(LB_BALANCE, 0, topN - 1, { rev: true, withScores: true }),
       redis.zrange(LB_EARNED, 0, topN - 1, { rev: true, withScores: true }),
       redis.zrange(LB_WINS, 0, topN - 1, { rev: true, withScores: true }),
-      redis.lrange(LB_RECENT_WINS, 0, 24),
+      redis.zrange("ra:lb:recentWins", 0, 24, { rev: true }),
     ]);
 
     const parseZ = (z: any[]) => {
