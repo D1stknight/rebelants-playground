@@ -19,12 +19,15 @@ async function getDiscordSession(req: NextApiRequest) {
       "cache-control": "no-store",
     },
   });
+
   const j: any = await r.json().catch(() => null);
   return { ok: r.ok && j?.ok, session: j };
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Cache-Control", "no-store, max-age=0");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
 
   try {
     if (req.method !== "GET") {
@@ -37,56 +40,56 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ ok: false, error: "Discord not connected." });
     }
 
-    const DRIP_API_KEY = mustEnv("DRIP_API_KEY");
-    const DRIP_REALM_ID = mustEnv("DRIP_REALM_ID");
-    const DRIP_REALM_POINT_ID = process.env.DRIP_REALM_POINT_ID || ""; // optional but recommended
+    const realmId = mustEnv("DRIP_REALM_ID");
+    const apiKey = mustEnv("DRIP_API_KEY");
+    const realmPointId = process.env.DRIP_REALM_POINT_ID || ""; // optional but recommended
 
     const discordId = String(session.discordUserId);
 
-    const url = `https://api.drip.re/api/v1/realm/${DRIP_REALM_ID}/members/search?type=discord-id&values=${encodeURIComponent(
-      discordId
-    )}`;
+    // ✅ DRIP: Find credential by discord-id
+    const findUrl =
+      `https://api.drip.re/api/v1/realms/${realmId}/credentials/find` +
+      `?type=discord-id&value=${encodeURIComponent(discordId)}`;
 
-    const r = await fetch(url, {
+    const fr = await fetch(findUrl, {
+      method: "GET",
       headers: {
-        Authorization: `Bearer ${DRIP_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
     });
 
-    const j: any = await r.json().catch(() => null);
-    if (!r.ok) {
-      return res.status(r.status).json({
+    const fj: any = await fr.json().catch(() => null);
+
+    if (!fr.ok) {
+      return res.status(fr.status).json({
         ok: false,
-        error: j?.error || j?.message || "DRIP member search failed",
-        detail: j,
+        error: fj?.error || "DRIP credential lookup failed",
+        detail: fj,
       });
     }
 
-    const member = Array.isArray(j) ? j[0] : j?.members?.[0] || j?.[0];
-    if (!member) {
-      return res.status(404).json({ ok: false, error: "DRIP member not found for this Discord ID." });
-    }
+    // If DRIP returns balances, use them. If not present, just return 0.
+    const balances = Array.isArray(fj?.balances) ? fj.balances : [];
+    let balance = 0;
 
-    const balances = member.pointBalances || member.point_balances || [];
-    let bal = 0;
-
-    if (DRIP_REALM_POINT_ID) {
-      const row = balances.find((b: any) => String(b?.realmPointId || b?.realm_point_id) === DRIP_REALM_POINT_ID);
-      bal = Number(row?.balance || 0);
+    if (realmPointId) {
+      const hit = balances.find((b: any) => String(b?.realmPointId || b?.pointId || "") === realmPointId);
+      balance = Number(hit?.balance || hit?.amount || 0) || 0;
     } else {
-      // fallback: first currency balance
-      bal = Number(balances?.[0]?.balance || 0);
+      // fallback: take first numeric balance if available
+      const first = balances.find((b: any) => Number.isFinite(Number(b?.balance ?? b?.amount)));
+      balance = Number(first?.balance ?? first?.amount ?? 0) || 0;
     }
 
     return res.status(200).json({
       ok: true,
       discordUserId: discordId,
-      memberId: member.id || member.memberId,
-      balance: Number.isFinite(bal) ? bal : 0,
+      balance,
+      note: realmPointId ? "Using DRIP_REALM_POINT_ID filter." : "No DRIP_REALM_POINT_ID set; using first available balance.",
     });
-  } catch (err: any) {
-    console.error("drip balance error:", err);
-    return res.status(500).json({ ok: false, error: err?.message || "Server error" });
+  } catch (e: any) {
+    console.error("drip balance error:", e);
+    return res.status(500).json({ ok: false, error: e?.message || "Server error" });
   }
 }
