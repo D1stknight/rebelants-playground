@@ -26,8 +26,15 @@ async function getDiscordSession(req: NextApiRequest) {
   const host = req.headers.host;
   const url = `${proto}://${host}/api/auth/discord/session`;
 
-  const r = await fetch(url, { method: "GET", headers: { "Cache-Control": "no-store" } });
-  const j: any = await r.json().catch(() => null);
+  const r = await fetch(url, {
+  method: "GET",
+  headers: {
+    "Cache-Control": "no-store",
+    // ✅ forward cookies so the session endpoint can read them
+    cookie: req.headers.cookie || "",
+  },
+});
+const j: any = await r.json().catch(() => null);
   if (!r.ok || !j?.ok || !j?.discordUserId) return null;
   return { discordUserId: String(j.discordUserId), discordName: String(j.discordName || "") };
 }
