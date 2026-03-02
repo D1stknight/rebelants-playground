@@ -700,20 +700,24 @@ await fetch("/api/wins/add", {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     ts: Date.now(),
     game: "shuffle",
-    playerId: pid,
-    playerName: pname,
+
+    // ✅ IMPORTANT: record wins to the same identity used for points
+    playerId: effectivePlayerId || pid,
+    playerName: prof?.discordName || prof?.name || pname,
+
     rarity: r,
     pointsAwarded,
   }),
 }).catch(() => {});
 
+window.dispatchEvent(new Event("ra:leaderboards-refresh"));
+  
 setRarity(r);
 setPhase("revealed");
 setShowPrize(true);
 setBusy(false);
     }, 350);
   };
-
   const resetAfterPrize = () => {
   setShowPrize(false);
   setRarity("none");
