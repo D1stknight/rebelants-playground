@@ -728,6 +728,47 @@ setPrize(null); // ✅ clear actual prize object
   setPhase("idle");
 };
 
+// ✅ Leaderboards (server summary)
+const [lb, setLb] = React.useState<{
+  balance: { playerId: string; score: number }[];
+  earned: { playerId: string; score: number }[];
+  wins: { playerId: string; score: number }[];
+  recentWins: any[];
+}>({
+  balance: [],
+  earned: [],
+  wins: [],
+  recentWins: [],
+});
+
+async function loadLeaderboards() {
+  try {
+    const r = await fetch("/api/leaderboard/summary", { cache: "no-store" });
+    const j = await r.json().catch(() => null);
+    if (!r.ok || !j?.ok) return;
+    setLb({
+      balance: Array.isArray(j.balance) ? j.balance : [],
+      earned: Array.isArray(j.earned) ? j.earned : [],
+      wins: Array.isArray(j.wins) ? j.wins : [],
+      recentWins: Array.isArray(j.recentWins) ? j.recentWins : [],
+    });
+  } catch {}
+}
+
+// ✅ Load once on mount
+React.useEffect(() => {
+  loadLeaderboards();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
+
+// ✅ Live-refresh leaderboards when a win is recorded (no page refresh needed)
+React.useEffect(() => {
+  const onRefresh = () => loadLeaderboards();
+  window.addEventListener("ra:leaderboards-refresh", onRefresh);
+  return () => window.removeEventListener("ra:leaderboards-refresh", onRefresh);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
+
 async function openDripModal() {
   setDripStatus("");
   setDripBusy(true);
@@ -753,7 +794,6 @@ async function openDripModal() {
     setDripBusy(false);
   }
 }
-
 async function migrateDripNow() {
   const amt = Math.floor(Number(dripAmount || 0));
   if (!amt || amt <= 0) {
