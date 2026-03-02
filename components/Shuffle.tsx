@@ -952,13 +952,13 @@ return (
       }}
     >
       <div style={{ fontWeight: 800, marginBottom: 6 }}>How points work</div>
-      <div style={{ fontSize: 13, opacity: 0.9, lineHeight: 1.4 }}>
-        • Shuffle costs <b>{pointsConfig.shuffleCost}</b> {pointsConfig.currency}.<br />
-        • Prizes: Common <b>+{pointsConfig.rewards.common}</b>, Rare <b>+{pointsConfig.rewards.rare}</b>, Ultra <b>+{pointsConfig.rewards.ultra}</b>.<br />
-        • Daily claim: <b>+{pointsConfig.dailyClaim}</b> {pointsConfig.currency} (cap: <b>{pointsConfig.dailyEarnCap}</b>/day).<br />
-        • Leaderboards are based on total earned + recent wins (local for now).
-      </div>
-
+    <div style={{ fontSize: 13, opacity: 0.9, lineHeight: 1.4 }}>
+  • Shuffle costs <b>{pointsConfig.shuffleCost}</b> {pointsConfig.currency}.<br />
+  • Daily claim is <b>once per day</b>: <b>+{pointsConfig.dailyClaim}</b> {pointsConfig.currency}.<br />
+  • Gameplay earnings have a daily cap: <b>{pointsConfig.dailyEarnCap}</b>/day.<br />
+  • Buy Points lets you connect an Ape wallet and purchase points with <b>APE</b> (1 APE = 100 pts).<br />
+  • “Migrate from Discord (DRIP)” moves points into the game and <b>deducts them from DRIP</b> to prevent double-dipping.<br />
+</div>
       <button
         type="button"
         className="btn"
