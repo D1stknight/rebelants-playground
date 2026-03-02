@@ -20,7 +20,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const playerName = String(body.playerName || "guest").trim().slice(0, 64) || "guest";
     const game = String(body.game || "shuffle").trim().slice(0, 32) || "shuffle";
     const rarity = String(body.rarity || "none").trim().slice(0, 16) || "none";
-
     const pointsAwardedRaw = Number(body.pointsAwarded || 0);
     const pointsAwarded = Number.isFinite(pointsAwardedRaw) ? pointsAwardedRaw : 0;
 
@@ -35,14 +34,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       prize: body.prize ?? null,
     };
 
-    // ✅ Top wins
+    // ✅ wins count
     await redis.zincrby(LB_WINS, 1, playerId);
 
-    // ✅ Recent wins (LIST) — this must match what summary reads
+    // ✅ recent wins feed
     await redis.lpush(LB_RECENT_WINS, JSON.stringify(evt));
     await redis.ltrim(LB_RECENT_WINS, 0, 49);
 
-    return res.status(200).json({ ok: true, event: evt });
+    // 🔎 DEBUG: verify Redis sees it immediately
+    const len = await redis.llen(LB_RECENT_WINS);
+    const head = await redis.lrange(LB_RECENT_WINS, 0, 0);
+
+    return res.status(200).json({
+      ok: true,
+      event: evt,
+      debug: {
+        LB_RECENT_WINS,
+        recentLen: Number(len || 0),
+        recentHead: head?.[0] ? String(head[0]).slice(0, 180) : null,
+      },
+    });
   } catch (err: any) {
     console.error("wins/add error:", err);
     return res.status(500).json({ ok: false, error: "Server error" });
