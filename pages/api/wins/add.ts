@@ -1,7 +1,9 @@
 // pages/api/wins/add.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
-import { LB_WINS, LB_RECENT_WINS } from "../../../lib/server/leaderboards";
+import { LB_WINS } from "../../../lib/server/leaderboards";
+
+const RECENT_WINS_ZSET = "ra:lb:recentWins";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Cache-Control", "no-store, max-age=0");
@@ -11,7 +13,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(405).json({ ok: false });
     }
 
-    const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body ?? {});
+    const body =
+      typeof req.body === "string" ? JSON.parse(req.body) : (req.body ?? {});
 
     const playerId = String(body.playerId || "guest");
     const playerName = String(body.playerName || "guest");
@@ -30,11 +33,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       prize: body.prize ?? null,
     };
 
+    // ✅ Wins leaderboard (this already works)
     await redis.zincrby(LB_WINS, 1, playerId);
 
-    // leave this in place for now
-    await redis.lpush(LB_RECENT_WINS, JSON.stringify(evt));
-    await redis.ltrim(LB_RECENT_WINS, 0, 49);
+    // ✅ Recent wins as ZSET (replace LIST completely)
+    await redis.zadd(RECENT_WINS_ZSET, {
+      score: evt.ts,
+      member: JSON.stringify(evt),
+    });
+
+    // keep only latest 50 (remove oldest)
+    await redis.zremrangebyrank(RECENT_WINS_ZSET, 0, -51);
 
     return res.status(200).json({ ok: true });
   } catch (err) {
