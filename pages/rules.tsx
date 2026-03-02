@@ -1,3 +1,9 @@
+import Link from "next/link";
+
+<Link href="/shuffle" style={{ textDecoration: "underline", display: "inline-block", marginBottom: 12 }}>
+  ← Back to Shuffle
+</Link>
+
 export default function Rules() {
   return (
     <main className="max-w-3xl mx-auto p-6">
