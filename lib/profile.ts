@@ -9,6 +9,9 @@ export type Profile = {
 
   // ✅ NEW: once linked, this becomes permanent identity
   primaryId?: string;         // "wallet:0x..." or later "discord:123"
+
+  // ✅ NEW: if user clicks Disconnect, block auto-relink on refresh
+  discordSkipLink?: boolean;
 };
 
 const KEY = "ra_profile_v1";
@@ -57,13 +60,14 @@ export function saveProfile(next: Partial<Profile>) {
   if (typeof window === "undefined") return;
   const cur = loadProfile();
 
-  const merged: Profile = {
+    const merged: Profile = {
     ...cur,
     ...next,
     walletAddress: normalizeWallet(next.walletAddress ?? cur.walletAddress),
     discordUserId: next.discordUserId ?? cur.discordUserId,
     discordName: next.discordName ?? cur.discordName,
     primaryId: next.primaryId ?? cur.primaryId, // ✅ preserve
+    discordSkipLink: next.discordSkipLink ?? cur.discordSkipLink, // ✅ preserve
   };
 
   localStorage.setItem(KEY, JSON.stringify(merged));
