@@ -160,15 +160,17 @@ const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
   append(`CONFIG status ${r.status}\n${JSON.stringify(j, null, 2)}`);
 
   const merged = (j?.config ?? j?.pointsConfig) as PointsConfigShape | undefined;
-  if (merged) setCfg(merged);
-}
 
   if (merged) {
-  const pct = Math.round(Number((merged as any).rareMerchChance ?? 0.01) * 100);
-  setRareMerchChancePct(String(pct));
+    setCfg(merged);
+
+    // ✅ keep the % input in sync with loaded config
+    const pct = Math.round(Number((merged as any).rareMerchChance ?? 0.01) * 100);
+    setRareMerchChancePct(String(pct));
+  }
 }
   
-  async function saveConfig() {
+ async function saveConfig() {
   append("Saving config…");
   const r = await fetch("/api/admin/config", {
     method: "POST",
@@ -179,7 +181,14 @@ const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
   append(`SAVE CONFIG status ${r.status}\n${JSON.stringify(j, null, 2)}`);
 
   const merged = (j?.config ?? j?.pointsConfig) as PointsConfigShape | undefined;
-  if (merged) setCfg(merged);
+
+  if (merged) {
+    setCfg(merged);
+
+    // ✅ keep the % input in sync with saved config
+    const pct = Math.round(Number((merged as any).rareMerchChance ?? 0.01) * 100);
+    setRareMerchChancePct(String(pct));
+  }
 }
 
   async function loadClaims() {
