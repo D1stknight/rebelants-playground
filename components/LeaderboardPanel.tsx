@@ -186,7 +186,7 @@ export default function LeaderboardPanel() {
     {!lb.recentWins?.length && <div className="lb-empty">No recent wins yet.</div>}
   </div>
 </div>
-
+      </div> {
       <style jsx>{`
         .lb-wrap {
           margin-top: 18px;
@@ -293,6 +293,6 @@ export default function LeaderboardPanel() {
           text-align: center;
         }
       `}</style>
-    </div>
+    </div> {
   );
 }
