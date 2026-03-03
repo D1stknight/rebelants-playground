@@ -42,7 +42,8 @@ export default function PrizeModal({
 }: Props) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string>("");
-  const [okMsg, setOkMsg] = useState<string>("");
+    const [okMsg, setOkMsg] = useState<string>("");
+  const [savedClaim, setSavedClaim] = useState<any>(null);
 
   const [shipping, setShipping] = useState<Shipping>({
     name: "",
@@ -103,7 +104,8 @@ export default function PrizeModal({
         return;
       }
 
-      setOkMsg("Shipping received ✅");
+           setOkMsg("✅ Shipping saved! You can close this window safely.");
+      setSavedClaim(j.claim);
       if (onShippingSaved) onShippingSaved(j.claim);
     } catch (e: any) {
       setErr(e?.message || "Shipping submit failed");
@@ -125,6 +127,23 @@ export default function PrizeModal({
           <div style={{ marginTop: 10 }}>
             <div style={{ fontWeight: 900, marginBottom: 8 }}>Shipping Info</div>
 
+                        {/* ✅ After save: show proof + claim id */}
+            {savedClaim?.claimId && (
+              <div style={{ marginBottom: 10, fontSize: 12, opacity: 0.95 }}>
+                <div>
+                  <b>Claim ID:</b>{" "}
+                  <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+                    {String(savedClaim.claimId)}
+                  </span>
+                </div>
+                {savedClaim?.prize?.label && (
+                  <div style={{ marginTop: 6 }}>
+                    <b>You won:</b> {String(savedClaim.prize.label)}
+                  </div>
+                )}
+              </div>
+            )}
+            
             {err && (
               <div style={{ marginBottom: 10, opacity: 0.95 }}>
                 ❌ {err}
@@ -195,17 +214,18 @@ export default function PrizeModal({
               />
             </div>
 
-            <div style={{ display: "flex", gap: 10, marginTop: 12, justifyContent: "flex-end" }}>
+                        <div style={{ display: "flex", gap: 10, marginTop: 12, justifyContent: "flex-end" }}>
               <button
                 className="btn"
                 onClick={submitShipping}
-                disabled={busy}
+                disabled={busy || !!savedClaim}
                 style={{ padding: "10px 12px" }}
               >
-                {busy ? "Submitting…" : "Submit Shipping"}
+                {busy ? "Saving…" : savedClaim ? "Saved ✅" : "Save Shipping"}
               </button>
+
               <button onClick={onClose} className="btn" style={{ padding: "10px 12px" }}>
-                Close
+                {savedClaim ? "Continue" : "Close"}
               </button>
             </div>
           </div>
