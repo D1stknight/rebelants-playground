@@ -107,7 +107,7 @@ export default function LeaderboardPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return (
+    return (
     <div className="lb-wrap">
       <div className="lb-title">
         Leaderboards{" "}
@@ -124,7 +124,7 @@ export default function LeaderboardPanel() {
             {(lb.balance || []).slice(0, 10).map((r, i) => (
               <div key={`${r.playerId}-${i}`} className="lb-row">
                 <div className="lb-rank">#{i + 1}</div>
-               <div className="lb-name">{fmtName(r.playerId, my)}</div>
+                <div className="lb-name">{fmtName(r.playerId, my)}</div>
                 <div className="lb-score">{Math.floor(r.score || 0)}</div>
               </div>
             ))}
@@ -139,7 +139,7 @@ export default function LeaderboardPanel() {
             {(lb.earned || []).slice(0, 10).map((r, i) => (
               <div key={`${r.playerId}-${i}`} className="lb-row">
                 <div className="lb-rank">#{i + 1}</div>
-               <div className="lb-name">{fmtName(r.playerId, my)}</div>
+                <div className="lb-name">{fmtName(r.playerId, my)}</div>
                 <div className="lb-score">{Math.floor(r.score || 0)}</div>
               </div>
             ))}
@@ -147,46 +147,47 @@ export default function LeaderboardPanel() {
           </div>
         </div>
 
-     {/* Wins */}
-<div className="lb-card">
-  <div className="lb-card-title">Top Wins</div>
-  <div className="lb-rows lb-scroll">
-    {(lb.wins || []).slice(0, 30).map((r, i) => (
-      <div key={`${r.playerId}-${i}`} className="lb-row">
-        <div className="lb-rank">#{i + 1}</div>
-        <div className="lb-name">{fmtName(r.playerId, my)}</div>
-        <div className="lb-score">{Math.floor(r.score || 0)}</div>
-      </div>
-    ))}
-    {!lb.wins?.length && <div className="lb-empty">No wins entries yet.</div>}
-  </div>
-</div>
-
-       {/* Recent Wins */}
-<div className="lb-card">
-  <div className="lb-card-title">Recent Wins</div>
-  <div className="lb-rows lb-scroll">
-    {(lb.recentWins || []).slice(0, 40).map((w, i) => {
-      const name = w?.playerName || fmtName(String(w?.playerId || ""), my);
-      const pts = Math.floor(Number(w?.pointsAwarded || 0));
-      const rarity = String(w?.rarity || "none");
-      const game = String(w?.game || "shuffle");
-      return (
-        <div key={`${w?.id || i}`} className="lb-win">
-          <span className={`pill pill-${rarity}`}>{rarity}</span>
-          <div className="lb-win-text">
-            <div className="lb-win-name">{name}</div>
-            <div className="lb-win-sub">
-              +{pts} ({game})
-            </div>
+        {/* Wins */}
+        <div className="lb-card">
+          <div className="lb-card-title">Top Wins</div>
+          <div className="lb-rows lb-scroll">
+            {(lb.wins || []).slice(0, 30).map((r, i) => (
+              <div key={`${r.playerId}-${i}`} className="lb-row">
+                <div className="lb-rank">#{i + 1}</div>
+                <div className="lb-name">{fmtName(r.playerId, my)}</div>
+                <div className="lb-score">{Math.floor(r.score || 0)}</div>
+              </div>
+            ))}
+            {!lb.wins?.length && <div className="lb-empty">No wins entries yet.</div>}
           </div>
         </div>
-      );
-    })}
-    {!lb.recentWins?.length && <div className="lb-empty">No recent wins yet.</div>}
-  </div>
-</div>
-      </div> {
+
+        {/* Recent Wins */}
+        <div className="lb-card">
+          <div className="lb-card-title">Recent Wins</div>
+          <div className="lb-rows lb-scroll">
+            {(lb.recentWins || []).slice(0, 40).map((w, i) => {
+              const name = w?.playerName || fmtName(String(w?.playerId || ""), my);
+              const pts = Math.floor(Number(w?.pointsAwarded || 0));
+              const rarity = String(w?.rarity || "none");
+              const game = String(w?.game || "shuffle");
+              return (
+                <div key={`${w?.id || i}`} className="lb-win">
+                  <span className={`pill pill-${rarity}`}>{rarity}</span>
+                  <div className="lb-win-text">
+                    <div className="lb-win-name">{name}</div>
+                    <div className="lb-win-sub">
+                      +{pts} ({game})
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            {!lb.recentWins?.length && <div className="lb-empty">No recent wins yet.</div>}
+          </div>
+        </div>
+      </div>
+
       <style jsx>{`
         .lb-wrap {
           margin-top: 18px;
@@ -216,24 +217,26 @@ export default function LeaderboardPanel() {
           gap: 8px;
         }
 
-.lb-scroll {
-  max-height: 170px;          /* ~3 rows visible */
-  overflow-y: auto;
-  padding-right: 6px;         /* space so scrollbar doesn't overlay text */
-  align-content: start;}
+        .lb-scroll {
+          max-height: 170px; /* ~3 rows visible */
+          overflow-y: auto;
+          padding-right: 6px; /* space so scrollbar doesn't overlay text */
+          align-content: start;
+        }
 
-/* optional: nicer scrollbar */
-.lb-scroll::-webkit-scrollbar {
-  width: 10px;
-}
-.lb-scroll::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,.18);
-  border-radius: 999px;
-}
-.lb-scroll::-webkit-scrollbar-track {
-  background: rgba(0,0,0,.18);
-  border-radius: 999px;
-}        
+        /* optional: nicer scrollbar */
+        .lb-scroll::-webkit-scrollbar {
+          width: 10px;
+        }
+        .lb-scroll::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.18);
+          border-radius: 999px;
+        }
+        .lb-scroll::-webkit-scrollbar-track {
+          background: rgba(0, 0, 0, 0.18);
+          border-radius: 999px;
+        }
+
         .lb-row {
           display: grid;
           grid-template-columns: 42px 1fr 90px;
@@ -293,6 +296,6 @@ export default function LeaderboardPanel() {
           text-align: center;
         }
       `}</style>
-    </div> {
+    </div>
   );
 }
