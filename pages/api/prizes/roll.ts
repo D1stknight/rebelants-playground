@@ -65,9 +65,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 // ---------- ULTRA ----------
 if (rarity === "ultra") {
   // 🔥 Try to pull an NFT from inventory (atomic)
-  const nftRaw = await redis.rpop(ULTRA_NFT_INVENTORY_KEY);
+  // We loop to SKIP junk/stale entries that may be in the list.
+  for (let i = 0; i < 10; i++) {
+    const nftRaw = await redis.rpop(ULTRA_NFT_INVENTORY_KEY);
+    if (!nftRaw) break;
 
-  if (nftRaw) {
     let item: any = null;
     try {
       item = JSON.parse(String(nftRaw));
@@ -80,27 +82,48 @@ if (rarity === "ultra") {
     const tokenId = String(item?.tokenId ?? "").trim();
     const label = String(item?.label || "NFT Prize").trim();
 
-    // ✅ REQUIRED by /api/prizes/claim
-    const inventoryKey =
-      String(item?.inventoryKey || "").trim() ||
-      `ultra:${chain}:${contract}:${tokenId}`;
+    // ✅ Only accept valid entries
+    if (contract && contract.startsWith("0x") && tokenId) {
+      // ✅ REQUIRED by /api/prizes/claim
+      const inventoryKey =
+        String(item?.inventoryKey || "").trim() ||
+        `ultra:${chain}:${contract}:${tokenId}`;
 
-    return res.status(200).json({
-      ok: true,
-      rarity,
-      prize: {
-        type: "nft",
-        label,
-        meta: {
-          chain,
-          contract,
-          tokenId,
+      return res.status(200).json({
+        ok: true,
+        rarity,
+        prize: {
+          type: "nft",
           label,
-          inventoryKey,
+          meta: {
+            chain,
+            contract,
+            tokenId,
+            label,
+            inventoryKey,
+          },
         },
-      },
-    });
+      });
+    }
+
+    // if invalid, keep looping and pop the next one
   }
+
+  // fallback to points if no VALID NFT available
+  const ptsCfg = Number(cfg.rewards.ultra || 0);
+  const min = Number(cfg.ultraMinReward || 0);
+  const pts = Math.max(ptsCfg, min);
+
+  return res.status(200).json({
+    ok: true,
+    rarity,
+    prize: {
+      type: "points",
+      points: pts,
+      label: `${pts} ${currency}`,
+    },
+  });
+}
 
   // fallback to points if no NFT available
   const ptsCfg = Number(cfg.rewards.ultra || 0);
