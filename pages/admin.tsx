@@ -14,6 +14,10 @@ type PointsConfigShape = {
   // ✅ NEW
   ultraMinReward: number;
 
+  // ✅ PRO: rarity weights + rare merch chance
+  rarityWeights: { none: number; common: number; rare: number; ultra: number };
+  rareMerchChancePercent: number;
+
   prizePools?: {
     none: any[];
     common: any[];
@@ -24,6 +28,16 @@ type PointsConfigShape = {
 
 function safeNum(v: any, fallback: number) {
   const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function parsePercentLike(v: any, fallback: number) {
+  const s = String(v ?? "").trim();
+  if (!s) return fallback;
+
+  const cleaned = s.endsWith("%") ? s.slice(0, -1).trim() : s;
+  const n = Number(cleaned);
+
   return Number.isFinite(n) ? n : fallback;
 }
 
@@ -42,7 +56,7 @@ export default function AdminPage() {
   const [amount, setAmount] = useState(5000);
 
   // config form
- const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
+const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
   currency: defaultConfig.currency,
   shuffleCost: defaultConfig.shuffleCost,
   dailyClaim: defaultConfig.dailyClaim,
@@ -51,6 +65,16 @@ export default function AdminPage() {
 
   // ✅ NEW (fallback if missing)
   ultraMinReward: Number((defaultConfig as any).ultraMinReward ?? 50),
+
+  // ✅ PRO defaults (so Admin Save keeps these fields)
+  rarityWeights: (defaultConfig as any).rarityWeights || {
+    none: 45,
+    common: 37,
+    rare: 15,
+    ultra: 3,
+  },
+
+  rareMerchChancePercent: Number((defaultConfig as any).rareMerchChancePercent ?? 1),
 
   prizePools: (defaultConfig as any).prizePools || {
     none: [],
@@ -709,6 +733,65 @@ export default function AdminPage() {
   ))}
 </div>
 
+<div style={{ marginTop: 14, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,.12)" }}>
+  <div style={{ fontWeight: 900, marginBottom: 10 }}>Pro Odds</div>
+
+  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+    {(["ultra", "rare", "common", "none"] as const).map((k) => (
+      <label key={k} style={{ fontSize: 12, opacity: 0.9 }}>
+        Rarity Weight {k} (ex: 50%)
+        <input
+          value={`${(cfg.rarityWeights as any)?.[k] ?? 0}%`}
+          onChange={(e) =>
+            setCfg((c) => ({
+              ...c,
+              rarityWeights: {
+                ...(c.rarityWeights || { none: 45, common: 37, rare: 15, ultra: 3 }),
+                [k]: parsePercentLike(e.target.value, Number((c.rarityWeights as any)?.[k] ?? 0)),
+              },
+            }))
+          }
+          style={{
+            width: "100%",
+            marginTop: 6,
+            padding: "10px 12px",
+            borderRadius: 12,
+            border: "1px solid rgba(255,255,255,.18)",
+            background: "rgba(0,0,0,.25)",
+            color: "white",
+          }}
+        />
+      </label>
+    ))}
+
+    <label style={{ fontSize: 12, opacity: 0.9 }}>
+      Rare → Merch chance (ex: 10%)
+      <input
+        value={`${cfg.rareMerchChancePercent ?? 1}%`}
+        onChange={(e) =>
+          setCfg((c) => ({
+            ...c,
+            rareMerchChancePercent: parsePercentLike(e.target.value, Number(c.rareMerchChancePercent ?? 1)),
+          }))
+        }
+        style={{
+          width: "100%",
+          marginTop: 6,
+          padding: "10px 12px",
+          borderRadius: 12,
+          border: "1px solid rgba(255,255,255,.18)",
+          background: "rgba(0,0,0,.25)",
+          color: "white",
+        }}
+      />
+    </label>
+  </div>
+
+  <div style={{ marginTop: 8, fontSize: 12, opacity: 0.8 }}>
+    These are <b>weights</b>. They do NOT need to add to 100. Higher = more likely.
+  </div>
+</div>
+          
           {/* Prize Pool Presets */}
 <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
   <button
