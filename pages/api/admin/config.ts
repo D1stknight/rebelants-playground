@@ -29,16 +29,20 @@ const DEFAULTS = {
   currency: "REBEL",
   rewards: { none: 0, common: 50, rare: 100, ultra: 200 },
 
+  // ✅ NEW: rare merch chance (decimal 0..1)
+  // 0.01 = 1%
+  rareMerchChance: 0.01,
+
   // ✅ NEW: prize pools per rarity (can be points, merch, NFT, APE, or nothing)
   prizePools: {
-  none: [{ type: "NONE", label: "Nothing this time", points: 0 }],
-  common: [{ type: "POINTS", label: "50 REBEL", points: 50 }],
-  rare: [{ type: "POINTS", label: "100 REBEL", points: 100 }],
-  ultra: [{ type: "POINTS", label: "200 REBEL", points: 200 }],
-},
+    none: [{ type: "NONE", label: "Nothing this time", points: 0 }],
+    common: [{ type: "POINTS", label: "50 REBEL", points: 50 }],
+    rare: [{ type: "POINTS", label: "100 REBEL", points: 100 }],
+    ultra: [{ type: "POINTS", label: "200 REBEL", points: 200 }],
+  },
 
-// ✅ NEW default (top-level)
-ultraMinReward: 50,
+  // ✅ NEW default (top-level)
+  ultraMinReward: 50,
 };
 
 function safeNum(v: any, fallback: number) {
@@ -81,23 +85,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // 2) { shuffleCost, dailyClaim, ... } (flat)
   const src = body?.pointsConfig ?? body ?? {};
 
- const next = {
+const rawRareMerch = Number(src?.rareMerchChance ?? DEFAULTS.rareMerchChance);
+const rareMerchDecimal = Number.isFinite(rawRareMerch)
+  ? (rawRareMerch > 1 ? rawRareMerch / 100 : rawRareMerch) // if 100 => 1.0
+  : DEFAULTS.rareMerchChance;
+
+const next = {
   shuffleCost: Number(src?.shuffleCost ?? DEFAULTS.shuffleCost),
   dailyClaim: Number(src?.dailyClaim ?? DEFAULTS.dailyClaim),
   dailyEarnCap: Number(src?.dailyEarnCap ?? DEFAULTS.dailyEarnCap),
-currency: String(src?.currency ?? DEFAULTS.currency),
-rewards: {
-  none: Number(src?.rewards?.none ?? DEFAULTS.rewards.none),
-  common: Number(src?.rewards?.common ?? DEFAULTS.rewards.common),
-  rare: Number(src?.rewards?.rare ?? DEFAULTS.rewards.rare),
-  ultra: Number(src?.rewards?.ultra ?? DEFAULTS.rewards.ultra),
-},
+  currency: String(src?.currency ?? DEFAULTS.currency),
 
-// ✅ NEW: ultraMinReward (must be >= 1, fallback to defaults)
-ultraMinReward: Math.max(
-  1,
-  Number(src?.ultraMinReward ?? DEFAULTS.ultraMinReward ?? 50)
-),
+  rewards: {
+    none: Number(src?.rewards?.none ?? DEFAULTS.rewards.none),
+    common: Number(src?.rewards?.common ?? DEFAULTS.rewards.common),
+    rare: Number(src?.rewards?.rare ?? DEFAULTS.rewards.rare),
+    ultra: Number(src?.rewards?.ultra ?? DEFAULTS.rewards.ultra),
+  },
+
+  // ✅ save rare merch chance (clamped 0..1)
+  rareMerchChance: Math.max(0, Math.min(1, rareMerchDecimal)),
+
+  // ✅ ultraMinReward (must be >= 1, fallback to defaults)
+  ultraMinReward: Math.max(
+    1,
+    Number(src?.ultraMinReward ?? DEFAULTS.ultraMinReward ?? 50)
+  ),
 
   prizePools: {
     none: Array.isArray(src?.prizePools?.none) ? src.prizePools.none : DEFAULTS.prizePools.none,
