@@ -510,6 +510,22 @@ export default function Shuffle() {
   // listen for wallet / discord changes
   window.addEventListener("ra:identity-changed", updateIdentity);
 
+   // ✅ Keep Discord connected status in sync with local profile changes
+React.useEffect(() => {
+  const sync = () => {
+    try {
+      const p: any = loadProfile?.() || {};
+      setIsDiscordConnected(!!p?.discordUserId);
+    } catch {
+      setIsDiscordConnected(false);
+    }
+  };
+
+  sync();
+  window.addEventListener("ra:identity-changed", sync);
+  return () => window.removeEventListener("ra:identity-changed", sync);
+}, []);
+   
   return () => {
     window.removeEventListener("ra:identity-changed", updateIdentity);
   };
@@ -661,8 +677,17 @@ const [shippingForm, setShippingForm] = useState<any>({
 const [showDripMigrate, setShowDripMigrate] = useState(false);
 const [dripBalance, setDripBalance] = useState<number | null>(null);
 
-const isDiscordConnected = !!prof?.discordUserId;
-  const [dripAmount, setDripAmount] = useState<number>(0);
+// ✅ Discord connection status (reactive)
+const [isDiscordConnected, setIsDiscordConnected] = useState<boolean>(() => {
+  try {
+    const p: any = loadProfile?.() || {};
+    return !!p?.discordUserId;
+  } catch {
+    return false;
+  }
+});
+
+const [dripAmount, setDripAmount] = useState<number>(0);
 const [dripBusy, setDripBusy] = useState(false);
 const [dripStatus, setDripStatus] = useState("");
 
@@ -1196,18 +1221,21 @@ return (
     onClick={() => {
       try {
         const p: any = loadProfile?.() || {};
+        if (p && typeof p === "object") {
+          delete p.discordUserId;
+          delete p.discordName;
+          delete p.discordAvatar;
+          delete p.discordUsername;
 
-if (p && typeof p === "object") {
-  delete p.discordUserId;
-  delete p.discordName;
-  delete p.discordAvatar;
-  delete p.discordUsername;
+          // ✅ DO NOT touch primaryId (keeps points identity stable)
+          saveProfile?.(p);
+        }
 
-  // 🔴 THIS IS THE KEY FIX
-  p.primaryId = p.id || "guest";
+        // ✅ update UI immediately (react state)
+        setIsDiscordConnected(false);
 
-  saveProfile?.(p);
-}
+        // ✅ also notify any identity listeners you already have
+        window.dispatchEvent(new Event("ra:identity-changed"));
       } catch {}
 
       window.location.href = "/api/auth/discord/logout";
