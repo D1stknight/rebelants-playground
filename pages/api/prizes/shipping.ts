@@ -66,11 +66,11 @@ if (!claim || typeof claim !== "object") {
     // Update shipping + status
     claim.shipping = shipping;
     claim.status = "PENDING";
-    await redis.set(claimKey(claimId), JSON.stringify(claim));
-    await redis.set(key, JSON.stringify(claim));
-    await redis.expire(key, 60 * 60 * 24 * 90); // keep 90 days
 
-    return res.status(200).json({ ok: true, claim });
+await redis.set(claimKey(claimId), JSON.stringify(claim));
+await redis.expire(claimKey(claimId), 60 * 60 * 24 * 90); // keep 90 days
+
+return res.status(200).json({ ok: true, claim });
   } catch (e: any) {
     console.error("prizes/shipping error:", e);
     return res.status(500).json({ ok: false, error: e?.message || "Server error" });
