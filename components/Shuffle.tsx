@@ -702,16 +702,6 @@ const [shippingForm, setShippingForm] = useState<any>({
 const [showDripMigrate, setShowDripMigrate] = useState(false);
 const [dripBalance, setDripBalance] = useState<number | null>(null);
 
-// ✅ Discord connection status (reactive)
-const [isDiscordConnected, setIsDiscordConnected] = useState<boolean>(() => {
-  try {
-    const p: any = loadProfile?.() || {};
-    return !!p?.discordUserId;
-  } catch {
-    return false;
-  }
-});
-
 const [dripAmount, setDripAmount] = useState<number>(0);
 const [dripBusy, setDripBusy] = useState(false);
 const [dripStatus, setDripStatus] = useState("");
