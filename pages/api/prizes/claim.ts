@@ -114,28 +114,34 @@ if (String(prize?.type || "").toLowerCase() === "nft") {
   };
 }
 
-    // ✅ If merch prize: require shipping info
-    if (String(prize?.type || "").toLowerCase() === "merch") {
-      if (!shipping) {
-        return res.status(400).json({ ok: false, error: "Missing shipping for merch claim" });
-      }
-    }
+   // ✅ If merch prize: do NOT hard-fail if shipping is missing.
+// We create the claim and mark it NEEDS_SHIPPING so the UI can prompt immediately.
+const isMerch = String(prize?.type || "").toLowerCase() === "merch";
+const hasShipping = !!shipping;
 
-    // store claim
-    const payload = {
-      claimId,
-      ts: Date.now(),
-      playerId,
-      prize,
-      wallet: wallet || null,
-      shipping,
-      status: "PENDING",
-    };
+if (isMerch && !hasShipping) {
+  // no-op here; we’ll set status = NEEDS_SHIPPING below
+}
+
+   // store claim
+const isMerch = String(prize?.type || "").toLowerCase() === "merch";
+const hasShipping = !!shipping;
+
+const payload = {
+  claimId,
+  ts: Date.now(),
+  playerId,
+  prize,
+  wallet: wallet || null,
+  shipping: shipping || null,
+  status: isMerch && !hasShipping ? "NEEDS_SHIPPING" : "PENDING",
+};
 
     await redis.set(claimKey(claimId), JSON.stringify(payload));
     await redis.expire(claimKey(claimId), 60 * 60 * 24 * 90); // 90 days
 
-    return res.status(200).json({ ok: true, claim: payload });
+    const needShipping = String(prize?.type || "").toLowerCase() === "merch" && !shipping;
+return res.status(200).json({ ok: true, needShipping, claim: payload });
   } catch (e: any) {
     console.error("prizes/claim error:", e);
     return res.status(500).json({ ok: false, error: "Server error" });
