@@ -1,12 +1,15 @@
-import { shuffleConfig } from "../lib/shuffleConfig";
-import React from 'react';
-import Link from 'next/link';
-import Shuffle from '../components/Shuffle';
+import React from "react";
+import Link from "next/link";
+import dynamic from "next/dynamic";
 
-export default function ShufflePage() { 
+// ✅ Client-only (prevents localStorage/window SSR crashes)
+const Shuffle = dynamic(() => import("../components/Shuffle"), { ssr: false });
+
+export default function ShufflePage() {
   return (
     <main className="max-w-5xl mx-auto px-4 py-6">
       <h1 className="title mb-3">Rebel Ants Playground</h1>
+
       <nav className="mb-6 flex items-center gap-2">
         <Link href="/tunnel" className="tab">Ant Tunnel</Link>
         <Link href="/hatch" className="tab">Queen&apos;s Egg Hatch</Link>
