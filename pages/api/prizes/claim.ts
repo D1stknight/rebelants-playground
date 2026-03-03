@@ -114,16 +114,7 @@ if (String(prize?.type || "").toLowerCase() === "nft") {
   };
 }
 
-   // ✅ If merch prize: do NOT hard-fail if shipping is missing.
-// We create the claim and mark it NEEDS_SHIPPING so the UI can prompt immediately.
-const isMerch = String(prize?.type || "").toLowerCase() === "merch";
-const hasShipping = !!shipping;
-
-if (isMerch && !hasShipping) {
-  // no-op here; we’ll set status = NEEDS_SHIPPING below
-}
-
-   // store claim
+   // determine prize type
 const isMerch = String(prize?.type || "").toLowerCase() === "merch";
 const hasShipping = !!shipping;
 
