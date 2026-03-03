@@ -2,6 +2,20 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
 
+// ===== helper: Upstash may return string OR already-parsed object =====
+function parseMaybeJson<T = any>(v: any): T | null {
+  if (!v) return null;
+  if (typeof v === "object") return v as T;
+  if (typeof v === "string") {
+    try {
+      return JSON.parse(v) as T;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 function claimKey(id: string) {
   return `ra:claim:${id}`;
 }
@@ -31,18 +45,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ ok: false, error: "Missing shipping" });
     }
 
-    const key = claimKey(claimId);
-    const raw = await redis.get<string>(key);
-    if (!raw) {
-      return res.status(404).json({ ok: false, error: "Claim not found" });
-    }
+   // ===== AFTER =====
+const raw = await redis.get<any>(claimKey(claimId));
+if (!raw) return res.status(404).json({ ok: false, error: "Claim not found" });
 
-    let claim: any = null;
-    try {
-      claim = JSON.parse(raw);
-    } catch {
-      return res.status(500).json({ ok: false, error: "Stored claim is not valid JSON" });
-    }
+const claim = parseMaybeJson<any>(raw);
+if (!claim || typeof claim !== "object") {
+  return res.status(500).json({ ok: false, error: "Stored claim is not valid JSON" });
+}
 
     if (String(claim?.playerId || "") !== playerId) {
       return res.status(403).json({ ok: false, error: "Player mismatch" });
@@ -56,7 +66,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Update shipping + status
     claim.shipping = shipping;
     claim.status = "PENDING";
-
+    await redis.set(claimKey(claimId), JSON.stringify(claim));
     await redis.set(key, JSON.stringify(claim));
     await redis.expire(key, 60 * 60 * 24 * 90); // keep 90 days
 
