@@ -204,10 +204,24 @@ function PrizeModal({
   rarity,
   prize,
   onClose,
+  needShipping,
+  shippingForm,
+  setShippingForm,
+  shipBusy,
+  shipMsg,
+  onSubmitShipping,
 }: {
   rarity: Rarity;
   prize: Prize | null;
   onClose: () => void;
+
+  // ✅ merch shipping flow
+  needShipping: boolean;
+  shippingForm: any;
+  setShippingForm: (v: any) => void;
+  shipBusy: boolean;
+  shipMsg: string;
+  onSubmitShipping: () => Promise<void>;
 }) {
   const title =
     rarity === "ultra"
@@ -270,7 +284,86 @@ function PrizeModal({
             </b>
           </div>
 
-          <div className="prize-sub">Tap continue to play again.</div>
+         {needShipping ? (
+  <div style={{ marginTop: 10, textAlign: "left" }}>
+    <div className="prize-sub" style={{ marginBottom: 10 }}>
+      ✅ This merch prize needs shipping info to fulfill.
+    </div>
+
+    <div style={{ display: "grid", gap: 8 }}>
+      <input
+        value={shippingForm.name}
+        onChange={(e) => setShippingForm({ ...shippingForm, name: e.target.value })}
+        placeholder="Full Name"
+        style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
+      />
+      <input
+        value={shippingForm.email}
+        onChange={(e) => setShippingForm({ ...shippingForm, email: e.target.value })}
+        placeholder="Email"
+        style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
+      />
+      <input
+        value={shippingForm.phone}
+        onChange={(e) => setShippingForm({ ...shippingForm, phone: e.target.value })}
+        placeholder="Phone"
+        style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
+      />
+      <input
+        value={shippingForm.address1}
+        onChange={(e) => setShippingForm({ ...shippingForm, address1: e.target.value })}
+        placeholder="Address Line 1"
+        style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
+      />
+      <input
+        value={shippingForm.address2}
+        onChange={(e) => setShippingForm({ ...shippingForm, address2: e.target.value })}
+        placeholder="Address Line 2 (optional)"
+        style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
+      />
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        <input
+          value={shippingForm.city}
+          onChange={(e) => setShippingForm({ ...shippingForm, city: e.target.value })}
+          placeholder="City"
+          style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
+        />
+        <input
+          value={shippingForm.state}
+          onChange={(e) => setShippingForm({ ...shippingForm, state: e.target.value })}
+          placeholder="State"
+          style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
+        />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        <input
+          value={shippingForm.zip}
+          onChange={(e) => setShippingForm({ ...shippingForm, zip: e.target.value })}
+          placeholder="ZIP"
+          style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
+        />
+        <input
+          value={shippingForm.country}
+          onChange={(e) => setShippingForm({ ...shippingForm, country: e.target.value })}
+          placeholder="Country (US)"
+          style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
+        />
+      </div>
+
+      <button className="btn" onClick={onSubmitShipping} disabled={shipBusy} style={{ padding: "10px 12px" }}>
+        {shipBusy ? "Saving…" : "Save Shipping"}
+      </button>
+
+      {shipMsg ? (
+        <div className="prize-sub" style={{ marginTop: 8 }}>
+          {shipMsg}
+        </div>
+      ) : null}
+    </div>
+  </div>
+) : (
+  <div className="prize-sub">Tap continue to play again.</div>
+)}
         </>
       ) : (
         <div className="prize-sub" style={{ marginBottom: 12 }}>
@@ -546,6 +639,24 @@ const [prize, setPrize] = useState<Prize | null>(null);
 const [showPrize, setShowPrize] = useState(false);
 const [showBuyPoints, setShowBuyPoints] = useState(false);
 
+// ✅ Merch shipping capture (only for merch)
+const [lastClaimId, setLastClaimId] = useState<string>("");
+const [lastPid, setLastPid] = useState<string>("");
+const [needShipping, setNeedShipping] = useState<boolean>(false);
+const [shipBusy, setShipBusy] = useState<boolean>(false);
+const [shipMsg, setShipMsg] = useState<string>("");
+
+const [shippingForm, setShippingForm] = useState<any>({
+  name: "",
+  email: "",
+  phone: "",
+  address1: "",
+  address2: "",
+  city: "",
+  state: "",
+  zip: "",
+  country: "US",
+});
 // ✅ DRIP migrate UI
 const [showDripMigrate, setShowDripMigrate] = useState(false);
 const [dripBalance, setDripBalance] = useState<number | null>(null);
@@ -682,6 +793,38 @@ setTimeout(async () => {
 
   const r = rollJson.rarity as any;
   let pz = rollJson.prize as any;
+
+// ✅ Merch auto-claim (creates claim immediately, then modal captures shipping)
+setNeedShipping(false);
+setShipMsg("");
+setLastClaimId("");
+setLastPid(pid);
+
+if (String(pz?.type || "").toLowerCase() === "merch") {
+  const claimId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  const cr = await fetch("/api/prizes/claim", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      claimId,
+      playerId: pid,
+      prize: pz,
+      wallet: null,
+      shipping: null,
+    }),
+  });
+
+  const cj = await cr.json().catch(() => null);
+
+  if (cr.ok && cj?.ok) {
+    setLastClaimId(claimId);
+    setNeedShipping(!!cj.needShipping);
+  } else {
+    console.warn("Merch claim failed:", cr.status, cj);
+    setShipMsg(cj?.error || "Merch claim failed");
+  }
+}  
 
   // ✅ If prize is points, credit them via /api/points/earn (respects daily cap)
   if (pz?.type === "points" && Number(pz?.points || 0) > 0) {
@@ -831,6 +974,42 @@ async function migrateDripNow() {
     setDripStatus("Enter an amount greater than 0.");
     return;
   }
+
+async function submitShipping() {
+  if (!lastClaimId || !lastPid) {
+    setShipMsg("Missing claimId/playerId");
+    return;
+  }
+
+  setShipBusy(true);
+  setShipMsg("");
+
+  try {
+    const r = await fetch("/api/prizes/shipping", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        claimId: lastClaimId,
+        playerId: lastPid,
+        shipping: shippingForm,
+      }),
+    });
+
+    const j = await r.json().catch(() => null);
+
+    if (!r.ok || !j?.ok) {
+      setShipMsg(j?.error || "Could not save shipping.");
+      return;
+    }
+
+    setShipMsg("✅ Shipping saved!");
+    setNeedShipping(false);
+  } catch (e: any) {
+    setShipMsg(e?.message || "Shipping error");
+  } finally {
+    setShipBusy(false);
+  }
+}  
 
   setDripBusy(true);
   setDripStatus("Migrating… (deducting from DRIP + crediting game)");
@@ -1184,7 +1363,19 @@ return (
   <LeaderboardPanel />
 </div>
 
-     {showPrize && <PrizeModal rarity={rarity} prize={prize} onClose={resetAfterPrize} />}
+    {showPrize && (
+  <PrizeModal
+    rarity={rarity}
+    prize={prize}
+    onClose={resetAfterPrize}
+    needShipping={needShipping}
+    shippingForm={shippingForm}
+    setShippingForm={setShippingForm}
+    shipBusy={shipBusy}
+    shipMsg={shipMsg}
+    onSubmitShipping={submitShipping}
+  />
+)}
         
 <BuyPointsModal
   open={showBuyPoints}
