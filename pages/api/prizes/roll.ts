@@ -68,56 +68,54 @@ const rarity =
       });
     }
 
- // ---------- ULTRA ----------
+// ---------- ULTRA ----------
 if (rarity === "ultra") {
-  // ✅ Peek inventory (do NOT consume here)
-  // Claim will consume (remove) the item.
-  for (let i = 0; i < 10; i++) {
-    const head = await redis.lrange(ULTRA_NFT_INVENTORY_KEY, 0, 0); // peek first item
-    const nftRaw = Array.isArray(head) ? head[0] : null;
+  // ✅ PEEK inventory (do NOT consume here — claim will consume)
+  const peek = await redis.lrange<any>(ULTRA_NFT_INVENTORY_KEY, 0, 0);
+  const nftRaw = Array.isArray(peek) && peek.length ? peek[0] : null;
 
-    if (!nftRaw) break;
-
-    let item: any = null;
-    try {
-      item = JSON.parse(String(nftRaw));
-    } catch {
-      item = null;
-    }
+  if (nftRaw) {
+    // Upstash can return a string OR an object depending on client/typing
+    const item =
+      typeof nftRaw === "string"
+        ? (() => {
+            try {
+              return JSON.parse(nftRaw);
+            } catch {
+              return null;
+            }
+          })()
+        : nftRaw;
 
     const chain = String(item?.chain || "ETH").toUpperCase();
     const contract = String(item?.contract || "").trim();
     const tokenId = String(item?.tokenId ?? "").trim();
     const label = String(item?.label || "NFT Prize").trim();
 
-    // If the item is malformed, remove it and keep going
-    if (!contract || !contract.startsWith("0x") || !tokenId) {
-      await redis.lpop(ULTRA_NFT_INVENTORY_KEY);
-      continue;
-    }
+    if (contract && contract.startsWith("0x") && tokenId) {
+      const inventoryKey =
+        String(item?.inventoryKey || "").trim() ||
+        `ultra:${chain}:${contract}:${tokenId}`;
 
-    const inventoryKey =
-      String(item?.inventoryKey || "").trim() ||
-      `ultra:${chain}:${contract}:${tokenId}`;
-
-    return res.status(200).json({
-      ok: true,
-      rarity,
-      prize: {
-        type: "nft",
-        label,
-        meta: {
-          chain,
-          contract,
-          tokenId,
+      return res.status(200).json({
+        ok: true,
+        rarity,
+        prize: {
+          type: "nft",
           label,
-          inventoryKey,
+          meta: {
+            chain,
+            contract,
+            tokenId,
+            label,
+            inventoryKey,
+          },
         },
-      },
-    });
+      });
+    }
   }
 
-  // fallback to points if no NFT available
+  // fallback to points if no NFT available/valid
   const ptsCfg = Number(cfg?.rewards?.ultra ?? 0);
   const min = Number(cfg?.ultraMinReward ?? 0);
   const pts = Math.max(ptsCfg, min);
