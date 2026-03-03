@@ -602,6 +602,10 @@ React.useEffect(() => {
 
   (async () => {
     try {
+      // ✅ If user clicked "Disconnect", do NOT auto-reconnect on refresh
+      const gate = loadProfile();
+      if (gate?.discordSkipLink) return;
+
       const sr = await fetch("/api/auth/discord/session", { cache: "no-store" });
       const sj = await sr.json().catch(() => null);
 
@@ -999,6 +1003,9 @@ function disconnectDiscord() {
   try {
     const p: any = loadProfile() || {};
 
+    // ✅ NEW: prevent auto-reconnect on refresh (even if server cookie still exists)
+    p.discordSkipLink = true;
+
     delete p.discordUserId;
     delete p.discordName;
     delete p.discordAvatar;
@@ -1220,9 +1227,18 @@ return (
   <button
     className="btn"
     type="button"
-    onClick={() => {
-      window.location.href = "/api/auth/discord/login";
-    }}
+onClick={() => {
+  try {
+    const p: any = loadProfile?.() || {};
+    if (p && typeof p === "object") {
+      delete p.discordSkipLink;
+      saveProfile?.(p);
+      window.dispatchEvent(new Event("ra:identity-changed"));
+    }
+  } catch {}
+
+  window.location.href = "/api/auth/discord/login";
+}}
     style={{ padding: "10px 12px", fontSize: 13, opacity: 0.95 }}
   >
     Connect Discord
