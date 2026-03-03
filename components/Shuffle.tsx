@@ -1196,13 +1196,18 @@ return (
     onClick={() => {
       try {
         const p: any = loadProfile?.() || {};
-        if (p && typeof p === "object") {
-          delete p.discordUserId;
-          delete p.discordName;
-          delete p.discordAvatar;
-          delete p.discordUsername;
-          saveProfile?.(p);
-        }
+
+if (p && typeof p === "object") {
+  delete p.discordUserId;
+  delete p.discordName;
+  delete p.discordAvatar;
+  delete p.discordUsername;
+
+  // 🔴 THIS IS THE KEY FIX
+  p.primaryId = p.id || "guest";
+
+  saveProfile?.(p);
+}
       } catch {}
 
       window.location.href = "/api/auth/discord/logout";
