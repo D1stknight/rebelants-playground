@@ -970,6 +970,26 @@ async function openDripModal() {
     setDripBusy(false);
   }
 }
+
+function disconnectDiscord() {
+  try {
+    const p: any = loadProfile() || {};
+
+    delete p.discordUserId;
+    delete p.discordName;
+    delete p.discordAvatar;
+    delete p.discordUsername;
+
+    saveProfile(p);
+
+    // force UI refresh so buttons update
+    window.location.reload();
+
+  } catch (e) {}
+
+  window.location.href = "/api/auth/discord/logout";
+}
+  
 async function migrateDripNow() {
   const amt = Math.floor(Number(dripAmount || 0));
   if (!amt || amt <= 0) {
@@ -1169,29 +1189,44 @@ return (
   Connect Discord
 </button>
 
- <button
-  className="btn"
-  type="button"
-  onClick={() => {
-    try {
-      // ✅ Clear Discord identity from local profile so UI updates immediately
-      const p: any = loadProfile?.() || {};
-      if (p && typeof p === "object") {
-        delete p.discordUserId;
-        delete p.discordName;
-        delete p.discordAvatar;
-        delete p.discordUsername;
-        saveProfile?.(p);
-      }
-    } catch {}
+{isDiscordConnected ? (
+  <button
+    className="btn"
+    type="button"
+    onClick={() => {
+      try {
+        const p: any = loadProfile?.() || {};
+        if (p && typeof p === "object") {
+          delete p.discordUserId;
+          delete p.discordName;
+          delete p.discordAvatar;
+          delete p.discordUsername;
+          saveProfile?.(p);
+        }
+      } catch {}
 
-    // ✅ Then log out server-side
-    window.location.href = "/api/auth/discord/logout";
-  }}
-  style={{ padding: "10px 12px", fontSize: 13, opacity: 0.95 }}
->
-  Disconnect Discord
-</button>
+      window.location.href = "/api/auth/discord/logout";
+    }}
+    style={{ padding: "10px 12px", fontSize: 13, opacity: 0.95 }}
+  >
+    Disconnect Discord
+  </button>
+) : (
+  <button
+    className="btn"
+    type="button"
+    onClick={() => {
+      window.location.href = "/api/auth/discord/login";
+    }}
+    style={{ padding: "10px 12px", fontSize: 13, opacity: 0.95 }}
+  >
+    Connect Discord
+  </button>
+)}
+
+<div style={{ fontSize: 12, opacity: 0.8 }}>
+  Discord: <b>{isDiscordConnected ? "Connected ✅" : "Not Connected ❌"}</b>
+</div>  
   
   <div style={{ marginLeft: 12, fontSize: 13, opacity: 0.9, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
     <span>
