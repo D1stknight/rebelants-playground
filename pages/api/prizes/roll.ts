@@ -100,33 +100,43 @@ const rarity =
     }
 
     // ---------- RARE ----------
-    if (rarity === "rare") {
-      // Prefer percent-style Admin control if present
-const merchChance =
-  typeof cfg?.rareMerchChancePercent === "number"
-    ? percentToChance(cfg.rareMerchChancePercent, 0.01)
-    : Number(cfg?.rareMerchChance ?? 0.01);
+  if (rarity === "rare") {
+  // cfg.rareMerchChance must be decimal 0..1
+  const merchChanceRaw = Number(cfg?.rareMerchChance ?? 0.01);
+  const merchChance = Math.max(0, Math.min(1, merchChanceRaw));
 
-const roll = Math.random();
+  // ✅ hard guarantee for testing
+  if (merchChance >= 1) {
+    return res.status(200).json({
+      ok: true,
+      rarity,
+      prize: { type: "merch", label: "Merch Prize" },
+      debug: { merchChanceRaw, merchChance },
+    });
+  }
 
-if (roll < merchChance) {
-        return res.status(200).json({
-          ok: true,
-          rarity,
-          prize: { type: "merch", label: "Merch Prize" },
-        });
-      }
+  const roll = Math.random();
 
-      const pts = Number(cfg?.rewards?.rare ?? 0);
-      return res.status(200).json({
-        ok: true,
-        rarity,
-        prize:
-          pts > 0
-            ? { type: "points", points: pts, label: `${pts} ${currency}` }
-            : { type: "none", label: "Nothing this time" },
-      });
-    }
+  if (roll < merchChance) {
+    return res.status(200).json({
+      ok: true,
+      rarity,
+      prize: { type: "merch", label: "Merch Prize" },
+      debug: { merchChanceRaw, merchChance, roll },
+    });
+  }
+
+  const pts = Number(cfg?.rewards?.rare ?? 0);
+  return res.status(200).json({
+    ok: true,
+    rarity,
+    prize:
+      pts > 0
+        ? { type: "points", points: pts, label: `${pts} ${currency}` }
+        : { type: "none", label: "Nothing this time" },
+    debug: { merchChanceRaw, merchChance, roll },
+  });
+}
 
 // ---------- ULTRA ----------
 if (rarity === "ultra") {
