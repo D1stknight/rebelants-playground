@@ -11,8 +11,11 @@ function isAdmin(req: NextApiRequest) {
     headerValue(req.headers["x-admin-key"]) ||
     headerValue(req.headers["x-admin-token"]) ||
     "";
+
   const expected = process.env.ADMIN_KEY || process.env.ADMIN_TOKEN || "";
-  return !!expected && !!provided && provided === expected;
+  if (!expected) return false;
+
+  return !!provided && provided === expected;
 }
 
 function claimKey(id: string) {
@@ -24,19 +27,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     if (!isAdmin(req)) return res.status(401).json({ ok: false, error: "Unauthorized" });
-    if (req.method !== "GET") return res.status(405).json({ ok: false, error: "Method not allowed" });
+
+    if (req.method !== "GET") {
+      res.setHeader("Allow", "GET");
+      return res.status(405).json({ ok: false, error: "Method Not Allowed" });
+    }
 
     const claimId = String(req.query.claimId || "").trim();
     if (!claimId) return res.status(400).json({ ok: false, error: "Missing claimId" });
 
-    const raw = await redis.get<string>(claimKey(claimId));
-    if (!raw) return res.status(404).json({ ok: false, error: "Not found" });
+    const key = claimKey(claimId);
+    const raw = await redis.get<string>(key);
+
+    if (!raw) {
+      return res.status(200).json({ ok: true, claim: null });
+    }
 
     let claim: any = null;
     try {
       claim = JSON.parse(String(raw));
     } catch {
-      claim = null;
+      // If something weird was stored, still return raw for debugging
+      return res.status(200).json({ ok: true, claim: { raw: String(raw) } });
     }
 
     return res.status(200).json({ ok: true, claim });
