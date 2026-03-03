@@ -170,13 +170,19 @@ const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
   }
 }
   
- async function saveConfig() {
+async function saveConfig() {
   append("Saving config…");
+
+  // force percent box -> decimal (0..1) at save time
+  const pct = Math.max(0, Math.min(100, Number(rareMerchChancePct || "0")));
+  const payload = { ...cfg, rareMerchChance: pct / 100 };
+
   const r = await fetch("/api/admin/config", {
     method: "POST",
     headers,
-    body: JSON.stringify(cfg),
+    body: JSON.stringify(payload),
   });
+
   const j = await r.json().catch(() => null);
   append(`SAVE CONFIG status ${r.status}\n${JSON.stringify(j, null, 2)}`);
 
@@ -185,9 +191,8 @@ const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
   if (merged) {
     setCfg(merged);
 
-    // ✅ keep the % input in sync with saved config
-    const pct = Math.round(Number((merged as any).rareMerchChance ?? 0.01) * 100);
-    setRareMerchChancePct(String(pct));
+    const pct2 = Math.round(Number((merged as any).rareMerchChance ?? 0.01) * 100);
+    setRareMerchChancePct(String(pct2));
   }
 }
 
