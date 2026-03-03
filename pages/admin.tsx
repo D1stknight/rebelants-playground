@@ -143,7 +143,7 @@ export default function AdminPage() {
     setClaimsLoading(false);
   }
 
-  async function getClaim() {
+   async function getClaim() {
     const id = (claimLookupId || "").trim();
     if (!id) {
       append("Get claim: missing claimId");
@@ -163,7 +163,69 @@ export default function AdminPage() {
         return next;
       });
     }
-  }  
+  }
+
+  async function unlockClaimTransferLock(id: string) {
+    const claimId = String(id || "").trim();
+    if (!claimId) {
+      append("Unlock transfer: missing claimId");
+      return;
+    }
+
+    append(`Unlocking transfer lock for ${claimId}…`);
+    const r = await fetch("/api/admin/claims/unlock-transfer", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ claimId }),
+    });
+
+    const j = await r.json().catch(() => null);
+    append(`UNLOCK TRANSFER status ${r.status}\n${JSON.stringify(j, null, 2)}`);
+
+    // refresh the row
+    await fetch(`/api/admin/claims/get?claimId=${encodeURIComponent(claimId)}`, { headers })
+      .then((x) => x.json())
+      .then((data) => {
+        if (data?.claim) {
+          setClaims((prev) => {
+            const next = [data.claim, ...prev.filter((c) => c?.claimId !== data.claim?.claimId)];
+            return next;
+          });
+        }
+      })
+      .catch(() => null);
+  }
+
+  async function transferClaimNFT(id: string) {
+    const claimId = String(id || "").trim();
+    if (!claimId) {
+      append("Transfer: missing claimId");
+      return;
+    }
+
+    append(`Transferring NFT for ${claimId}…`);
+    const r = await fetch("/api/prizes/transfer", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ claimId }),
+    });
+
+    const text = await r.text();
+    append(`TRANSFER status ${r.status}\n${text}`);
+
+    // refresh the row
+    await fetch(`/api/admin/claims/get?claimId=${encodeURIComponent(claimId)}`, { headers })
+      .then((x) => x.json())
+      .then((data) => {
+        if (data?.claim) {
+          setClaims((prev) => {
+            const next = [data.claim, ...prev.filter((c) => c?.claimId !== data.claim?.claimId)];
+            return next;
+          });
+        }
+      })
+      .catch(() => null);
+  }
 
     async function grantPoints() {
     append("Granting points…");
@@ -412,7 +474,7 @@ export default function AdminPage() {
 
           <div style={{ marginTop: 12, overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-              <thead>
+                           <thead>
                 <tr style={{ textAlign: "left", opacity: 0.9 }}>
                   <th style={{ padding: "8px 6px" }}>Claim</th>
                   <th style={{ padding: "8px 6px" }}>Type</th>
@@ -420,6 +482,7 @@ export default function AdminPage() {
                   <th style={{ padding: "8px 6px" }}>Wallet</th>
                   <th style={{ padding: "8px 6px" }}>Status</th>
                   <th style={{ padding: "8px 6px" }}>Tx</th>
+                  <th style={{ padding: "8px 6px" }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -433,6 +496,9 @@ export default function AdminPage() {
 
                   const short = (s: string, n = 8) => (s && s.length > n ? `${s.slice(0, n)}…` : s);
 
+                  const isNft = type.toLowerCase() === "nft";
+                  const isPending = status.toUpperCase() === "PENDING";
+
                   return (
                     <tr key={id} style={{ borderTop: "1px solid rgba(255,255,255,.08)" }}>
                       <td style={{ padding: "8px 6px", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{short(id, 14)}</td>
@@ -441,6 +507,30 @@ export default function AdminPage() {
                       <td style={{ padding: "8px 6px", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{short(wallet, 12)}</td>
                       <td style={{ padding: "8px 6px" }}>{status}</td>
                       <td style={{ padding: "8px 6px", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{short(tx, 12)}</td>
+
+                      <td style={{ padding: "8px 6px" }}>
+                        {isNft && isPending ? (
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                            <button
+                              className="btn"
+                              onClick={() => unlockClaimTransferLock(id)}
+                              style={{ padding: "6px 10px", fontSize: 12 }}
+                            >
+                              Unlock
+                            </button>
+
+                            <button
+                              className="btn"
+                              onClick={() => transferClaimNFT(id)}
+                              style={{ padding: "6px 10px", fontSize: 12 }}
+                            >
+                              Transfer
+                            </button>
+                          </div>
+                        ) : (
+                          <span style={{ opacity: 0.7, fontSize: 12 }}>—</span>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
