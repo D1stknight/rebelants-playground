@@ -494,6 +494,12 @@ export default function AdminPage() {
                   const status = String(c?.status || "");
                   const tx = String(c?.txHash || "");
 
+       const statusColor =
+  status.toUpperCase() === "FULFILLED"
+    ? "#4ade80"
+    : status.toUpperCase() === "PENDING"
+    ? "#facc15"
+    : "white";
                   const short = (s: string, n = 8) => (s && s.length > n ? `${s.slice(0, n)}…` : s);
 
                   const isNft = type.toLowerCase() === "nft";
@@ -505,7 +511,9 @@ export default function AdminPage() {
                       <td style={{ padding: "8px 6px" }}>{type}</td>
                       <td style={{ padding: "8px 6px" }}>{label}</td>
                       <td style={{ padding: "8px 6px", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{short(wallet, 12)}</td>
-                      <td style={{ padding: "8px 6px" }}>{status}</td>
+                      <td style={{ padding: "8px 6px", color: statusColor }}>
+  {status}
+</td>
                       <td style={{ padding: "8px 6px", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{short(tx, 12)}</td>
 
                       <td style={{ padding: "8px 6px" }}>
