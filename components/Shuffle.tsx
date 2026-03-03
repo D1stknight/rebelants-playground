@@ -82,7 +82,7 @@ function normalizePrize(rarity: Rarity, pointsConfig: any): Prize {
   // Rare = points only (bigger) AND very occasionally merch
   if (rarity === "rare") {
     // optional: 1% chance to try merch from prizePools.rare (only merch entries)
-    const merchChance = Number(pointsConfig?.rareMerchChance ?? 1.00); // default 1%
+    const merchChance = Number(pointsConfig?.rareMerchChance ?? 0.01); // default 1%
     const roll = Math.random();
 
     if (roll < merchChance) {
