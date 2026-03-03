@@ -29,11 +29,14 @@ const DEFAULTS = {
   currency: "REBEL",
   rewards: { none: 0, common: 50, rare: 100, ultra: 200 },
 
-  // ✅ NEW: rare merch chance (decimal 0..1)
-  // 0.01 = 1%
+  // ✅ Pro Odds (weights) — Admin editable
+  // NOTE: these do NOT have to add to 100
+  rarityWeights: { none: 45, common: 37, rare: 15, ultra: 3 },
+
+  // ✅ Rare merch chance (decimal) — 0.01 = 1%
   rareMerchChance: 0.01,
 
-  // ✅ NEW: prize pools per rarity (can be points, merch, NFT, APE, or nothing)
+  // ✅ Prize pools per rarity (future use)
   prizePools: {
     none: [{ type: "NONE", label: "Nothing this time", points: 0 }],
     common: [{ type: "POINTS", label: "50 REBEL", points: 50 }],
@@ -41,7 +44,7 @@ const DEFAULTS = {
     ultra: [{ type: "POINTS", label: "200 REBEL", points: 200 }],
   },
 
-  // ✅ NEW default (top-level)
+  // ✅ Ultra min reward fallback
   ultraMinReward: 50,
 };
 
@@ -50,6 +53,9 @@ function safeNum(v: any, fallback: number) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
+}
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     if (!isAuthed(req)) return res.status(401).json({ ok: false, error: "Unauthorized" });
@@ -58,13 +64,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const raw = await redis.get(KEY);
   const parsed = raw ? (typeof raw === "string" ? JSON.parse(raw) : raw) : {};
 
-  const merged = {
+   const merged = {
     ...DEFAULTS,
     ...(parsed || {}),
     rewards: {
       ...DEFAULTS.rewards,
       ...(parsed as any)?.rewards,
     },
+
+    // ✅ keep Pro Odds + Rare merch chance if saved
+    rarityWeights: {
+      ...DEFAULTS.rarityWeights,
+      ...(parsed as any)?.rarityWeights,
+    },
+    rareMerchChance: safeNum((parsed as any)?.rareMerchChance, DEFAULTS.rareMerchChance),
+
     prizePools: {
       ...DEFAULTS.prizePools,
       ...(parsed as any)?.prizePools,
@@ -90,7 +104,7 @@ const rareMerchDecimal = Number.isFinite(rawRareMerch)
   ? (rawRareMerch > 1 ? rawRareMerch / 100 : rawRareMerch) // if 100 => 1.0
   : DEFAULTS.rareMerchChance;
 
-const next = {
+ const next = {
   shuffleCost: Number(src?.shuffleCost ?? DEFAULTS.shuffleCost),
   dailyClaim: Number(src?.dailyClaim ?? DEFAULTS.dailyClaim),
   dailyEarnCap: Number(src?.dailyEarnCap ?? DEFAULTS.dailyEarnCap),
@@ -103,10 +117,22 @@ const next = {
     ultra: Number(src?.rewards?.ultra ?? DEFAULTS.rewards.ultra),
   },
 
-  // ✅ save rare merch chance (clamped 0..1)
-  rareMerchChance: Math.max(0, Math.min(1, rareMerchDecimal)),
+  // ✅ Pro Odds (weights) — SAVE THEM
+  rarityWeights: {
+    none: safeNum(src?.rarityWeights?.none, DEFAULTS.rarityWeights.none),
+    common: safeNum(src?.rarityWeights?.common, DEFAULTS.rarityWeights.common),
+    rare: safeNum(src?.rarityWeights?.rare, DEFAULTS.rarityWeights.rare),
+    ultra: safeNum(src?.rarityWeights?.ultra, DEFAULTS.rarityWeights.ultra),
+  },
 
-  // ✅ ultraMinReward (must be >= 1, fallback to defaults)
+  // ✅ Rare merch chance — SAVE IT (clamp 0..1)
+  rareMerchChance: clamp(
+    safeNum(src?.rareMerchChance, DEFAULTS.rareMerchChance),
+    0,
+    1
+  ),
+
+  // ✅ ultraMinReward (must be >= 1)
   ultraMinReward: Math.max(
     1,
     Number(src?.ultraMinReward ?? DEFAULTS.ultraMinReward ?? 50)
