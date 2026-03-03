@@ -721,38 +721,6 @@ const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
               />
             </label>
 
-<label style={{ fontSize: 12, opacity: 0.9 }}>
-  Rare → Merch chance
-  <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6 }}>
-    <input
-      value={rareMerchChancePct}
-      onChange={(e) => {
-        // allow only digits
-        const v = String(e.target.value || "").replace(/[^\d]/g, "");
-        setRareMerchChancePct(v);
-      }}
-      onBlur={() => {
-        const pct = Math.max(0, Math.min(100, Number(rareMerchChancePct || "0")));
-        setRareMerchChancePct(String(pct));
-        setCfg((c: any) => ({ ...c, rareMerchChance: pct / 100 }));
-      }}
-      placeholder="1"
-      style={{
-        width: 120,
-        padding: "10px 12px",
-        borderRadius: 12,
-        border: "1px solid rgba(255,255,255,.18)",
-        background: "rgba(0,0,0,.25)",
-        color: "white",
-      }}
-    />
-    <span style={{ opacity: 0.9, fontWeight: 800 }}>%</span>
-  </div>
-  <div style={{ fontSize: 11, opacity: 0.75, marginTop: 6 }}>
-    Tip: type 100 then click outside the box (blur), then Save.
-  </div>
-</label>
-
             <label style={{ fontSize: 12, opacity: 0.9 }}>
               Currency
               <input
@@ -836,33 +804,35 @@ const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
       </label>
     ))}
 
-    <label style={{ fontSize: 12, opacity: 0.9 }}>
-      Rare → Merch chance (ex: 10%)
-      <input
-  value={`${rareMerchChancePct}%`}
-  onChange={(e) => {
-    const raw = String(e.target.value || "").replace("%", "").trim();
-    const n = Math.max(0, Math.min(100, Number(raw || 0))); // clamp 0-100
-    setRareMerchChancePct(String(n));
+   <label style={{ fontSize: 12, opacity: 0.9 }}>
+  Rare → Merch chance (ex: 10%)
+  <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6 }}>
+    <input
+      value={rareMerchChancePct}
+      onChange={(e) => {
+        const v = String(e.target.value || "").replace(/[^\d]/g, ""); // digits only
+        const pct = Math.max(0, Math.min(100, Number(v || 0))); // clamp 0-100
+        setRareMerchChancePct(String(pct));
 
-    // store as decimal in cfg (0.01 = 1%)
-    setCfg((c: any) => ({
-      ...c,
-      rareMerchChance: n / 100,
-    }));
-  }}
-  placeholder="10%"
-  style={{
-    width: "100%",
-    marginTop: 6,
-    padding: "10px 12px",
-    borderRadius: 12,
-    border: "1px solid rgba(255,255,255,.18)",
-    background: "rgba(0,0,0,.25)",
-    color: "white",
-  }}
-/>
-    </label>
+        // ✅ update cfg immediately (NO blur needed)
+        setCfg((c: any) => ({
+          ...c,
+          rareMerchChance: pct / 100,
+        }));
+      }}
+      placeholder="10"
+      style={{
+        width: 120,
+        padding: "10px 12px",
+        borderRadius: 12,
+        border: "1px solid rgba(255,255,255,.18)",
+        background: "rgba(0,0,0,.25)",
+        color: "white",
+      }}
+    />
+    <span style={{ opacity: 0.9, fontWeight: 800 }}>%</span>
+  </div>
+</label>
   </div>
 
   <div style={{ marginTop: 8, fontSize: 12, opacity: 0.8 }}>
