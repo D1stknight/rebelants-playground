@@ -660,7 +660,9 @@ const [shippingForm, setShippingForm] = useState<any>({
 // ✅ DRIP migrate UI
 const [showDripMigrate, setShowDripMigrate] = useState(false);
 const [dripBalance, setDripBalance] = useState<number | null>(null);
-const [dripAmount, setDripAmount] = useState<number>(0);
+  const prof = loadProfile();
+const isDiscordConnected = !!prof?.discordUserId;
+  const [dripAmount, setDripAmount] = useState<number>(0);
 const [dripBusy, setDripBusy] = useState(false);
 const [dripStatus, setDripStatus] = useState("");
 
@@ -1167,17 +1169,29 @@ return (
   Connect Discord
 </button>
 
-  <button
+ <button
   className="btn"
   type="button"
   onClick={() => {
+    try {
+      // ✅ Clear Discord identity from local profile so UI updates immediately
+      const p: any = loadProfile?.() || {};
+      if (p && typeof p === "object") {
+        delete p.discordUserId;
+        delete p.discordName;
+        delete p.discordAvatar;
+        delete p.discordUsername;
+        saveProfile?.(p);
+      }
+    } catch {}
+
+    // ✅ Then log out server-side
     window.location.href = "/api/auth/discord/logout";
   }}
   style={{ padding: "10px 12px", fontSize: 13, opacity: 0.95 }}
-  title="Disconnects Discord login only. Your in-game identity and points remain the same."
-  >
-  Disconnect Discord (keep playing)
-</button>  
+>
+  Disconnect Discord
+</button>
   
   <div style={{ marginLeft: 12, fontSize: 13, opacity: 0.9, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
     <span>
@@ -1302,18 +1316,27 @@ return (
       : `Claim Daily +${pointsConfig.dailyClaim} ${pointsConfig.currency}`}
   </button>
 
-  <button
-    className="btn"
-    type="button"
-    onClick={async () => {
-      await openDripModal();
-    }}
-    disabled={dripBusy}
-    style={{ padding: "8px 12px", fontSize: 13 }}
-    title="Move points from Discord (DRIP) into the game (and deduct them from DRIP so no double-dip)."
-  >
-    {dripBusy ? "Loading DRIP…" : "Migrate from Discord (DRIP)"}
-  </button>
+ <button
+  className="btn"
+  type="button"
+  onClick={async () => {
+    if (!isDiscordConnected) return;
+    await openDripModal();
+  }}
+  disabled={dripBusy || !isDiscordConnected}
+  style={{ padding: "8px 12px", fontSize: 13 }}
+  title={
+    isDiscordConnected
+      ? "Move points from Discord (DRIP) into the game."
+      : "Connect Discord to migrate DRIP points."
+  }
+>
+  {dripBusy
+    ? "Loading DRIP…"
+    : isDiscordConnected
+    ? "Migrate from Discord (DRIP)"
+    : "Connect Discord for DRIP"}
+</button>
 
   {typeof dripBalance === "number" && (
     <div style={{ fontSize: 12, opacity: 0.9, display: "grid", alignItems: "center" }}>
