@@ -57,11 +57,23 @@ const body =
       return res.status(200).json({ ok: true, alreadyRunning: true });
     }
 
-    const raw = await redis.get<string>(claimKey(claimId));
-    if (!raw) return res.status(404).json({ ok: false, error: "Claim not found" });
+    const raw: any = await redis.get<any>(claimKey(claimId));
+if (!raw) return res.status(404).json({ ok: false, error: "Claim not found" });
 
-    const claim = JSON.parse(String(raw));
+const claim =
+  typeof raw === "string"
+    ? (() => {
+        try {
+          return JSON.parse(raw);
+        } catch {
+          return null;
+        }
+      })()
+    : raw;
 
+if (!claim) {
+  return res.status(500).json({ ok: false, error: "Claim payload invalid" });
+}
     const prize = claim?.prize;
     const wallet = String(claim?.wallet || "").trim();
 
