@@ -975,6 +975,47 @@ async function migrateDripNow() {
     return;
   }
 
+  setDripBusy(true);
+  setDripStatus("Migrating… (deducting from DRIP + crediting game)");
+
+  try {
+    const idem = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+    const r = await fetch("/api/drip/migrate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-idempotency-key": idem,
+      },
+      body: JSON.stringify({
+        amount: amt,
+        playerId: effectivePlayerId,
+        idempotencyKey: idem,
+      }),
+    });
+
+    const j = await r.json().catch(() => null);
+
+    if (!r.ok || !j?.ok) {
+      setDripStatus(j?.error || "Migrate failed.");
+      if (typeof j?.dripBalance === "number") setDripBalance(j.dripBalance);
+      return;
+    }
+
+    setDripStatus(`✅ Migrated ${amt} points into the game.`);
+    await refresh();
+
+    const br = await fetch("/api/drip/balance", { cache: "no-store" });
+    const bj = await br.json().catch(() => null);
+    if (br.ok && bj?.ok) setDripBalance(Number(bj.balance || 0));
+  } catch (e: any) {
+    setDripStatus(e?.message || "Migrate error");
+  } finally {
+    setDripBusy(false);
+  }
+}
+
+// ✅ put submitShipping HERE (outside migrateDripNow, but still inside Shuffle component)
 async function submitShipping() {
   if (!lastClaimId || !lastPid) {
     setShipMsg("Missing claimId/playerId");
@@ -1008,48 +1049,6 @@ async function submitShipping() {
     setShipMsg(e?.message || "Shipping error");
   } finally {
     setShipBusy(false);
-  }
-}  
-
-  setDripBusy(true);
-  setDripStatus("Migrating… (deducting from DRIP + crediting game)");
-
-  try {
-    const idem = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-
-const r = await fetch("/api/drip/migrate", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    "x-idempotency-key": idem,
-  },
-  body: JSON.stringify({
-    amount: amt,
-    playerId: effectivePlayerId,
-    idempotencyKey: idem, // backup (optional)
-  }),
-});
-
-    const j = await r.json().catch(() => null);
-
-    if (!r.ok || !j?.ok) {
-      setDripStatus(j?.error || "Migrate failed.");
-      // refresh balance display if server returned it
-      if (typeof j?.dripBalance === "number") setDripBalance(j.dripBalance);
-      return;
-    }
-
-    setDripStatus(`✅ Migrated ${amt} points into the game.`);
-    await refresh();
-
-    // refresh DRIP balance after migration
-    const br = await fetch("/api/drip/balance", { cache: "no-store" });
-    const bj = await br.json().catch(() => null);
-    if (br.ok && bj?.ok) setDripBalance(Number(bj.balance || 0));
-  } catch (e: any) {
-    setDripStatus(e?.message || "Migrate error");
-  } finally {
-    setDripBusy(false);
   }
 }
 
