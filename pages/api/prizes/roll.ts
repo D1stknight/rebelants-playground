@@ -49,9 +49,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(405).json({ ok: false, error: "Method not allowed" });
     }
 
-   const force = String(req.query.force || "").toLowerCase();
+const force = String(req.query.force || "").toLowerCase();
 
 const cfg: any = defaultConfig;
+const currency = cfg.currency || "REBEL";
 
 // Use Admin-controlled rarity weights if present
 const rolledRarity = rollFromWeights(
@@ -66,8 +67,6 @@ const rarity =
   force === "common" ? "common" :
   force === "none" ? "none" :
   rolledRarity;
-    const cfg: any = defaultConfig;
-    const currency = cfg.currency || "REBEL";
 
     // ---------- COMMON ----------
     if (rarity === "common") {
