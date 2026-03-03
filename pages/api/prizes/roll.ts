@@ -3,6 +3,8 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
 import { pointsConfig as defaultConfig } from "../../../lib/pointsConfig";
 
+const ECON_KEY = "ra:config:economy";
+
 const ULTRA_NFT_INVENTORY_KEY = "ra:inv:ultra:nft";
 
 function clamp(n: number, min: number, max: number) {
@@ -51,7 +53,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 const force = String(req.query.force || "").toLowerCase();
 
-const cfg: any = defaultConfig;
+// ✅ Load Admin-config from Redis, fallback to defaults
+const raw = await redis.get(ECON_KEY);
+const saved = raw ? (typeof raw === "string" ? JSON.parse(raw) : raw) : null;
+
+// merge: defaults first, then saved overrides
+const cfg: any = {
+  ...(defaultConfig as any),
+  ...(saved || {}),
+  rewards: {
+    ...(defaultConfig as any)?.rewards,
+    ...(saved as any)?.rewards,
+  },
+  rarityWeights: {
+    ...(defaultConfig as any)?.rarityWeights,
+    ...(saved as any)?.rarityWeights,
+  },
+};
 const currency = cfg.currency || "REBEL";
 
 // Use Admin-controlled rarity weights if present
