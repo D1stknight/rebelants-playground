@@ -105,7 +105,7 @@ if (rarity === "ultra") {
         },
       });
     }
-
+  }
     // if invalid, keep looping and pop the next one
   }
 
