@@ -2,6 +2,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
 
+const ULTRA_NFT_INVENTORY_KEY = "ra:inv:ultra:nft";
+
 function claimKey(id: string) {
   return `ra:claim:${id}`;
 }
@@ -15,19 +17,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const rawBody = req.body;
-const body =
-  typeof rawBody === "string"
-    ? (rawBody.trim() ? JSON.parse(rawBody) : {})
-    : (rawBody ?? {});
-    
+    const body =
+      typeof rawBody === "string"
+        ? (rawBody.trim() ? JSON.parse(rawBody) : {})
+        : (rawBody ?? {});
+
     const claimId = String(body.claimId || "").trim();
     const playerId = String(body.playerId || "").trim().slice(0, 64);
-    const prizeIn = body.prize ?? null;
+    const prize = body.prize ?? null;
 
     const wallet = String(body.wallet || "").trim();
     const shipping = body.shipping ?? null;
 
-    if (!claimId || !playerId || !prizeIn) {
+    if (!claimId || !playerId || !prize) {
       return res.status(400).json({ ok: false, error: "Missing claimId/playerId/prize" });
     }
 
@@ -37,47 +39,41 @@ const body =
       return res.status(200).json({ ok: true, already: true });
     }
 
-    let prize = prizeIn;
-
-    // ✅ If NFT prize: reserve an actual token from inventory NOW
+    // ✅ If it's an NFT prize, consume 1 inventory item now (so roll doesn't burn inventory)
     if (String(prize?.type || "").toLowerCase() === "nft") {
       const invKey = String(prize?.meta?.inventoryKey || "").trim();
-
       if (!invKey) {
         return res.status(400).json({ ok: false, error: "NFT prize missing meta.inventoryKey" });
       }
-
-      // pop 1 inventory item (atomic reservation)
-      const rawItem = await redis.rpop(invKey);
-
-      if (!rawItem) {
-        // no NFT left -> fail claim (caller should fall back to points on next roll)
-        return res.status(409).json({ ok: false, error: "No NFT inventory available" });
-      }
-
-      // inventory item should be JSON like:
-      // {"chain":"eth","contract":"0x...","tokenId":"123"}
-      let token: any = null;
-      try {
-        token = JSON.parse(String(rawItem));
-      } catch {
-        // if it was stored as a plain string, keep it as-is
-        token = { raw: String(rawItem) };
-      }
-
-      prize = {
-        ...prize,
-        label: prize?.label || "NFT Prize",
-        meta: {
-          ...(prize?.meta || {}),
-          ...token,
-        },
-      };
 
       // require wallet for NFT claims
       if (!wallet || !wallet.startsWith("0x") || wallet.length < 10) {
         return res.status(400).json({ ok: false, error: "Missing/invalid recipient wallet" });
       }
+
+      // Find the exact raw item in the inventory list and remove it (consume once)
+      const items = await redis.lrange(ULTRA_NFT_INVENTORY_KEY, 0, 250);
+      const rawMatch = (items || []).find((s: any) => {
+        try {
+          const obj = JSON.parse(String(s));
+          const chain = String(obj?.chain || "").toUpperCase();
+          const contract = String(obj?.contract || "").trim();
+          const tokenId = String(obj?.tokenId ?? "").trim();
+          const k =
+            String(obj?.inventoryKey || "").trim() ||
+            `ultra:${chain}:${contract}:${tokenId}`;
+          return k === invKey;
+        } catch {
+          return false;
+        }
+      });
+
+      if (!rawMatch) {
+        return res.status(409).json({ ok: false, error: "No NFT inventory available" });
+      }
+
+      // Remove just ONE matching entry
+      await redis.lrem(ULTRA_NFT_INVENTORY_KEY, 1, rawMatch);
     }
 
     // ✅ If merch prize: require shipping info
