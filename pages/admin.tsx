@@ -585,29 +585,63 @@ async function saveConfig() {
 </td>
                       <td style={{ padding: "8px 6px", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{short(tx, 12)}</td>
 
-                      <td style={{ padding: "8px 6px" }}>
-                        {isNft && isPending ? (
-                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                            <button
-                              className="btn"
-                              onClick={() => unlockClaimTransferLock(id)}
-                              style={{ padding: "6px 10px", fontSize: 12 }}
-                            >
-                              Unlock
-                            </button>
+   <td style={{ padding: "8px 6px" }}>
+  {isNft && isPending ? (
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      <button
+        className="btn"
+        onClick={() => unlockClaimTransferLock(id)}
+        style={{ padding: "6px 10px", fontSize: 12 }}
+      >
+        Unlock
+      </button>
 
-                            <button
-                              className="btn"
-                              onClick={() => transferClaimNFT(id)}
-                              style={{ padding: "6px 10px", fontSize: 12 }}
-                            >
-                              Transfer
-                            </button>
-                          </div>
-                        ) : (
-                          <span style={{ opacity: 0.7, fontSize: 12 }}>—</span>
-                        )}
-                      </td>
+      <button
+        className="btn"
+        onClick={() => transferClaimNFT(id)}
+        style={{ padding: "6px 10px", fontSize: 12 }}
+      >
+        Transfer
+      </button>
+    </div>
+  ) : String(type).toLowerCase() === "merch" &&
+    (String(status).toUpperCase() === "READY_TO_FULFILL" ||
+      String(status).toUpperCase() === "PENDING" ||
+      String(status).toUpperCase() === "NEEDS_SHIPPING") ? (
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      <button
+        className="btn"
+        onClick={async () => {
+          append(`Fulfilling merch claim ${id}…`);
+          const r = await fetch("/api/admin/claims/fulfill", {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ claimId: id }),
+          });
+          const j = await r.json().catch(() => null);
+          append(`FULFILL status ${r.status}\n${JSON.stringify(j, null, 2)}`);
+          await loadClaims();
+        }}
+        style={{ padding: "6px 10px", fontSize: 12 }}
+      >
+        Mark Fulfilled
+      </button>
+
+      <button
+        className="btn"
+        onClick={() => {
+          setClaimLookupId(id);
+          getClaim();
+        }}
+        style={{ padding: "6px 10px", fontSize: 12 }}
+      >
+        View
+      </button>
+    </div>
+  ) : (
+    <span style={{ opacity: 0.7, fontSize: 12 }}>—</span>
+  )}
+</td>
                     </tr>
                   );
                 })}
