@@ -11,8 +11,11 @@ function isAdmin(req: NextApiRequest) {
     headerValue(req.headers["x-admin-key"]) ||
     headerValue(req.headers["x-admin-token"]) ||
     "";
+
   const expected = process.env.ADMIN_KEY || process.env.ADMIN_TOKEN || "";
-  return !!expected && !!provided && provided === expected;
+  if (!expected) return false;
+
+  return !!provided && provided === expected;
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -20,42 +23,62 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     if (!isAdmin(req)) return res.status(401).json({ ok: false, error: "Unauthorized" });
-    if (req.method !== "GET") return res.status(405).json({ ok: false, error: "Method not allowed" });
 
-    // Upstash scan
-    let cursor = 0;
-    const out: any[] = [];
+    if (req.method !== "GET") {
+      res.setHeader("Allow", "GET");
+      return res.status(405).json({ ok: false, error: "Method not allowed" });
+    }
 
-    do {
-      const resp = await redis.scan(cursor, { match: "ra:claim:*", count: 200 });
-      cursor = Number((resp as any)?.cursor ?? 0);
-      const keys = ((resp as any)?.keys ?? []) as string[];
+    const match = "ra:claim:*";
+    const rAny: any = redis as any;
 
-      for (const k of keys) {
-        // skip lock keys
-        if (k.endsWith(":transferLock")) continue;
+    let keys: string[] = [];
 
-        const raw = await redis.get<string>(k);
-        if (!raw) continue;
-
-        let claim: any = null;
-        try {
-          claim = JSON.parse(String(raw));
-        } catch {
-          claim = null;
+    // Prefer SCAN if available (safer than KEYS on large DBs)
+    if (typeof rAny.scan === "function") {
+      let cursor = 0;
+      for (let i = 0; i < 50; i++) {
+        const out = await rAny.scan(cursor, { match, count: 200 });
+        // Upstash returns [cursor, keys] OR { cursor, keys }
+        if (Array.isArray(out)) {
+          cursor = Number(out[0] ?? 0);
+          const batch = Array.isArray(out[1]) ? out[1] : [];
+          keys.push(...batch);
+        } else if (out && typeof out === "object") {
+          cursor = Number(out.cursor ?? 0);
+          const batch = Array.isArray(out.keys) ? out.keys : [];
+          keys.push(...batch);
+        } else {
+          break;
         }
-        if (!claim) continue;
-
-        out.push(claim);
+        if (!cursor) break;
       }
-    } while (cursor !== 0);
+    } else if (typeof rAny.keys === "function") {
+      keys = await rAny.keys(match);
+    } else {
+      return res.status(500).json({
+        ok: false,
+        error: "Redis client has no scan() or keys() method",
+      });
+    }
 
-    // newest first
-    out.sort((a, b) => Number(b?.ts || 0) - Number(a?.ts || 0));
+    // newest first (roughly)
+    keys = (keys || []).sort().reverse();
 
-    return res.status(200).json({ ok: true, count: out.length, claims: out.slice(0, 200) });
+    // Don’t return a giant payload
+    const slice = keys.slice(0, 200);
+
+    return res.status(200).json({
+      ok: true,
+      count: keys.length,
+      claimIds: slice.map((k) => k.replace("ra:claim:", "")),
+      keys: slice,
+    });
   } catch (e: any) {
     console.error("admin claims list error:", e);
-    return res.status(500).json({ ok: false, error: "Server error" });
+    return res.status(500).json({
+      ok: false,
+      error: e?.message || "Server error",
+    });
   }
 }
