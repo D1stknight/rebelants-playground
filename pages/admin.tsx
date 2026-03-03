@@ -11,12 +11,18 @@ type PointsConfigShape = {
   dailyEarnCap: number;
   rewards: { none: number; common: number; rare: number; ultra: number };
 
-  // ✅ NEW
   ultraMinReward: number;
 
-  // ✅ PRO: rarity weights + rare merch chance
-  rarityWeights: { none: number; common: number; rare: number; ultra: number };
-  rareMerchChancePercent: number;
+  // ✅ ADD THIS (decimal: 0.01 = 1%)
+  rareMerchChance: number;
+
+  // (optional) if you already added rarityWeights in "Pro Odds", keep it here too
+  rarityWeights?: {
+    none: number;
+    common: number;
+    rare: number;
+    ultra: number;
+  };
 
   prizePools?: {
     none: any[];
@@ -80,18 +86,18 @@ const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
   dailyEarnCap: defaultConfig.dailyEarnCap,
   rewards: { ...defaultConfig.rewards },
 
-  // ✅ NEW (fallback if missing)
   ultraMinReward: Number((defaultConfig as any).ultraMinReward ?? 50),
 
-  // ✅ PRO defaults (so Admin Save keeps these fields)
-  rarityWeights: (defaultConfig as any).rarityWeights || {
-    none: 45,
-    common: 37,
-    rare: 15,
-    ultra: 3,
-  },
+  // ✅ ADD THIS (default 1% if missing)
+  rareMerchChance: Number((defaultConfig as any).rareMerchChance ?? 0.01),
 
-  rareMerchChancePercent: Number((defaultConfig as any).rareMerchChancePercent ?? 1),
+  // ✅ If you have pro odds weights, keep them too
+  rarityWeights: (defaultConfig as any).rarityWeights || {
+    none: 0,
+    common: 0,
+    rare: 0,
+    ultra: 0,
+  },
 
   prizePools: (defaultConfig as any).prizePools || {
     none: [],
@@ -101,6 +107,9 @@ const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
   },
 }));
 
+  const [rareMerchChancePct, setRareMerchChancePct] = useState(
+  `${Math.round(((defaultConfig as any).rareMerchChance ?? 0.01) * 100)}`
+);
     const [log, setLog] = useState<string>("");
 
   // =========================
@@ -154,6 +163,11 @@ const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
   if (merged) setCfg(merged);
 }
 
+  if (merged) {
+  const pct = Math.round(Number((merged as any).rareMerchChance ?? 0.01) * 100);
+  setRareMerchChancePct(String(pct));
+}
+  
   async function saveConfig() {
   append("Saving config…");
   const r = await fetch("/api/admin/config", {
@@ -699,27 +713,36 @@ const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
             </label>
 
 <label style={{ fontSize: 12, opacity: 0.9 }}>
-  Rare → Merch Chance
-  <input
-    value={formatDecimalAsPercent((cfg as any).rareMerchChance ?? 0.01)}
-    onChange={(e) =>
-      setCfg((c: any) => ({
-        ...c,
-        rareMerchChance: parsePercentToDecimal(e.target.value, c.rareMerchChance ?? 0.01),
-      }))
-    }
-    placeholder="1%"
-    style={{
-      width: "100%",
-      marginTop: 6,
-      padding: "10px 12px",
-      borderRadius: 12,
-      border: "1px solid rgba(255,255,255,.18)",
-      background: "rgba(0,0,0,.25)",
-      color: "white",
-    }}
-  />
-</label>            
+  Rare → Merch chance
+  <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6 }}>
+    <input
+      value={rareMerchChancePct}
+      onChange={(e) => {
+        // allow only digits
+        const v = String(e.target.value || "").replace(/[^\d]/g, "");
+        setRareMerchChancePct(v);
+      }}
+      onBlur={() => {
+        const pct = Math.max(0, Math.min(100, Number(rareMerchChancePct || "0")));
+        setRareMerchChancePct(String(pct));
+        setCfg((c: any) => ({ ...c, rareMerchChance: pct / 100 }));
+      }}
+      placeholder="1"
+      style={{
+        width: 120,
+        padding: "10px 12px",
+        borderRadius: 12,
+        border: "1px solid rgba(255,255,255,.18)",
+        background: "rgba(0,0,0,.25)",
+        color: "white",
+      }}
+    />
+    <span style={{ opacity: 0.9, fontWeight: 800 }}>%</span>
+  </div>
+  <div style={{ fontSize: 11, opacity: 0.75, marginTop: 6 }}>
+    Tip: type 100 then click outside the box (blur), then Save.
+  </div>
+</label>
 
             <label style={{ fontSize: 12, opacity: 0.9 }}>
               Currency
