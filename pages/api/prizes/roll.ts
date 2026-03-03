@@ -62,92 +62,67 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-// ---------- ULTRA ----------
-if (rarity === "ultra") {
-  // 🔥 Try to pull an NFT from inventory (atomic)
-  // We loop to SKIP junk/stale entries that may be in the list.
-  for (let i = 0; i < 10; i++) {
-    const nftRaw = await redis.rpop(ULTRA_NFT_INVENTORY_KEY);
-    if (!nftRaw) break;
+    // ---------- ULTRA ----------
+    if (rarity === "ultra") {
+      // Try to pull NFT inventory safely
+      for (let i = 0; i < 10; i++) {
+        const nftRaw = await redis.rpop(ULTRA_NFT_INVENTORY_KEY);
+        if (!nftRaw) break;
 
-    let item: any = null;
-    try {
-      item = JSON.parse(String(nftRaw));
-    } catch {
-      item = null;
-    }
+        let item: any = null;
+        try {
+          item = JSON.parse(String(nftRaw));
+        } catch {
+          item = null;
+        }
 
-    const chain = String(item?.chain || "ETH").toUpperCase();
-    const contract = String(item?.contract || "").trim();
-    const tokenId = String(item?.tokenId ?? "").trim();
-    const label = String(item?.label || "NFT Prize").trim();
+        const chain = String(item?.chain || "ETH").toUpperCase();
+        const contract = String(item?.contract || "").trim();
+        const tokenId = String(item?.tokenId ?? "").trim();
+        const label = String(item?.label || "NFT Prize").trim();
 
-    // ✅ Only accept valid entries
-    if (contract && contract.startsWith("0x") && tokenId) {
-      // ✅ REQUIRED by /api/prizes/claim
-      const inventoryKey =
-        String(item?.inventoryKey || "").trim() ||
-        `ultra:${chain}:${contract}:${tokenId}`;
+        if (contract && contract.startsWith("0x") && tokenId) {
+          const inventoryKey =
+            String(item?.inventoryKey || "").trim() ||
+            `ultra:${chain}:${contract}:${tokenId}`;
+
+          return res.status(200).json({
+            ok: true,
+            rarity,
+            prize: {
+              type: "nft",
+              label,
+              meta: {
+                chain,
+                contract,
+                tokenId,
+                label,
+                inventoryKey,
+              },
+            },
+          });
+        }
+      }
+
+      // fallback to points
+      const ptsCfg = Number(cfg.rewards.ultra || 0);
+      const min = Number(cfg.ultraMinReward || 0);
+      const pts = Math.max(ptsCfg, min);
 
       return res.status(200).json({
         ok: true,
         rarity,
         prize: {
-          type: "nft",
-          label,
-          meta: {
-            chain,
-            contract,
-            tokenId,
-            label,
-            inventoryKey,
-          },
+          type: "points",
+          points: pts,
+          label: `${pts} ${currency}`,
         },
       });
     }
-  }
-    // if invalid, keep looping and pop the next one
-  }
 
-  // fallback to points if no VALID NFT available
-  const ptsCfg = Number(cfg.rewards.ultra || 0);
-  const min = Number(cfg.ultraMinReward || 0);
-  const pts = Math.max(ptsCfg, min);
-
-  return res.status(200).json({
-    ok: true,
-    rarity,
-    prize: {
-      type: "points",
-      points: pts,
-      label: `${pts} ${currency}`,
-    },
-  });
-}
-
-  // fallback to points if no NFT available
-  const ptsCfg = Number(cfg.rewards.ultra || 0);
-  const min = Number(cfg.ultraMinReward || 0);
-  const pts = Math.max(ptsCfg, min);
-
-  return res.status(200).json({
-    ok: true,
-    rarity,
-    prize: {
-      type: "points",
-      points: pts,
-      label: `${pts} ${currency}`,
-    },
-  });
-}
     // ---------- NONE ----------
     return res.status(200).json({
       ok: true,
       rarity,
       prize: { type: "none", label: "Nothing this time" },
     });
-  } catch (err: any) {
-    console.error("prizes/roll error:", err);
-    return res.status(500).json({ ok: false, error: "Server error" });
-  }
-}
