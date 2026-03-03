@@ -5,12 +5,40 @@ import { pointsConfig as defaultConfig } from "../../../lib/pointsConfig";
 
 const ULTRA_NFT_INVENTORY_KEY = "ra:inv:ultra:nft";
 
-function rollRarity(): "none" | "common" | "rare" | "ultra" {
-  const r = Math.random();
-  if (r < 0.01) return "ultra"; // 1%
-  if (r < 0.18) return "rare";
-  if (r < 0.55) return "common";
-  return "none";
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
+}
+
+function rollFromWeights(
+  weights: Record<string, any> | undefined,
+  order: string[],
+  fallback: "none" | "common" | "rare" | "ultra"
+): "none" | "common" | "rare" | "ultra" {
+  if (!weights) return fallback;
+
+  const pairs = order.map((k) => [
+    k,
+    Math.max(0, Number(weights[k] ?? 0)),
+  ] as const);
+
+  const total = pairs.reduce((s, [, v]) => s + v, 0);
+
+  if (!Number.isFinite(total) || total <= 0) return fallback;
+
+  let r = Math.random() * total;
+
+  for (const [k, v] of pairs) {
+    r -= v;
+    if (r <= 0) return k as any;
+  }
+
+  return pairs[pairs.length - 1][0] as any;
+}
+
+function percentToChance(p: any, fallback = 0.01) {
+  const n = Number(p);
+  if (!Number.isFinite(n)) return fallback;
+  return clamp(n / 100, 0, 1);
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -21,13 +49,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(405).json({ ok: false, error: "Method not allowed" });
     }
 
-    const force = String(req.query.force || "").toLowerCase();
+   const force = String(req.query.force || "").toLowerCase();
+
+const cfg: any = defaultConfig;
+
+// Use Admin-controlled rarity weights if present
+const rolledRarity = rollFromWeights(
+  cfg?.rarityWeights,
+  ["ultra", "rare", "common", "none"],
+  "none"
+);
+
 const rarity =
   force === "ultra" ? "ultra" :
   force === "rare" ? "rare" :
   force === "common" ? "common" :
   force === "none" ? "none" :
-  rollRarity();
+  rolledRarity;
     const cfg: any = defaultConfig;
     const currency = cfg.currency || "REBEL";
 
@@ -46,10 +84,15 @@ const rarity =
 
     // ---------- RARE ----------
     if (rarity === "rare") {
-      const merchChance = Number(cfg?.rareMerchChance ?? 0.01);
-      const roll = Math.random();
+      // Prefer percent-style Admin control if present
+const merchChance =
+  typeof cfg?.rareMerchChancePercent === "number"
+    ? percentToChance(cfg.rareMerchChancePercent, 0.01)
+    : Number(cfg?.rareMerchChance ?? 0.01);
 
-      if (roll < merchChance) {
+const roll = Math.random();
+
+if (roll < merchChance) {
         return res.status(200).json({
           ok: true,
           rarity,
