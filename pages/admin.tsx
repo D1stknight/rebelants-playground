@@ -55,7 +55,18 @@ export default function AdminPage() {
   },
 }));
 
-  const [log, setLog] = useState<string>("");
+    const [log, setLog] = useState<string>("");
+
+  // =========================
+  // Ultra NFT Inventory (Admin UI)
+  // =========================
+  const [invChain, setInvChain] = useState<"ETH" | "APECHAIN">("ETH");
+  const [invContract, setInvContract] = useState("");
+  const [invTokenIds, setInvTokenIds] = useState(""); // comma-separated
+  const [invLabel, setInvLabel] = useState("NFT Prize");
+
+  const [invBusy, setInvBusy] = useState(false);
+  const [invDebug, setInvDebug] = useState<any>(null);
 
    const headers = useMemo(() => {
     return {
@@ -190,7 +201,7 @@ export default function AdminPage() {
     append(`RESET status ${r.status}\n${JSON.stringify(j, null, 2)}`);
   }
 
-  async function resetAll() {
+   async function resetAll() {
     append("Resetting ALL…");
     const r = await fetch("/api/admin/reset", {
       method: "POST",
@@ -199,6 +210,90 @@ export default function AdminPage() {
     });
     const j = await r.json().catch(() => null);
     append(`RESET status ${r.status}\n${JSON.stringify(j, null, 2)}`);
+  }
+
+  // =========================
+  // Ultra NFT Inventory actions
+  // =========================
+  async function invRefresh() {
+    if (!authed) {
+      append("Inventory: NOT AUTHORIZED (click Verify first)");
+      return;
+    }
+    setInvBusy(true);
+    try {
+      const r = await fetch("/api/admin/inventory/nft/debug", { headers });
+      const j = await r.json().catch(() => null);
+      setInvDebug(j);
+      append(`INV DEBUG status ${r.status}\n${JSON.stringify(j, null, 2)}`);
+    } finally {
+      setInvBusy(false);
+    }
+  }
+
+  async function invAdd() {
+    if (!authed) {
+      append("Inventory: NOT AUTHORIZED (click Verify first)");
+      return;
+    }
+
+    const contract = invContract.trim();
+    const label = (invLabel || "NFT Prize").trim();
+
+    const tokenIds = invTokenIds
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    if (!contract || !contract.startsWith("0x")) {
+      append("Inventory: invalid contract (must start with 0x)");
+      return;
+    }
+    if (!tokenIds.length) {
+      append("Inventory: add at least one tokenId (comma-separated)");
+      return;
+    }
+
+    setInvBusy(true);
+    try {
+      const r = await fetch("/api/admin/inventory/nft/add", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          chain: invChain,
+          contract,
+          tokenIds,
+          label,
+        }),
+      });
+      const j = await r.json().catch(() => null);
+      append(`INV ADD status ${r.status}\n${JSON.stringify(j, null, 2)}`);
+      if (r.ok) {
+        setInvTokenIds("");
+        await invRefresh();
+      }
+    } finally {
+      setInvBusy(false);
+    }
+  }
+
+  async function invClear() {
+    if (!authed) {
+      append("Inventory: NOT AUTHORIZED (click Verify first)");
+      return;
+    }
+    setInvBusy(true);
+    try {
+      const r = await fetch("/api/admin/inventory/nft/clear", {
+        method: "POST",
+        headers,
+      });
+      const j = await r.json().catch(() => null);
+      append(`INV CLEAR status ${r.status}\n${JSON.stringify(j, null, 2)}`);
+      await invRefresh();
+    } finally {
+      setInvBusy(false);
+    }
   }
 
   return (
@@ -535,6 +630,130 @@ export default function AdminPage() {
         </div>
       </div>
 
+      {/* Inventory */}
+      <div
+        style={{
+          marginTop: 14,
+          padding: 14,
+          border: "1px solid rgba(255,255,255,.14)",
+          borderRadius: 14,
+          background: "rgba(15,23,42,.55)",
+        }}
+      >
+        <div style={{ fontWeight: 900, marginBottom: 10 }}>Ultra NFT Inventory</div>
+
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>
+            Chain
+            <select
+              value={invChain}
+              onChange={(e) => setInvChain((e.target.value || "ETH") as any)}
+              style={{
+                display: "block",
+                marginTop: 6,
+                padding: "10px 12px",
+                borderRadius: 12,
+                border: "1px solid rgba(255,255,255,.18)",
+                background: "rgba(0,0,0,.25)",
+                color: "white",
+              }}
+            >
+              <option value="ETH">ETH</option>
+              <option value="APECHAIN">APECHAIN</option>
+            </select>
+          </label>
+
+          <label style={{ fontSize: 12, opacity: 0.9, minWidth: 420, maxWidth: "92vw" }}>
+            Contract
+            <input
+              value={invContract}
+              onChange={(e) => setInvContract(e.target.value)}
+              placeholder="0x…"
+              style={{
+                width: "100%",
+                marginTop: 6,
+                padding: "10px 12px",
+                borderRadius: 12,
+                border: "1px solid rgba(255,255,255,.18)",
+                background: "rgba(0,0,0,.25)",
+                color: "white",
+              }}
+            />
+          </label>
+        </div>
+
+        <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <label style={{ fontSize: 12, opacity: 0.9, minWidth: 420, maxWidth: "92vw" }}>
+            Token IDs (comma-separated)
+            <input
+              value={invTokenIds}
+              onChange={(e) => setInvTokenIds(e.target.value)}
+              placeholder="935,936,937"
+              style={{
+                width: "100%",
+                marginTop: 6,
+                padding: "10px 12px",
+                borderRadius: 12,
+                border: "1px solid rgba(255,255,255,.18)",
+                background: "rgba(0,0,0,.25)",
+                color: "white",
+              }}
+            />
+          </label>
+
+          <label style={{ fontSize: 12, opacity: 0.9, minWidth: 260 }}>
+            Label
+            <input
+              value={invLabel}
+              onChange={(e) => setInvLabel(e.target.value)}
+              placeholder="Rebel Ant #935"
+              style={{
+                width: "100%",
+                marginTop: 6,
+                padding: "10px 12px",
+                borderRadius: 12,
+                border: "1px solid rgba(255,255,255,.18)",
+                background: "rgba(0,0,0,.25)",
+                color: "white",
+              }}
+            />
+          </label>
+
+          <button className="btn" onClick={invAdd} disabled={invBusy} style={{ padding: "10px 12px" }}>
+            Add
+          </button>
+          <button className="btn" onClick={invRefresh} disabled={invBusy} style={{ padding: "10px 12px" }}>
+            Refresh
+          </button>
+          <button className="btn" onClick={invClear} disabled={invBusy} style={{ padding: "10px 12px" }}>
+            Clear
+          </button>
+
+          <span style={{ fontSize: 12, opacity: 0.85 }}>
+            (Uses key: <b>ra:inv:ultra:nft</b>)
+          </span>
+        </div>
+
+        <div style={{ marginTop: 10, fontSize: 12, opacity: 0.9 }}>
+          Current length: <b>{typeof invDebug?.len === "number" ? invDebug.len : "—"}</b>
+        </div>
+
+        <div
+          style={{
+            marginTop: 10,
+            padding: 12,
+            borderRadius: 12,
+            border: "1px solid rgba(255,255,255,.14)",
+            background: "rgba(0,0,0,.25)",
+            fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+            fontSize: 12,
+            whiteSpace: "pre-wrap",
+          }}
+        >
+          {invDebug ? JSON.stringify(invDebug, null, 2) : "Inventory debug… (click Refresh)"}
+        </div>
+      </div> 
+         
       {/* Maintenance */}
       <div style={{ marginTop: 14, padding: 14, border: "1px solid rgba(255,255,255,.14)", borderRadius: 14, background: "rgba(15,23,42,.55)" }}>
         <div style={{ fontWeight: 900, marginBottom: 10 }}>Maintenance</div>
