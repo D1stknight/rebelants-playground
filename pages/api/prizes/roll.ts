@@ -126,3 +126,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       rarity,
       prize: { type: "none", label: "Nothing this time" },
     });
+  } catch (err: any) {
+    console.error("prizes/roll error:", err);
+    return res.status(500).json({ ok: false, error: "Server error" });
+  }
+}
