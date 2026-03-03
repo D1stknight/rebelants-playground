@@ -30,7 +30,19 @@ export type PointsConfig = {
     ultra: number;
   };
 
-  // ✅ Rare “very occasionally merch” chance (Model C)
+  // ✅ PRO: rarity weights (percent-style numbers; treated as weights)
+  // Higher = more likely. Does NOT need to add to 100.
+  rarityWeights?: {
+    none: number;
+    common: number;
+    rare: number;
+    ultra: number;
+  };
+
+  // ✅ PRO: Rare → Merch chance as a percent (ex: 10 = 10%)
+  rareMerchChancePercent?: number;
+
+  // ✅ Legacy (keep for backward compat)
   // example: 0.01 = 1%
   rareMerchChance: number;
 
@@ -57,6 +69,19 @@ export const pointsConfig: PointsConfig = {
     ultra: 300,
   },
 
+  // ✅ PRO: rarity weights (percent-style numbers; treated as weights)
+  // Higher = more likely. Does NOT need to add to 100.
+  rarityWeights: {
+    none: 45,
+    common: 37,
+    rare: 15,
+    ultra: 3,
+  },
+
+  // ✅ PRO: Rare → Merch chance percent (ex: 10 = 10%)
+  rareMerchChancePercent: 1,
+
+  // ✅ Legacy (keep for backward compat)
   // ✅ 1% rare merch attempt
   rareMerchChance: 0.01,
 
@@ -87,7 +112,13 @@ export const pointsConfig: PointsConfig = {
     ],
 
     ultra: [
-      { id: "u-nft-1", type: "nft", label: "NFT Prize (manual delivery)", weight: 3, meta: { note: "Deliver manually for now" } },
+      {
+        id: "u-nft-1",
+        type: "nft",
+        label: "NFT Prize (manual delivery)",
+        weight: 3,
+        meta: { note: "Deliver manually for now" },
+      },
     ],
   },
 
