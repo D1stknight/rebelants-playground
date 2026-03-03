@@ -120,7 +120,7 @@ export default function LeaderboardPanel() {
         {/* Balance */}
         <div className="lb-card">
           <div className="lb-card-title">Top Balance</div>
-          <div className="lb-rows">
+          <div className="lb-rows lb-scroll">
             {(lb.balance || []).slice(0, 10).map((r, i) => (
               <div key={`${r.playerId}-${i}`} className="lb-row">
                 <div className="lb-rank">#{i + 1}</div>
@@ -135,7 +135,7 @@ export default function LeaderboardPanel() {
         {/* Earned */}
         <div className="lb-card">
           <div className="lb-card-title">Top Earners</div>
-          <div className="lb-rows">
+          <div className="lb-rows lb-scroll">
             {(lb.earned || []).slice(0, 10).map((r, i) => (
               <div key={`${r.playerId}-${i}`} className="lb-row">
                 <div className="lb-rank">#{i + 1}</div>
