@@ -31,6 +31,11 @@ export default function AdminPage() {
   const [token, setToken] = useState("");
   const [authed, setAuthed] = useState(false);
 
+  // claims
+  const [claims, setClaims] = useState<any[]>([]);
+  const [claimsLoading, setClaimsLoading] = useState(false);
+  const [claimLookupId, setClaimLookupId] = useState("");  
+
     // grant
   const [playerId, setPlayerId] = useState("guest");
   const [walletAddress, setWalletAddress] = useState("");
@@ -121,6 +126,44 @@ export default function AdminPage() {
   const merged = (j?.config ?? j?.pointsConfig) as PointsConfigShape | undefined;
   if (merged) setCfg(merged);
 }
+
+  async function loadClaims() {
+    setClaimsLoading(true);
+    append("Loading claims…");
+
+    const r = await fetch("/api/admin/claims/list", { headers });
+    const j = await r.json().catch(() => null);
+
+    append(`CLAIMS LIST status ${r.status}\n${JSON.stringify(j, null, 2)}`);
+
+    if (r.ok && Array.isArray(j?.claims)) {
+      setClaims(j.claims);
+    }
+
+    setClaimsLoading(false);
+  }
+
+  async function getClaim() {
+    const id = (claimLookupId || "").trim();
+    if (!id) {
+      append("Get claim: missing claimId");
+      return;
+    }
+
+    append(`Getting claim ${id}…`);
+    const r = await fetch(`/api/admin/claims/get?claimId=${encodeURIComponent(id)}`, { headers });
+    const j = await r.json().catch(() => null);
+
+    append(`CLAIM GET status ${r.status}\n${JSON.stringify(j, null, 2)}`);
+
+    if (r.ok && j?.claim) {
+      // put it at top, de-dupe by claimId
+      setClaims((prev) => {
+        const next = [j.claim, ...prev.filter((c) => c?.claimId !== j.claim?.claimId)];
+        return next;
+      });
+    }
+  }  
 
     async function grantPoints() {
     append("Granting points…");
@@ -241,7 +284,7 @@ export default function AdminPage() {
     const label = (invLabel || "NFT Prize").trim();
 
     const tokenIds = invTokenIds
-      .split(",")
+  .split(/[\s,]+/)
       .map((s) => s.trim())
       .filter(Boolean);
 
@@ -337,6 +380,81 @@ export default function AdminPage() {
       </div>
 
       <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+
+        {/* Claims */}
+        <div style={{ padding: 14, border: "1px solid rgba(255,255,255,.14)", borderRadius: 14, background: "rgba(15,23,42,.55)" }}>
+          <div style={{ fontWeight: 900, marginBottom: 10 }}>Claims (latest)</div>
+
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+            <button className="btn" onClick={loadClaims} style={{ padding: "10px 12px" }}>
+              {claimsLoading ? "Loading…" : "Load Claims"}
+            </button>
+
+            <input
+              value={claimLookupId}
+              onChange={(e) => setClaimLookupId(e.target.value)}
+              placeholder="claimId to lookup (optional)"
+              style={{
+                width: 320,
+                maxWidth: "92vw",
+                padding: "10px 12px",
+                borderRadius: 12,
+                border: "1px solid rgba(255,255,255,.18)",
+                background: "rgba(0,0,0,.25)",
+                color: "white",
+              }}
+            />
+
+            <button className="btn" onClick={getClaim} style={{ padding: "10px 12px" }}>
+              Get Claim
+            </button>
+          </div>
+
+          <div style={{ marginTop: 12, overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+              <thead>
+                <tr style={{ textAlign: "left", opacity: 0.9 }}>
+                  <th style={{ padding: "8px 6px" }}>Claim</th>
+                  <th style={{ padding: "8px 6px" }}>Type</th>
+                  <th style={{ padding: "8px 6px" }}>Label</th>
+                  <th style={{ padding: "8px 6px" }}>Wallet</th>
+                  <th style={{ padding: "8px 6px" }}>Status</th>
+                  <th style={{ padding: "8px 6px" }}>Tx</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(claims || []).map((c) => {
+                  const id = String(c?.claimId || "");
+                  const type = String(c?.prize?.type || "");
+                  const label = String(c?.prize?.label || "");
+                  const wallet = String(c?.wallet || "");
+                  const status = String(c?.status || "");
+                  const tx = String(c?.txHash || "");
+
+                  const short = (s: string, n = 8) => (s && s.length > n ? `${s.slice(0, n)}…` : s);
+
+                  return (
+                    <tr key={id} style={{ borderTop: "1px solid rgba(255,255,255,.08)" }}>
+                      <td style={{ padding: "8px 6px", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{short(id, 14)}</td>
+                      <td style={{ padding: "8px 6px" }}>{type}</td>
+                      <td style={{ padding: "8px 6px" }}>{label}</td>
+                      <td style={{ padding: "8px 6px", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{short(wallet, 12)}</td>
+                      <td style={{ padding: "8px 6px" }}>{status}</td>
+                      <td style={{ padding: "8px 6px", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{short(tx, 12)}</td>
+                    </tr>
+                  );
+                })}
+                {(!claims || claims.length === 0) && (
+                  <tr>
+                    <td colSpan={6} style={{ padding: "10px 6px", opacity: 0.8 }}>
+                      No claims loaded yet.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>        
                {/* Grant */}
         <div style={{ padding: 14, border: "1px solid rgba(255,255,255,.14)", borderRadius: 14, background: "rgba(15,23,42,.55)" }}>
           <div style={{ fontWeight: 900, marginBottom: 10 }}>Grant Points</div>
