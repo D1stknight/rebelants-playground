@@ -509,23 +509,7 @@ export default function Shuffle() {
 
   // listen for wallet / discord changes
   window.addEventListener("ra:identity-changed", updateIdentity);
-
-   // ✅ Keep Discord connected status in sync with local profile changes
-React.useEffect(() => {
-  const sync = () => {
-    try {
-      const p: any = loadProfile?.() || {};
-      setIsDiscordConnected(!!p?.discordUserId);
-    } catch {
-      setIsDiscordConnected(false);
-    }
-  };
-
-  sync();
-  window.addEventListener("ra:identity-changed", sync);
-  return () => window.removeEventListener("ra:identity-changed", sync);
-}, []);
-   
+ 
   return () => {
     window.removeEventListener("ra:identity-changed", updateIdentity);
   };
