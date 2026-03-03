@@ -62,17 +62,51 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // newest first (roughly)
-    keys = (keys || []).sort().reverse();
+        // Filter ONLY real claim keys (exclude locks like :transferLock)
+    const claimKeys = (keys || [])
+      .filter((k) => k.startsWith("ra:claim:") && !k.endsWith(":transferLock"))
+      .sort()
+      .reverse();
 
     // Don’t return a giant payload
-    const slice = keys.slice(0, 200);
+    const slice = claimKeys.slice(0, 200);
+
+    // Fetch claim payloads
+    const rAny2: any = redis as any;
+
+    let values: any[] = [];
+    if (typeof rAny2.mget === "function") {
+      values = await rAny2.mget(...slice);
+    } else {
+      values = await Promise.all(slice.map((k) => redis.get(k)));
+    }
+
+    const claims = slice.map((key, idx) => {
+      const claimId = key.replace("ra:claim:", "");
+      const raw = values?.[idx];
+
+      if (!raw) return { claimId, missing: true };
+
+      // Upstash may return a string OR already-parsed object depending on client behavior
+      const obj =
+        typeof raw === "string"
+          ? (() => {
+              try {
+                return JSON.parse(raw);
+              } catch {
+                return { claimId, raw };
+              }
+            })()
+          : raw;
+
+      return obj?.claimId ? obj : { claimId, ...obj };
+    });
 
     return res.status(200).json({
       ok: true,
-      count: keys.length,
+      count: claimKeys.length,
       claimIds: slice.map((k) => k.replace("ra:claim:", "")),
-      keys: slice,
+      claims,
     });
   } catch (e: any) {
     console.error("admin claims list error:", e);
