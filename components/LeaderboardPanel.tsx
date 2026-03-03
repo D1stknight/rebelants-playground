@@ -147,46 +147,45 @@ export default function LeaderboardPanel() {
           </div>
         </div>
 
-        {/* Wins */}
-        <div className="lb-card">
-          <div className="lb-card-title">Top Wins</div>
-          <div className="lb-rows">
-            {(lb.wins || []).slice(0, 10).map((r, i) => (
-              <div key={`${r.playerId}-${i}`} className="lb-row">
-                <div className="lb-rank">#{i + 1}</div>
-                <div className="lb-name">{fmtName(r.playerId, my)}</div>
-                <div className="lb-score">{Math.floor(r.score || 0)}</div>
-              </div>
-            ))}
-            {!lb.wins?.length && <div className="lb-empty">No wins entries yet.</div>}
-          </div>
-        </div>
-
-        {/* Recent Wins */}
-        <div className="lb-card">
-          <div className="lb-card-title">Recent Wins</div>
-          <div className="lb-rows">
-            {(lb.recentWins || []).slice(0, 12).map((w, i) => {
-              const name = w?.playerName || fmtName(String(w?.playerId || ""), my);
-              const pts = Math.floor(Number(w?.pointsAwarded || 0));
-              const rarity = String(w?.rarity || "none");
-              const game = String(w?.game || "shuffle");
-              return (
-                <div key={`${w?.id || i}`} className="lb-win">
-                  <span className={`pill pill-${rarity}`}>{rarity}</span>
-                  <div className="lb-win-text">
-                    <div className="lb-win-name">{name}</div>
-                    <div className="lb-win-sub">
-                      +{pts} ({game})
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-            {!lb.recentWins?.length && <div className="lb-empty">No recent wins yet.</div>}
-          </div>
-        </div>
+     {/* Wins */}
+<div className="lb-card">
+  <div className="lb-card-title">Top Wins</div>
+  <div className="lb-rows lb-scroll">
+    {(lb.wins || []).slice(0, 30).map((r, i) => (
+      <div key={`${r.playerId}-${i}`} className="lb-row">
+        <div className="lb-rank">#{i + 1}</div>
+        <div className="lb-name">{fmtName(r.playerId, my)}</div>
+        <div className="lb-score">{Math.floor(r.score || 0)}</div>
       </div>
+    ))}
+    {!lb.wins?.length && <div className="lb-empty">No wins entries yet.</div>}
+  </div>
+</div>
+
+       {/* Recent Wins */}
+<div className="lb-card">
+  <div className="lb-card-title">Recent Wins</div>
+  <div className="lb-rows lb-scroll">
+    {(lb.recentWins || []).slice(0, 40).map((w, i) => {
+      const name = w?.playerName || fmtName(String(w?.playerId || ""), my);
+      const pts = Math.floor(Number(w?.pointsAwarded || 0));
+      const rarity = String(w?.rarity || "none");
+      const game = String(w?.game || "shuffle");
+      return (
+        <div key={`${w?.id || i}`} className="lb-win">
+          <span className={`pill pill-${rarity}`}>{rarity}</span>
+          <div className="lb-win-text">
+            <div className="lb-win-name">{name}</div>
+            <div className="lb-win-sub">
+              +{pts} ({game})
+            </div>
+          </div>
+        </div>
+      );
+    })}
+    {!lb.recentWins?.length && <div className="lb-empty">No recent wins yet.</div>}
+  </div>
+</div>
 
       <style jsx>{`
         .lb-wrap {
@@ -216,6 +215,25 @@ export default function LeaderboardPanel() {
           display: grid;
           gap: 8px;
         }
+
+.lb-scroll {
+  max-height: 170px;          /* ~3 rows visible */
+  overflow-y: auto;
+  padding-right: 6px;         /* space so scrollbar doesn't overlay text */
+  align-content: start;}
+
+/* optional: nicer scrollbar */
+.lb-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+.lb-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,.18);
+  border-radius: 999px;
+}
+.lb-scroll::-webkit-scrollbar-track {
+  background: rgba(0,0,0,.18);
+  border-radius: 999px;
+}        
         .lb-row {
           display: grid;
           grid-template-columns: 42px 1fr 90px;
