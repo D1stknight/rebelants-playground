@@ -647,7 +647,7 @@ async function saveConfig() {
                 })}
                 {(!claims || claims.length === 0) && (
                   <tr>
-                    <td colSpan={6} style={{ padding: "10px 6px", opacity: 0.8 }}>
+                    <td colSpan={7} style={{ padding: "10px 6px", opacity: 0.8 }}>
                       No claims loaded yet.
                     </td>
                   </tr>
