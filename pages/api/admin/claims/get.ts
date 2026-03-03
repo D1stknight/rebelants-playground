@@ -37,21 +37,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!claimId) return res.status(400).json({ ok: false, error: "Missing claimId" });
 
     const key = claimKey(claimId);
-    const raw = await redis.get<string>(key);
+    const raw = await redis.get<any>(key);
 
-    if (!raw) {
-      return res.status(200).json({ ok: true, claim: null });
-    }
+if (!raw) {
+  return res.status(200).json({ ok: true, claim: null });
+}
 
-    let claim: any = null;
-    try {
-      claim = JSON.parse(String(raw));
-    } catch {
-      // If something weird was stored, still return raw for debugging
-      return res.status(200).json({ ok: true, claim: { raw: String(raw) } });
-    }
+// ✅ If Upstash returns an already-parsed object, return it directly
+if (typeof raw === "object") {
+  return res.status(200).json({ ok: true, claim: raw });
+}
 
-    return res.status(200).json({ ok: true, claim });
+// ✅ Otherwise it's a string: try JSON.parse, else return raw string
+if (typeof raw === "string") {
+  try {
+    return res.status(200).json({ ok: true, claim: JSON.parse(raw) });
+  } catch {
+    return res.status(200).json({ ok: true, claim: { raw } });
+  }
+}
+
+// fallback (shouldn't happen)
+return res.status(200).json({ ok: true, claim: { raw: String(raw) } });
   } catch (e: any) {
     console.error("admin claims get error:", e);
     return res.status(500).json({ ok: false, error: "Server error" });
