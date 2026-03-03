@@ -560,11 +560,36 @@ React.useEffect(() => {
     };
   }, []);
 
-const prof = loadProfile();
-const computedEffectivePlayerId = getEffectivePlayerId(prof);
-
 const { balance, spend, earn, claimDaily, devGrant, refresh } =
   usePoints(effectivePlayerId);
+
+// ✅ Keep profile reactive (so UI updates when localStorage changes)
+const [profile, setProfile] = React.useState<any>(() => {
+  try {
+    return loadProfile();
+  } catch {
+    return {};
+  }
+});
+
+React.useEffect(() => {
+  const sync = () => {
+    try {
+      setProfile(loadProfile());
+    } catch {
+      setProfile({});
+    }
+  };
+
+  // initial
+  sync();
+
+  // whenever identity changes (wallet/discord connect/disconnect)
+  window.addEventListener("ra:identity-changed", sync);
+  return () => window.removeEventListener("ra:identity-changed", sync);
+}, []);
+
+const isDiscordConnected = !!profile?.discordUserId;
 
 // ✅ Whenever identity changes, force the points hook to refetch for the new id
 const lastPidRef = React.useRef<string>("");
@@ -1005,13 +1030,18 @@ function disconnectDiscord() {
     delete p.discordAvatar;
     delete p.discordUsername;
 
+    // ✅ IMPORTANT: if primaryId stays discord:..., you will still look "connected"
+    // set it back to guest/wallet identity
+    const fallback = (p.walletAddress ? `wallet:${p.walletAddress}` : (p.id || "guest")).trim();
+    p.primaryId = fallback;
+
     saveProfile(p);
 
-    // force UI refresh so buttons update
-    window.location.reload();
+    // ✅ tell the app to recompute effective id + refresh UI (no hard reload)
+    window.dispatchEvent(new Event("ra:identity-changed"));
+  } catch {}
 
-  } catch (e) {}
-
+  // ✅ log out server-side
   window.location.href = "/api/auth/discord/logout";
 }
   
@@ -1203,43 +1233,11 @@ return (
   Buy Points / Connect Ape Wallet
 </button>
 
-  <button
-  className="btn"
-  type="button"
-  onClick={() => {
-    window.location.href = "/api/auth/discord/login";
-  }}
-  style={{ padding: "10px 12px", fontSize: 13, opacity: 0.95 }}
->
-  Connect Discord
-</button>
-
-{isDiscordConnected ? (
+ {isDiscordConnected ? (
   <button
     className="btn"
     type="button"
-    onClick={() => {
-      try {
-        const p: any = loadProfile?.() || {};
-        if (p && typeof p === "object") {
-          delete p.discordUserId;
-          delete p.discordName;
-          delete p.discordAvatar;
-          delete p.discordUsername;
-
-          // ✅ DO NOT touch primaryId (keeps points identity stable)
-          saveProfile?.(p);
-        }
-
-        // ✅ update UI immediately (react state)
-        setIsDiscordConnected(false);
-
-        // ✅ also notify any identity listeners you already have
-        window.dispatchEvent(new Event("ra:identity-changed"));
-      } catch {}
-
-      window.location.href = "/api/auth/discord/logout";
-    }}
+    onClick={disconnectDiscord}
     style={{ padding: "10px 12px", fontSize: 13, opacity: 0.95 }}
   >
     Disconnect Discord
@@ -1259,7 +1257,7 @@ return (
 
 <div style={{ fontSize: 12, opacity: 0.8 }}>
   Discord: <b>{isDiscordConnected ? "Connected ✅" : "Not Connected ❌"}</b>
-</div>  
+</div>
   
   <div style={{ marginLeft: 12, fontSize: 13, opacity: 0.9, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
     <span>
