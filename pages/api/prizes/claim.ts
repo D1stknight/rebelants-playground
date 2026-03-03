@@ -24,7 +24,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const claimId = String(body.claimId || "").trim();
     const playerId = String(body.playerId || "").trim().slice(0, 64);
-    const prize = body.prize ?? null;
+    let prize = body.prize ?? null;
 
     const wallet = String(body.wallet || "").trim();
     const shipping = body.shipping ?? null;
@@ -39,42 +39,80 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ ok: true, already: true });
     }
 
-    // ✅ If it's an NFT prize, consume 1 inventory item now (so roll doesn't burn inventory)
-    if (String(prize?.type || "").toLowerCase() === "nft") {
-      const invKey = String(prize?.meta?.inventoryKey || "").trim();
-      if (!invKey) {
-        return res.status(400).json({ ok: false, error: "NFT prize missing meta.inventoryKey" });
-      }
+  // ✅ If NFT prize: consume EXACTLY the rolled inventory item from ra:inv:ultra:nft
+if (String(prize?.type || "").toLowerCase() === "nft") {
+  const invKey = String(prize?.meta?.inventoryKey || "").trim();
 
-      // require wallet for NFT claims
-      if (!wallet || !wallet.startsWith("0x") || wallet.length < 10) {
-        return res.status(400).json({ ok: false, error: "Missing/invalid recipient wallet" });
-      }
+  if (!invKey) {
+    return res.status(400).json({ ok: false, error: "NFT prize missing meta.inventoryKey" });
+  }
 
-      // Find the exact raw item in the inventory list and remove it (consume once)
-      const items = await redis.lrange(ULTRA_NFT_INVENTORY_KEY, 0, 250);
-      const rawMatch = (items || []).find((s: any) => {
-        try {
-          const obj = JSON.parse(String(s));
-          const chain = String(obj?.chain || "").toUpperCase();
-          const contract = String(obj?.contract || "").trim();
-          const tokenId = String(obj?.tokenId ?? "").trim();
-          const k =
-            String(obj?.inventoryKey || "").trim() ||
-            `ultra:${chain}:${contract}:${tokenId}`;
-          return k === invKey;
-        } catch {
-          return false;
-        }
-      });
+  // require wallet for NFT claims
+  if (!wallet || !wallet.startsWith("0x") || wallet.length < 10) {
+    return res.status(400).json({ ok: false, error: "Missing/invalid recipient wallet" });
+  }
 
-      if (!rawMatch) {
-        return res.status(409).json({ ok: false, error: "No NFT inventory available" });
-      }
+  // Read some inventory items and find the exact one that matches inventoryKey
+  const items = await redis.lrange<any>(ULTRA_NFT_INVENTORY_KEY, 0, 500);
 
-      // Remove just ONE matching entry
-      await redis.lrem(ULTRA_NFT_INVENTORY_KEY, 1, rawMatch);
+  let rawMatch: any = null;
+  let parsedMatch: any = null;
+
+  for (const it of items || []) {
+    // Upstash may return strings OR already-parsed objects depending on client behavior
+    const obj =
+      typeof it === "string"
+        ? (() => {
+            try {
+              return JSON.parse(it);
+            } catch {
+              return null;
+            }
+          })()
+        : it;
+
+    if (!obj) continue;
+
+    const chain = String(obj?.chain || "").toUpperCase();
+    const contract = String(obj?.contract || "").trim();
+    const tokenId = String(obj?.tokenId ?? "").trim();
+
+    const k =
+      String(obj?.inventoryKey || "").trim() ||
+      `ultra:${chain}:${contract}:${tokenId}`;
+
+    if (k === invKey) {
+      rawMatch = it;       // what lrange returned (string OR object)
+      parsedMatch = obj;   // the parsed object
+      break;
     }
+  }
+
+  if (!rawMatch || !parsedMatch) {
+    return res.status(409).json({ ok: false, error: "No NFT inventory available" });
+  }
+
+  // Remove ONE matching entry from the list.
+  // lrem compares values; if lrange gave us an object, remove the canonical JSON string.
+  const removeValue =
+    typeof rawMatch === "string" ? rawMatch : JSON.stringify(parsedMatch);
+
+  await redis.lrem(ULTRA_NFT_INVENTORY_KEY, 1, removeValue);
+
+  // Ensure prize.meta has the actual token details
+  prize = {
+    ...prize,
+    label: prize?.label || parsedMatch?.label || "NFT Prize",
+    meta: {
+      ...(prize?.meta || {}),
+      chain: String(parsedMatch?.chain || "ETH").toUpperCase(),
+      contract: String(parsedMatch?.contract || "").trim(),
+      tokenId: String(parsedMatch?.tokenId ?? "").trim(),
+      label: String(parsedMatch?.label || prize?.label || "NFT Prize"),
+      inventoryKey: invKey,
+    },
+  };
+}
 
     // ✅ If merch prize: require shipping info
     if (String(prize?.type || "").toLowerCase() === "merch") {
