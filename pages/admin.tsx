@@ -31,6 +31,23 @@ function safeNum(v: any, fallback: number) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
+}
+
+function parsePercentToDecimal(input: string, fallback: number) {
+  const raw = String(input || "").trim().replace("%", "");
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return fallback;
+  return clamp(n / 100, 0, 1);
+}
+
+function formatDecimalAsPercent(decimal: any, fallbackPct = 0) {
+  const n = Number(decimal);
+  const pct = Number.isFinite(n) ? Math.round(n * 100) : fallbackPct;
+  return `${pct}%`;
+}
+
 function parsePercentLike(v: any, fallback: number) {
   const s = String(v ?? "").trim();
   if (!s) return fallback;
@@ -680,6 +697,29 @@ const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
                 style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
               />
             </label>
+
+<label style={{ fontSize: 12, opacity: 0.9 }}>
+  Rare → Merch Chance
+  <input
+    value={formatDecimalAsPercent((cfg as any).rareMerchChance ?? 0.01)}
+    onChange={(e) =>
+      setCfg((c: any) => ({
+        ...c,
+        rareMerchChance: parsePercentToDecimal(e.target.value, c.rareMerchChance ?? 0.01),
+      }))
+    }
+    placeholder="1%"
+    style={{
+      width: "100%",
+      marginTop: 6,
+      padding: "10px 12px",
+      borderRadius: 12,
+      border: "1px solid rgba(255,255,255,.18)",
+      background: "rgba(0,0,0,.25)",
+      color: "white",
+    }}
+  />
+</label>            
 
             <label style={{ fontSize: 12, opacity: 0.9 }}>
               Currency
