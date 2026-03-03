@@ -660,7 +660,7 @@ const [shippingForm, setShippingForm] = useState<any>({
 // ✅ DRIP migrate UI
 const [showDripMigrate, setShowDripMigrate] = useState(false);
 const [dripBalance, setDripBalance] = useState<number | null>(null);
-  const prof = loadProfile();
+
 const isDiscordConnected = !!prof?.discordUserId;
   const [dripAmount, setDripAmount] = useState<number>(0);
 const [dripBusy, setDripBusy] = useState(false);
