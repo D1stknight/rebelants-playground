@@ -603,8 +603,8 @@ React.useEffect(() => {
   (async () => {
     try {
       // ✅ If user clicked "Disconnect", do NOT auto-reconnect on refresh
-      const gate = loadProfile();
-      if (gate?.discordSkipLink) return;
+const gate: any = loadProfile();
+if (gate?.discordSkipLink) return;
 
       const sr = await fetch("/api/auth/discord/session", { cache: "no-store" });
       const sj = await sr.json().catch(() => null);
