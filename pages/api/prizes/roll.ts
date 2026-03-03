@@ -75,10 +75,16 @@ const rarity =
         const nftRaw = await redis.rpop(ULTRA_NFT_INVENTORY_KEY);
         if (!nftRaw) break;
 
-        let item: any = null;
-        try {
-          item = JSON.parse(String(nftRaw));
-        } catch {
+              // Upstash can return a string OR an already-parsed object depending on client config
+        let item: any = nftRaw;
+
+        if (typeof nftRaw === "string") {
+          try {
+            item = JSON.parse(nftRaw);
+          } catch {
+            item = null;
+          }
+        } else if (!item || typeof item !== "object") {
           item = null;
         }
 
