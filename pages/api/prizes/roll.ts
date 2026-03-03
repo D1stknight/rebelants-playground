@@ -21,7 +21,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(405).json({ ok: false, error: "Method not allowed" });
     }
 
-    const rarity = rollRarity();
+    const force = String(req.query.force || "").toLowerCase();
+const rarity =
+  force === "ultra" ? "ultra" :
+  force === "rare" ? "rare" :
+  force === "common" ? "common" :
+  force === "none" ? "none" :
+  rollRarity();
     const cfg: any = defaultConfig;
     const currency = cfg.currency || "REBEL";
 
