@@ -1043,8 +1043,8 @@ async function submitShipping() {
       return;
     }
 
-    setShipMsg("✅ Shipping saved!");
-    setNeedShipping(false);
+    setShipMsg("✅ Shipping saved! We’ll email you when it ships.");
+// ✅ IMPORTANT: do NOT setNeedShipping(false) here
   } catch (e: any) {
     setShipMsg(e?.message || "Shipping error");
   } finally {
@@ -1362,11 +1362,11 @@ return (
   <LeaderboardPanel />
 </div>
 
-    {showPrize && (
+   {showPrize && (
   <PrizeModal
     rarity={rarity}
     prize={prize}
-    onClose={resetAfterPrize}
+    onClose={() => setShowPrize(false)}
     needShipping={needShipping}
     shippingForm={shippingForm}
     setShippingForm={setShippingForm}
