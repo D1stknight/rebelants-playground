@@ -839,23 +839,29 @@ const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
     <label style={{ fontSize: 12, opacity: 0.9 }}>
       Rare → Merch chance (ex: 10%)
       <input
-        value={`${cfg.rareMerchChancePercent ?? 1}%`}
-        onChange={(e) =>
-          setCfg((c) => ({
-            ...c,
-            rareMerchChancePercent: parsePercentLike(e.target.value, Number(c.rareMerchChancePercent ?? 1)),
-          }))
-        }
-        style={{
-          width: "100%",
-          marginTop: 6,
-          padding: "10px 12px",
-          borderRadius: 12,
-          border: "1px solid rgba(255,255,255,.18)",
-          background: "rgba(0,0,0,.25)",
-          color: "white",
-        }}
-      />
+  value={`${rareMerchChancePct}%`}
+  onChange={(e) => {
+    const raw = String(e.target.value || "").replace("%", "").trim();
+    const n = Math.max(0, Math.min(100, Number(raw || 0))); // clamp 0-100
+    setRareMerchChancePct(String(n));
+
+    // store as decimal in cfg (0.01 = 1%)
+    setCfg((c: any) => ({
+      ...c,
+      rareMerchChance: n / 100,
+    }));
+  }}
+  placeholder="10%"
+  style={{
+    width: "100%",
+    marginTop: 6,
+    padding: "10px 12px",
+    borderRadius: 12,
+    border: "1px solid rgba(255,255,255,.18)",
+    background: "rgba(0,0,0,.25)",
+    color: "white",
+  }}
+/>
     </label>
   </div>
 
