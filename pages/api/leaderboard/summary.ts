@@ -3,6 +3,8 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
 import { LB_BALANCE, LB_EARNED, LB_WINS, LB_RECENT_WINS } from "../../../lib/server/leaderboards";
 
+const PLAYER_NAMES = "ra:player_names_v1"; // playerId -> last known display name
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Cache-Control", "no-store, max-age=0");
   res.setHeader("Pragma", "no-cache");
@@ -53,11 +55,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     };
 
+        const balanceRows = parseZ(bal);
+    const earnedRows = parseZ(earned);
+    const winsRows = parseZ(wins);
+
+    // ✅ attach stored names (so we can show Discord names even after disconnect)
+    const allIds = Array.from(
+      new Set(
+        [...balanceRows, ...earnedRows, ...winsRows]
+          .map((x: any) => String(x?.playerId || "").trim())
+          .filter(Boolean)
+      )
+    );
+
+    const namePairs = await Promise.all(
+      allIds.map(async (id) => {
+        try {
+          const n = await redis.hget(PLAYER_NAMES, id);
+          return [id, n ? String(n) : ""] as const;
+        } catch {
+          return [id, ""] as const;
+        }
+      })
+    );
+
+    const nameMap = Object.fromEntries(namePairs) as Record<string, string>;
+
+    const withNames = (rows: any[]) =>
+      rows.map((r: any) => ({
+        ...r,
+        playerName: nameMap[String(r.playerId)] || undefined,
+      }));
+
     return res.status(200).json({
       ok: true,
-      balance: parseZ(bal),
-      earned: parseZ(earned),
-      wins: parseZ(wins),
+      balance: withNames(balanceRows),
+      earned: withNames(earnedRows),
+      wins: withNames(winsRows),
       recentWins: (recent || []).map(safeWin).filter(Boolean),
     });
   } catch (e: any) {
