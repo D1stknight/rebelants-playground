@@ -1207,6 +1207,7 @@ return (
 
       {/* Shuffle button + balance row */}
 <div className="shuffle-cta" style={{ position: "relative", display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+<div style={{ height: 44, display: "flex", alignItems: "center" }}>
   <button
     className="btn"
     onClick={runShuffle}
@@ -1217,6 +1218,7 @@ return (
       ? "Shuffling…"
       : `Shuffle (-${cost} ${pointsConfig.currency})`}
   </button>
+</div>
 
  <button
   className="btn"
