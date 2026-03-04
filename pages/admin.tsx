@@ -118,7 +118,6 @@ const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
   const [rareMerchChancePct, setRareMerchChancePct] = useState(
   `${Math.round(((defaultConfig as any).rareMerchChance ?? 0.01) * 100)}`
 );
-      const [log, setLog] = useState<string>("");
 
   // =========================
   // Prize Inventory Dashboard (Merch + APE budget)
@@ -263,6 +262,8 @@ async function loadDashboard() {
       setDashLoading(false);
     }
   }
+
+const [log, setLog] = useState<string>("");
 
   function append(msg: string) {
     setLog((s) => `${msg}\n\n${s}`.trim());
