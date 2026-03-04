@@ -3,6 +3,8 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
 import { LB_WINS, LB_RECENT_WINS } from "../../../lib/server/leaderboards";
 
+const PLAYER_NAMES = "ra:player_names_v1"; // playerId -> last known display name
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Cache-Control", "no-store, max-age=0");
   res.setHeader("Pragma", "no-cache");
@@ -23,7 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const pointsAwardedRaw = Number(body.pointsAwarded || 0);
     const pointsAwarded = Number.isFinite(pointsAwardedRaw) ? pointsAwardedRaw : 0;
 
-    const evt = {
+        const evt = {
       id: String(body.id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`),
       ts: Number(body.ts || Date.now()),
       game,
@@ -33,6 +35,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       pointsAwarded,
       prize: body.prize ?? null,
     };
+
+    // ✅ store last known display name for this playerId
+    // (lets leaderboards show Discord names even after disconnect)
+    await redis.hset(PLAYER_NAMES, { [playerId]: playerName });
 
     // ✅ wins count
     // Only count REAL wins (points or prize)
