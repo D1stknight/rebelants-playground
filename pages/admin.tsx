@@ -877,20 +877,18 @@ String(c.status).toUpperCase()==="PENDING"
             </table>
           </div>
         </div>        
-              {/* Grant */}
+                         {/* Grant */}
 <div style={{ padding: 14, border: "1px solid rgba(255,255,255,.14)", borderRadius: 14, background: "rgba(15,23,42,.55)" }}>
   <div style={{ fontWeight: 900, marginBottom: 10 }}>Grant Points</div>
 
-  {/* Your autocomplete input can stay wherever you already added it.
-      This box now assumes playerId is being set by that autocomplete selection. */}
-
-  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+  {/* Discord name search (autocomplete) */}
+  <div style={{ position: "relative", maxWidth: 520 }}>
     <input
-      value={playerId}
-      onChange={(e) => setPlayerId(e.target.value)}
-      placeholder="Discord playerId (select from search)"
+      value={playerSearch}
+      onChange={(e) => searchPlayers(e.target.value)}
+      placeholder="Search Discord name (ex: 1stKnight)…"
       style={{
-        width: 420,
+        width: 520,
         maxWidth: "92vw",
         padding: "10px 12px",
         borderRadius: 12,
@@ -900,6 +898,63 @@ String(c.status).toUpperCase()==="PENDING"
       }}
     />
 
+    {/* Dropdown */}
+    {(playerSearchBusy || (playerHits && playerHits.length > 0)) && (
+      <div
+        style={{
+          position: "absolute",
+          top: "100%",
+          left: 0,
+          right: 0,
+          marginTop: 6,
+          borderRadius: 12,
+          border: "1px solid rgba(255,255,255,.18)",
+          background: "rgba(0,0,0,.92)",
+          overflow: "hidden",
+          zIndex: 50,
+        }}
+      >
+        {playerSearchBusy && (
+          <div style={{ padding: "10px 12px", fontSize: 12, opacity: 0.85 }}>
+            Searching…
+          </div>
+        )}
+
+        {!playerSearchBusy && (playerHits || []).map((hit) => (
+          <button
+            key={hit.playerId}
+            type="button"
+            onClick={() => {
+              setPlayerId(hit.playerId);
+              setPlayerSearch(hit.name);
+              setPlayerHits([]);
+            }}
+            style={{
+              width: "100%",
+              textAlign: "left",
+              padding: "10px 12px",
+              border: "none",
+              background: "transparent",
+              color: "white",
+              cursor: "pointer",
+              fontSize: 13,
+            }}
+          >
+            <div style={{ fontWeight: 900 }}>{hit.name}</div>
+            <div style={{ fontSize: 12, opacity: 0.75 }}>{hit.playerId}</div>
+          </button>
+        ))}
+
+        {!playerSearchBusy && (!playerHits || playerHits.length === 0) && playerSearch.trim().length >= 2 && (
+          <div style={{ padding: "10px 12px", fontSize: 12, opacity: 0.8 }}>
+            No matches.
+          </div>
+        )}
+      </div>
+    )}
+  </div>
+
+  <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
     <input
       value={amount}
       onChange={(e) => setAmount(safeNum(e.target.value, 0))}
@@ -917,10 +972,14 @@ String(c.status).toUpperCase()==="PENDING"
     <button className="btn" onClick={grantPoints} style={{ padding: "10px 12px" }}>
       Grant
     </button>
+
+    <span style={{ fontSize: 12, opacity: 0.85 }}>
+      Selected: <b>{playerId || "—"}</b>
+    </span>
   </div>
 
   <div style={{ marginTop: 8, fontSize: 12, opacity: 0.85 }}>
-    Tip: Use the Discord name search above, click the correct result, then hit Grant.
+    Tip: Type a Discord name, click the correct result, then hit Grant.
   </div>
 </div>
         {/* Config */}
