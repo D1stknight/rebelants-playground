@@ -197,11 +197,46 @@ const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
   // =========================
   // Admin Dashboard: Recent Wins (Win History)
   // =========================
-  const [dashRecentWins, setDashRecentWins] = useState<any[]>([]);
-  const [dashLoading, setDashLoading] = useState(false);
+ const [dashRecentWins, setDashRecentWins] = useState<any[]>([]);
+const [dashClaims, setDashClaims] = useState<any[]>([]);
+const [dashInventory, setDashInventory] = useState<any>(null);
+const [dashNftInventory, setDashNftInventory] = useState<any>(null);
+const [dashLoading, setDashLoading] = useState(false);
 
-  async function loadDashboard() {
-    setDashLoading(true);
+async function loadDashboard() {
+  setDashLoading(true);
+  append("Loading dashboard…");
+
+  try {
+
+    const winsReq = fetch("/api/leaderboard/summary?top=15", { cache: "no-store" });
+    const claimsReq = fetch("/api/admin/claims/list", { headers });
+    const merchReq = fetch("/api/admin/inventory", { headers });
+    const nftReq = fetch("/api/admin/inventory/nft/debug", { headers });
+
+    const [winsRes, claimsRes, merchRes, nftRes] = await Promise.all([
+      winsReq,
+      claimsReq,
+      merchReq,
+      nftReq,
+    ]);
+
+    const wins = await winsRes.json().catch(() => null);
+    const claims = await claimsRes.json().catch(() => null);
+    const merch = await merchRes.json().catch(() => null);
+    const nft = await nftRes.json().catch(() => null);
+
+    if (wins?.recentWins) setDashRecentWins(wins.recentWins);
+    if (claims?.claims) setDashClaims(claims.claims);
+    if (merch) setDashInventory(merch);
+    if (nft) setDashNftInventory(nft);
+
+  } catch (e: any) {
+    append(`Dashboard error\n${String(e?.message || e)}`);
+  } finally {
+    setDashLoading(false);
+  }
+}
     append("Loading dashboard (recent wins)…");
     try {
       const r = await fetch("/api/leaderboard/summary?top=15", { cache: "no-store" });
@@ -617,7 +652,41 @@ async function saveConfig() {
           </button>
         </div>
 
-        <div style={{ marginTop: 10, overflowX: "auto" }}>
+        {/* System Summary */}
+<div style={{
+  marginTop: 12,
+  display: "grid",
+  gridTemplateColumns: "repeat(4,1fr)",
+  gap: 10,
+  fontSize: 12
+}}>
+
+<div style={{padding:10,border:"1px solid rgba(255,255,255,.1)",borderRadius:10}}>
+<b>Pending Shipments</b><br/>
+{dashClaims?.filter((c:any)=>String(c.status).toUpperCase()==="PENDING").length || 0}
+</div>
+
+<div style={{padding:10,border:"1px solid rgba(255,255,255,.1)",borderRadius:10}}>
+<b>NFT Transfers Pending</b><br/>
+{dashClaims?.filter((c:any)=>
+String(c.prize?.type).toLowerCase()==="nft" &&
+String(c.status).toUpperCase()==="PENDING"
+).length || 0}
+</div>
+
+<div style={{padding:10,border:"1px solid rgba(255,255,255,.1)",borderRadius:10}}>
+<b>Merch Inventory</b><br/>
+{dashInventory?.summary?.merchOnHand ?? "—"}
+</div>
+
+<div style={{padding:10,border:"1px solid rgba(255,255,255,.1)",borderRadius:10}}>
+<b>NFT Inventory</b><br/>
+{dashNftInventory?.len ?? "—"}
+</div>
+
+</div>
+
+<div style={{ marginTop: 10, overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
             <thead>
               <tr style={{ textAlign: "left", opacity: 0.9 }}>
