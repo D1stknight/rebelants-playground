@@ -647,7 +647,8 @@ if ((gate as any)?.discordSkipLink) return;
         discordName: sj.discordName,
         primaryId: toId,
         name: sj.discordName || prof.name,
-      });
+        discordSkipLink: false, // ✅ IMPORTANT: ensure connect flow doesn't stay "blocked"
+        });
 
       if (!cancelled) {
         // force refresh so UI pulls balance under new discord id
