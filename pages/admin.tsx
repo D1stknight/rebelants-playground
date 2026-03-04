@@ -191,8 +191,35 @@ const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
   const [invTokenIds, setInvTokenIds] = useState(""); // comma-separated
   const [invLabel, setInvLabel] = useState("NFT Prize");
 
-  const [invBusy, setInvBusy] = useState(false);
+    const [invBusy, setInvBusy] = useState(false);
   const [invDebug, setInvDebug] = useState<any>(null);
+
+  // =========================
+  // Admin Dashboard: Recent Wins (Win History)
+  // =========================
+  const [dashRecentWins, setDashRecentWins] = useState<any[]>([]);
+  const [dashLoading, setDashLoading] = useState(false);
+
+  async function loadDashboard() {
+    setDashLoading(true);
+    append("Loading dashboard (recent wins)…");
+    try {
+      const r = await fetch("/api/leaderboard/summary?top=15", { cache: "no-store" });
+      const j = await r.json().catch(() => null);
+      append(`DASH status ${r.status}\n${JSON.stringify(j, null, 2)}`);
+
+      if (r.ok && j?.ok && Array.isArray(j?.recentWins)) {
+        setDashRecentWins(j.recentWins);
+      } else {
+        setDashRecentWins([]);
+      }
+    } catch (e: any) {
+      append(`DASH error\n${String(e?.message || e)}`);
+      setDashRecentWins([]);
+    } finally {
+      setDashLoading(false);
+    }
+  }
 
    const headers = useMemo(() => {
     return {
@@ -555,7 +582,7 @@ async function saveConfig() {
         </Link>
       </div>
 
-      <div style={{ marginTop: 16, padding: 14, border: "1px solid rgba(255,255,255,.14)", borderRadius: 14, background: "rgba(15,23,42,.55)" }}>
+            <div style={{ marginTop: 16, padding: 14, border: "1px solid rgba(255,255,255,.14)", borderRadius: 14, background: "rgba(15,23,42,.55)" }}>
         <div style={{ fontWeight: 900, marginBottom: 8 }}>Auth</div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
           <input
@@ -579,10 +606,61 @@ async function saveConfig() {
             Status: <b>{authed ? "AUTHORIZED ✅" : "NOT AUTHORIZED ❌"}</b>
           </span>
         </div>
+            </div>
+
+      {/* Dashboard: Recent Wins */}
+      <div style={{ marginTop: 14, padding: 14, border: "1px solid rgba(255,255,255,.14)", borderRadius: 14, background: "rgba(15,23,42,.55)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <div style={{ fontWeight: 900 }}>Win History (Recent Wins)</div>
+          <button className="btn" onClick={loadDashboard} disabled={dashLoading} style={{ padding: "10px 12px" }}>
+            {dashLoading ? "Loading…" : "Refresh Win History"}
+          </button>
+        </div>
+
+        <div style={{ marginTop: 10, overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+            <thead>
+              <tr style={{ textAlign: "left", opacity: 0.9 }}>
+                <th style={{ padding: "8px 6px" }}>Time</th>
+                <th style={{ padding: "8px 6px" }}>Player</th>
+                <th style={{ padding: "8px 6px" }}>Rarity</th>
+                <th style={{ padding: "8px 6px" }}>Prize</th>
+                <th style={{ padding: "8px 6px" }}>Points</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(dashRecentWins || []).map((w: any, i: number) => {
+                const ts = Number(w?.ts || 0);
+                const when = ts ? new Date(ts).toLocaleString() : "—";
+                const name = String(w?.playerName || w?.playerId || "guest");
+                const rarity = String(w?.rarity || "none");
+                const prizeLabel = w?.prize?.label ? String(w.prize.label) : (w?.prize ? "Prize" : "—");
+                const pts = Number(w?.pointsAwarded || 0);
+
+                return (
+                  <tr key={`${String(w?.id || i)}-${i}`} style={{ borderTop: "1px solid rgba(255,255,255,.08)" }}>
+                    <td style={{ padding: "8px 6px", whiteSpace: "nowrap" }}>{when}</td>
+                    <td style={{ padding: "8px 6px" }}>{name}</td>
+                    <td style={{ padding: "8px 6px" }}>{rarity}</td>
+                    <td style={{ padding: "8px 6px" }}>{prizeLabel}</td>
+                    <td style={{ padding: "8px 6px" }}>{pts > 0 ? pts : "—"}</td>
+                  </tr>
+                );
+              })}
+
+              {(!dashRecentWins || dashRecentWins.length === 0) && (
+                <tr>
+                  <td colSpan={5} style={{ padding: "10px 6px", opacity: 0.8 }}>
+                    No recent wins loaded yet. Click “Refresh Win History”.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-
         {/* Claims */}
         <div style={{ padding: 14, border: "1px solid rgba(255,255,255,.14)", borderRadius: 14, background: "rgba(15,23,42,.55)" }}>
           <div style={{ fontWeight: 900, marginBottom: 10 }}>Claims (latest)</div>
