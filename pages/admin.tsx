@@ -701,7 +701,13 @@ String(c.status).toUpperCase()==="PENDING"
               </tr>
             </thead>
             <tbody>
-              {(dashRecentWins || []).map((w: any, i: number) => {
+              {(dashRecentWins || [])
+.filter((w: any) => {
+  const pts = Number(w?.pointsAwarded || 0);
+  const hasPrize = !!w?.prize;
+  return pts > 0 || hasPrize;
+})
+.map((w: any, i: number) => {
                 const ts = Number(w?.ts || 0);
                 const when = ts ? new Date(ts).toLocaleString() : "—";
                 const name = String(w?.playerName || w?.playerId || "guest");
