@@ -40,13 +40,14 @@ export function loadProfile(): Profile {
       const id = String(parsed.id || "").trim() || randomId();
       const name = String(parsed.name || "").trim() || "guest";
 
-      return {
+     return {
   id,
   name,
   walletAddress: normalizeWallet(parsed.walletAddress),
   discordUserId: parsed.discordUserId ? String(parsed.discordUserId) : undefined,
   discordName: parsed.discordName ? String(parsed.discordName) : undefined,
   primaryId: parsed.primaryId ? String(parsed.primaryId) : undefined,
+  discordSkipLink: !!(parsed as any).discordSkipLink,
 };
     }
   } catch {}
@@ -61,14 +62,14 @@ export function saveProfile(next: Partial<Profile>) {
   const cur = loadProfile();
 
     const merged: Profile = {
-    ...cur,
-    ...next,
-    walletAddress: normalizeWallet(next.walletAddress ?? cur.walletAddress),
-    discordUserId: next.discordUserId ?? cur.discordUserId,
-    discordName: next.discordName ?? cur.discordName,
-    primaryId: next.primaryId ?? cur.primaryId, // ✅ preserve
-    discordSkipLink: next.discordSkipLink ?? cur.discordSkipLink, // ✅ preserve
-  };
+  ...cur,
+  ...next,
+  walletAddress: normalizeWallet(next.walletAddress ?? cur.walletAddress),
+  discordUserId: next.discordUserId ?? cur.discordUserId,
+  discordName: next.discordName ?? cur.discordName,
+  primaryId: next.primaryId ?? cur.primaryId, // ✅ preserve
+  discordSkipLink: (next as any).discordSkipLink ?? (cur as any).discordSkipLink,
+};
 
   localStorage.setItem(KEY, JSON.stringify(merged));
   return merged;
