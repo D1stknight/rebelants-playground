@@ -38,12 +38,18 @@ function fmtName(pid: string, my?: { discordUserId?: string; discordName?: strin
     return `wallet:${shortMid(w, 6, 4)}`;
   }
 
-  // ✅ Discord: if it's ME, show my Discord name; else shorten the id
+  // ✅ Discord: show Discord display name when we can
   if (id.startsWith("discord:")) {
     const did = id.replace("discord:", "");
+
+    // If it's ME, show my Discord name (passed from loadProfile)
     if (my?.discordUserId && String(my.discordUserId) === String(did) && my?.discordName) {
       return my.discordName;
     }
+
+    // If the win row already includes a playerName, prefer it (covers other users too if server returns it later)
+    // NOTE: Leaderboard rows don't include playerName today, but RecentWins might.
+    // If not available, fall back to shortened discord id.
     return `discord:${shortMid(did, 4, 4)}`;
   }
 
