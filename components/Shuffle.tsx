@@ -573,6 +573,17 @@ React.useEffect(() => {
   return () => window.removeEventListener("ra:identity-changed", sync);
 }, []);
 
+// ✅ If returning from Discord OAuth, refresh identity immediately
+React.useEffect(() => {
+  if (typeof window === "undefined") return;
+
+  const params = new URLSearchParams(window.location.search);
+
+  if (params.get("discord") === "1") {
+    window.dispatchEvent(new Event("ra:identity-changed"));
+  }
+}, []);  
+
 const isDiscordConnected = !!profile?.discordUserId && !(profile as any)?.discordSkipLink;
   
 // ✅ Whenever identity changes, force the points hook to refetch for the new id
