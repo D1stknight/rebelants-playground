@@ -1592,7 +1592,7 @@ return (
 
         .page-head {
           position: relative;
-          z-index: 50;
+          z-index: 10;
           max-width: 980px;
           margin: 24px auto 14px;
           padding: 4px 2px;
