@@ -341,7 +341,7 @@ if (typeof window !== "undefined") {
       style={{ padding: "10px 12px", fontSize: 13 }}
       title="One-time link: migrates guest points to wallet identity"
     >
-      Link Wallet (migrate points)
+      Link Wallet for Payments and Prizes
     </button>
 
     <span style={{ fontSize: 12, opacity: 0.85 }}>
