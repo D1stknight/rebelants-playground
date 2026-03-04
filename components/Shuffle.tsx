@@ -1218,18 +1218,6 @@ return (
     Disconnect Discord
   </button>
 ) : (
-  
- {isDiscordConnected ? (
-  <button
-    className="btn"
-    type="button"
-    onClick={disconnectDiscord}
-    style={{ padding: "10px 12px", fontSize: 13, opacity: 0.95 }}
-  >
-    Disconnect Discord
-  </button>
-) : (
-  <button
     className="btn"
     type="button"
 onClick={() => {
