@@ -1166,7 +1166,10 @@ return (
           {EGG_COUNT} eggs. We shuffle. You pick one for a prize.
         </p>
 
-        <div className="shuffle-scene ant-scene" style={{ position: "relative" }}>
+        <div
+  className="shuffle-scene ant-scene"
+  style={{ position: "relative", minHeight: 420, overflow: "hidden" }}
+>
           {/* in-scene dojo BG */}
          <div
   className="scene-bg"
