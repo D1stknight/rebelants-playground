@@ -10,7 +10,7 @@ export type Profile = {
   // ✅ NEW: once linked, this becomes permanent identity
   primaryId?: string;         // "wallet:0x..." or later "discord:123"
 
-  // ✅ NEW: if user clicks Disconnect, block auto-relink on refresh
+  // ✅ NEW: when true, we will NOT auto-link discord session on refresh
   discordSkipLink?: boolean;
 };
 
@@ -66,13 +66,25 @@ export function saveProfile(next: Partial<Profile>) {
     ...next,
 
     walletAddress: normalizeWallet(
-      ("walletAddress" in next ? next.walletAddress : cur.walletAddress) as any
+      ("walletAddress" in next) ? next.walletAddress : cur.walletAddress
     ),
 
-    // ✅ IMPORTANT: allow clearing by passing undefined
-    discordUserId: ("discordUserId" in next) ? (next.discordUserId as any) : cur.discordUserId,
-    discordName: ("discordName" in next) ? (next.discordName as any) : cur.discordName,
-    primaryId: ("primaryId" in next) ? (next.primaryId as any) : cur.primaryId,
+    // ✅ allow clearing when caller includes the key (even if undefined)
+    discordUserId: ("discordUserId" in next)
+      ? (next.discordUserId ? String(next.discordUserId) : undefined)
+      : cur.discordUserId,
+
+    discordName: ("discordName" in next)
+      ? (next.discordName ? String(next.discordName) : undefined)
+      : cur.discordName,
+
+    primaryId: ("primaryId" in next)
+      ? (next.primaryId ? String(next.primaryId) : undefined)
+      : cur.primaryId,
+
+    discordSkipLink: ("discordSkipLink" in next)
+      ? !!next.discordSkipLink
+      : cur.discordSkipLink,
   };
 
   localStorage.setItem(KEY, JSON.stringify(merged));
