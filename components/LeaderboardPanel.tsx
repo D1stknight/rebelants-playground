@@ -197,6 +197,7 @@ export default function LeaderboardPanel() {
       <style jsx>{`
         .lb-wrap {
           margin-top: 18px;
+          min-width: 0;
         }
         .lb-title {
           font-weight: 900;
@@ -207,12 +208,14 @@ export default function LeaderboardPanel() {
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 14px;
+          min-width: 0;
         }
         .lb-card {
           border: 1px solid rgba(255, 255, 255, 0.14);
           border-radius: 16px;
           background: rgba(0, 0, 0, 0.25);
           padding: 14px;
+          min-width: 0; /* ✅ prevents grid overflow */
         }
         .lb-card-title {
           font-weight: 900;
@@ -221,16 +224,17 @@ export default function LeaderboardPanel() {
         .lb-rows {
           display: grid;
           gap: 8px;
+          min-width: 0;
         }
 
         .lb-scroll {
-          max-height: 170px; /* ~3 rows visible */
+          max-height: 170px;
           overflow-y: auto;
-          padding-right: 6px; /* space so scrollbar doesn't overlay text */
+          padding-right: 6px;
           align-content: start;
+          min-width: 0;
         }
 
-        /* optional: nicer scrollbar */
         .lb-scroll::-webkit-scrollbar {
           width: 10px;
         }
@@ -251,21 +255,26 @@ export default function LeaderboardPanel() {
           padding: 8px 10px;
           border-radius: 12px;
           background: rgba(15, 23, 42, 0.35);
+          min-width: 0;
         }
         .lb-rank {
           font-weight: 900;
           opacity: 0.9;
+          white-space: nowrap;
         }
         .lb-name {
           font-weight: 800;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
+          min-width: 0;
         }
         .lb-score {
           text-align: right;
           font-weight: 900;
+          white-space: nowrap;
         }
+
         .lb-win {
           display: flex;
           gap: 10px;
@@ -273,23 +282,32 @@ export default function LeaderboardPanel() {
           padding: 10px;
           border-radius: 12px;
           background: rgba(15, 23, 42, 0.35);
+          min-width: 0;
         }
         .lb-win-text {
           display: grid;
           gap: 2px;
+          min-width: 0;
         }
         .lb-win-name {
           font-weight: 900;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          min-width: 0;
         }
         .lb-win-sub {
           font-size: 12px;
           opacity: 0.85;
+          white-space: nowrap;
         }
+
         .lb-empty {
           opacity: 0.75;
           font-size: 12px;
           padding: 8px 2px;
         }
+
         .pill {
           font-size: 11px;
           font-weight: 900;
@@ -300,6 +318,29 @@ export default function LeaderboardPanel() {
           text-transform: lowercase;
           min-width: 64px;
           text-align: center;
+          white-space: nowrap;
+        }
+
+        /* ✅ MOBILE: stack into 1 column + tighten row layout */
+        @media (max-width: 680px) {
+          .lb-grid {
+            grid-template-columns: 1fr;
+          }
+          .lb-card {
+            padding: 12px;
+          }
+          .lb-scroll {
+            max-height: 220px; /* a bit taller on mobile */
+          }
+          .lb-row {
+            grid-template-columns: 34px 1fr auto;
+          }
+          .lb-score {
+            min-width: 56px;
+          }
+          .pill {
+            min-width: 56px;
+          }
         }
       `}</style>
     </div>
