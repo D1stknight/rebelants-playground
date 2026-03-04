@@ -2,7 +2,7 @@
 import React from "react";
 import { loadProfile } from "../lib/profile";
 
-type ZRow = { playerId: string; score: number };
+type ZRow = { playerId: string; score: number; playerName?: string };
 type WinRow = {
   id?: string;
   ts?: number;
