@@ -642,18 +642,23 @@ if ((gate as any)?.discordSkipLink) return;
       }
 
       // ✅ lock identity to Discord (permanent)
-      saveProfile({
-        discordUserId: sj.discordUserId,
-        discordName: sj.discordName,
-        primaryId: toId,
-        name: sj.discordName || prof.name,
-        discordSkipLink: false, // ✅ IMPORTANT: ensure connect flow doesn't stay "blocked"
-        });
+saveProfile({
+  discordUserId: sj.discordUserId,
+  discordName: sj.discordName,
+  primaryId: toId,
+  name: sj.discordName || prof.name,
+  discordSkipLink: false,
+});
 
-      if (!cancelled) {
-        // force refresh so UI pulls balance under new discord id
-        await refresh();
-      }
+// ✅ CRITICAL: tell the app to recompute effectivePlayerId immediately
+if (typeof window !== "undefined") {
+  window.dispatchEvent(new Event("ra:identity-changed"));
+}
+
+if (!cancelled) {
+  // force refresh so UI pulls balance under new discord id
+  await refresh();
+}
     } catch (e) {
       console.warn("Discord session check error:", e);
     }
