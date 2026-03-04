@@ -1219,22 +1219,22 @@ return (
   </button>
 ) : (
   <button
-    className="btn"
-    type="button"
-    onClick={() => {
-      try {
-        const p: any = loadProfile() || {};
-        delete p.discordSkipLink;
-        saveProfile(p);
-        window.dispatchEvent(new Event("ra:identity-changed"));
-      } catch {}
-      window.location.href = "/api/auth/discord/login";
-    }}
-    style={{ padding: "10px 12px", fontSize: 13, opacity: 0.95 }}
-  >
-    Connect Discord
-  </button>
-)}
+    <button
+  className="btn"
+  type="button"
+  onClick={() => {
+    try {
+      // ✅ Explicitly clear the gate (deleting won't work with saveProfile merge rules)
+      saveProfile({ discordSkipLink: false });
+      window.dispatchEvent(new Event("ra:identity-changed"));
+    } catch {}
+
+    window.location.href = "/api/auth/discord/login";
+  }}
+  style={{ padding: "10px 12px", fontSize: 13, opacity: 0.95 }}
+>
+  Connect Discord
+</button>
 
 <div style={{ fontSize: 12, opacity: 0.8 }}>
   Discord: <b>{isDiscordConnected ? "Connected ✅" : "Not Connected ❌"}</b>
