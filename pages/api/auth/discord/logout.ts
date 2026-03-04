@@ -11,10 +11,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // ✅ IMPORTANT:
   // /api/auth/discord/session reads cookie: "ra_discord_user"
   // So logout MUST clear "ra_discord_user" (and also clear "ra_discord_session" just in case)
-  const cookies = [
-    `ra_discord_user=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`,
-    `ra_discord_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`,
-  ];
+ const cookies = [
+  // clear main cookie
+  `ra_discord_user=; Path=/; Max-Age=0`,
+  `ra_discord_user=; Path=/; HttpOnly; Max-Age=0`,
+  `ra_discord_user=; Path=/; SameSite=Lax; Max-Age=0`,
+  `ra_discord_user=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`,
+  `ra_discord_user=; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=0`,
+
+  // safety clear
+  `ra_discord_session=; Path=/; Max-Age=0`,
+];
 
   res.setHeader("Cache-Control", "no-store, max-age=0");
   res.setHeader("Set-Cookie", cookies);
