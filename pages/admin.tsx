@@ -758,7 +758,7 @@ String(c.status).toUpperCase()==="PENDING"
         </div>
       </div>
 
-      <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+     <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 14 }}>
         {/* Claims */}
         <div style={{ padding: 14, border: "1px solid rgba(255,255,255,.14)", borderRadius: 14, background: "rgba(15,23,42,.55)" }}>
           <div style={{ fontWeight: 900, marginBottom: 10 }}>Claims (latest)</div>
