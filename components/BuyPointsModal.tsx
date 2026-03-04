@@ -319,6 +319,15 @@ if (typeof window !== "undefined") {
   Rate locked: <b>1 APE = 100 pts</b>. No refunds.
 </div>
 
+<div style={{ marginTop: 10, fontSize: 12, opacity: 0.85, lineHeight: 1.4 }}>
+  <b>Important:</b> Points are credited to the identity you’re currently playing as.<br />
+  • If you are not connected to Discord, your purchase is credited to your <b>Guest ID</b> on this device.<br />
+  • If you connect Discord, your points follow your <b>Discord identity</b> across devices.<br />
+  <span style={{ opacity: 0.9 }}>
+    Joining Discord is recommended for account recovery, cross-device play, and community perks.
+  </span>
+</div>
+
         <div style={{ marginTop: 12 }}>
   <ConnectButton />
 </div>
