@@ -68,6 +68,14 @@ export default function AdminPage() {
   const [token, setToken] = useState("");
   const [authed, setAuthed] = useState(false);
 
+const headers = useMemo(() => {
+  return {
+    "Content-Type": "application/json",
+    "x-admin-key": token,
+    "x-admin-token": token,
+  };
+}, [token]);  
+
   // claims
   const [claims, setClaims] = useState<any[]>([]);
   const [claimsLoading, setClaimsLoading] = useState(false);
@@ -255,14 +263,6 @@ async function loadDashboard() {
       setDashLoading(false);
     }
   }
-
-   const headers = useMemo(() => {
-    return {
-      "Content-Type": "application/json",
-      "x-admin-key": token,
-      "x-admin-token": token,
-    };
-  }, [token]);
 
   function append(msg: string) {
     setLog((s) => `${msg}\n\n${s}`.trim());
