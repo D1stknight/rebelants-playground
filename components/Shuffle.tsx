@@ -1208,16 +1208,40 @@ return (
       {/* Shuffle button + balance row */}
 <div className="shuffle-cta" style={{ position: "relative", display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
 <div style={{ height: 44, display: "flex", alignItems: "center" }}>
-  <button
-    className="btn"
-    onClick={runShuffle}
-    disabled={busy || phase === "shuffling" || needMore > 0}
-    title={needMore > 0 ? "Not enough points" : ""}
+ <button
+  className="btn"
+  onClick={runShuffle}
+  disabled={busy || phase === "shuffling" || needMore > 0}
+  title={needMore > 0 ? "Not enough points" : ""}
+  style={{
+    position: "relative",
+    minWidth: 240,           // ✅ keeps row from reflowing
+    height: 44,              // ✅ consistent height
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+  }}
+>
+  {/* ✅ reserve the “largest” label width so layout never shifts */}
+  <span style={{ visibility: "hidden" }}>
+    {`Shuffle (-${cost} ${pointsConfig.currency})`}
+  </span>
+
+  {/* ✅ real visible label */}
+  <span
+    style={{
+      position: "absolute",
+      inset: 0,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+    }}
   >
     {phase === "shuffling"
       ? "Shuffling…"
       : `Shuffle (-${cost} ${pointsConfig.currency})`}
-  </button>
+  </span>
+</button>
 </div>
 
  <button
