@@ -40,15 +40,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // (lets leaderboards show Discord names even after disconnect)
     await redis.hset(PLAYER_NAMES, { [playerId]: playerName });
 
-    // ✅ wins count
-    // Only count REAL wins (points or prize)
-if (pointsAwarded > 0 || body.prize) {
-  await redis.zincrby(LB_WINS, 1, playerId);
-}
+       // ✅ Only record/count REAL wins (points or prize)
+    const isRealWin = pointsAwarded > 0 || !!evt.prize;
 
-       // ✅ recent wins feed
-    await redis.lpush(LB_RECENT_WINS, JSON.stringify(evt));
-    await redis.ltrim(LB_RECENT_WINS, 0, 49);
+    // ✅ wins count
+    if (isRealWin) {
+      await redis.zincrby(LB_WINS, 1, playerId);
+    }
+
+    // ✅ recent wins feed (skip 0 points + no prize)
+    if (isRealWin) {
+      await redis.lpush(LB_RECENT_WINS, JSON.stringify(evt));
+      await redis.ltrim(LB_RECENT_WINS, 0, 49);
+    }
 
     // ✅ notifications (Rule Set 1: ULTRA or real prize)
     try {
