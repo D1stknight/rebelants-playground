@@ -83,7 +83,6 @@ const headers = useMemo(() => {
 
      // grant
   const [playerId, setPlayerId] = useState("guest");
-  const [walletAddress, setWalletAddress] = useState("");
   const [amount, setAmount] = useState(5000);
 
   // ✅ Autocomplete (search by Discord name)
@@ -444,12 +443,15 @@ async function saveConfig() {
    async function grantPoints() {
   append("Granting points…");
 
-  const w = (walletAddress || "").trim();
-  const pid = String(playerId || "guest").trim();
+  const pid = String(playerId || "").trim();
+  if (!pid) {
+    append("GRANT: missing playerId (pick a Discord user from search)");
+    return;
+  }
 
   const payload: any = {
     amount: Number(amount || 0),
-    ...(w ? { walletAddress: w } : { playerId: pid }),
+    playerId: pid,
   };
 
   console.log("🟦 GRANT payload =", payload);
@@ -465,34 +467,8 @@ async function saveConfig() {
   console.log("🟩 GRANT status =", r.status);
   console.log("🟩 GRANT raw body =", text);
 
-  let j: any = null;
-  try {
-    j = text ? JSON.parse(text) : null;
-  } catch {}
-
   append(`GRANT status ${r.status}\n${text || "(empty response)"}`);
-
-  // if grant-by-wallet returned mapped playerId, keep UI in sync
-  if (r.ok && j?.playerId) setPlayerId(j.playerId);
 }
-
-      async function lookupWallet() {
-    append("Looking up wallet…");
-    const w = (walletAddress || "").trim();
-    if (!w) {
-      append("Wallet lookup: missing walletAddress");
-      return;
-    }
-
-    const r = await fetch(`/api/admin/wallet?walletAddress=${encodeURIComponent(w)}`, { headers });
-    const j = await r.json().catch(() => null);
-    append(`WALLET LOOKUP status ${r.status}\n${JSON.stringify(j, null, 2)}`);
-
-    if (r.ok && j?.playerId) {
-      setPlayerId(j.playerId);
-    }
-  }
-
   async function getBalance() {
     append("Getting balance…");
     const r = await fetch(`/api/points/balance?playerId=${encodeURIComponent(playerId)}`);
@@ -901,141 +877,52 @@ String(c.status).toUpperCase()==="PENDING"
             </table>
           </div>
         </div>        
-               {/* Grant */}
-        <div style={{ padding: 14, border: "1px solid rgba(255,255,255,.14)", borderRadius: 14, background: "rgba(15,23,42,.55)" }}>
-          <div style={{ fontWeight: 900, marginBottom: 10 }}>Grant Points</div>
+              {/* Grant */}
+<div style={{ padding: 14, border: "1px solid rgba(255,255,255,.14)", borderRadius: 14, background: "rgba(15,23,42,.55)" }}>
+  <div style={{ fontWeight: 900, marginBottom: 10 }}>Grant Points</div>
 
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-            <input
-              value={walletAddress}
-              onChange={(e) => setWalletAddress(e.target.value)}
-              placeholder="walletAddress (optional)"
-              style={{
-                width: 420,
-                maxWidth: "92vw",
-                padding: "10px 12px",
-                borderRadius: 12,
-                border: "1px solid rgba(255,255,255,.18)",
-                background: "rgba(0,0,0,.25)",
-                color: "white",
-              }}
-            />
+  {/* Your autocomplete input can stay wherever you already added it.
+      This box now assumes playerId is being set by that autocomplete selection. */}
 
-            <button className="btn" onClick={lookupWallet} style={{ padding: "10px 12px" }}>
-              Lookup Wallet → Player
-            </button>
-          </div>
+  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+    <input
+      value={playerId}
+      onChange={(e) => setPlayerId(e.target.value)}
+      placeholder="Discord playerId (select from search)"
+      style={{
+        width: 420,
+        maxWidth: "92vw",
+        padding: "10px 12px",
+        borderRadius: 12,
+        border: "1px solid rgba(255,255,255,.18)",
+        background: "rgba(0,0,0,.25)",
+        color: "white",
+      }}
+    />
 
-          <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-                       <div style={{ position: "relative", width: 360, maxWidth: "92vw" }}>
-              <input
-                value={playerSearch}
-                onChange={(e) => searchPlayers(e.target.value)}
-                placeholder="Search player (Discord name)…"
-                style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  borderRadius: 12,
-                  border: "1px solid rgba(255,255,255,.18)",
-                  background: "rgba(0,0,0,.25)",
-                  color: "white",
-                }}
-              />
+    <input
+      value={amount}
+      onChange={(e) => setAmount(safeNum(e.target.value, 0))}
+      placeholder="amount"
+      style={{
+        width: 160,
+        padding: "10px 12px",
+        borderRadius: 12,
+        border: "1px solid rgba(255,255,255,.18)",
+        background: "rgba(0,0,0,.25)",
+        color: "white",
+      }}
+    />
 
-              <div style={{ marginTop: 6, fontSize: 12, opacity: 0.85 }}>
-                Selected PlayerId:{" "}
-                <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
-                  {playerId}
-                </span>
-                {playerSearchBusy ? <span> • searching…</span> : null}
-              </div>
+    <button className="btn" onClick={grantPoints} style={{ padding: "10px 12px" }}>
+      Grant
+    </button>
+  </div>
 
-              {playerHits.length > 0 ? (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: 44,
-                    left: 0,
-                    right: 0,
-                    zIndex: 50,
-                    borderRadius: 12,
-                    border: "1px solid rgba(255,255,255,.18)",
-                    background: "rgba(15,23,42,.98)",
-                    overflow: "hidden",
-                  }}
-                >
-                  {playerHits.map((hit) => (
-                    <button
-                      key={hit.playerId}
-                      type="button"
-                      className="btn"
-                      onClick={() => {
-                        setPlayerId(hit.playerId);      // ✅ this is what Grant uses
-                        setPlayerHits([]);              // close dropdown
-                        setPlayerSearch(hit.name);      // keep it pretty
-                        setWalletAddress("");           // avoid confusion (optional)
-                      }}
-                      style={{
-                        width: "100%",
-                        textAlign: "left",
-                        padding: "10px 12px",
-                        borderRadius: 0,
-                        border: "none",
-                        borderBottom: "1px solid rgba(255,255,255,.08)",
-                        background: "transparent",
-                        color: "white",
-                        cursor: "pointer",
-                        fontWeight: 700,
-                      }}
-                    >
-                      <div>{hit.name}</div>
-                      <div style={{ fontSize: 12, opacity: 0.85, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
-                        {hit.playerId}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-
-            <input
-              value={amount}
-              onChange={(e) => setAmount(safeNum(e.target.value, 0))}
-              placeholder="amount"
-              style={{
-                width: 160,
-                padding: "10px 12px",
-                borderRadius: 12,
-                border: "1px solid rgba(255,255,255,.18)",
-                background: "rgba(0,0,0,.25)",
-                color: "white",
-              }}
-            />
-
-                       <button className="btn" onClick={getBalance} style={{ padding: "10px 12px" }}>
-              Get Balance
-            </button>
-
-            <button
-  className="btn"
-  onClick={() => {
-    console.log("✅ GRANT BUTTON CLICKED");
-    grantPoints();
-  }}
-  style={{ padding: "10px 12px" }}
->
-  Grant (wallet if provided)
-</button>
-            <button className="btn" onClick={resetEarnedToday} style={{ padding: "10px 12px" }}>
-              Reset Earned Today
-            </button>
-          </div>
-
-          <div style={{ marginTop: 8, fontSize: 12, opacity: 0.85 }}>
-            Tip: If walletAddress is filled, grants go to the linked playerId automatically. If empty, it grants to playerId.
-          </div>
-        </div>
-
+  <div style={{ marginTop: 8, fontSize: 12, opacity: 0.85 }}>
+    Tip: Use the Discord name search above, click the correct result, then hit Grant.
+  </div>
+</div>
         {/* Config */}
         <div style={{ padding: 14, border: "1px solid rgba(255,255,255,.14)", borderRadius: 14, background: "rgba(15,23,42,.55)" }}>
           <div style={{ fontWeight: 900, marginBottom: 10 }}>Economy Config</div>
