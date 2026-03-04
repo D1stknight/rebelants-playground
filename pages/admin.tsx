@@ -110,7 +110,78 @@ const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
   const [rareMerchChancePct, setRareMerchChancePct] = useState(
   `${Math.round(((defaultConfig as any).rareMerchChance ?? 0.01) * 100)}`
 );
-    const [log, setLog] = useState<string>("");
+      const [log, setLog] = useState<string>("");
+
+  // =========================
+  // Prize Inventory Dashboard (Merch + APE budget)
+  // =========================
+  const [invMerchJson, setInvMerchJson] = useState<string>(
+    JSON.stringify([{ sku: "HOODIE", label: "Rebel Ants Hoodie", onHand: 10 }], null, 2)
+  );
+  const [invApeJson, setInvApeJson] = useState<string>(
+    JSON.stringify({ dailyMaxApe: 0, usedTodayApe: 0, note: "" }, null, 2)
+  );
+  const [invDashBusy, setInvDashBusy] = useState(false);
+  const [invDash, setInvDash] = useState<any>(null);
+
+  async function invDashLoad() {
+    if (!authed) {
+      append("Inventory Dashboard: NOT AUTHORIZED (click Verify first)");
+      return;
+    }
+    setInvDashBusy(true);
+    try {
+      const r = await fetch("/api/admin/inventory", { headers });
+      const j = await r.json().catch(() => null);
+      setInvDash(j);
+      append(`INV DASH LOAD status ${r.status}\n${JSON.stringify(j, null, 2)}`);
+
+      if (r.ok && j?.ok) {
+        setInvMerchJson(JSON.stringify(j.merch ?? [], null, 2));
+        setInvApeJson(JSON.stringify(j.ape ?? { dailyMaxApe: 0, usedTodayApe: 0, note: "" }, null, 2));
+      }
+    } finally {
+      setInvDashBusy(false);
+    }
+  }
+
+  async function invDashSave() {
+    if (!authed) {
+      append("Inventory Dashboard: NOT AUTHORIZED (click Verify first)");
+      return;
+    }
+
+    let merch: any[] = [];
+    let ape: any = { dailyMaxApe: 0, usedTodayApe: 0, note: "" };
+
+    try {
+      merch = JSON.parse(invMerchJson || "[]");
+    } catch {
+      append("INV DASH SAVE: Merch JSON is invalid");
+      return;
+    }
+
+    try {
+      ape = JSON.parse(invApeJson || "{}");
+    } catch {
+      append("INV DASH SAVE: APE JSON is invalid");
+      return;
+    }
+
+    setInvDashBusy(true);
+    try {
+      const r = await fetch("/api/admin/inventory", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ merch, ape }),
+      });
+      const j = await r.json().catch(() => null);
+      setInvDash(j);
+      append(`INV DASH SAVE status ${r.status}\n${JSON.stringify(j, null, 2)}`);
+    } finally {
+      setInvDashBusy(false);
+    }
+  }
 
   // =========================
   // Ultra NFT Inventory (Admin UI)
@@ -1019,6 +1090,90 @@ async function saveConfig() {
     Save
   </button>
 </div>
+        </div>
+      </div>
+
+          {/* Prize Inventory Dashboard */}
+      <div
+        style={{
+          marginTop: 14,
+          padding: 14,
+          border: "1px solid rgba(255,255,255,.14)",
+          borderRadius: 14,
+          background: "rgba(15,23,42,.55)",
+        }}
+      >
+        <div style={{ fontWeight: 900, marginBottom: 10 }}>Prize Inventory Dashboard</div>
+
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <button className="btn" onClick={invDashLoad} disabled={invDashBusy} style={{ padding: "10px 12px" }}>
+            Load Inventory
+          </button>
+          <button className="btn" onClick={invDashSave} disabled={invDashBusy} style={{ padding: "10px 12px" }}>
+            Save Inventory
+          </button>
+
+          <span style={{ fontSize: 12, opacity: 0.85 }}>
+            Merch key: <b>ra:inv:merch_v1</b> • APE key: <b>ra:inv:ape_v1</b>
+          </span>
+        </div>
+
+        <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div>
+            <div style={{ fontWeight: 900, marginBottom: 8, fontSize: 12, opacity: 0.95 }}>Merch Inventory (JSON)</div>
+            <textarea
+              value={invMerchJson}
+              onChange={(e) => setInvMerchJson(e.target.value)}
+              style={{
+                width: "100%",
+                minHeight: 170,
+                padding: "10px 12px",
+                borderRadius: 12,
+                border: "1px solid rgba(255,255,255,.18)",
+                background: "rgba(0,0,0,.25)",
+                color: "white",
+                fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                fontSize: 12,
+              }}
+            />
+            <div style={{ marginTop: 6, fontSize: 12, opacity: 0.8 }}>
+              Format: <code>[{"{"}"sku":"HOODIE","label":"Rebel Ants Hoodie","onHand":10{"}"}]</code>
+            </div>
+          </div>
+
+          <div>
+            <div style={{ fontWeight: 900, marginBottom: 8, fontSize: 12, opacity: 0.95 }}>APE Budget (JSON)</div>
+            <textarea
+              value={invApeJson}
+              onChange={(e) => setInvApeJson(e.target.value)}
+              style={{
+                width: "100%",
+                minHeight: 170,
+                padding: "10px 12px",
+                borderRadius: 12,
+                border: "1px solid rgba(255,255,255,.18)",
+                background: "rgba(0,0,0,.25)",
+                color: "white",
+                fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                fontSize: 12,
+              }}
+            />
+            <div style={{ marginTop: 6, fontSize: 12, opacity: 0.8 }}>
+              Format: <code>{"{"}"dailyMaxApe":1,"usedTodayApe":0,"note":"optional"{"}"}</code>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ marginTop: 10, fontSize: 12, opacity: 0.9 }}>
+          Summary:{" "}
+          <b>
+            {typeof invDash?.summary?.merchSkus === "number" ? invDash.summary.merchSkus : "—"}
+          </b>{" "}
+          SKUs •{" "}
+          <b>
+            {typeof invDash?.summary?.merchOnHand === "number" ? invDash.summary.merchOnHand : "—"}
+          </b>{" "}
+          total on-hand
         </div>
       </div>
 
