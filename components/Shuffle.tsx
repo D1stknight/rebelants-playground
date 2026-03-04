@@ -1431,7 +1431,7 @@ return (
   {dripBusy
     ? "Loading DRIP…"
     : isDiscordConnected
-    ? "Migrate from Discord (DRIP)"
+    ? "Migrate Points from DRIP in Discord"
     : "Connect Discord for DRIP"}
 </button>
 
