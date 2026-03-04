@@ -215,7 +215,6 @@ async function loadDashboard() {
   append("Loading dashboard…");
 
   try {
-
     const winsReq = fetch("/api/leaderboard/summary?top=15", { cache: "no-store" });
     const claimsReq = fetch("/api/admin/claims/list", { headers });
     const merchReq = fetch("/api/admin/inventory", { headers });
@@ -237,31 +236,12 @@ async function loadDashboard() {
     if (claims?.claims) setDashClaims(claims.claims);
     if (merch) setDashInventory(merch);
     if (nft) setDashNftInventory(nft);
-
   } catch (e: any) {
     append(`Dashboard error\n${String(e?.message || e)}`);
   } finally {
     setDashLoading(false);
   }
 }
-    append("Loading dashboard (recent wins)…");
-    try {
-      const r = await fetch("/api/leaderboard/summary?top=15", { cache: "no-store" });
-      const j = await r.json().catch(() => null);
-      append(`DASH status ${r.status}\n${JSON.stringify(j, null, 2)}`);
-
-      if (r.ok && j?.ok && Array.isArray(j?.recentWins)) {
-        setDashRecentWins(j.recentWins);
-      } else {
-        setDashRecentWins([]);
-      }
-    } catch (e: any) {
-      append(`DASH error\n${String(e?.message || e)}`);
-      setDashRecentWins([]);
-    } finally {
-      setDashLoading(false);
-    }
-  }
 
 const [log, setLog] = useState<string>("");
 
