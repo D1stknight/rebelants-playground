@@ -410,25 +410,40 @@ async function saveConfig() {
       .catch(() => null);
   }
 
-    async function grantPoints() {
-    append("Granting points…");
-    const payload: any = { amount };
+   async function grantPoints() {
+  append("Granting points…");
 
-    const w = (walletAddress || "").trim();
-    if (w) payload.walletAddress = w;
-    else payload.playerId = playerId;
+  const w = (walletAddress || "").trim();
+  const pid = String(playerId || "guest").trim();
 
-    const r = await fetch("/api/admin/grant", {
-      method: "POST",
-      headers,
-      body: JSON.stringify(payload),
-    });
-    const j = await r.json().catch(() => null);
-    append(`GRANT status ${r.status}\n${JSON.stringify(j, null, 2)}`);
+  const payload: any = {
+    amount: Number(amount || 0),
+    ...(w ? { walletAddress: w } : { playerId: pid }),
+  };
 
-    // if grant-by-wallet returned mapped playerId, keep UI in sync
-    if (r.ok && j?.playerId) setPlayerId(j.playerId);
-  }
+  console.log("🟦 GRANT payload =", payload);
+  console.log("🟦 GRANT headers =", headers);
+
+  const r = await fetch("/api/admin/grant", {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload),
+  });
+
+  const text = await r.text();
+  console.log("🟩 GRANT status =", r.status);
+  console.log("🟩 GRANT raw body =", text);
+
+  let j: any = null;
+  try {
+    j = text ? JSON.parse(text) : null;
+  } catch {}
+
+  append(`GRANT status ${r.status}\n${text || "(empty response)"}`);
+
+  // if grant-by-wallet returned mapped playerId, keep UI in sync
+  if (r.ok && j?.playerId) setPlayerId(j.playerId);
+}
 
       async function lookupWallet() {
     append("Looking up wallet…");
