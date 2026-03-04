@@ -701,18 +701,38 @@ String(c.status).toUpperCase()==="PENDING"
               </tr>
             </thead>
             <tbody>
-              {(dashRecentWins || [])
+             {(dashRecentWins || [])
 .filter((w: any) => {
   const pts = Number(w?.pointsAwarded || 0);
-  const hasPrize = !!w?.prize;
-  return pts > 0 || hasPrize;
+
+  // ✅ Only count a "real prize" if it's an object with keys
+  // (this filters out null, "null", {}, etc.)
+  const p = w?.prize;
+  const hasRealPrize =
+    p &&
+    typeof p === "object" &&
+    !Array.isArray(p) &&
+    Object.keys(p).length > 0;
+
+  return pts > 0 || hasRealPrize;
 })
 .map((w: any, i: number) => {
                 const ts = Number(w?.ts || 0);
                 const when = ts ? new Date(ts).toLocaleString() : "—";
                 const name = String(w?.playerName || w?.playerId || "guest");
                 const rarity = String(w?.rarity || "none");
-                const prizeLabel = w?.prize?.label ? String(w.prize.label) : (w?.prize ? "Prize" : "—");
+
+                const p = w?.prize;
+                const hasRealPrize =
+                  p &&
+                  typeof p === "object" &&
+                  !Array.isArray(p) &&
+                  Object.keys(p).length > 0;
+
+                const prizeLabel = hasRealPrize
+                  ? (p?.label ? String(p.label) : "Prize")
+                  : "—";
+
                 const pts = Number(w?.pointsAwarded || 0);
 
                 return (
