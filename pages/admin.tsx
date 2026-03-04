@@ -879,30 +879,31 @@ async function saveConfig() {
   </div>
 </div>
           
-          {/* Prize Pool Presets */}
+         {/* Economy Presets (affects real gameplay) */}
 <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
   <button
     className="btn"
     type="button"
     onClick={() => {
-      // House Edge: lots of NONE, small points, Ultra always something
+      // House Edge: more NONE, smaller points, rare merch low, ultra still pays points (NFTs only if you add them)
       setCfg((c: any) => ({
         ...c,
+
+        // ✅ real game knobs
+        rarityWeights: { none: 55, common: 33, rare: 10, ultra: 2 },
+        rewards: { none: 0, common: 50, rare: 100, ultra: 300 },
+        rareMerchChance: 0.01, // 1%
+
+        // ✅ pools only matter for rare merch + ultra NFTs (points here won't drive payouts)
         prizePools: {
-          none: [{ type: "NONE", label: "Nothing this time", weight: 100 }],
-          common: [
-            { type: "NONE", label: "Nothing", weight: 85 },
-            { type: "POINTS", label: "50 REBEL", points: 50, weight: 15 },
-          ],
+          ...(c.prizePools || {}),
+          none: [{ type: "NONE", label: "Nothing this time", points: 0 }],
+          common: [{ type: "POINTS", label: "50 REBEL", points: 50 }], // harmless
           rare: [
-            { type: "NONE", label: "Nothing", weight: 90 },
-            { type: "POINTS", label: "100 REBEL", points: 100, weight: 9 },
             { type: "MERCH", label: "Sticker Pack", sku: "STICKERS", qty: 10, weight: 1 },
           ],
           ultra: [
-            { type: "POINTS", label: "200 REBEL", points: 200, weight: 92 },
-            { type: "POINTS", label: "500 REBEL", points: 500, weight: 7 },
-            { type: "MERCH", label: "T-Shirt", sku: "TSHIRT", qty: 5, weight: 1 },
+            // put NFTs here when ready; Ultra points are driven by rewards.ultra
           ],
         },
       }));
@@ -915,24 +916,25 @@ async function saveConfig() {
     className="btn"
     type="button"
     onClick={() => {
-      // Promo Weekend: more points + a few items
+      // Promo Weekend: better odds, bigger points, higher rare merch chance
       setCfg((c: any) => ({
         ...c,
+
+        // ✅ real game knobs
+        rarityWeights: { none: 35, common: 40, rare: 20, ultra: 5 },
+        rewards: { none: 0, common: 75, rare: 150, ultra: 500 },
+        rareMerchChance: 0.05, // 5%
+
+        // ✅ pools only matter for rare merch + ultra NFTs
         prizePools: {
-          none: [{ type: "NONE", label: "Nothing this time", weight: 100 }],
-          common: [
-            { type: "POINTS", label: "50 REBEL", points: 50, weight: 70 },
-            { type: "POINTS", label: "100 REBEL", points: 100, weight: 30 },
-          ],
+          ...(c.prizePools || {}),
+          none: [{ type: "NONE", label: "Nothing this time", points: 0 }],
+          common: [{ type: "POINTS", label: "75 REBEL", points: 75 }], // harmless
           rare: [
-            { type: "POINTS", label: "150 REBEL", points: 150, weight: 75 },
-            { type: "POINTS", label: "250 REBEL", points: 250, weight: 20 },
-            { type: "MERCH", label: "Hat", sku: "HAT", qty: 3, weight: 5 },
+            { type: "MERCH", label: "Hat", sku: "HAT", qty: 3, weight: 1 },
           ],
           ultra: [
-            { type: "POINTS", label: "500 REBEL", points: 500, weight: 80 },
-            { type: "MERCH", label: "Hoodie", sku: "HOODIE", qty: 2, weight: 15 },
-            { type: "APE", label: "0.25 APE", ape: 0.25, qty: 1, weight: 5 },
+            // put NFTs here when ready; Ultra points are driven by rewards.ultra
           ],
         },
       }));
@@ -945,19 +947,23 @@ async function saveConfig() {
     className="btn"
     type="button"
     onClick={() => {
-      // Reset: safe defaults (points only)
+      // Reset: safe defaults (points-driven)
       setCfg((c: any) => ({
         ...c,
+        rarityWeights: { none: 45, common: 37, rare: 15, ultra: 3 },
+        rewards: { none: 0, common: 50, rare: 100, ultra: 200 },
+        rareMerchChance: 0.01,
         prizePools: {
-          none: [{ type: "NONE", label: "Nothing this time", weight: 1, points: 0 }],
-          common: [{ type: "POINTS", label: "50 REBEL", points: 50, weight: 1 }],
-          rare: [{ type: "POINTS", label: "100 REBEL", points: 100, weight: 1 }],
-          ultra: [{ type: "POINTS", label: "200 REBEL", points: 200, weight: 1 }],
+          ...(c.prizePools || {}),
+          none: [{ type: "NONE", label: "Nothing this time", points: 0 }],
+          common: [{ type: "POINTS", label: "50 REBEL", points: 50 }],
+          rare: [{ type: "POINTS", label: "100 REBEL", points: 100 }],
+          ultra: [{ type: "POINTS", label: "200 REBEL", points: 200 }],
         },
       }));
     }}
   >
-    Reset Prize Pools
+    Reset Economy
   </button>
 </div>
           
