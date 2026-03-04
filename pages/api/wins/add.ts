@@ -46,9 +46,17 @@ if (pointsAwarded > 0 || body.prize) {
   await redis.zincrby(LB_WINS, 1, playerId);
 }
 
-    // ✅ recent wins feed
+       // ✅ recent wins feed
     await redis.lpush(LB_RECENT_WINS, JSON.stringify(evt));
     await redis.ltrim(LB_RECENT_WINS, 0, 49);
+
+    // ✅ notifications (Rule Set 1: ULTRA or real prize)
+    try {
+      const { notifyWinIfNeeded } = await import("../../../lib/server/notifyWins");
+      await notifyWinIfNeeded(evt as any);
+    } catch (e) {
+      console.warn("notify failed:", e);
+    }
 
     // 🔎 DEBUG: verify Redis sees it immediately
     const len = await redis.llen(LB_RECENT_WINS);
