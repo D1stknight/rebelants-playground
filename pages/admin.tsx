@@ -913,10 +913,16 @@ String(c.status).toUpperCase()==="PENDING"
               Get Balance
             </button>
 
-            <button className="btn" onClick={grantPoints} style={{ padding: "10px 12px" }}>
-              Grant (wallet if provided)
-            </button>
-
+            <button
+  className="btn"
+  onClick={() => {
+    console.log("✅ GRANT BUTTON CLICKED");
+    grantPoints();
+  }}
+  style={{ padding: "10px 12px" }}
+>
+  Grant (wallet if provided)
+</button>
             <button className="btn" onClick={resetEarnedToday} style={{ padding: "10px 12px" }}>
               Reset Earned Today
             </button>
