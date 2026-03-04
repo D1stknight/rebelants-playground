@@ -1218,7 +1218,6 @@ return (
     Disconnect Discord
   </button>
 ) : (
-  <button
     <button
   className="btn"
   type="button"
