@@ -609,8 +609,9 @@ async function saveConfig() {
   return (
      <>
     <Head>
-      <meta name="robots" content="noindex,nofollow" />
-    </Head>  
+  <meta name="robots" content="noindex,nofollow" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+</Head>
        
        <div style={{ padding: 28, color: "white", maxWidth: 1100, margin: "0 auto" }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
