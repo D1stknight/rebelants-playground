@@ -61,15 +61,19 @@ export function saveProfile(next: Partial<Profile>) {
   if (typeof window === "undefined") return;
   const cur = loadProfile();
 
-    const merged: Profile = {
-  ...cur,
-  ...next,
-  walletAddress: normalizeWallet(next.walletAddress ?? cur.walletAddress),
-  discordUserId: next.discordUserId ?? cur.discordUserId,
-  discordName: next.discordName ?? cur.discordName,
-  primaryId: next.primaryId ?? cur.primaryId, // ✅ preserve
-  discordSkipLink: (next as any).discordSkipLink ?? (cur as any).discordSkipLink,
-};
+  const merged: Profile = {
+    ...cur,
+    ...next,
+
+    walletAddress: normalizeWallet(
+      ("walletAddress" in next ? next.walletAddress : cur.walletAddress) as any
+    ),
+
+    // ✅ IMPORTANT: allow clearing by passing undefined
+    discordUserId: ("discordUserId" in next) ? (next.discordUserId as any) : cur.discordUserId,
+    discordName: ("discordName" in next) ? (next.discordName as any) : cur.discordName,
+    primaryId: ("primaryId" in next) ? (next.primaryId as any) : cur.primaryId,
+  };
 
   localStorage.setItem(KEY, JSON.stringify(merged));
   return merged;
