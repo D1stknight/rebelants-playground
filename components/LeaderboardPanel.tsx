@@ -130,7 +130,7 @@ export default function LeaderboardPanel() {
             {(lb.balance || []).slice(0, 10).map((r, i) => (
               <div key={`${r.playerId}-${i}`} className="lb-row">
                 <div className="lb-rank">#{i + 1}</div>
-                <div className="lb-name">{fmtName(r.playerId, my)}</div>
+                <div className="lb-name">{r.playerName || fmtName(r.playerId, my)}</div>
                 <div className="lb-score">{Math.floor(r.score || 0)}</div>
               </div>
             ))}
@@ -145,7 +145,7 @@ export default function LeaderboardPanel() {
             {(lb.earned || []).slice(0, 10).map((r, i) => (
               <div key={`${r.playerId}-${i}`} className="lb-row">
                 <div className="lb-rank">#{i + 1}</div>
-                <div className="lb-name">{fmtName(r.playerId, my)}</div>
+               <div className="lb-name">{r.playerName || fmtName(r.playerId, my)}</div>
                 <div className="lb-score">{Math.floor(r.score || 0)}</div>
               </div>
             ))}
@@ -160,7 +160,7 @@ export default function LeaderboardPanel() {
             {(lb.wins || []).slice(0, 30).map((r, i) => (
               <div key={`${r.playerId}-${i}`} className="lb-row">
                 <div className="lb-rank">#{i + 1}</div>
-                <div className="lb-name">{fmtName(r.playerId, my)}</div>
+                <div className="lb-name">{r.playerName || fmtName(r.playerId, my)}</div>
                 <div className="lb-score">{Math.floor(r.score || 0)}</div>
               </div>
             ))}
