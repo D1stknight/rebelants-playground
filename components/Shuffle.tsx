@@ -378,13 +378,13 @@ function PrizeModal({
 
     <style>{`
       .prize-modal {
-        position: fixed;
-        inset: 0;
-        display: grid;
-        place-items: center;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 1000;
-      }
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 2147483647; /* 👈 always above header/tabs */
+}
       .prize-card {
         position: relative;
         min-width: 320px;
