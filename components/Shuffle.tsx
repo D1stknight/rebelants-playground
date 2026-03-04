@@ -1218,27 +1218,6 @@ return (
     Disconnect Discord
   </button>
 ) : (
-  <button
-    className="btn"
-    type="button"
-    onClick={() => {
-      try {
-        const p: any = loadProfile() || {};
-        delete p.discordSkipLink; // allow connect again
-        saveProfile(p);
-        window.dispatchEvent(new Event("ra:identity-changed"));
-      } catch {}
-      window.location.href = "/api/auth/discord/login";
-    }}
-    style={{ padding: "10px 12px", fontSize: 13, opacity: 0.95 }}
-  >
-    Connect Discord
-  </button>
-)}
-
-<div style={{ fontSize: 12, opacity: 0.8 }}>
-  Discord: <b>{isDiscordConnected ? "Connected ✅" : "Not Connected ❌"}</b>
-</div>
   
  {isDiscordConnected ? (
   <button
