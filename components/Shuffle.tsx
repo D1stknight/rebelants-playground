@@ -1208,7 +1208,7 @@ return (
   Buy Points / Connect Ape Wallet
 </button>
 
-  {isDiscordConnected ? (
+{isDiscordConnected ? (
   <button
     className="btn"
     type="button"
@@ -1218,20 +1218,18 @@ return (
     Disconnect Discord
   </button>
 ) : (
+  <button
     className="btn"
     type="button"
-onClick={() => {
-  try {
-    const p: any = loadProfile?.() || {};
-    if (p && typeof p === "object") {
-      delete p.discordSkipLink;
-      saveProfile?.(p);
-      window.dispatchEvent(new Event("ra:identity-changed"));
-    }
-  } catch {}
-
-  window.location.href = "/api/auth/discord/login";
-}}
+    onClick={() => {
+      try {
+        const p: any = loadProfile() || {};
+        delete p.discordSkipLink;
+        saveProfile(p);
+        window.dispatchEvent(new Event("ra:identity-changed"));
+      } catch {}
+      window.location.href = "/api/auth/discord/login";
+    }}
     style={{ padding: "10px 12px", fontSize: 13, opacity: 0.95 }}
   >
     Connect Discord
