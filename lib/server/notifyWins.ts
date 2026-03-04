@@ -63,6 +63,42 @@ async function notifyDiscord(evt: WinEvent) {
   }).catch(() => {});
 }
 
+// ✅ Public jackpot post (separate webhook)
+async function notifyDiscordPublic(evt: WinEvent) {
+  const url = process.env.DISCORD_PUBLIC_WIN_WEBHOOK_URL;
+  if (!url) return;
+
+  const rarityUpper = String(evt.rarity || "none").toUpperCase();
+  const name = String(evt.playerName || "guest");
+
+  const prizeType = String(evt?.prize?.type || "").toLowerCase();
+  const prizeLabel = evt?.prize?.label
+    ? String(evt.prize.label)
+    : (evt.pointsAwarded > 0 ? `+${evt.pointsAwarded} REBEL` : "—");
+
+  // Simple emoji mapping
+  const emoji =
+    prizeType === "merch" ? "👕" :
+    prizeType === "nft" ? "🖼️" :
+    prizeType === "ape" ? "🦍" :
+    "🎁";
+
+  // Use a stable public link
+  const link = "https://rebelants.io/shuffle";
+
+  const text =
+    `🔥 REBEL ANTS JACKPOT 🔥\n\n` +
+    `**${name}** just opened a **${rarityUpper}** crate and won:\n\n` +
+    `${emoji} **${prizeLabel}**\n\n` +
+    `Try your luck:\n${link}`;
+
+  await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content: text }),
+  }).catch(() => {});
+}
+
 async function notifyEmail(evt: WinEvent) {
   const key = process.env.RESEND_API_KEY;
   const to = process.env.WIN_NOTIFY_EMAIL_TO;
@@ -130,5 +166,6 @@ export async function notifyWinIfNeeded(evt: WinEvent) {
   const firstTime = await markNotifiedOnce(evt.id);
   if (!firstTime) return;
 
-  await Promise.all([notifyDiscord(evt), notifyEmail(evt)]);
+  // ✅ Private Discord + Email + Public Jackpot Discord
+  await Promise.all([notifyDiscord(evt), notifyEmail(evt), notifyDiscordPublic(evt)]);
 }
