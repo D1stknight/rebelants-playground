@@ -1196,3 +1196,13 @@ body::after{
 
 /* keep your content above the decorative layers */
 #___next, body > div, .ant-card, .shuffle-wrap { position: relative; z-index: 1; }
+
+/* === MOBILE OVERFLOW FIX (no sideways scroll) === */
+html, body {
+  width: 100%;
+  overflow-x: hidden;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
