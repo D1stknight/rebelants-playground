@@ -922,7 +922,11 @@ body { @apply bg-slate-950 text-slate-100; }
 
 /* Fallback crate shape (when no images uploaded yet) */
 .prize-crate{
-  width: 200px; height: 130px; margin: 0 auto 12px; border-radius: 10px;
+  .prize-crate{
+  width: min(200px, 42vw);
+  aspect-ratio: 200 / 130;
+  margin: 0 auto 12px;
+  border-radius: 10px;
   background:
     linear-gradient(180deg, rgba(0,0,0,.2), transparent 35%),
     repeating-linear-gradient(90deg, rgba(0,0,0,.15) 0 6px, rgba(255,255,255,.06) 6px 12px);
