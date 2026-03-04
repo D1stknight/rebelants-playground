@@ -928,6 +928,10 @@ await fetch("/api/wins/add", {
 
     rarity: r,
     pointsAwarded,
+
+    // ✅ KEY: let the server know if this win had a real prize
+    // (points wins will usually have prize null)
+    prize: pz?.type && pz.type !== "points" ? pz : null,
   }),
 }).catch(() => {});
 
