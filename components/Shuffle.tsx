@@ -1003,26 +1003,26 @@ function disconnectDiscord() {
   try {
     const p: any = loadProfile() || {};
 
-    // ✅ NEW: prevent auto-reconnect on refresh (even if server cookie still exists)
+    // ✅ block auto-link on refresh
     p.discordSkipLink = true;
 
+    // ✅ remove local discord fields
     delete p.discordUserId;
     delete p.discordName;
     delete p.discordAvatar;
     delete p.discordUsername;
 
-    // ✅ IMPORTANT: if primaryId stays discord:..., you will still look "connected"
-    // set it back to guest/wallet identity
+    // ✅ stop using discord as primary id
     const fallback = (p.walletAddress ? `wallet:${p.walletAddress}` : (p.id || "guest")).trim();
     p.primaryId = fallback;
 
     saveProfile(p);
 
-    // ✅ tell the app to recompute effective id + refresh UI (no hard reload)
+    // ✅ update UI immediately
     window.dispatchEvent(new Event("ra:identity-changed"));
   } catch {}
 
-  // ✅ log out server-side
+  // ✅ clear server cookie
   window.location.href = "/api/auth/discord/logout";
 }
   
