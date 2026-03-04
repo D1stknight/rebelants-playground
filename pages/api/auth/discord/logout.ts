@@ -8,12 +8,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ ok: false, error: "Method not allowed" });
   }
 
-  // Clear cookie used by your discord session endpoint
-  // (This assumes your session cookie name is "ra_discord_session")
-  res.setHeader(
-    "Set-Cookie",
-    `ra_discord_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; Secure`
-  );
+  // No cache
+  res.setHeader("Cache-Control", "no-store, max-age=0");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+
+  // ✅ IMPORTANT: your /api/auth/discord/session reads ra_discord_user
+  // So logout must clear ra_discord_user (and also clear ra_discord_session just in case)
+  res.setHeader("Set-Cookie", [
+    `ra_discord_user=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; Secure`,
+    `ra_discord_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; Secure`,
+  ]);
 
   // Go back to Shuffle
   res.writeHead(302, { Location: "/shuffle" });
