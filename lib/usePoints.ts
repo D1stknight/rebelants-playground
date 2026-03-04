@@ -1,5 +1,5 @@
 // lib/usePoints.ts
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type BalanceRes = { playerId: string; balance: number; earnedToday?: number };
 type SpendRes = { ok: boolean; playerId: string; balance: number; earnedToday?: number; error?: string };
@@ -7,19 +7,24 @@ type EarnRes = { ok: boolean; playerId: string; balance: number; earnedToday?: n
 type DevGrantRes = { ok: boolean; dev: boolean; playerId: string; added: number; balance: number; error?: string };
 
 export function usePoints(playerId: string) {
-  const pid = (playerId || "guest").slice(0, 64);
+  // ✅ always use the latest id (prevents "stuck on guest" after discord connect)
+  const playerIdRef = useRef((playerId || "guest").slice(0, 64));
+  useEffect(() => {
+    playerIdRef.current = (playerId || "guest").slice(0, 64);
+  }, [playerId]);
 
   const [balance, setBalance] = useState(0);
   const [earnedToday, setEarnedToday] = useState(0);
 
-  const refresh = useCallback(async () => {
-    const r = await fetch(`/api/points/balance?playerId=${encodeURIComponent(pid)}`, {
-      cache: "no-store",
-    });
+    const refresh = useCallback(async () => {
+    const r = await fetch(
+      `/api/points/balance?playerId=${encodeURIComponent(playerIdRef.current)}`,
+      { cache: "no-store" }
+    );
     const j = (await r.json()) as BalanceRes;
     setBalance(j.balance ?? 0);
     setEarnedToday(j.earnedToday ?? 0);
-  }, [pid]);
+  }, [playerId]);
 
   useEffect(() => {
     refresh().catch(() => {});
@@ -27,10 +32,10 @@ export function usePoints(playerId: string) {
 
   const spend = useCallback(
     async (cost: number, reason?: string) => {
-      const r = await fetch("/api/points/spend", {
+           const r = await fetch("/api/points/spend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerId: pid, amount: cost, reason }),
+        body: JSON.stringify({ playerId: playerIdRef.current, amount: cost, reason }),
       });
 
       const j = (await r.json().catch(() => null)) as SpendRes | null;
@@ -42,18 +47,18 @@ export function usePoints(playerId: string) {
       } else {
         console.warn("spend failed:", r.status, j);
         await refresh();
-        return (j || { ok: false, playerId: pid, balance, earnedToday }) as SpendRes;
+                return (j || { ok: false, playerId: playerIdRef.current, balance, earnedToday }) as SpendRes;
       }
     },
-    [pid, refresh, earnedToday, balance]
+        [playerId, refresh, earnedToday, balance]
   );
 
   const earn = useCallback(
     async (amount: number) => {
-      const r = await fetch("/api/points/earn", {
+           const r = await fetch("/api/points/earn", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerId: pid, amount }),
+        body: JSON.stringify({ playerId: playerIdRef.current, amount }),
       });
 
       const j = (await r.json().catch(() => null)) as EarnRes | null;
@@ -65,10 +70,10 @@ export function usePoints(playerId: string) {
       } else {
         console.warn("earn failed:", r.status, j);
         await refresh();
-        return (j || { ok: false, playerId: pid, balance, earnedToday }) as EarnRes;
+               return (j || { ok: false, playerId: playerIdRef.current, balance, earnedToday }) as EarnRes;
       }
     },
-    [pid, refresh, earnedToday, balance]
+       [playerId, refresh, earnedToday, balance]
   );
 
   const claimDaily = useCallback(
@@ -80,10 +85,10 @@ export function usePoints(playerId: string) {
 
   const devGrant = useCallback(
     async (amount: number) => {
-      const r = await fetch("/api/points/dev-grant", {
+            const r = await fetch("/api/points/dev-grant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerId: pid, amount }),
+        body: JSON.stringify({ playerId: playerIdRef.current, amount }),
       });
 
       const j = (await r.json().catch(() => null)) as DevGrantRes | null;
@@ -94,10 +99,10 @@ export function usePoints(playerId: string) {
       } else {
         console.warn("devGrant failed:", r.status, j);
         await refresh();
-        return (j || { ok: false, dev: true, playerId: pid, added: 0, balance }) as DevGrantRes;
+                return (j || { ok: false, dev: true, playerId: playerIdRef.current, added: 0, balance }) as DevGrantRes;
       }
     },
-    [pid, refresh, balance]
+        [playerId, refresh, balance]
   );
 
   const set = useCallback(async (newBalance: number) => {
