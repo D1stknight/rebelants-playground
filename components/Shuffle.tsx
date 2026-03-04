@@ -573,8 +573,8 @@ React.useEffect(() => {
   return () => window.removeEventListener("ra:identity-changed", sync);
 }, []);
 
-const isDiscordConnected = !!profile?.discordUserId;
-
+const isDiscordConnected = !!profile?.discordUserId && !(profile as any)?.discordSkipLink;
+  
 // ✅ Whenever identity changes, force the points hook to refetch for the new id
 const lastPidRef = React.useRef<string>("");
 
@@ -1002,27 +1002,21 @@ async function openDripModal() {
 function disconnectDiscord() {
   try {
     const p: any = loadProfile() || {};
-
-    // ✅ block auto-link on refresh
-    p.discordSkipLink = true;
-
-    // ✅ remove local discord fields
-    delete p.discordUserId;
-    delete p.discordName;
-    delete p.discordAvatar;
-    delete p.discordUsername;
-
-    // ✅ stop using discord as primary id
     const fallback = (p.walletAddress ? `wallet:${p.walletAddress}` : (p.id || "guest")).trim();
-    p.primaryId = fallback;
 
-    saveProfile(p);
+    // ✅ Clear discord identity using saveProfile (now supports clearing)
+    saveProfile({
+      discordUserId: undefined,
+      discordName: undefined,
+      primaryId: fallback,
+      // keep this if you're using it to block auto-link
+      discordSkipLink: true as any,
+    } as any);
 
-    // ✅ update UI immediately
     window.dispatchEvent(new Event("ra:identity-changed"));
   } catch {}
 
-  // ✅ clear server cookie
+  // ✅ log out server-side (clears httpOnly cookie)
   window.location.href = "/api/auth/discord/logout";
 }
   
