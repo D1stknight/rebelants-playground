@@ -1194,19 +1194,19 @@ return (
           <AntProgress progress={progress} />
 
           {Array.from({ length: EGG_COUNT }, (_, i) => (
-            <button
-              key={i}
-              className={`egg-card ${phase === "pick" ? "can-pick" : ""}`}
-              style={{ left: `${LANES[order[i]]}%`, top: "58%" }}
-              onClick={onPick}
-              disabled={phase !== "pick" || busy}
-              aria-label="Pick egg"
-            >
-              <div className={`egg-body ${phase === "pick" ? "wobble-on-pick" : ""}`} />
-              <div className="egg-shadow" />
-              <div className="egg-speckle" />
-            </button>
-          ))}
+  <button
+    key={i}
+    className={`egg-card ${phase === "pick" ? "can-pick" : ""}`}
+    style={{ left: `${LANES[order[i]]}%`, top: "58%", width: "min(74px, 16vw)" }}
+    onClick={onPick}
+    disabled={phase !== "pick" || busy}
+    aria-label="Pick egg"
+  >
+    <div className={`egg-body ${phase === "pick" ? "wobble-on-pick" : ""}`} />
+    <div className="egg-shadow" />
+    <div className="egg-speckle" />
+  </button>
+))}
         </div>
 
       {/* Shuffle button + balance row */}
