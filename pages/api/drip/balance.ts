@@ -62,6 +62,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const fj: any = await fr.json().catch(() => null);
 
     if (!fr.ok) {
+      // ✅ If user has no DRIP credential yet, treat as zero balance (do NOT error)
+      const msg = String(fj?.detail?.message || fj?.message || fj?.error || "").toLowerCase();
+
+      if (fr.status === 404 || msg.includes("credential not found")) {
+        return res.status(200).json({
+          ok: true,
+          discordUserId: discordId,
+          balance: 0,
+          debug: {
+            realmPointId: realmPointId || null,
+            balancesCount: 0,
+            note: "No DRIP credential linked",
+          },
+        });
+      }
+
       return res.status(fr.status).json({
         ok: false,
         error: fj?.error || "DRIP credential lookup failed",
