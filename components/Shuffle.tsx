@@ -980,10 +980,7 @@ setBusy(false);
   try {
     // ✅ If the prize was an NFT, create a claim
     if (prize && prize.type === "nft" && prize.meta) {
-      const wallet =
-        loadProfile()?.walletAddress ||
-        loadProfile()?.wallet ||
-        "";
+     const wallet = loadProfile()?.walletAddress || "";
 
       await fetch("/api/claims/create", {
         method: "POST",
