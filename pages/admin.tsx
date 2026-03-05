@@ -1278,12 +1278,37 @@ String(c.status).toUpperCase()==="PENDING"
           }}
         />
 
-        {/* ✅ sample format so you never forget */}
-        <div style={{ marginTop: 6, fontSize: 12, opacity: 0.8 }}>
-          Format example:{" "}
-          <code style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
-            {sample}
-          </code>
+                {/* ✅ sample format so you never forget */}
+        <div style={{ marginTop: 6, fontSize: 12, opacity: 0.8, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <div>
+            Format example:{" "}
+            <code style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+              {sample}
+            </code>
+          </div>
+
+          <button
+            className="btn"
+            type="button"
+            onClick={() => {
+              try {
+                const nextArr = JSON.parse(String(sample || "[]"));
+                setCfg((c: any) => ({
+                  ...c,
+                  prizePools: {
+                    ...(c.prizePools || { none: [], common: [], rare: [], ultra: [] }),
+                    [k]: Array.isArray(nextArr) ? nextArr : [],
+                  },
+                }));
+              } catch {
+                // ignore
+              }
+            }}
+            style={{ padding: "6px 10px", fontSize: 12 }}
+            title="Restores the example JSON into this pool (you can edit after)"
+          >
+            Restore Example
+          </button>
         </div>
       </label>
     );
