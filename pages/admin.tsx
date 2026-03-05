@@ -78,9 +78,9 @@ const headers = useMemo(() => {
 
   // claims
   const [claims, setClaims] = useState<any[]>([]);
-  const [claimsLoading, setClaimsLoading] = useState(false);
-  const [claimLookupId, setClaimLookupId] = useState("");  
-
+const [claimsLoading, setClaimsLoading] = useState(false);
+const [claimLookupId, setClaimLookupId] = useState("");
+const [showClaims, setShowClaims] = useState(false);
      // grant
   const [playerId, setPlayerId] = useState("guest");
   const [amount, setAmount] = useState(5000);
@@ -765,9 +765,24 @@ String(c.status).toUpperCase()==="PENDING"
           <div style={{ fontWeight: 900, marginBottom: 10 }}>Claims (latest)</div>
 
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-            <button className="btn" onClick={loadClaims} style={{ padding: "10px 12px" }}>
-              {claimsLoading ? "Loading…" : "Load Claims"}
-            </button>
+            <button
+  className="btn"
+  onClick={() => {
+    loadClaims();
+    setShowClaims(true);
+  }}
+  style={{ padding: "10px 12px" }}
+>
+  {claimsLoading ? "Loading…" : "Load Claims"}
+</button>
+
+<button
+  className="btn"
+  onClick={() => setShowClaims(false)}
+  style={{ padding: "10px 12px" }}
+>
+  Collapse
+</button>            
 
             <input
               value={claimLookupId}
@@ -789,7 +804,8 @@ String(c.status).toUpperCase()==="PENDING"
             </button>
           </div>
 
-          <div style={{ marginTop: 12, overflowX: "auto" }}>
+         {showClaims && (
+<div style={{ marginTop: 12, overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                            <thead>
                 <tr style={{ textAlign: "left", opacity: 0.9 }}>
@@ -902,9 +918,12 @@ String(c.status).toUpperCase()==="PENDING"
                 )}
               </tbody>
             </table>
-          </div>
-        </div>        
-                        {/* Grant */}
+</div>
+)}
+
+</div>
+
+{/* Grant */}
 <div
   style={{
     padding: 14,
