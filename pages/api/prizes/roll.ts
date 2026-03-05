@@ -157,14 +157,17 @@ if (rarity === "ultra") {
           })()
         : nftRaw;
 
-    const chain = String(item?.chain || "ETH").toUpperCase();
-    const contract = String(item?.contract || "").trim();
-    const tokenId = String(item?.tokenId ?? "").trim();
-    const label = String(item?.label || "NFT Prize").trim();
+       // ✅ Inventory items are stored as { type, label, meta:{ chain, contract, tokenId, inventoryKey } }
+    const meta = (item as any)?.meta || item;
+
+    const chain = String(meta?.chain || "ETH").toUpperCase();
+    const contract = String(meta?.contract || "").trim();
+    const tokenId = String(meta?.tokenId ?? "").trim();
+    const label = String(meta?.label || item?.label || "NFT Prize").trim();
 
     if (contract && contract.startsWith("0x") && tokenId) {
       const inventoryKey =
-        String(item?.inventoryKey || "").trim() ||
+        String(meta?.inventoryKey || "").trim() ||
         `ultra:${chain}:${contract}:${tokenId}`;
 
       return res.status(200).json({
