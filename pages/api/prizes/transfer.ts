@@ -133,29 +133,56 @@ await redis.set(claimKey(claimId), JSON.stringify(claim));
 await redis.expire(claimKey(claimId), 60 * 60 * 24 * 90);
 
 /* ---------------------------------
-   Remove NFT from inventory
+   Remove NFT from inventory (remove EXACTLY ONE)
+   Match by inventoryKey first (best), else contract+tokenId
 ---------------------------------- */
 
 try {
   const invKey = "ra:inv:ultra:nft";
-  const inventoryKey = String(prize?.meta?.inventoryKey || "").trim();
 
-  const items = await redis.lrange(invKey, 0, -1);
+  const wantedInvKey = String(prize?.meta?.inventoryKey || "").trim();
+  const wantedContract = String(prize?.meta?.contract || contract || "").trim().toLowerCase();
+  const wantedTokenId = String(prize?.meta?.tokenId ?? tokenId ?? "").trim();
 
-  const filtered = (items || []).filter((item: any) => {
-    const str = String(item || "");
-    if (!inventoryKey) return true;
+  const list = await redis.lrange(invKey, 0, -1);
 
-    // remove the exact NFT entry
-    return !str.includes(inventoryKey);
-  });
+  let removed = false;
+  const kept: string[] = [];
 
-  await redis.del(invKey);
+  for (const item of list || []) {
+    // Upstash returns strings here (your debug shows raw is a string)
+    const s = typeof item === "string" ? item : JSON.stringify(item);
 
-  if (filtered.length) {
-    await redis.rpush(invKey, ...filtered);
+    try {
+      const obj = JSON.parse(s);
+
+      const invKeyInItem = String(obj?.meta?.inventoryKey || "").trim();
+      const cInItem = String(obj?.meta?.contract || "").trim().toLowerCase();
+      const tInItem = String(obj?.meta?.tokenId ?? "").trim();
+
+      const isMatch =
+        (wantedInvKey && invKeyInItem && invKeyInItem === wantedInvKey) ||
+        (!!wantedContract && !!wantedTokenId && cInItem === wantedContract && tInItem === wantedTokenId);
+
+      if (!removed && isMatch) {
+        removed = true; // skip exactly one matching item
+        continue;
+      }
+    } catch {
+      // if a row is malformed, keep it (don’t delete unknown data)
+    }
+
+    kept.push(s);
   }
 
+  // Rebuild list only if we actually removed something
+  if (removed) {
+    await redis.del(invKey);
+    if (kept.length) await redis.rpush(invKey, ...kept);
+    console.log("✅ Inventory removed:", { wantedInvKey, wantedContract, wantedTokenId });
+  } else {
+    console.warn("⚠️ Inventory item NOT found to remove:", { wantedInvKey, wantedContract, wantedTokenId });
+  }
 } catch (e) {
   console.warn("Inventory removal failed", e);
 }
