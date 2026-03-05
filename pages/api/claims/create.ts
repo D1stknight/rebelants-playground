@@ -39,13 +39,78 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ ok: false, error: "Missing prize" });
     }
 
-    // For NFT claims, wallet is required
-    if (String(prize?.type).toLowerCase() === "nft") {
-      if (!wallet) return res.status(400).json({ ok: false, error: "Missing wallet" });
-      if (!wallet.startsWith("0x") || wallet.length < 40) {
-        return res.status(400).json({ ok: false, error: "Invalid wallet" });
-      }
+   // For NFT claims, wallet is required
+if (String(prize?.type).toLowerCase() === "nft") {
+  if (!wallet) return res.status(400).json({ ok: false, error: "Missing wallet" });
+  if (!wallet.startsWith("0x") || wallet.length < 40) {
+    return res.status(400).json({ ok: false, error: "Invalid wallet" });
+  }
+
+  // ✅ Consume the NFT from inventory so it cannot be claimed twice
+  const ULTRA_NFT_INVENTORY_KEY = "ra:inv:ultra:nft";
+  const invKey = String(prize?.meta?.inventoryKey || "").trim();
+
+  if (!invKey) {
+    return res.status(400).json({ ok: false, error: "NFT prize missing meta.inventoryKey" });
+  }
+
+  const items = await redis.lrange<any>(ULTRA_NFT_INVENTORY_KEY, 0, 500);
+
+  let rawMatch: any = null;
+  let parsedMatch: any = null;
+
+  for (const it of items || []) {
+    const obj =
+      typeof it === "string"
+        ? (() => {
+            try {
+              return JSON.parse(it);
+            } catch {
+              return null;
+            }
+          })()
+        : it;
+
+    if (!obj) continue;
+
+    const meta = obj?.meta || obj;
+
+    const chain = String(meta?.chain || "").toUpperCase();
+    const contract = String(meta?.contract || "").trim();
+    const tokenId = String(meta?.tokenId ?? "").trim();
+
+    const k =
+      String(meta?.inventoryKey || "").trim() ||
+      `ultra:${chain}:${contract}:${tokenId}`;
+
+    if (k === invKey) {
+      rawMatch = it;
+      parsedMatch = meta;
+      break;
     }
+  }
+
+  if (!rawMatch || !parsedMatch) {
+    return res.status(409).json({ ok: false, error: "No NFT inventory available" });
+  }
+
+  const removeValue =
+    typeof rawMatch === "string" ? rawMatch : JSON.stringify(parsedMatch);
+
+  await redis.lrem(ULTRA_NFT_INVENTORY_KEY, 1, removeValue);
+
+  // ensure prize meta contains correct token data
+  prize = {
+    ...prize,
+    meta: {
+      ...(prize?.meta || {}),
+      chain: parsedMatch.chain,
+      contract: parsedMatch.contract,
+      tokenId: parsedMatch.tokenId,
+      inventoryKey: invKey,
+    },
+  };
+}
 
     const claimId = makeId();
     const key = `ra:claim:${claimId}`;
