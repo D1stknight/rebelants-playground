@@ -35,7 +35,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const chain = String(body.chain || "ETH").trim().toUpperCase();
     const contract = String(body.contract || "").trim();
-    const tokenIds = Array.isArray(body.tokenIds) ? body.tokenIds : [];
+    const tokenIdsRaw = Array.isArray(body.tokenIds) ? body.tokenIds : [];
+
+// ✅ De-dupe tokenIds (prevents accidental duplicates in inventory)
+const tokenIds = Array.from(
+  new Set(
+    tokenIdsRaw
+      .map((t: any) => String(t ?? "").trim())
+      .filter(Boolean)
+  )
+);
     const label = String(body.label || "NFT Prize").trim();
 
     if (!contract || !contract.startsWith("0x")) {
