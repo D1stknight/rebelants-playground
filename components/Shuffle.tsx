@@ -976,11 +976,33 @@ setShowPrize(true);
 setBusy(false);
     }, 350);
   };
-  const resetAfterPrize = () => {
+ const resetAfterPrize = async () => {
+  try {
+    // ✅ If the prize was an NFT, create a claim
+    if (prize && prize.type === "nft" && prize.meta) {
+      const wallet =
+        loadProfile()?.walletAddress ||
+        loadProfile()?.wallet ||
+        "";
+
+      await fetch("/api/claims/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          playerId: effectivePlayerId,
+          wallet,
+          prize: prize,
+        }),
+      });
+    }
+  } catch (e) {
+    console.error("Claim creation failed", e);
+  }
+
   setShowPrize(false);
   setRarity("none");
-setWinText(""); // optional (can remove later)
-setPrize(null); // ✅ clear actual prize object
+  setWinText("");
+  setPrize(null);
   setProgress(0);
   setOrder(Array.from({ length: EGG_COUNT }, (_, i) => i));
   setPhase("idle");
