@@ -20,6 +20,15 @@ function isAdmin(req: NextApiRequest) {
 
 const ULTRA_NFT_INVENTORY_KEY = "ra:inv:ultra:nft";
 
+function safeParse(v: any) {
+  if (typeof v !== "string") return v;
+  try {
+    return JSON.parse(v);
+  } catch {
+    return null;
+  }
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Cache-Control", "no-store, max-age=0");
 
@@ -31,26 +40,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(405).json({ ok: false, error: "Method not allowed" });
     }
 
-    const len = await redis.llen(ULTRA_NFT_INVENTORY_KEY);
-    const items = await redis.lrange(ULTRA_NFT_INVENTORY_KEY, 0, 9);
+    const len = Number((await redis.llen(ULTRA_NFT_INVENTORY_KEY)) || 0);
+    const items = await redis.lrange(ULTRA_NFT_INVENTORY_KEY, 0, -1);
 
-    // Parse safely so you can see what's actually stored
-    const parsed = (items || []).map((x: any) => {
-      try {
-        return JSON.parse(String(x));
-      } catch {
-        return { raw: String(x) };
-      }
+    const out = (items || []).map((it: any) => {
+      // If Upstash returns objects, show them as JSON not "[object Object]"
+      const raw = typeof it === "string" ? it : JSON.stringify(it);
+      const parsed = safeParse(raw) ?? (typeof it === "object" ? it : null);
+
+      return {
+        raw,
+        parsed,
+      };
     });
 
     return res.status(200).json({
       ok: true,
       key: ULTRA_NFT_INVENTORY_KEY,
-      len: Number(len || 0),
-      items: parsed,
+      len,
+      items: out,
     });
   } catch (e: any) {
-    console.error("admin inventory debug error:", e);
-    return res.status(500).json({ ok: false, error: "Server error" });
+    console.error("inv nft debug error:", e);
+    return res.status(500).json({ ok: false, error: e?.message || "Server error" });
   }
 }
