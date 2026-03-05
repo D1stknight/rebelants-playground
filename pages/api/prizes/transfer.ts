@@ -107,13 +107,42 @@ if (!claim) {
 
     // mark claim complete
     claim.status = "FULFILLED";
-    claim.fulfilledAt = Date.now();
-    claim.txHash = receipt?.hash || tx?.hash || null;
+claim.fulfilledAt = Date.now();
+claim.txHash = receipt?.hash || tx?.hash || null;
 
-    await redis.set(claimKey(claimId), JSON.stringify(claim));
+await redis.set(claimKey(claimId), JSON.stringify(claim));
 await redis.expire(claimKey(claimId), 60 * 60 * 24 * 90);
 
-// ✅ release transfer lock after success
+/* ---------------------------------
+   Remove NFT from inventory
+---------------------------------- */
+
+try {
+  const invKey = "ra:inv:ultra:nft";
+  const raw = await redis.lrange(invKey, 0, -1);
+
+  const filtered = (raw || []).filter((item: any) => {
+    try {
+      const obj = typeof item === "string" ? JSON.parse(item) : item;
+      return String(obj?.meta?.tokenId) !== String(tokenId);
+    } catch {
+      return true;
+    }
+  });
+
+  await redis.del(invKey);
+
+  if (filtered.length) {
+    await redis.rpush(invKey, ...filtered);
+  }
+} catch (e) {
+  console.warn("Inventory removal failed", e);
+}
+
+/* ---------------------------------
+   Release transfer lock
+---------------------------------- */
+
 await redis.del(transferLockKey(claimId));
 
 return res.status(200).json({ ok: true, txHash: claim.txHash });
