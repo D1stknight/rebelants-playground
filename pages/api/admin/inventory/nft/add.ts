@@ -56,26 +56,29 @@ const tokenIds = Array.from(
 
     let added = 0;
 
-    // ✅ We use LPUSH so newest added is used first (roll uses RPOP)
+        // ✅ We use LPUSH so newest added is used first (roll uses RPOP)
     // If you prefer FIFO, switch to RPUSH + LPOP later.
+    const seen = new Set<string>();
+
     for (const tid of tokenIds) {
       const tokenId = String(tid ?? "").trim();
       if (!tokenId) continue;
 
-     const payload = {
-  type: "NFT",
-  label,
-  meta: {
-    chain,
-    contract,
-    tokenId,
-    label,
-    inventoryKey: `ultra:${chain}:${contract}:${tokenId}`,
-  },
-};
+      // ✅ prevent duplicates in same request
+      if (seen.has(tokenId)) continue;
+      seen.add(tokenId);
 
-await redis.lpush(ULTRA_NFT_INVENTORY_KEY, JSON.stringify(payload));
-added++;
+      const payload = {
+        type: "NFT",
+        label,
+        meta: {
+          chain,
+          contract,
+          tokenId,
+          label,
+          inventoryKey: `ultra:${chain}:${contract}:${tokenId}`,
+        },
+      };
 
       await redis.lpush(ULTRA_NFT_INVENTORY_KEY, JSON.stringify(payload));
       added++;
