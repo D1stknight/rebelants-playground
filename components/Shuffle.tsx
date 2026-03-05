@@ -404,9 +404,56 @@ function PrizeModal({
         </div>
       )}
 
-      <button className="btn" onClick={onClose}>
-        Continue
-      </button>
+     <button
+  className="btn"
+  onClick={async () => {
+    try {
+      // ✅ If it's an NFT prize, create a claim BEFORE closing
+      if (prize?.type === "nft") {
+        const p = loadProfile();
+
+        // Prefer connected wallet, else use what user typed
+        const wallet =
+          (p as any)?.walletAddress ||
+          (shippingForm as any)?.walletAddress ||
+          "";
+
+        if (!wallet) {
+          alert("Please enter a wallet address first.");
+          return;
+        }
+
+        const r = await fetch("/api/claims/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prize,
+            rarity,
+            walletAddress: wallet,
+          }),
+        });
+
+        const j = await r.json().catch(() => null);
+
+        if (!r.ok || !j?.ok) {
+          console.log("CLAIM CREATE FAILED", r.status, j);
+          alert(`Claim failed (${r.status}). Check console.`);
+          return;
+        }
+
+        console.log("✅ CLAIM CREATED", j);
+      }
+    } catch (e: any) {
+      console.log("CLAIM CREATE ERROR", e);
+      alert(`Claim error: ${String(e?.message || e)}`);
+      return;
+    }
+
+    onClose();
+  }}
+>
+  Continue
+</button>
     </div>
 
     <style>{`
