@@ -13,6 +13,15 @@ function transferLockKey(id: string) {
   return `ra:claim:${id}:transferLock`;
 }
 
+function safeJsonParse(v: any) {
+  if (typeof v !== "string") return v;
+  try {
+    return JSON.parse(v);
+  } catch {
+    return null;
+  }
+}
+
 const ERC721_ABI = [
   "function safeTransferFrom(address from, address to, uint256 tokenId) external",
 ];
@@ -51,32 +60,42 @@ const body =
 
     if (!claimId) return res.status(400).json({ ok: false, error: "Missing claimId" });
 
-    // lock so we never double-send
-    const locked = await redis.set(transferLockKey(claimId), "1", { nx: true, ex: 60 * 10 });
-    if (!locked) {
-      return res.status(200).json({ ok: true, alreadyRunning: true });
-    }
+  // Load claim first (so we can be idempotent)
+const raw1: any = await redis.get<any>(claimKey(claimId));
+if (!raw1) return res.status(404).json({ ok: false, error: "Claim not found" });
 
-    const raw: any = await redis.get<any>(claimKey(claimId));
-if (!raw) return res.status(404).json({ ok: false, error: "Claim not found" });
-
-const claim =
-  typeof raw === "string"
-    ? (() => {
-        try {
-          return JSON.parse(raw);
-        } catch {
-          return null;
-        }
-      })()
-    : raw;
-
-if (!claim) {
+let claim: any = safeJsonParse(raw1) ?? raw1;
+if (!claim || typeof claim !== "object") {
   return res.status(500).json({ ok: false, error: "Claim payload invalid" });
 }
-    const prize = claim?.prize;
-    const wallet = String(claim?.wallet || "").trim();
 
+// ✅ If already fulfilled, do NOT require unlock. Just return the txHash.
+if (String(claim.status || "").toUpperCase() === "FULFILLED") {
+  await redis.del(transferLockKey(claimId)); // safety cleanup
+  return res.status(200).json({ ok: true, alreadyFulfilled: true, txHash: claim.txHash || "" });
+}
+
+// lock so we never double-send
+const locked = await redis.set(transferLockKey(claimId), "1", { nx: true, ex: 60 * 10 });
+if (!locked) {
+  return res.status(200).json({ ok: true, alreadyRunning: true });
+}
+
+// Re-load claim after lock (in case something changed)
+const raw2: any = await redis.get<any>(claimKey(claimId));
+if (!raw2) {
+  await redis.del(transferLockKey(claimId));
+  return res.status(404).json({ ok: false, error: "Claim not found" });
+}
+
+claim = safeJsonParse(raw2) ?? raw2;
+if (!claim || typeof claim !== "object") {
+  await redis.del(transferLockKey(claimId));
+  return res.status(500).json({ ok: false, error: "Claim payload invalid" });
+}
+
+const prize = claim?.prize;
+const wallet = String(claim?.wallet || "").trim();
     if (!prize || prize.type !== "nft") {
       return res.status(400).json({ ok: false, error: "Claim is not an NFT prize" });
     }
@@ -119,15 +138,16 @@ await redis.expire(claimKey(claimId), 60 * 60 * 24 * 90);
 
 try {
   const invKey = "ra:inv:ultra:nft";
-  const raw = await redis.lrange(invKey, 0, -1);
+  const inventoryKey = String(prize?.meta?.inventoryKey || "").trim();
 
-  const filtered = (raw || []).filter((item: any) => {
-    try {
-      const obj = typeof item === "string" ? JSON.parse(item) : item;
-      return String(obj?.meta?.tokenId) !== String(tokenId);
-    } catch {
-      return true;
-    }
+  const items = await redis.lrange(invKey, 0, -1);
+
+  const filtered = (items || []).filter((item: any) => {
+    const str = String(item || "");
+    if (!inventoryKey) return true;
+
+    // remove the exact NFT entry
+    return !str.includes(inventoryKey);
   });
 
   await redis.del(invKey);
@@ -135,6 +155,7 @@ try {
   if (filtered.length) {
     await redis.rpush(invKey, ...filtered);
   }
+
 } catch (e) {
   console.warn("Inventory removal failed", e);
 }
