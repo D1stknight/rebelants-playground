@@ -849,30 +849,87 @@ String(c.status).toUpperCase()==="PENDING"
 </td>
                       <td style={{ padding: "8px 6px", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{short(tx, 12)}</td>
 
-   <td style={{ padding: "8px 6px" }}>
-  {isNft && isPending ? (
-    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-      <button
-        className="btn"
-        onClick={() => unlockClaimTransferLock(id)}
-        style={{ padding: "6px 10px", fontSize: 12 }}
-      >
-        Unlock
-      </button>
+ <td style={{ padding: "8px 6px" }}>
+  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+    {/* ✅ ALWAYS: Copy claimId */}
+    <button
+      className="btn"
+      onClick={() => {
+        try {
+          navigator.clipboard.writeText(String(id || ""));
+        } catch {}
+        setClaimLookupId(id);
+        append(`Copied claimId ${id}`);
+      }}
+      style={{ padding: "6px 10px", fontSize: 12 }}
+    >
+      Copy ID
+    </button>
 
-      <button
-        className="btn"
-        onClick={() => transferClaimNFT(id)}
-        style={{ padding: "6px 10px", fontSize: 12 }}
-      >
-        Transfer
-      </button>
-    </div>
-  ) : String(type).toLowerCase() === "merch" &&
+    {/* ✅ ALWAYS: View (fills lookup + runs getClaim) */}
+    <button
+      className="btn"
+      onClick={() => {
+        setClaimLookupId(id);
+        getClaim();
+      }}
+      style={{ padding: "6px 10px", fontSize: 12 }}
+    >
+      View
+    </button>
+
+    {/* ✅ ALWAYS: Delete */}
+    <button
+      className="btn"
+      onClick={async () => {
+        const ok = confirm(`Delete claim ${id}? This cannot be undone.`);
+        if (!ok) return;
+
+        append(`Deleting claim ${id}…`);
+        const r = await fetch("/api/admin/claims/delete", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ claimId: id }),
+        });
+
+        const j = await r.json().catch(() => null);
+        append(`DELETE status ${r.status}\n${JSON.stringify(j, null, 2)}`);
+
+        if (r.ok && j?.ok) {
+          await loadClaims();
+        }
+      }}
+      style={{ padding: "6px 10px", fontSize: 12 }}
+    >
+      Delete
+    </button>
+
+    {/* ✅ CONDITIONAL: NFT Pending actions */}
+    {isNft && isPending ? (
+      <>
+        <button
+          className="btn"
+          onClick={() => unlockClaimTransferLock(id)}
+          style={{ padding: "6px 10px", fontSize: 12 }}
+        >
+          Unlock
+        </button>
+
+        <button
+          className="btn"
+          onClick={() => transferClaimNFT(id)}
+          style={{ padding: "6px 10px", fontSize: 12 }}
+        >
+          Transfer
+        </button>
+      </>
+    ) : null}
+
+    {/* ✅ CONDITIONAL: Merch fulfill */}
+    {String(type).toLowerCase() === "merch" &&
     (String(status).toUpperCase() === "READY_TO_FULFILL" ||
       String(status).toUpperCase() === "PENDING" ||
       String(status).toUpperCase() === "NEEDS_SHIPPING") ? (
-    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
       <button
         className="btn"
         onClick={async () => {
@@ -890,21 +947,8 @@ String(c.status).toUpperCase()==="PENDING"
       >
         Mark Fulfilled
       </button>
-
-      <button
-        className="btn"
-        onClick={() => {
-          setClaimLookupId(id);
-          getClaim();
-        }}
-        style={{ padding: "6px 10px", fontSize: 12 }}
-      >
-        View
-      </button>
-    </div>
-  ) : (
-    <span style={{ opacity: 0.7, fontSize: 12 }}>—</span>
-  )}
+    ) : null}
+  </div>
 </td>
                     </tr>
                   );
