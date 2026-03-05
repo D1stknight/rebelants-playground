@@ -1226,44 +1226,68 @@ String(c.status).toUpperCase()==="PENDING"
 <div style={{ marginTop: 12 }}>
   <div style={{ fontWeight: 900, marginBottom: 8 }}>Prize Pools (JSON)</div>
   <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 10 }}>
-    This is for future “NFT / APE / Merch / Nothing” prizes. (Shuffle does NOT use this yet.)
-    You can safely edit these now and we’ll wire Shuffle next.
+    These define what CAN be awarded for each rarity. If a pool is empty, it will fall back to points (if configured).
   </div>
 
-  {(["none", "common", "rare", "ultra"] as const).map((k) => (
-    <label key={k} style={{ display: "block", marginBottom: 10, fontSize: 12, opacity: 0.95 }}>
-      Pool: <b>{k}</b>
-      <textarea
-        value={JSON.stringify((cfg as any).prizePools?.[k] ?? [], null, 2)}
-        onChange={(e) => {
-          try {
-            const nextArr = JSON.parse(e.target.value || "[]");
-            setCfg((c: any) => ({
-              ...c,
-              prizePools: {
-                ...(c.prizePools || { none: [], common: [], rare: [], ultra: [] }),
-                [k]: Array.isArray(nextArr) ? nextArr : [],
-              },
-            }));
-          } catch {
-            // ignore parse errors while typing
-          }
-        }}
-        style={{
-          width: "100%",
-          minHeight: 110,
-          marginTop: 6,
-          padding: "10px 12px",
-          borderRadius: 12,
-          border: "1px solid rgba(255,255,255,.18)",
-          background: "rgba(0,0,0,.25)",
-          color: "white",
-          fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-          fontSize: 12,
-        }}
-      />
-    </label>
-  ))}
+  {(["none", "common", "rare", "ultra"] as const).map((k) => {
+    const currency = String((cfg as any)?.currency || "REBEL");
+
+    const sample =
+      k === "none"
+        ? `[{ "type":"NONE", "label":"Nothing this time", "points":0 }]`
+        : k === "common"
+        ? `[{ "type":"POINTS", "label":"50 ${currency}", "points":50 }]`
+        : k === "rare"
+        ? `[
+  { "type":"MERCH", "label":"Sticker Pack", "sku":"STICKERS", "qty":1, "weight":5 },
+  { "type":"MERCH", "label":"Rebel Ants Hat", "sku":"HAT", "qty":1, "weight":1 }
+]`
+        : `[{ "type":"NFT", "label":"Ultra NFT Prize", "weight":1 }]`;
+
+    return (
+      <label key={k} style={{ display: "block", marginBottom: 10, fontSize: 12, opacity: 0.95 }}>
+        Pool: <b>{k}</b>
+
+        <textarea
+          value={JSON.stringify((cfg as any).prizePools?.[k] ?? [], null, 2)}
+          onChange={(e) => {
+            try {
+              const nextArr = JSON.parse(e.target.value || "[]");
+              setCfg((c: any) => ({
+                ...c,
+                prizePools: {
+                  ...(c.prizePools || { none: [], common: [], rare: [], ultra: [] }),
+                  [k]: Array.isArray(nextArr) ? nextArr : [],
+                },
+              }));
+            } catch {
+              // ignore parse errors while typing
+            }
+          }}
+          style={{
+            width: "100%",
+            minHeight: 110,
+            marginTop: 6,
+            padding: "10px 12px",
+            borderRadius: 12,
+            border: "1px solid rgba(255,255,255,.18)",
+            background: "rgba(0,0,0,.25)",
+            color: "white",
+            fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+            fontSize: 12,
+          }}
+        />
+
+        {/* ✅ sample format so you never forget */}
+        <div style={{ marginTop: 6, fontSize: 12, opacity: 0.8 }}>
+          Format example:{" "}
+          <code style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+            {sample}
+          </code>
+        </div>
+      </label>
+    );
+  })}
 </div>
 
 <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
