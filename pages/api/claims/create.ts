@@ -25,7 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const body = safeJson(req.body) || {};
 
-    const prize = body?.prize || null;
+    let prize = body?.prize || null;
     const wallet = String(body?.wallet || "").trim();
 
     // Optional context (nice for admin UI / debugging)
