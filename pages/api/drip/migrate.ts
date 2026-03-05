@@ -83,7 +83,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const pj: any = await pr.json().catch(() => null);
 
-    if (!pr.ok) {
+       if (!pr.ok) {
+      const msg = String(pj?.detail?.message || pj?.message || pj?.error || "").toLowerCase();
+
+      // ✅ If the user has no DRIP credential yet, return a friendly 400 (no retries)
+      if (pr.status === 404 || msg.includes("credential not found")) {
+        return res.status(400).json({
+          ok: false,
+          error: "DRIP credential not found for this Discord account. User must link DRIP first.",
+          detail: pj,
+        });
+      }
+
       return res.status(pr.status).json({
         ok: false,
         error: pj?.error || "DRIP deduction failed",
