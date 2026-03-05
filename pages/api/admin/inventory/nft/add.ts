@@ -54,12 +54,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!tokenId) continue;
 
      const payload = {
-  chain,
-  contract,
-  tokenId,
+  type: "NFT",
   label,
-  inventoryKey: `ultra:${chain}:${contract}:${tokenId}`,
+  meta: {
+    chain,
+    contract,
+    tokenId,
+    label,
+    inventoryKey: `ultra:${chain}:${contract}:${tokenId}`,
+  },
 };
+
+await redis.lpush(ULTRA_NFT_INVENTORY_KEY, JSON.stringify(payload));
+added++;
 
       await redis.lpush(ULTRA_NFT_INVENTORY_KEY, JSON.stringify(payload));
       added++;
