@@ -73,12 +73,14 @@ if (String(prize?.type || "").toLowerCase() === "nft") {
 
     if (!obj) continue;
 
-    const chain = String(obj?.chain || "").toUpperCase();
-    const contract = String(obj?.contract || "").trim();
-    const tokenId = String(obj?.tokenId ?? "").trim();
+        const meta = (obj && typeof obj === "object" ? (obj as any).meta : null) || null;
+
+    const chain = String(obj?.chain || meta?.chain || "").toUpperCase();
+    const contract = String(obj?.contract || meta?.contract || "").trim();
+    const tokenId = String(obj?.tokenId ?? meta?.tokenId ?? "").trim();
 
     const k =
-      String(obj?.inventoryKey || "").trim() ||
+      String(obj?.inventoryKey || meta?.inventoryKey || "").trim() ||
       `ultra:${chain}:${contract}:${tokenId}`;
 
     if (k === invKey) {
@@ -94,21 +96,24 @@ if (String(prize?.type || "").toLowerCase() === "nft") {
 
   // Remove ONE matching entry from the list.
   // lrem compares values; if lrange gave us an object, remove the canonical JSON string.
-  const removeValue =
-    typeof rawMatch === "string" ? rawMatch : JSON.stringify(parsedMatch);
+    const removeValue =
+    typeof rawMatch === "string" ? rawMatch : JSON.stringify(rawMatch);
 
   await redis.lrem(ULTRA_NFT_INVENTORY_KEY, 1, removeValue);
 
   // Ensure prize.meta has the actual token details
+    const pm: any = (parsedMatch as any) || {};
+  const mm: any = pm?.meta || {};
+
   prize = {
     ...prize,
-    label: prize?.label || parsedMatch?.label || "NFT Prize",
+    label: prize?.label || pm?.label || mm?.label || "NFT Prize",
     meta: {
       ...(prize?.meta || {}),
-      chain: String(parsedMatch?.chain || "ETH").toUpperCase(),
-      contract: String(parsedMatch?.contract || "").trim(),
-      tokenId: String(parsedMatch?.tokenId ?? "").trim(),
-      label: String(parsedMatch?.label || prize?.label || "NFT Prize"),
+      chain: String(pm?.chain || mm?.chain || "ETH").toUpperCase(),
+      contract: String(pm?.contract || mm?.contract || "").trim(),
+      tokenId: String(pm?.tokenId ?? mm?.tokenId ?? "").trim(),
+      label: String(pm?.label || mm?.label || prize?.label || "NFT Prize"),
       inventoryKey: invKey,
     },
   };
