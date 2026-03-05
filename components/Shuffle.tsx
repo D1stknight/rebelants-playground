@@ -362,7 +362,40 @@ function PrizeModal({
     </div>
   </div>
 ) : (
-  <div className="prize-sub">Tap continue to play again.</div>
+  <>
+    {/* ✅ NFT wallet capture (ONLY if Ultra NFT + no wallet connected) */}
+    {rarity === "ultra" && prize?.type === "nft" && !loadProfile()?.walletAddress ? (
+      <div style={{ marginTop: 10, textAlign: "left" }}>
+        <div className="prize-sub" style={{ marginBottom: 10 }}>
+          ✅ Enter the wallet you want this NFT sent to (we’ll remember it for next time).
+        </div>
+
+        <input
+          defaultValue={loadProfile()?.walletAddress || ""}
+          onChange={(e) => {
+            const next = String(e.target.value || "").trim();
+            const p = loadProfile();
+            saveProfile({ ...p, walletAddress: next });
+          }}
+          placeholder="0x… wallet address"
+          style={{
+            width: "100%",
+            padding: "10px 12px",
+            borderRadius: 10,
+            border: "1px solid rgba(255,255,255,.18)",
+            background: "rgba(0,0,0,.25)",
+            color: "white",
+          }}
+        />
+
+        <div className="prize-sub" style={{ marginTop: 8 }}>
+          After you continue, your claim will show up in Admin → Claims.
+        </div>
+      </div>
+    ) : (
+      <div className="prize-sub">Tap continue to play again.</div>
+    )}
+  </>
 )}
         </>
       ) : (
