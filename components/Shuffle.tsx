@@ -427,10 +427,10 @@ function PrizeModal({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            prize,
-            rarity,
-            walletAddress: wallet,
-          }),
+  prize,
+  rarity,
+  wallet: wallet,
+}),
         });
 
         const j = await r.json().catch(() => null);
