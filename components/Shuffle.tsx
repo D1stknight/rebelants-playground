@@ -423,15 +423,17 @@ function PrizeModal({
           return;
         }
 
-        const r = await fetch("/api/claims/create", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-  prize,
-  rarity,
-  wallet: wallet,
-}),
-        });
+       const r = await fetch("/api/prizes/claim", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    claimId: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    playerId: getEffectivePlayerId(loadProfile()),
+    prize,
+    wallet: wallet,
+    shipping: null,
+  }),
+});
 
         const j = await r.json().catch(() => null);
 
