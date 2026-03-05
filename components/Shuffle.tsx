@@ -1197,7 +1197,7 @@ return (
   <button
     key={i}
     className={`egg-card ${phase === "pick" ? "can-pick" : ""}`}
-    style={{ left: `${LANES[order[i]]}%`, top: "58%", width: "min(74px, 16vw)" }}
+   style={{ left: `${LANES[order[i]]}%`, top: "58%" }}
     onClick={onPick}
     disabled={phase !== "pick" || busy}
     aria-label="Pick egg"
