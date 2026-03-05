@@ -1212,31 +1212,14 @@ html, body {
   box-sizing: border-box;
 }
 
-/* === MOBILE: eggs auto-resize + wrap so portrait never overflows === */
-@media (max-width: 480px) {
-  /* whichever container your eggs are using */
-  .ra-shuffle2 .eggs,
-  .ra-shuffle2 .egg-row,
-  .ra-shuffle2 .egg-grid {
-    display: flex !important;
-    flex-wrap: wrap !important;
-    justify-content: center !important;
-    gap: 10px !important;
+/* === MOBILE: eggs auto-resize (portrait) ONLY === */
+@media (max-width: 520px) {
+  .ra-shuffle2 .egg-card {
+    width: min(74px, 16vw);
   }
 
-  /* whichever element is the clickable egg */
-  .ra-shuffle2 .egg,
-  .ra-shuffle2 .egg-btn,
-  .ra-shuffle2 button.egg {
-    width: clamp(72px, 24vw, 110px) !important;
-  }
-
-  /* if eggs are images inside buttons/divs */
-  .ra-shuffle2 .eggs img,
-  .ra-shuffle2 .egg-row img,
-  .ra-shuffle2 .egg-grid img {
-    width: 100% !important;
-    height: auto !important;
-    display: block !important;
+  .ra-shuffle2 .egg-card .egg-body {
+    width: 100%;
+    height: 100%;
   }
 }
