@@ -111,11 +111,23 @@ if (!claim) {
     claim.txHash = receipt?.hash || tx?.hash || null;
 
     await redis.set(claimKey(claimId), JSON.stringify(claim));
-    await redis.expire(claimKey(claimId), 60 * 60 * 24 * 90);
+await redis.expire(claimKey(claimId), 60 * 60 * 24 * 90);
 
-    return res.status(200).json({ ok: true, txHash: claim.txHash });
+// ✅ release transfer lock after success
+await redis.del(transferLockKey(claimId));
+
+return res.status(200).json({ ok: true, txHash: claim.txHash });
   } catch (e: any) {
-    console.error("prizes/transfer error:", e);
-    return res.status(500).json({ ok: false, error: e?.message || "Server error" });
-  }
+  console.error("prizes/transfer error:", e);
+
+  // ✅ release lock if transfer fails
+  try {
+    const claimId = String(req.body?.claimId || "");
+    if (claimId) {
+      await redis.del(transferLockKey(claimId));
+    }
+  } catch {}
+
+  return res.status(500).json({ ok: false, error: e?.message || "Server error" });
+}
 }
