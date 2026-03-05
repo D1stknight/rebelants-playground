@@ -74,12 +74,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Store the claim
     await redis.set(key, claim);
 
-    // ✅ Create a transfer lock for NFTs (Admin has an "Unlock" button)
-    if (String(prize?.type).toLowerCase() === "nft") {
-      await redis.set(`${key}:transferLock`, "1");
-    }
-
-    return res.status(200).json({ ok: true, claimId, claim });
+   // ✅ Do NOT create transferLock here.
+// The transfer endpoint sets a short lock while it runs to prevent double-sends.
+return res.status(200).json({ ok: true, claimId, claim });
   } catch (e: any) {
     console.error("claims/create error:", e);
     return res.status(500).json({ ok: false, error: e?.message || "Server error" });
