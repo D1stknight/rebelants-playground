@@ -922,9 +922,10 @@ body { @apply bg-slate-950 text-slate-100; }
 
 /* Fallback crate shape (when no images uploaded yet) */
 .prize-crate{
-  .prize-crate{
-  width: min(200px, 42vw);
-  aspect-ratio: 200 / 130;
+  width: 200px;
+  max-width: 42vw;
+  height: 130px;
+  max-height: 27vw;
   margin: 0 auto 12px;
   border-radius: 10px;
   background:
