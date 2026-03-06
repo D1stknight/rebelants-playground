@@ -6,7 +6,7 @@ import Expedition3D from '../components/Expedition3D'
 import Shuffle from '../components/Shuffle'
 
 export default function Home() {
-  const [tab, setTab] = useState<'tunnel'|'hatch'|'expedition'|'shuffle'>('tunnel')
+  const [tab, setTab] = useState<'tunnel'|'hatch'|'expedition'|'shuffle'>('shuffle')
 
   return (
     <main className="max-w-5xl mx-auto p-6">
