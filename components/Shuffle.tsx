@@ -76,51 +76,66 @@ function normalizePrize(rarity: Rarity, pointsConfig: any): Prize {
   // Common = points only (ignore prizePools)
   if (rarity === "common") {
     const pts = Number(pointsConfig?.rewards?.common ?? defaultPts);
-    return Number.isFinite(pts) && pts > 0 ? pointsPrize(pts) : { type: "none", label: "Nothing this time" };
+    return Number.isFinite(pts) && pts > 0
+      ? pointsPrize(pts)
+      : { type: "none", label: "Nothing this time" };
   }
 
   // Rare = points only (bigger) AND very occasionally merch
   if (rarity === "rare") {
-    // optional: 1% chance to try merch from prizePools.rare (only merch entries)
     const merchChance = Number(pointsConfig?.rareMerchChance ?? 0.01); // default 1%
     const roll = Math.random();
 
     if (roll < merchChance) {
       const pool = (pointsConfig?.prizePools?.rare || []) as any[];
-      const merchOnly = pool.filter((p) => String(p?.type || "").toUpperCase() === "MERCH");
+      const merchOnly = pool.filter(
+        (p) => String(p?.type || "").toUpperCase() === "MERCH"
+      );
       const picked = pickWeightedPrize(merchOnly);
 
       if (picked) {
-        return { type: "merch", label: String(picked?.label || "Merch Prize"), meta: picked };
+        return {
+          type: "merch",
+          label: String(picked?.label || "Merch Prize"),
+          meta: picked,
+        };
       }
       // if no merch available, fall back to points
     }
 
     const pts = Number(pointsConfig?.rewards?.rare ?? defaultPts);
-    return Number.isFinite(pts) && pts > 0 ? pointsPrize(pts) : { type: "none", label: "Nothing this time" };
+    return Number.isFinite(pts) && pts > 0
+      ? pointsPrize(pts)
+      : { type: "none", label: "Nothing this time" };
   }
 
- // Ultra = try NFT first; if none available -> points fallback higher than rare
-if (rarity === "ultra") {
-  const pool = (pointsConfig?.prizePools?.ultra || []) as any[];
-  const nftOnly = pool.filter((p) => String(p?.type || "").toUpperCase() === "NFT");
-  const picked = pickWeightedPrize(nftOnly);
+  // Ultra = try NFT first; if none available -> points fallback higher than rare
+  if (rarity === "ultra") {
+    const pool = (pointsConfig?.prizePools?.ultra || []) as any[];
+    const nftOnly = pool.filter(
+      (p) => String(p?.type || "").toUpperCase() === "NFT"
+    );
+    const picked = pickWeightedPrize(nftOnly);
 
-  if (picked) {
-    return { type: "nft", label: String(picked?.label || "NFT Prize"), meta: picked };
+    if (picked) {
+      return {
+        type: "nft",
+        label: String(picked?.label || "NFT Prize"),
+        meta: picked,
+      };
+    }
+
+    // fallback points (higher than rare) + enforce ultraMinReward
+    const ptsCfg = Number(pointsConfig?.rewards?.ultra ?? defaultPts);
+    const min = Number(pointsConfig?.ultraMinReward ?? defaultPts);
+
+    const pts = Math.max(
+      Number.isFinite(ptsCfg) ? ptsCfg : defaultPts,
+      Number.isFinite(min) ? min : defaultPts
+    );
+
+    return pointsPrize(pts);
   }
-
-  // fallback points (higher than rare) + enforce ultraMinReward
-  const ptsCfg = Number(pointsConfig?.rewards?.ultra ?? defaultPts);
-  const min = Number(pointsConfig?.ultraMinReward ?? defaultPts);
-
-  const pts = Math.max(
-    Number.isFinite(ptsCfg) ? ptsCfg : defaultPts,
-    Number.isFinite(min) ? min : defaultPts
-  );
-
-  return pointsPrize(pts);
-}
 
   // none
   return { type: "none", label: "Nothing this time" };
@@ -800,6 +815,16 @@ const [dripStatus, setDripStatus] = useState("");
 const [dailyClaimed, setDailyClaimed] = useState(false);
 const [claimStatus, setClaimStatus] = useState("");
 const [claimBusy, setClaimBusy] = useState(false);
+const [msUntilNextClaim, setMsUntilNextClaim] = useState(0);
+const [nextClaimAt, setNextClaimAt] = useState("");
+
+function formatClaimCountdown(ms: number) {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${hours}h ${minutes}m ${seconds}s`;
+}
 
 async function refreshClaimStatus(pid: string) {
   try {
@@ -808,7 +833,12 @@ async function refreshClaimStatus(pid: string) {
       { cache: "no-store" }
     );
     const j = await r.json().catch(() => null);
-    if (r.ok && j?.ok) setDailyClaimed(!!j.claimed);
+
+    if (r.ok && j?.ok) {
+      setDailyClaimed(!!j.claimed);
+      setMsUntilNextClaim(Number(j.msUntilNextClaim || 0));
+      setNextClaimAt(String(j.nextClaimAt || ""));
+    }
   } catch {}
 }
 
@@ -817,6 +847,16 @@ React.useEffect(() => {
   refreshClaimStatus(effectivePlayerId);
   // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [effectivePlayerId]);
+
+React.useEffect(() => {
+  if (!dailyClaimed || msUntilNextClaim <= 0) return;
+
+  const interval = setInterval(() => {
+    setMsUntilNextClaim((prev) => Math.max(0, prev - 1000));
+  }, 1000);
+
+  return () => clearInterval(interval);
+}, [dailyClaimed, msUntilNextClaim]);
 
 async function claimDailyNow() {
   if (!effectivePlayerId) return;
@@ -852,6 +892,7 @@ async function claimDailyNow() {
 
     setDailyClaimed(true);
     await refresh();
+    await refreshClaimStatus(effectivePlayerId);
   } catch (e: any) {
     setClaimStatus(e?.message || "Claim error");
   } finally {
@@ -1558,11 +1599,60 @@ return (
     </button>
   )}
 
-  {claimStatus && (
-    <div style={{ fontSize: 12, opacity: 0.9 }}>
-      {claimStatus}
+ {claimStatus && (
+  <div style={{ fontSize: 12, opacity: 0.9 }}>
+    {claimStatus}
+  </div>
+)}
+
+{dailyClaimed && msUntilNextClaim > 0 && (
+  <>
+    <div
+      style={{
+        fontSize: 12,
+        marginTop: 4,
+        fontWeight: 700,
+        color:
+          msUntilNextClaim < 5 * 60 * 1000
+            ? "#ef4444" // red
+            : msUntilNextClaim < 60 * 60 * 1000
+            ? "#f97316" // orange
+            : "#facc15", // yellow
+        textShadow:
+          msUntilNextClaim < 5 * 60 * 1000
+            ? "0 0 10px rgba(239,68,68,0.45)"
+            : msUntilNextClaim < 60 * 60 * 1000
+            ? "0 0 8px rgba(249,115,22,0.35)"
+            : "0 0 8px rgba(250,204,21,0.25)",
+        animation:
+          msUntilNextClaim < 5 * 60 * 1000
+            ? "claimPulse 1s ease-in-out infinite"
+            : msUntilNextClaim < 60 * 60 * 1000
+            ? "claimPulse 1.8s ease-in-out infinite"
+            : "none",
+      }}
+    >
+      Next claim in: {formatClaimCountdown(msUntilNextClaim)}
     </div>
-  )}
+
+    <style jsx>{`
+      @keyframes claimPulse {
+        0% {
+          transform: scale(1);
+          opacity: 0.9;
+        }
+        50% {
+          transform: scale(1.03);
+          opacity: 1;
+        }
+        100% {
+          transform: scale(1);
+          opacity: 0.9;
+        }
+      }
+    `}</style>
+  </>
+)}
 </div>
         {/* Official Rules link */}
         <div className="rules-row">
