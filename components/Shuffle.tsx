@@ -807,6 +807,7 @@ const [dripBalance, setDripBalance] = useState<number | null>(null);
 const [dripAmount, setDripAmount] = useState<number>(0);
 const [dripBusy, setDripBusy] = useState(false);
 const [dripStatus, setDripStatus] = useState("");
+const [showDripFix, setShowDripFix] = useState(false);
 
 // ==============================
 // ✅ ADD DAILY CLAIM BLOCK HERE
@@ -1211,18 +1212,18 @@ async function migrateDripNow() {
 
     const j = await r.json().catch(() => null);
 
-        if (!r.ok || !j?.ok) {
+           if (!r.ok || !j?.ok) {
       const rawError = String(j?.error || "Migrate failed.");
 
       if (
         rawError.toLowerCase().includes("drip credential not found") ||
         rawError.toLowerCase().includes("user must link drip first")
       ) {
-        setDripStatus(
-  "No DRIP Discord link found. Please sign into DRIP with your Discord first: https://drip.re — then come back and try again."
-);
+        setDripStatus("No DRIP Discord link found yet.");
+        setShowDripFix(true);
       } else {
         setDripStatus(rawError);
+        setShowDripFix(false);
       }
 
       if (typeof j?.dripBalance === "number") setDripBalance(j.dripBalance);
@@ -1230,6 +1231,7 @@ async function migrateDripNow() {
     }
 
     setDripStatus(`✅ Migrated ${amt} points into the game.`);
+    setShowDripFix(false);
     await refresh();
 
     const br = await fetch("/api/drip/balance", { cache: "no-store" });
@@ -1787,8 +1789,29 @@ return (
         </button>
       </div>
 
-      {dripStatus && (
-        <div style={{ marginTop: 12, fontSize: 12, opacity: 0.9, whiteSpace: "pre-wrap" }}>{dripStatus}</div>
+          {dripStatus && (
+        <div style={{ marginTop: 12, fontSize: 12, opacity: 0.9, whiteSpace: "pre-wrap" }}>
+          {dripStatus}
+        </div>
+      )}
+
+      {showDripFix && (
+        <button
+          type="button"
+          onClick={() => window.open("https://drip.re", "_blank", "noopener,noreferrer")}
+          style={{
+            marginTop: 10,
+            padding: "10px 12px",
+            borderRadius: 12,
+            border: "1px solid rgba(255,255,255,.18)",
+            background: "rgba(88, 101, 242, 0.95)",
+            color: "white",
+            fontWeight: 800,
+            cursor: "pointer",
+          }}
+        >
+          Connect DRIP with Discord
+        </button>
       )}
 
     <style>{`
