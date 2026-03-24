@@ -57,16 +57,16 @@ function pickWeightedPrize(pool: any[]): any | null {
 }
 
 function normalizePrize(rarity: Rarity, pointsConfig: any): Prize {
-   currency = pointsConfig?.currency || "REBEL";
+  const currency = pointsConfig?.currency || "REBEL";
 
   // ✅ Default points for C (safe fallback)
-   defaultPts =
+  const defaultPts =
     rarity === "ultra" ? 300 :
     rarity === "rare" ? 100 :
     rarity === "common" ? 50 : 0;
 
   // Helper: make a points prize
-   pointsPrize = (pts: number, label?: string): Prize => ({
+  const pointsPrize = (pts: number, label?: string): Prize => ({
     type: "points",
     points: pts,
     label: label || `${pts} ${currency}`,
