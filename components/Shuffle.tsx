@@ -75,52 +75,67 @@ function normalizePrize(rarity: Rarity, pointsConfig: any): Prize {
   // ✅ Rule C enforcement:
   // Common = points only (ignore prizePools)
   if (rarity === "common") {
-     pts = Number(pointsConfig?.rewards?.common ?? defaultPts);
-    return Number.isFinite(pts) && pts > 0 ? pointsPrize(pts) : { type: "none", label: "Nothing this time" };
+    const pts = Number(pointsConfig?.rewards?.common ?? defaultPts);
+    return Number.isFinite(pts) && pts > 0
+      ? pointsPrize(pts)
+      : { type: "none", label: "Nothing this time" };
   }
 
   // Rare = points only (bigger) AND very occasionally merch
   if (rarity === "rare") {
-    // optional: 1% chance to try merch from prizePools.rare (only merch entries)
-     merchChance = Number(pointsConfig?.rareMerchChance ?? 0.01); // default 1%
-     roll = Math.random();
+    const merchChance = Number(pointsConfig?.rareMerchChance ?? 0.01); // default 1%
+    const roll = Math.random();
 
     if (roll < merchChance) {
-       pool = (pointsConfig?.prizePools?.rare || []) as any[];
-       merchOnly = pool.filter((p) => String(p?.type || "").toUpperCase() === "MERCH");
-       picked = pickWeightedPrize(merchOnly);
+      const pool = (pointsConfig?.prizePools?.rare || []) as any[];
+      const merchOnly = pool.filter(
+        (p) => String(p?.type || "").toUpperCase() === "MERCH"
+      );
+      const picked = pickWeightedPrize(merchOnly);
 
       if (picked) {
-        return { type: "merch", label: String(picked?.label || "Merch Prize"), meta: picked };
+        return {
+          type: "merch",
+          label: String(picked?.label || "Merch Prize"),
+          meta: picked,
+        };
       }
       // if no merch available, fall back to points
     }
 
-     pts = Number(pointsConfig?.rewards?.rare ?? defaultPts);
-    return Number.isFinite(pts) && pts > 0 ? pointsPrize(pts) : { type: "none", label: "Nothing this time" };
+    const pts = Number(pointsConfig?.rewards?.rare ?? defaultPts);
+    return Number.isFinite(pts) && pts > 0
+      ? pointsPrize(pts)
+      : { type: "none", label: "Nothing this time" };
   }
 
- // Ultra = try NFT first; if none available -> points fallback higher than rare
-if (rarity === "ultra") {
-   pool = (pointsConfig?.prizePools?.ultra || []) as any[];
-   nftOnly = pool.filter((p) => String(p?.type || "").toUpperCase() === "NFT");
-   picked = pickWeightedPrize(nftOnly);
+  // Ultra = try NFT first; if none available -> points fallback higher than rare
+  if (rarity === "ultra") {
+    const pool = (pointsConfig?.prizePools?.ultra || []) as any[];
+    const nftOnly = pool.filter(
+      (p) => String(p?.type || "").toUpperCase() === "NFT"
+    );
+    const picked = pickWeightedPrize(nftOnly);
 
-  if (picked) {
-    return { type: "nft", label: String(picked?.label || "NFT Prize"), meta: picked };
+    if (picked) {
+      return {
+        type: "nft",
+        label: String(picked?.label || "NFT Prize"),
+        meta: picked,
+      };
+    }
+
+    // fallback points (higher than rare) + enforce ultraMinReward
+    const ptsCfg = Number(pointsConfig?.rewards?.ultra ?? defaultPts);
+    const min = Number(pointsConfig?.ultraMinReward ?? defaultPts);
+
+    const pts = Math.max(
+      Number.isFinite(ptsCfg) ? ptsCfg : defaultPts,
+      Number.isFinite(min) ? min : defaultPts
+    );
+
+    return pointsPrize(pts);
   }
-
-  // fallback points (higher than rare) + enforce ultraMinReward
-  const ptsCfg = Number(pointsConfig?.rewards?.ultra ?? defaultPts);
-  const min = Number(pointsConfig?.ultraMinReward ?? defaultPts);
-
-  const pts = Math.max(
-    Number.isFinite(ptsCfg) ? ptsCfg : defaultPts,
-    Number.isFinite(min) ? min : defaultPts
-  );
-
-  return pointsPrize(pts);
-}
 
   // none
   return { type: "none", label: "Nothing this time" };
