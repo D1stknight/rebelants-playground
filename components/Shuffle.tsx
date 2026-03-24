@@ -1599,11 +1599,17 @@ return (
     </button>
   )}
 
-  {claimStatus && (
-    <div style={{ fontSize: 12, opacity: 0.9 }}>
-      {claimStatus}
-    </div>
-  )}
+ {claimStatus && (
+  <div style={{ fontSize: 12, opacity: 0.9 }}>
+    {claimStatus}
+  </div>
+)}
+
+{dailyClaimed && msUntilNextClaim > 0 && (
+  <div style={{ fontSize: 12, color: "#facc15", marginTop: 4 }}>
+    Next claim in: {formatClaimCountdown(msUntilNextClaim)}
+  </div>
+)}
 </div>
         {/* Official Rules link */}
         <div className="rules-row">
