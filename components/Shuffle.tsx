@@ -39,9 +39,9 @@ type Prize =
 function pickWeightedPrize(pool: any[]): any | null {
   if (!Array.isArray(pool) || pool.length === 0) return null;
 
-   items = pool
-    .map((p) => ({ ...p, weight: Number(p?.weight ?? 0) }))
-    .filter((p) => Number.isFinite(p.weight) && p.weight > 0);
+   const items = pool
+  .map((p) => ({ ...p, weight: Number(p?.weight ?? 0) }))
+  .filter((p) => Number.isFinite(p.weight) && p.weight > 0);
 
   if (!items.length) return null;
 
