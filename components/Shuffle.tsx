@@ -1211,8 +1211,20 @@ async function migrateDripNow() {
 
     const j = await r.json().catch(() => null);
 
-    if (!r.ok || !j?.ok) {
-      setDripStatus(j?.error || "Migrate failed.");
+        if (!r.ok || !j?.ok) {
+      const rawError = String(j?.error || "Migrate failed.");
+
+      if (
+        rawError.toLowerCase().includes("drip credential not found") ||
+        rawError.toLowerCase().includes("user must link drip first")
+      ) {
+        setDripStatus(
+  "No DRIP Discord link found. Please sign into DRIP with your Discord first: https://drip.re — then come back and try again."
+);
+      } else {
+        setDripStatus(rawError);
+      }
+
       if (typeof j?.dripBalance === "number") setDripBalance(j.dripBalance);
       return;
     }
