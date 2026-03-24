@@ -1606,9 +1606,52 @@ return (
 )}
 
 {dailyClaimed && msUntilNextClaim > 0 && (
-  <div style={{ fontSize: 12, color: "#facc15", marginTop: 4 }}>
-    Next claim in: {formatClaimCountdown(msUntilNextClaim)}
-  </div>
+  <>
+    <div
+      style={{
+        fontSize: 12,
+        marginTop: 4,
+        fontWeight: 700,
+        color:
+          msUntilNextClaim < 5 * 60 * 1000
+            ? "#ef4444" // red
+            : msUntilNextClaim < 60 * 60 * 1000
+            ? "#f97316" // orange
+            : "#facc15", // yellow
+        textShadow:
+          msUntilNextClaim < 5 * 60 * 1000
+            ? "0 0 10px rgba(239,68,68,0.45)"
+            : msUntilNextClaim < 60 * 60 * 1000
+            ? "0 0 8px rgba(249,115,22,0.35)"
+            : "0 0 8px rgba(250,204,21,0.25)",
+        animation:
+          msUntilNextClaim < 5 * 60 * 1000
+            ? "claimPulse 1s ease-in-out infinite"
+            : msUntilNextClaim < 60 * 60 * 1000
+            ? "claimPulse 1.8s ease-in-out infinite"
+            : "none",
+      }}
+    >
+      Next claim in: {formatClaimCountdown(msUntilNextClaim)}
+    </div>
+
+    <style jsx>{`
+      @keyframes claimPulse {
+        0% {
+          transform: scale(1);
+          opacity: 0.9;
+        }
+        50% {
+          transform: scale(1.03);
+          opacity: 1;
+        }
+        100% {
+          transform: scale(1);
+          opacity: 0.9;
+        }
+      }
+    `}</style>
+  </>
 )}
 </div>
         {/* Official Rules link */}
