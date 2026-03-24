@@ -39,16 +39,16 @@ type Prize =
 function pickWeightedPrize(pool: any[]): any | null {
   if (!Array.isArray(pool) || pool.length === 0) return null;
 
-  const items = pool
+   items = pool
     .map((p) => ({ ...p, weight: Number(p?.weight ?? 0) }))
     .filter((p) => Number.isFinite(p.weight) && p.weight > 0);
 
   if (!items.length) return null;
 
-  const total = items.reduce((s, p) => s + p.weight, 0);
+   total = items.reduce((s, p) => s + p.weight, 0);
   let r = Math.random() * total;
 
-  for (const p of items) {
+  for ( p of items) {
     r -= p.weight;
     if (r <= 0) return p;
   }
@@ -57,16 +57,16 @@ function pickWeightedPrize(pool: any[]): any | null {
 }
 
 function normalizePrize(rarity: Rarity, pointsConfig: any): Prize {
-  const currency = pointsConfig?.currency || "REBEL";
+   currency = pointsConfig?.currency || "REBEL";
 
   // ✅ Default points for C (safe fallback)
-  const defaultPts =
+   defaultPts =
     rarity === "ultra" ? 300 :
     rarity === "rare" ? 100 :
     rarity === "common" ? 50 : 0;
 
   // Helper: make a points prize
-  const pointsPrize = (pts: number, label?: string): Prize => ({
+   pointsPrize = (pts: number, label?: string): Prize => ({
     type: "points",
     points: pts,
     label: label || `${pts} ${currency}`,
@@ -75,20 +75,20 @@ function normalizePrize(rarity: Rarity, pointsConfig: any): Prize {
   // ✅ Rule C enforcement:
   // Common = points only (ignore prizePools)
   if (rarity === "common") {
-    const pts = Number(pointsConfig?.rewards?.common ?? defaultPts);
+     pts = Number(pointsConfig?.rewards?.common ?? defaultPts);
     return Number.isFinite(pts) && pts > 0 ? pointsPrize(pts) : { type: "none", label: "Nothing this time" };
   }
 
   // Rare = points only (bigger) AND very occasionally merch
   if (rarity === "rare") {
     // optional: 1% chance to try merch from prizePools.rare (only merch entries)
-    const merchChance = Number(pointsConfig?.rareMerchChance ?? 0.01); // default 1%
-    const roll = Math.random();
+     merchChance = Number(pointsConfig?.rareMerchChance ?? 0.01); // default 1%
+     roll = Math.random();
 
     if (roll < merchChance) {
-      const pool = (pointsConfig?.prizePools?.rare || []) as any[];
-      const merchOnly = pool.filter((p) => String(p?.type || "").toUpperCase() === "MERCH");
-      const picked = pickWeightedPrize(merchOnly);
+       pool = (pointsConfig?.prizePools?.rare || []) as any[];
+       merchOnly = pool.filter((p) => String(p?.type || "").toUpperCase() === "MERCH");
+       picked = pickWeightedPrize(merchOnly);
 
       if (picked) {
         return { type: "merch", label: String(picked?.label || "Merch Prize"), meta: picked };
@@ -96,15 +96,15 @@ function normalizePrize(rarity: Rarity, pointsConfig: any): Prize {
       // if no merch available, fall back to points
     }
 
-    const pts = Number(pointsConfig?.rewards?.rare ?? defaultPts);
+     pts = Number(pointsConfig?.rewards?.rare ?? defaultPts);
     return Number.isFinite(pts) && pts > 0 ? pointsPrize(pts) : { type: "none", label: "Nothing this time" };
   }
 
  // Ultra = try NFT first; if none available -> points fallback higher than rare
 if (rarity === "ultra") {
-  const pool = (pointsConfig?.prizePools?.ultra || []) as any[];
-  const nftOnly = pool.filter((p) => String(p?.type || "").toUpperCase() === "NFT");
-  const picked = pickWeightedPrize(nftOnly);
+   pool = (pointsConfig?.prizePools?.ultra || []) as any[];
+   nftOnly = pool.filter((p) => String(p?.type || "").toUpperCase() === "NFT");
+   picked = pickWeightedPrize(nftOnly);
 
   if (picked) {
     return { type: "nft", label: String(picked?.label || "NFT Prize"), meta: picked };
@@ -800,6 +800,16 @@ const [dripStatus, setDripStatus] = useState("");
 const [dailyClaimed, setDailyClaimed] = useState(false);
 const [claimStatus, setClaimStatus] = useState("");
 const [claimBusy, setClaimBusy] = useState(false);
+const [msUntilNextClaim, setMsUntilNextClaim] = useState(0);
+const [nextClaimAt, setNextClaimAt] = useState("");
+
+function formatClaimCountdown(ms: number) {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${hours}h ${minutes}m ${seconds}s`;
+}
 
 async function refreshClaimStatus(pid: string) {
   try {
@@ -808,7 +818,12 @@ async function refreshClaimStatus(pid: string) {
       { cache: "no-store" }
     );
     const j = await r.json().catch(() => null);
-    if (r.ok && j?.ok) setDailyClaimed(!!j.claimed);
+
+    if (r.ok && j?.ok) {
+      setDailyClaimed(!!j.claimed);
+      setMsUntilNextClaim(Number(j.msUntilNextClaim || 0));
+      setNextClaimAt(String(j.nextClaimAt || ""));
+    }
   } catch {}
 }
 
@@ -817,6 +832,16 @@ React.useEffect(() => {
   refreshClaimStatus(effectivePlayerId);
   // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [effectivePlayerId]);
+
+React.useEffect(() => {
+  if (!dailyClaimed || msUntilNextClaim <= 0) return;
+
+  const interval = setInterval(() => {
+    setMsUntilNextClaim((prev) => Math.max(0, prev - 1000));
+  }, 1000);
+
+  return () => clearInterval(interval);
+}, [dailyClaimed, msUntilNextClaim]);
 
 async function claimDailyNow() {
   if (!effectivePlayerId) return;
@@ -852,6 +877,7 @@ async function claimDailyNow() {
 
     setDailyClaimed(true);
     await refresh();
+    await refreshClaimStatus(effectivePlayerId);
   } catch (e: any) {
     setClaimStatus(e?.message || "Claim error");
   } finally {
