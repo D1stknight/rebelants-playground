@@ -39,16 +39,16 @@ type Prize =
 function pickWeightedPrize(pool: any[]): any | null {
   if (!Array.isArray(pool) || pool.length === 0) return null;
 
-   const items = pool
-  .map((p) => ({ ...p, weight: Number(p?.weight ?? 0) }))
-  .filter((p) => Number.isFinite(p.weight) && p.weight > 0);
+  const items = pool
+    .map((p) => ({ ...p, weight: Number(p?.weight ?? 0) }))
+    .filter((p) => Number.isFinite(p.weight) && p.weight > 0);
 
   if (!items.length) return null;
 
-   total = items.reduce((s, p) => s + p.weight, 0);
+  const total = items.reduce((s, p) => s + p.weight, 0);
   let r = Math.random() * total;
 
-  for ( p of items) {
+  for (const p of items) {
     r -= p.weight;
     if (r <= 0) return p;
   }
