@@ -316,7 +316,8 @@ if (typeof window !== "undefined") {
        <div style={{ marginTop: 10, fontSize: 13, opacity: 0.9, lineHeight: 1.4 }}>
   You are buying <b>REBEL Points</b> with <b>APE</b>.<br />
   APE is sent to the Rebel Ants treasury wallet.<br />
-  Rate locked: <b>1 APE = 100 pts</b>. No refunds.
+  Rate locked: <b>1 APE = 100 pts</b>. No refunds.<br />
+  Each purchase also adds the same amount to your <b>Bonus Earn Room</b>, so you can keep playing and earning beyond the normal daily cap.
 </div>
 
 <div style={{ marginTop: 10, fontSize: 12, opacity: 0.85, lineHeight: 1.4 }}>
@@ -431,9 +432,10 @@ if (typeof window !== "undefined") {
               title={!isConnected ? "Connect wallet first" : ""}
             >
               <div style={{ fontWeight: 900 }}>{p.name}</div>
-              <div style={{ fontSize: 13, opacity: 0.9 }}>
-                Pay <b>{p.ape} APE</b> → get <b>{p.points.toLocaleString()} pts</b>
-              </div>
+             <div style={{ fontSize: 13, opacity: 0.9 }}>
+  Pay <b>{p.ape} APE</b> → get <b>{p.points.toLocaleString()} pts</b> +{" "}
+  <b>{p.points.toLocaleString()} bonus earn room</b>
+</div>
             </button>
           ))}
         </div>
