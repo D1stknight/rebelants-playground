@@ -164,7 +164,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Deduct balance
     const newBal = await redis.incrby(balKey(playerId), -amt);
 
-    return res.status(200).json({
+       return res.status(200).json({
       ok: true,
       playerId,
       spent: amt,
@@ -175,6 +175,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       remainingDaily,
       capBank,
       totalPlayRoom,
+      totalEarnRoom: totalPlayRoom,
     });
   } catch (err: any) {
     console.error("spend error:", err);
