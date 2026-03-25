@@ -434,7 +434,7 @@ if (typeof window !== "undefined") {
               <div style={{ fontWeight: 900 }}>{p.name}</div>
              <div style={{ fontSize: 13, opacity: 0.9 }}>
  Pay <b>{p.ape} APE</b> → get <b>{p.points.toLocaleString()} pts</b> +{" "}
-<b>more plays</b> (keep earning after the daily limit)
+<b>more plays</b> (play past the daily limit)
 </div>
             </button>
           ))}
