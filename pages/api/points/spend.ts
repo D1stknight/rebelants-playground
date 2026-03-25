@@ -7,6 +7,18 @@ function balKey(playerId: string) {
   return `ra:points:bal:${playerId}`;
 }
 
+function capBankKey(playerId: string) {
+  return `ra:points:capbank:${playerId}`;
+}
+
+function spentTodayKey(playerId: string) {
+  const d = new Date();
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  return `ra:points:spent:${playerId}:${yyyy}-${mm}-${dd}`;
+}
+
 // ✅ Reads the SAME live config that Admin saves, with safe fallbacks
 async function getLivePointsConfig() {
  const keysToTry = [
@@ -84,7 +96,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    const amt = Number(amountRaw || 0);
+        const amt = Number(amountRaw || 0);
     if (!Number.isFinite(amt) || amt <= 0) {
       return res.status(400).json({ ok: false, error: "Invalid amount" });
     }
@@ -97,7 +109,59 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ ok: false, error: "Insufficient balance", balance: bal });
     }
 
-    // Deduct
+    // ✅ Play-cap enforcement for shuffle spends
+    let spentToday = 0;
+    let capBank = 0;
+    let dailyCap = Number(liveCfg.dailyEarnCap || 0);
+    let remainingDaily = dailyCap;
+    let totalPlayRoom = dailyCap;
+
+    if (reason === "shuffle") {
+      const spentRaw = await redis.get<number>(spentTodayKey(playerId));
+      spentToday = Number(spentRaw || 0);
+
+      const capBankRaw = await redis.get<number>(capBankKey(playerId));
+      capBank = Number(capBankRaw || 0);
+
+      remainingDaily = Math.max(0, dailyCap - spentToday);
+      totalPlayRoom = remainingDaily + capBank;
+
+      if (amt > totalPlayRoom) {
+        return res.status(400).json({
+          ok: false,
+          error: "No play room left today",
+          balance: bal,
+          spentToday,
+          dailyCap,
+          remainingDaily,
+          capBank,
+          totalPlayRoom,
+        });
+      }
+
+      const useFromDaily = Math.min(amt, remainingDaily);
+      const useFromBank = Math.max(0, amt - useFromDaily);
+
+      if (useFromDaily > 0) {
+        await redis.incrby(spentTodayKey(playerId), useFromDaily);
+        await redis.expire(spentTodayKey(playerId), 60 * 60 * 48);
+      }
+
+      if (useFromBank > 0) {
+        await redis.decrby(capBankKey(playerId), useFromBank);
+      }
+
+      const updatedSpentRaw = await redis.get<number>(spentTodayKey(playerId));
+      spentToday = Number(updatedSpentRaw || 0);
+
+      const updatedCapBankRaw = await redis.get<number>(capBankKey(playerId));
+      capBank = Number(updatedCapBankRaw || 0);
+
+      remainingDaily = Math.max(0, dailyCap - spentToday);
+      totalPlayRoom = remainingDaily + capBank;
+    }
+
+    // Deduct balance
     const newBal = await redis.incrby(balKey(playerId), -amt);
 
     return res.status(200).json({
@@ -106,6 +170,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       spent: amt,
       reason: reason || undefined,
       balance: Number(newBal || 0),
+      spentToday,
+      dailyCap,
+      remainingDaily,
+      capBank,
+      totalPlayRoom,
     });
   } catch (err: any) {
     console.error("spend error:", err);
