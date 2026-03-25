@@ -641,8 +641,19 @@ export default function Shuffle() {
     };
   }, []);
 
-const { balance, spend, earn, claimDaily, devGrant, refresh } =
-  usePoints(effectivePlayerId);
+const {
+  balance,
+  earnedToday,
+  capBank,
+  dailyCap,
+  remainingDaily,
+  totalEarnRoom,
+  spend,
+  earn,
+  claimDaily,
+  devGrant,
+  refresh,
+} = usePoints(effectivePlayerId);
 
 // ✅ Keep profile reactive (so UI updates when localStorage changes)
 const [profile, setProfile] = React.useState<any>(() => {
@@ -1510,13 +1521,25 @@ return (
     </div>
   )}
 </div>
-        <div style={{ marginTop: 10, fontSize: 13, opacity: 0.9 }}>
+       <div style={{ marginTop: 10, fontSize: 13, opacity: 0.9 }}>
   <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
     <span>Cost: <b>{pointsConfig.shuffleCost}</b> {pointsConfig.currency}</span>
     <span>Common: <b>+{pointsConfig.rewards.common}</b></span>
     <span>Rare: <b>+{pointsConfig.rewards.rare}</b></span>
     <span>Ultra: <b>+{pointsConfig.rewards.ultra}</b></span>
     <span>Daily cap: <b>{pointsConfig.dailyEarnCap}</b></span>
+  </div>
+
+  <div style={{ marginTop: 8, display: "flex", gap: 12, flexWrap: "wrap" }}>
+    <span>
+      Earn room left: <b>{Number(totalEarnRoom || 0).toLocaleString()}</b>
+    </span>
+    <span>
+      Daily cap left: <b>{Number(remainingDaily || 0).toLocaleString()}</b>
+    </span>
+    <span>
+      Bonus cap bank: <b>{Number(capBank || 0).toLocaleString()}</b>
+    </span>
   </div>
 </div>
         
