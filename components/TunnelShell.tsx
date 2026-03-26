@@ -183,7 +183,7 @@ const [didWinRun, setDidWinRun] = useState(false);
   const theme = themeMap[boardTheme];
   const brokenWallSet = useMemo(() => new Set(brokenWalls), [brokenWalls]);
 
-  useEffect(() => {
+   useEffect(() => {
     let cancelled = false;
 
     const loadTunnelConfig = async () => {
@@ -194,7 +194,7 @@ const [didWinRun, setDidWinRun] = useState(false);
 
         if (cancelled) return;
 
-        setTunnelCfg({
+        const nextCfg = {
           currency: String(cfg?.currency || DEFAULT_TUNNEL_CONFIG.currency),
           dailyClaim: Number(cfg?.dailyClaim || DEFAULT_TUNNEL_CONFIG.dailyClaim),
           tunnelCost: Number(cfg?.tunnelCost || DEFAULT_TUNNEL_CONFIG.tunnelCost),
@@ -204,7 +204,14 @@ const [didWinRun, setDidWinRun] = useState(false);
           tunnelCrumbCount: Number(cfg?.tunnelCrumbCount || DEFAULT_TUNNEL_CONFIG.tunnelCrumbCount),
           tunnelWallBreaks: Number(cfg?.tunnelWallBreaks || DEFAULT_TUNNEL_CONFIG.tunnelWallBreaks),
           tunnelSpiderSpeedMs: Number(cfg?.tunnelSpiderSpeedMs || DEFAULT_TUNNEL_CONFIG.tunnelSpiderSpeedMs),
-        });
+        };
+
+        setTunnelCfg(nextCfg);
+
+        if (!isPlaying) {
+          setWallBreaksLeft(nextCfg.tunnelWallBreaks);
+          setTimeLeft(nextCfg.tunnelRunSeconds);
+        }
       } catch {
         // keep defaults
       }
@@ -215,8 +222,7 @@ const [didWinRun, setDidWinRun] = useState(false);
     return () => {
       cancelled = true;
     };
-  }, []);
-
+  }, [isPlaying]);
   function setupNewRun() {
     const nextBrokenWalls: string[] = [];
     const nextBrokenWallSet = new Set(nextBrokenWalls);
