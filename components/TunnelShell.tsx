@@ -1287,55 +1287,55 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               </div>
             </div>
 
-            <div style={mobileControlsWrapStyle}>
-              <div style={mobileControlsTitleStyle}>Mobile Controls</div>
+                      {isPlaying && (
+              <div className="mobileOnlyControls">
+                <div style={mobileControlsGridStyle}>
+                  <div />
+                  <button
+                    type="button"
+                    style={mobileControlButtonStyle}
+                    onClick={() => fireMobileKey("ArrowUp")}
+                  >
+                    ↑
+                  </button>
+                  <div />
 
-              <div style={mobileControlsGridStyle}>
-                <div />
-                <button
-                  type="button"
-                  style={mobileControlButtonStyle}
-                  onClick={() => fireMobileKey("ArrowUp")}
-                >
-                  ↑
-                </button>
-                <div />
+                  <button
+                    type="button"
+                    style={mobileControlButtonStyle}
+                    onClick={() => fireMobileKey("ArrowLeft")}
+                  >
+                    ←
+                  </button>
 
-                <button
-                  type="button"
-                  style={mobileControlButtonStyle}
-                  onClick={() => fireMobileKey("ArrowLeft")}
-                >
-                  ←
-                </button>
+                  <button
+                    type="button"
+                    style={mobileBreakButtonStyle}
+                    onClick={() => fireMobileKey(" ")}
+                  >
+                    Break
+                  </button>
 
-                <button
-                  type="button"
-                  style={mobileBreakButtonStyle}
-                  onClick={() => fireMobileKey(" ")}
-                >
-                  Break
-                </button>
+                  <button
+                    type="button"
+                    style={mobileControlButtonStyle}
+                    onClick={() => fireMobileKey("ArrowRight")}
+                  >
+                    →
+                  </button>
 
-                <button
-                  type="button"
-                  style={mobileControlButtonStyle}
-                  onClick={() => fireMobileKey("ArrowRight")}
-                >
-                  →
-                </button>
-
-                <div />
-                <button
-                  type="button"
-                  style={mobileControlButtonStyle}
-                  onClick={() => fireMobileKey("ArrowDown")}
-                >
-                  ↓
-                </button>
-                <div />
+                  <div />
+                  <button
+                    type="button"
+                    style={mobileControlButtonStyle}
+                    onClick={() => fireMobileKey("ArrowDown")}
+                  >
+                    ↓
+                  </button>
+                  <div />
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           <div style={tunnelLeaderboardWrapStyle}>
@@ -1487,8 +1487,28 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           animation: hitFlash 0.22s ease-out forwards;
         }
 
-        .hitShake {
+             .hitShake {
           animation: hitShake 0.18s linear;
+        }
+
+        .mobileOnlyControls {
+          display: none;
+        }
+
+        @media (max-width: 900px) {
+          .mobileOnlyControls {
+            position: fixed;
+            left: 50%;
+            bottom: max(14px, env(safe-area-inset-bottom));
+            transform: translateX(-50%);
+            z-index: 120;
+            display: block;
+            padding: 10px;
+            border-radius: 20px;
+            background: rgba(2, 6, 23, 0.34);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 12px 30px rgba(0,0,0,0.35);
+          }
         }
 
         @keyframes crumbPulse {
@@ -2040,21 +2060,6 @@ const tunnelRulesListStyle: React.CSSProperties = {
   opacity: 0.9,
 };
 
-const mobileControlsWrapStyle: React.CSSProperties = {
-  marginTop: 16,
-  padding: 14,
-  borderTop: "1px solid rgba(255,255,255,0.08)",
-  display: "flex",
-  flexDirection: "column",
-  gap: 10,
-};
-
-const mobileControlsTitleStyle: React.CSSProperties = {
-  fontSize: 13,
-  fontWeight: 800,
-  opacity: 0.85,
-};
-
 const mobileControlsGridStyle: React.CSSProperties = {
   display: "grid",
   gridTemplateColumns: "64px 64px 64px",
@@ -2066,24 +2071,26 @@ const mobileControlButtonStyle: React.CSSProperties = {
   width: 64,
   height: 64,
   borderRadius: 16,
-  border: "1px solid rgba(255,255,255,0.14)",
-  background: "rgba(15,23,42,0.82)",
+  border: "1px solid rgba(255,255,255,0.16)",
+  background: "rgba(15,23,42,0.88)",
   color: "white",
   fontSize: 28,
   fontWeight: 900,
   cursor: "pointer",
-  boxShadow: "0 8px 20px rgba(0,0,0,0.28)",
+  boxShadow: "0 8px 20px rgba(0,0,0,0.35)",
+  backdropFilter: "blur(8px)",
 };
 
 const mobileBreakButtonStyle: React.CSSProperties = {
   width: 64,
   height: 64,
   borderRadius: 16,
-  border: "1px solid rgba(250,204,21,0.25)",
-  background: "rgba(250,204,21,0.14)",
+  border: "1px solid rgba(250,204,21,0.30)",
+  background: "rgba(250,204,21,0.18)",
   color: "#fde68a",
   fontSize: 12,
   fontWeight: 900,
   cursor: "pointer",
-  boxShadow: "0 8px 20px rgba(0,0,0,0.28)",
+  boxShadow: "0 8px 20px rgba(0,0,0,0.35)",
+  backdropFilter: "blur(8px)",
 };
