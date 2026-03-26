@@ -1008,21 +1008,31 @@ const [didWinRun, setDidWinRun] = useState(false);
                             </div>
                           )}
 
-                          {!wall && isPlayer && (
+                                                                           {!wall && isPlayer && (
                             <div
                               className="antFloat"
                               style={{
                                 ...tokenStyle,
-                                width: 38,
-                                height: 38,
-                                borderRadius: 14,
-                                background: "rgba(15,23,42,0.96)",
-                                border: "1px solid rgba(255,255,255,0.18)",
-                                boxShadow: theme.antGlow,
-                                fontSize: 20,
+                                width: 42,
+                                height: 42,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                pointerEvents: "none",
+                                overflow: "visible",
                               }}
                             >
-                              🐜
+                              <img
+                                src="/ants/samurai.png"
+                                alt="Samurai Ant"
+                                style={{
+                                  width: "140%",
+                                  height: "140%",
+                                  objectFit: "contain",
+                                  transform: "translateY(3px)",
+                                  filter: "drop-shadow(0 0 6px rgba(0,0,0,0.45)) drop-shadow(0 0 10px rgba(255,255,255,0.12))",
+                                }}
+                              />
                             </div>
                           )}
                         </div>
