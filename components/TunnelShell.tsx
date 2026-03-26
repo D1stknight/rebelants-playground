@@ -407,7 +407,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     }
   }
 
-  async function recordTunnelRun(params: {
+   async function recordTunnelRun(params: {
     score: number;
     fullClear: boolean;
     crystalsCollected: number;
@@ -433,6 +433,19 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     } catch {
       // do not block gameplay if stats save fails
     }
+  }
+
+  function fireMobileKey(key: "ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight" | " ") {
+    if (!isPlaying) return;
+
+    const evt = new KeyboardEvent("keydown", {
+      key,
+      code: key === " " ? "Space" : key,
+      bubbles: true,
+      cancelable: true,
+    });
+
+    window.dispatchEvent(evt);
   }
 
    useEffect(() => {
@@ -1270,12 +1283,62 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                     })}
                   </div>
                 </div>
+                            </div>
               </div>
+            </div>
+
+            <div style={mobileControlsWrapStyle}>
+              <div style={mobileControlsTitleStyle}>Mobile Controls</div>
+
+              <div style={mobileControlsGridStyle}>
+                <div />
+                <button
+                  type="button"
+                  style={mobileControlButtonStyle}
+                  onClick={() => fireMobileKey("ArrowUp")}
+                >
+                  ↑
+                </button>
+                <div />
+
+                <button
+                  type="button"
+                  style={mobileControlButtonStyle}
+                  onClick={() => fireMobileKey("ArrowLeft")}
+                >
+                  ←
+                </button>
+
+                <button
+                  type="button"
+                  style={mobileBreakButtonStyle}
+                  onClick={() => fireMobileKey(" ")}
+                >
+                  Break
+                </button>
+
+                <button
+                  type="button"
+                  style={mobileControlButtonStyle}
+                  onClick={() => fireMobileKey("ArrowRight")}
+                >
+                  →
+                </button>
+
+                <div />
+                <button
+                  type="button"
+                  style={mobileControlButtonStyle}
+                  onClick={() => fireMobileKey("ArrowDown")}
+                >
+                  ↓
+                </button>
+                <div />
               </div>
-                       </div>
+            </div>
           </div>
 
-                 <div style={tunnelLeaderboardWrapStyle}>
+          <div style={tunnelLeaderboardWrapStyle}>
             <div style={tunnelLeaderboardGridStyle}>
               <div style={leaderboardCardBlueStyle}>
                 <div style={leaderboardCardHeaderStyle}>
@@ -1975,4 +2038,52 @@ const tunnelRulesListStyle: React.CSSProperties = {
   fontSize: 14,
   lineHeight: 1.8,
   opacity: 0.9,
+};
+
+const mobileControlsWrapStyle: React.CSSProperties = {
+  marginTop: 16,
+  padding: 14,
+  borderTop: "1px solid rgba(255,255,255,0.08)",
+  display: "flex",
+  flexDirection: "column",
+  gap: 10,
+};
+
+const mobileControlsTitleStyle: React.CSSProperties = {
+  fontSize: 13,
+  fontWeight: 800,
+  opacity: 0.85,
+};
+
+const mobileControlsGridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "64px 64px 64px",
+  justifyContent: "center",
+  gap: 10,
+};
+
+const mobileControlButtonStyle: React.CSSProperties = {
+  width: 64,
+  height: 64,
+  borderRadius: 16,
+  border: "1px solid rgba(255,255,255,0.14)",
+  background: "rgba(15,23,42,0.82)",
+  color: "white",
+  fontSize: 28,
+  fontWeight: 900,
+  cursor: "pointer",
+  boxShadow: "0 8px 20px rgba(0,0,0,0.28)",
+};
+
+const mobileBreakButtonStyle: React.CSSProperties = {
+  width: 64,
+  height: 64,
+  borderRadius: 16,
+  border: "1px solid rgba(250,204,21,0.25)",
+  background: "rgba(250,204,21,0.14)",
+  color: "#fde68a",
+  fontSize: 12,
+  fontWeight: 900,
+  cursor: "pointer",
+  boxShadow: "0 8px 20px rgba(0,0,0,0.28)",
 };
