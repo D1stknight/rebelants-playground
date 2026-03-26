@@ -5,10 +5,23 @@ import { loadProfile, getEffectivePlayerId, saveProfile } from "../lib/profile";
 import BuyPointsModal from "./BuyPointsModal";
 
 export default function TunnelShell() {
-  const [isPlaying, setIsPlaying] = useState(false);
+const buildCrumbs = () => {
+  const next: Array<{ row: number; col: number }> = [];
+
+  for (let row = 0; row < 8; row++) {
+    for (let col = 0; col < 12; col++) {
+      if (row === 4 && col === 5) continue; // player's spawn tile
+      next.push({ row, col });
+    }
+  }
+
+  return next;
+};  
+ const [isPlaying, setIsPlaying] = useState(false);
 const [timeLeft, setTimeLeft] = useState(30);
 const [score, setScore] = useState(0);
 const [playerPos, setPlayerPos] = useState({ row: 4, col: 5 });
+const [crumbs, setCrumbs] = useState<Array<{ row: number; col: number }>>([]);
 
   const initialProfile = loadProfile();
   const initialName = (initialProfile?.name || "guest").trim() || "guest";
@@ -63,7 +76,21 @@ React.useEffect(() => {
       nextRow = Math.max(0, Math.min(7, nextRow));
       nextCol = Math.max(0, Math.min(11, nextCol));
 
-      if (nextRow === prev.row && nextCol === prev.col) return prev;
+           if (nextRow === prev.row && nextCol === prev.col) return prev;
+
+      setCrumbs((current) => {
+        const hasCrumb = current.some(
+          (c) => c.row === nextRow && c.col === nextCol
+        );
+
+        if (hasCrumb) {
+          setScore((s) => s + 1);
+        }
+
+        return current.filter(
+          (c) => !(c.row === nextRow && c.col === nextCol)
+        );
+      });
 
       return { row: nextRow, col: nextCol };
     });
@@ -181,7 +208,7 @@ const tunnelCost = 200;
                   <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
                     {!isPlaying && (
                       <button
-                       onClick={() => {
+                      onClick={() => {
   if (totalEarnRoom <= 0) {
     alert("No plays left");
     return;
@@ -190,6 +217,7 @@ const tunnelCost = 200;
   setTimeLeft(30);
   setScore(0);
   setPlayerPos({ row: 4, col: 5 });
+  setCrumbs(buildCrumbs());
 }}
                         style={{
                           padding: "8px 12px",
@@ -215,23 +243,43 @@ const tunnelCost = 200;
               <div style={boardPreviewStyle}>
                 <div style={previewGlowStyle} />
 
-                <div style={previewGridStyle}>
-                  {Array.from({ length: 96 }, (_, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        borderRadius: 6,
-                        background:
-                          i % 7 === 0
-                            ? "rgba(96, 165, 250, 0.14)"
-                            : i % 11 === 0
-                            ? "rgba(250, 204, 21, 0.18)"
-                            : "rgba(255,255,255,0.04)",
-                        border: "1px solid rgba(255,255,255,0.04)",
-                      }}
-                    />
-                  ))}
-                </div>
+               <div style={previewGridStyle}>
+  {Array.from({ length: 96 }, (_, i) => {
+    const row = Math.floor(i / 12);
+    const col = i % 12;
+
+    const hasCrumb = crumbs.some((c) => c.row === row && c.col === col);
+
+    return (
+      <div
+        key={i}
+        style={{
+          position: "relative",
+          borderRadius: 6,
+          background: "rgba(255,255,255,0.04)",
+          border: "1px solid rgba(255,255,255,0.04)",
+          overflow: "hidden",
+        }}
+      >
+        {hasCrumb && (
+          <div
+            style={{
+              position: "absolute",
+              left: "50%",
+              top: "50%",
+              width: 10,
+              height: 10,
+              transform: "translate(-50%, -50%)",
+              borderRadius: 999,
+              background: "rgba(245, 222, 179, 0.95)",
+              boxShadow: "0 0 10px rgba(245, 222, 179, 0.6)",
+            }}
+          />
+        )}
+      </div>
+    );
+  })}
+</div>
 
                 <div
   style={{
