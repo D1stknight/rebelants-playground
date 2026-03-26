@@ -1,18 +1,20 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePoints } from "../lib/usePoints";
 import { loadProfile, getEffectivePlayerId, saveProfile } from "../lib/profile";
 import BuyPointsModal from "./BuyPointsModal";
 
 type Cell = { row: number; col: number };
+type Facing = "up" | "down" | "left" | "right";
 type BoardTheme = "colony" | "neon" | "mythic";
 
-const GRID_ROWS = 12;
-const GRID_COLS = 18;
-const TUNNEL_COST = 200;
+const GRID_ROWS = 14;
+const GRID_COLS = 22;
 const RUN_SECONDS = 30;
+const TUNNEL_COST = 200;
+const WALL_BREAKS_PER_RUN = 5;
 
-const START_CELL: Cell = { row: 9, col: 2 };
+const START_CELL: Cell = { row: 11, col: 2 };
 
 const themeMap: Record<
   BoardTheme,
@@ -33,25 +35,25 @@ const themeMap: Record<
     name: "Colony Tunnel",
     bg: "linear-gradient(180deg, rgba(16,24,39,0.14), rgba(0,0,0,0.24)), linear-gradient(135deg, #2d1f14, #1b130d)",
     floor: "rgba(255,255,255,0.04)",
-    wall: "linear-gradient(135deg, rgba(91,62,38,0.95), rgba(52,35,23,0.95))",
+    wall: "linear-gradient(135deg, rgba(91,62,38,0.96), rgba(52,35,23,0.98))",
     accent: "#60a5fa",
     crumb: "rgba(245, 222, 179, 0.98)",
     sugar: "rgba(250, 204, 21, 0.98)",
     crystal: "rgba(96, 165, 250, 0.98)",
-    antGlow: "0 0 24px rgba(96,165,250,0.30)",
-    spiderGlow: "0 0 22px rgba(239,68,68,0.28)",
+    antGlow: "0 0 26px rgba(96,165,250,0.30)",
+    spiderGlow: "0 0 22px rgba(239,68,68,0.26)",
   },
   neon: {
     name: "Neon Sci-Fi Tunnel",
     bg: "linear-gradient(180deg, rgba(3,7,18,0.18), rgba(0,0,0,0.30)), linear-gradient(135deg, #09111d, #111827)",
     floor: "rgba(34,211,238,0.06)",
-    wall: "linear-gradient(135deg, rgba(17,24,39,0.98), rgba(12,18,30,0.98))",
+    wall: "linear-gradient(135deg, rgba(17,24,39,0.98), rgba(8,15,28,0.98))",
     accent: "#22d3ee",
     crumb: "rgba(165, 243, 252, 0.98)",
     sugar: "rgba(45, 212, 191, 0.98)",
     crystal: "rgba(244, 114, 182, 0.98)",
-    antGlow: "0 0 24px rgba(34,211,238,0.32)",
-    spiderGlow: "0 0 22px rgba(244,114,182,0.28)",
+    antGlow: "0 0 26px rgba(34,211,238,0.32)",
+    spiderGlow: "0 0 22px rgba(244,114,182,0.26)",
   },
   mythic: {
     name: "Dark Mythic Colony",
@@ -62,8 +64,8 @@ const themeMap: Record<
     crumb: "rgba(254, 215, 170, 0.98)",
     sugar: "rgba(251, 191, 36, 0.98)",
     crystal: "rgba(244, 63, 94, 0.98)",
-    antGlow: "0 0 24px rgba(244,63,94,0.28)",
-    spiderGlow: "0 0 22px rgba(251,191,36,0.24)",
+    antGlow: "0 0 26px rgba(244,63,94,0.28)",
+    spiderGlow: "0 0 22px rgba(251,191,36,0.22)",
   },
 };
 
@@ -71,23 +73,39 @@ function cellKey(cell: Cell) {
   return `${cell.row}:${cell.col}`;
 }
 
-function isWall(row: number, col: number) {
-  if (row === 0 || row === GRID_ROWS - 1 || col === 0 || col === GRID_COLS - 1) return true;
+function isOuterBorder(row: number, col: number) {
+  return row === 0 || row === GRID_ROWS - 1 || col === 0 || col === GRID_COLS - 1;
+}
 
-  if ((row === 2 || row === 10) && ((col >= 3 && col <= 6) || (col >= 11 && col <= 14))) return true;
-  if ((row === 4 || row === 8) && ((col >= 1 && col <= 4) || (col >= 7 && col <= 10) || (col >= 13 && col <= 16))) return true;
-  if (row === 6 && col >= 3 && col <= 14 && col !== 8 && col !== 9) return true;
+function baseWall(row: number, col: number) {
+  if (isOuterBorder(row, col)) return true;
 
-  if ((col === 5 || col === 12) && ((row >= 2 && row <= 4) || (row >= 8 && row <= 10))) return true;
+  if ((row === 2 || row === 11) && ((col >= 3 && col <= 7) || (col >= 14 && col <= 18))) return true;
+  if ((row === 4 || row === 9) && ((col >= 2 && col <= 5) || (col >= 8 && col <= 12) || (col >= 16 && col <= 19))) return true;
+  if (row === 6 && ((col >= 4 && col <= 9) || (col >= 13 && col <= 17))) return true;
+  if (row === 7 && ((col >= 4 && col <= 6) || (col >= 15 && col <= 17))) return true;
+
+  if ((col === 6 || col === 15) && ((row >= 2 && row <= 4) || (row >= 9 && row <= 11))) return true;
+  if (col === 10 && row >= 5 && row <= 8) return true;
 
   return false;
 }
 
-function getOpenCells() {
+function isBreakableBaseWall(row: number, col: number) {
+  if (isOuterBorder(row, col)) return false;
+  return baseWall(row, col);
+}
+
+function isWall(row: number, col: number, brokenWallSet: Set<string>) {
+  if (!baseWall(row, col)) return false;
+  return !brokenWallSet.has(cellKey({ row, col }));
+}
+
+function getOpenCells(brokenWallSet: Set<string>) {
   const open: Cell[] = [];
   for (let row = 0; row < GRID_ROWS; row++) {
     for (let col = 0; col < GRID_COLS; col++) {
-      if (!isWall(row, col)) {
+      if (!isWall(row, col, brokenWallSet)) {
         open.push({ row, col });
       }
     }
@@ -102,11 +120,7 @@ function buildSpiderPath() {
   return next;
 }
 
-function pickRandomCells(
-  source: Cell[],
-  count: number,
-  excluded: Set<string>
-) {
+function pickRandomCells(source: Cell[], count: number, excluded: Set<string>) {
   const available = source.filter((cell) => !excluded.has(cellKey(cell)));
   const pool = [...available];
 
@@ -137,9 +151,11 @@ export default function TunnelShell() {
   const [sugars, setSugars] = useState<Cell[]>([]);
   const [crystals, setCrystals] = useState<Cell[]>([]);
   const [spiderIndex, setSpiderIndex] = useState(0);
+  const [wallBreaksLeft, setWallBreaksLeft] = useState(WALL_BREAKS_PER_RUN);
+  const [brokenWalls, setBrokenWalls] = useState<string[]>([]);
+  const [facing, setFacing] = useState<Facing>("right");
 
   const lastHitRef = useRef(0);
-  const endingRunRef = useRef(false);
 
   const {
     balance,
@@ -147,29 +163,32 @@ export default function TunnelShell() {
     remainingDaily,
     totalEarnRoom,
     refresh,
-    spend,
-    earn,
   } = usePoints(effectivePlayerId);
 
   const theme = themeMap[boardTheme];
-  const openCells = useMemo(() => getOpenCells(), []);
   const spiderPath = useMemo(() => buildSpiderPath(), []);
   const spiderPos = spiderPath[spiderIndex] || spiderPath[0];
+  const brokenWallSet = useMemo(() => new Set(brokenWalls), [brokenWalls]);
 
-  const setupNewRun = useCallback(() => {
+  function setupNewRun() {
+    const nextBrokenWalls: string[] = [];
+    const nextBrokenWallSet = new Set(nextBrokenWalls);
+    const openCells = getOpenCells(nextBrokenWallSet);
+
     const excluded = new Set<string>([
       cellKey(START_CELL),
       ...spiderPath.map(cellKey),
     ]);
 
-    const crumbCells = pickRandomCells(openCells, 55, excluded);
+    const crumbCells = pickRandomCells(openCells, 95, excluded);
     crumbCells.forEach((c) => excluded.add(cellKey(c)));
 
-    const sugarCells = pickRandomCells(openCells, 12, excluded);
+    const sugarCells = pickRandomCells(openCells, 18, excluded);
     sugarCells.forEach((c) => excluded.add(cellKey(c)));
 
-    const crystalCells = pickRandomCells(openCells, 3, excluded);
+    const crystalCells = pickRandomCells(openCells, 4, excluded);
 
+    setBrokenWalls(nextBrokenWalls);
     setPlayerPos(START_CELL);
     setCrumbs(crumbCells);
     setSugars(sugarCells);
@@ -177,70 +196,27 @@ export default function TunnelShell() {
     setSpiderIndex(0);
     setScore(0);
     setTimeLeft(RUN_SECONDS);
+    setWallBreaksLeft(WALL_BREAKS_PER_RUN);
+    setFacing("right");
     setRunMessage("");
     lastHitRef.current = 0;
-    endingRunRef.current = false;
-  }, [openCells, spiderPath]);
+  }
 
-  const endRun = useCallback(
-    async (finalScore: number) => {
-      if (endingRunRef.current) return;
-      endingRunRef.current = true;
-
-      setIsPlaying(false);
-
-      if (finalScore <= 0) {
-        setRunMessage("Run complete. No points earned this time.");
-        await refresh();
-        return;
-      }
-
-      setRunMessage(`Run complete. Claiming ${finalScore} REBEL Points…`);
-
-      try {
-        const earnRes: any = await earn(finalScore);
-
-        if (!earnRes?.ok) {
-          setRunMessage(earnRes?.error || "Run complete, but reward claim failed.");
-          await refresh();
-          return;
-        }
-
-        setRunMessage(`Run complete. +${earnRes?.added ?? finalScore} REBEL Points credited ✅`);
-        await refresh();
-      } catch (e: any) {
-        setRunMessage(e?.message || "Run complete, but reward claim failed.");
-        await refresh();
-      }
-    },
-    [earn, refresh]
-  );
-
-  async function startRun() {
+  function startRun() {
     if (isPlaying) return;
-
-    if (balance < TUNNEL_COST) {
-      setRunMessage("Not enough points to start a Tunnel run.");
-      return;
-    }
 
     if (Number(totalEarnRoom || 0) < TUNNEL_COST) {
       setRunMessage("No plays left today. Buy points to add bonus plays.");
       return;
     }
 
-    setRunMessage("Starting run…");
-
-    const spendRes: any = await spend(TUNNEL_COST, "tunnel");
-
-    if (!spendRes?.ok) {
-      setRunMessage(spendRes?.error || "Could not start run.");
+    if (balance < TUNNEL_COST) {
+      setRunMessage("Not enough points to start a Tunnel run.");
       return;
     }
 
     setupNewRun();
     setIsPlaying(true);
-    setRunMessage("");
   }
 
   useEffect(() => {
@@ -257,15 +233,16 @@ export default function TunnelShell() {
     if (!isPlaying) return;
     if (timeLeft > 0) return;
 
-    void endRun(score);
-  }, [timeLeft, isPlaying, score, endRun]);
+    setIsPlaying(false);
+    setRunMessage(`Run complete. Final score: ${score}`);
+  }, [timeLeft, isPlaying, score]);
 
   useEffect(() => {
     if (!isPlaying) return;
 
     const interval = setInterval(() => {
       setSpiderIndex((i) => (i + 1) % spiderPath.length);
-    }, 320);
+    }, 340);
 
     return () => clearInterval(interval);
   }, [isPlaying, spiderPath.length]);
@@ -278,7 +255,6 @@ export default function TunnelShell() {
     if (now - lastHitRef.current < 900) return;
 
     lastHitRef.current = now;
-
     setTimeLeft((t) => Math.max(0, t - 3));
     setRunMessage("Spider hit! -3 seconds");
   }, [playerPos, spiderPos, isPlaying]);
@@ -287,24 +263,80 @@ export default function TunnelShell() {
     if (!isPlaying) return;
 
     const onKeyDown = (e: KeyboardEvent) => {
-      const valid = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"];
-      if (!valid.includes(e.key)) return;
+      const validMove = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"];
+      const isBreak = e.code === "Space";
+
+      if (!validMove.includes(e.key) && !isBreak) return;
 
       e.preventDefault();
+
+      if (isBreak) {
+        if (wallBreaksLeft <= 0) {
+          setRunMessage("No wall breakers left.");
+          return;
+        }
+
+        const target = { row: playerPos.row, col: playerPos.col };
+
+        if (facing === "up") target.row -= 1;
+        if (facing === "down") target.row += 1;
+        if (facing === "left") target.col -= 1;
+        if (facing === "right") target.col += 1;
+
+        if (
+          target.row < 0 ||
+          target.row >= GRID_ROWS ||
+          target.col < 0 ||
+          target.col >= GRID_COLS
+        ) {
+          return;
+        }
+
+        if (!isBreakableBaseWall(target.row, target.col)) {
+          setRunMessage("No breakable wall in front of you.");
+          return;
+        }
+
+        const key = cellKey(target);
+        if (brokenWallSet.has(key)) {
+          setRunMessage("That wall is already broken.");
+          return;
+        }
+
+        setBrokenWalls((prev) => [...prev, key]);
+        setWallBreaksLeft((n) => Math.max(0, n - 1));
+        setRunMessage("Wall broken ✅");
+        return;
+      }
 
       setPlayerPos((prev) => {
         let nextRow = prev.row;
         let nextCol = prev.col;
+        let nextFacing: Facing = facing;
 
-        if (e.key === "ArrowUp") nextRow -= 1;
-        if (e.key === "ArrowDown") nextRow += 1;
-        if (e.key === "ArrowLeft") nextCol -= 1;
-        if (e.key === "ArrowRight") nextCol += 1;
+        if (e.key === "ArrowUp") {
+          nextRow -= 1;
+          nextFacing = "up";
+        }
+        if (e.key === "ArrowDown") {
+          nextRow += 1;
+          nextFacing = "down";
+        }
+        if (e.key === "ArrowLeft") {
+          nextCol -= 1;
+          nextFacing = "left";
+        }
+        if (e.key === "ArrowRight") {
+          nextCol += 1;
+          nextFacing = "right";
+        }
+
+        setFacing(nextFacing);
 
         nextRow = Math.max(0, Math.min(GRID_ROWS - 1, nextRow));
         nextCol = Math.max(0, Math.min(GRID_COLS - 1, nextCol));
 
-        if (isWall(nextRow, nextCol)) return prev;
+        if (isWall(nextRow, nextCol, brokenWallSet)) return prev;
         if (nextRow === prev.row && nextCol === prev.col) return prev;
 
         setCrumbs((current) => {
@@ -331,11 +363,17 @@ export default function TunnelShell() {
 
     window.addEventListener("keydown", onKeyDown, { passive: false });
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isPlaying]);
+  }, [isPlaying, facing, playerPos, wallBreaksLeft, brokenWallSet]);
 
   return (
     <>
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <main
+        style={{
+          maxWidth: 1600,
+          margin: "0 auto",
+          padding: "32px 16px",
+        }}
+      >
         <header style={{ marginBottom: 18 }}>
           <div style={{ fontSize: 28, fontWeight: 900, marginBottom: 8 }}>
             <Link href="/" style={{ textDecoration: "none", color: "inherit" }}>
@@ -364,7 +402,7 @@ export default function TunnelShell() {
             Ant Tunnel
           </div>
           <p style={{ opacity: 0.88, marginBottom: 18 }}>
-            Samurai Rebel Ants. Underground tunnels. Crumbs, sugar, crystals, and danger.
+            Samurai Rebel Ants. Underground tunnels. Crumbs, sugar, crystals, danger, and breakable walls.
           </p>
 
           <div style={statsWrapStyle}>
@@ -457,7 +495,7 @@ export default function TunnelShell() {
                 <div>
                   <div style={{ fontSize: 20, fontWeight: 900 }}>{theme.name}</div>
                   <div style={{ fontSize: 13, opacity: 0.82 }}>
-                    Use arrow keys. Collect crumbs, sugar, and crystals. Avoid the spider.
+                    Arrow keys move. Space breaks a wall in front of you.
                   </div>
 
                   <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
@@ -467,12 +505,16 @@ export default function TunnelShell() {
                       </button>
                     )}
 
-                    <div style={{ ...statusPillStyle, borderColor: "rgba(255,255,255,0.14)" }}>
+                    <div style={statusPillStyle}>
                       ⏱ Time: <b>{timeLeft}s</b>
                     </div>
 
-                    <div style={{ ...statusPillStyle, borderColor: "rgba(255,255,255,0.14)" }}>
+                    <div style={statusPillStyle}>
                       🎯 Score: <b>{score}</b>
+                    </div>
+
+                    <div style={statusPillStyle}>
+                      🧱 Wall Breaks: <b>{wallBreaksLeft}</b>
                     </div>
                   </div>
                 </div>
@@ -482,12 +524,8 @@ export default function TunnelShell() {
                 </div>
               </div>
 
-              <div style={{ padding: 16 }}>
-                {runMessage ? (
-                  <div style={runMessageStyle}>
-                    {runMessage}
-                  </div>
-                ) : null}
+              <div style={{ padding: 18 }}>
+                {runMessage ? <div style={runMessageStyle}>{runMessage}</div> : null}
 
                 <div style={{ ...boardPreviewStyle, background: theme.bg }}>
                   <div style={previewGlowStyle(theme.accent)} />
@@ -497,7 +535,7 @@ export default function TunnelShell() {
                       const row = Math.floor(i / GRID_COLS);
                       const col = i % GRID_COLS;
 
-                      const wall = isWall(row, col);
+                      const wall = isWall(row, col, brokenWallSet);
                       const hasCrumb = crumbs.some((c) => c.row === row && c.col === col);
                       const hasSugar = sugars.some((c) => c.row === row && c.col === col);
                       const hasCrystal = crystals.some((c) => c.row === row && c.col === col);
@@ -603,6 +641,7 @@ export default function TunnelShell() {
                     <span>Sugar = 5</span>
                     <span>Crystal = 20</span>
                     <span>Spider hit = -3 sec</span>
+                    <span>Wall breaks = 5</span>
                   </div>
                 </div>
               </div>
@@ -824,7 +863,8 @@ const boardPreviewStyle: React.CSSProperties = {
   position: "relative",
   overflow: "hidden",
   borderRadius: 18,
-  padding: 18,
+  padding: 20,
+  minHeight: 920,
 };
 
 function previewGlowStyle(accent: string): React.CSSProperties {
@@ -840,13 +880,13 @@ const previewGridStyle: React.CSSProperties = {
   position: "relative",
   display: "grid",
   gridTemplateColumns: `repeat(${GRID_COLS}, minmax(0, 1fr))`,
-  gap: 8,
+  gap: 10,
 };
 
 const tileStyle: React.CSSProperties = {
   aspectRatio: "1 / 1",
   position: "relative",
-  borderRadius: 10,
+  borderRadius: 12,
   display: "grid",
   placeItems: "center",
   overflow: "hidden",
