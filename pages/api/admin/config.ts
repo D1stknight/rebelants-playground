@@ -27,6 +27,15 @@ const DEFAULTS = {
   dailyClaim: 200,
   dailyEarnCap: 500,
   currency: "REBEL",
+
+  tunnelCost: 50,
+  tunnelRunSeconds: 60,
+  tunnelCrystalCount: 8,
+  tunnelSugarCount: 18,
+  tunnelCrumbCount: 95,
+  tunnelWallBreaks: 5,
+  tunnelSpiderSpeedMs: 160,
+
   rewards: { none: 0, common: 50, rare: 100, ultra: 200 },
 
   // ✅ Pro Odds (weights) — Admin editable
@@ -104,11 +113,19 @@ const rareMerchDecimal = Number.isFinite(rawRareMerch)
   ? (rawRareMerch > 1 ? rawRareMerch / 100 : rawRareMerch) // if 100 => 1.0
   : DEFAULTS.rareMerchChance;
 
- const next = {
+  const next = {
   shuffleCost: Number(src?.shuffleCost ?? DEFAULTS.shuffleCost),
   dailyClaim: Number(src?.dailyClaim ?? DEFAULTS.dailyClaim),
   dailyEarnCap: Number(src?.dailyEarnCap ?? DEFAULTS.dailyEarnCap),
   currency: String(src?.currency ?? DEFAULTS.currency),
+
+  tunnelCost: Number(src?.tunnelCost ?? DEFAULTS.tunnelCost),
+  tunnelRunSeconds: Number(src?.tunnelRunSeconds ?? DEFAULTS.tunnelRunSeconds),
+  tunnelCrystalCount: Number(src?.tunnelCrystalCount ?? DEFAULTS.tunnelCrystalCount),
+  tunnelSugarCount: Number(src?.tunnelSugarCount ?? DEFAULTS.tunnelSugarCount),
+  tunnelCrumbCount: Number(src?.tunnelCrumbCount ?? DEFAULTS.tunnelCrumbCount),
+  tunnelWallBreaks: Number(src?.tunnelWallBreaks ?? DEFAULTS.tunnelWallBreaks),
+  tunnelSpiderSpeedMs: Number(src?.tunnelSpiderSpeedMs ?? DEFAULTS.tunnelSpiderSpeedMs),
 
   rewards: {
     none: Number(src?.rewards?.none ?? DEFAULTS.rewards.none),
