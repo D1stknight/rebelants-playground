@@ -6,8 +6,9 @@ import BuyPointsModal from "./BuyPointsModal";
 
 export default function TunnelShell() {
   const [isPlaying, setIsPlaying] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(30);
-  const [score, setScore] = useState(0);
+const [timeLeft, setTimeLeft] = useState(30);
+const [score, setScore] = useState(0);
+const [playerPos, setPlayerPos] = useState({ row: 4, col: 5 });
 
   const initialProfile = loadProfile();
   const initialName = (initialProfile?.name || "guest").trim() || "guest";
@@ -26,27 +27,53 @@ export default function TunnelShell() {
   } = usePoints(effectivePlayerId);
 
   React.useEffect(() => {
-    if (!isPlaying) return;
+  if (!isPlaying) return;
 
-    const interval = setInterval(() => {
-      setTimeLeft((t) => {
-        if (t <= 1) {
-          clearInterval(interval);
-          setIsPlaying(false);
+  const interval = setInterval(() => {
+    setTimeLeft((t) => {
+      if (t <= 1) {
+        clearInterval(interval);
+        setIsPlaying(false);
 
-          // reward logic goes here later
-          console.log("Run ended. Score:", score);
+        // reward logic goes here later
+        console.log("Run ended. Score:", score);
 
-          return 0;
-        }
-        return t - 1;
-      });
-    }, 1000);
+        return 0;
+      }
+      return t - 1;
+    });
+  }, 1000);
 
-    return () => clearInterval(interval);
-  }, [isPlaying, score]);
+  return () => clearInterval(interval);
+}, [isPlaying, score]);
 
-  const tunnelCost = 200;
+React.useEffect(() => {
+  if (!isPlaying) return;
+
+  const onKeyDown = (e: KeyboardEvent) => {
+    setPlayerPos((prev) => {
+      let nextRow = prev.row;
+      let nextCol = prev.col;
+
+      if (e.key === "ArrowUp") nextRow -= 1;
+      if (e.key === "ArrowDown") nextRow += 1;
+      if (e.key === "ArrowLeft") nextCol -= 1;
+      if (e.key === "ArrowRight") nextCol += 1;
+
+      nextRow = Math.max(0, Math.min(7, nextRow));
+      nextCol = Math.max(0, Math.min(11, nextCol));
+
+      if (nextRow === prev.row && nextCol === prev.col) return prev;
+
+      return { row: nextRow, col: nextCol };
+    });
+  };
+
+  window.addEventListener("keydown", onKeyDown);
+  return () => window.removeEventListener("keydown", onKeyDown);
+}, [isPlaying]);
+
+const tunnelCost = 200;
 
   return (
     <>
@@ -154,15 +181,16 @@ export default function TunnelShell() {
                   <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
                     {!isPlaying && (
                       <button
-                        onClick={() => {
-                          if (totalEarnRoom <= 0) {
-                            alert("No plays left");
-                            return;
-                          }
-                          setIsPlaying(true);
-                          setTimeLeft(30);
-                          setScore(0);
-                        }}
+                       onClick={() => {
+  if (totalEarnRoom <= 0) {
+    alert("No plays left");
+    return;
+  }
+  setIsPlaying(true);
+  setTimeLeft(30);
+  setScore(0);
+  setPlayerPos({ row: 4, col: 5 });
+}}
                         style={{
                           padding: "8px 12px",
                           borderRadius: 10,
@@ -205,7 +233,15 @@ export default function TunnelShell() {
                   ))}
                 </div>
 
-                <div style={samuraiAntTokenStyle}>🐜</div>
+                <div
+  style={{
+    ...samuraiAntTokenStyle,
+    left: `${playerPos.col * (100 / 12) + 100 / 24}%`,
+    top: `${playerPos.row * (420 / 8) + 420 / 16 + 18}px`,
+  }}
+>
+  🐜
+</div>
 
                 <div style={{ marginTop: 12, fontSize: 14, fontWeight: 700 }}>
                   {isPlaying && (
@@ -350,8 +386,9 @@ const previewGridStyle: React.CSSProperties = {
   position: "relative",
   display: "grid",
   gridTemplateColumns: "repeat(12, 1fr)",
+  gridTemplateRows: "repeat(8, 1fr)",
   gap: 8,
-  minHeight: 420,
+  height: 420,
 };
 
 const samuraiAntTokenStyle: React.CSSProperties = {
