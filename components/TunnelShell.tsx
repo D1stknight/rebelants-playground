@@ -237,7 +237,7 @@ const tunnelCost = 200;
   style={{
     ...samuraiAntTokenStyle,
     left: `${playerPos.col * (100 / 12) + 100 / 24}%`,
-    top: `${playerPos.row * (420 / 8) + 420 / 16 + 18}px`,
+    top: `${playerPos.row * (600 / 8) + 600 / 16 + 18}px`,
   }}
 >
   🐜
@@ -367,7 +367,7 @@ const boardBadgeStyle: React.CSSProperties = {
 
 const boardPreviewStyle: React.CSSProperties = {
   position: "relative",
-  minHeight: 520,
+  minHeight: 700,
   padding: 18,
   overflow: "hidden",
   background:
@@ -387,8 +387,8 @@ const previewGridStyle: React.CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(12, 1fr)",
   gridTemplateRows: "repeat(8, 1fr)",
-  gap: 8,
-  height: 420,
+  gap: 10,
+  height: 600,
 };
 
 const samuraiAntTokenStyle: React.CSSProperties = {
