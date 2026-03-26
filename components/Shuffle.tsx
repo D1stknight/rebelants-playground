@@ -919,12 +919,20 @@ const runShuffle = async () => {
   if (balance < cost) return;
 
   if (Number(totalEarnRoom || 0) <= 0) {
-    setWinText("No earn room left today. Buy a pack to keep playing.");
+    setWinText("No play room left today. Buy a pack to keep playing.");
     return;
   }
 
-  await spend(cost, "shuffle");
+  const spendRes = await spend(cost, "shuffle");
 
+  if (!spendRes?.ok) {
+    setWinText(
+      spendRes?.error || "No play room left today. Buy a pack to keep playing."
+    );
+    return;
+  }
+
+  setWinText("");
   setBusy(true);
   setPhase("shuffling");
   setProgress(0);
