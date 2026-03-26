@@ -10,7 +10,7 @@ type BoardTheme = "colony" | "neon" | "mythic";
 
 const GRID_ROWS = 14;
 const GRID_COLS = 22;
-const RUN_SECONDS = 40;
+const RUN_SECONDS = 60;
 const TUNNEL_COST = 200;
 const WALL_BREAKS_PER_RUN = 5;
 
@@ -234,55 +234,61 @@ export default function TunnelShell() {
     setRunMessage(`Run complete. Final score: ${score}`);
   }, [timeLeft, isPlaying, score]);
 
-  useEffect(() => {
+    useEffect(() => {
     if (!isPlaying) return;
+
+    const nextSpiderStep = (current: Cell) => {
+      const directions = [
+        { row: -1, col: 0 },
+        { row: 1, col: 0 },
+        { row: 0, col: -1 },
+        { row: 0, col: 1 },
+      ];
+
+      const candidates = directions
+        .map((move) => ({
+          row: current.row + move.row,
+          col: current.col + move.col,
+        }))
+        .filter(
+          (next) =>
+            next.row >= 0 &&
+            next.row < GRID_ROWS &&
+            next.col >= 0 &&
+            next.col < GRID_COLS &&
+            !isWall(next.row, next.col, brokenWallSet)
+        );
+
+      if (!candidates.length) return current;
+
+      const ranked = [...candidates].sort((a, b) => {
+        const da = manhattanDistance(a, playerPos);
+        const db = manhattanDistance(b, playerPos);
+        return da - db;
+      });
+
+      const roll = Math.random();
+
+      // almost always choose the best chase move
+      if (roll < 0.88) return ranked[0];
+      if (roll < 0.97 && ranked[1]) return ranked[1];
+
+      return ranked[(Math.random() * ranked.length) | 0];
+    };
 
     const interval = setInterval(() => {
       setSpiderPos((current) => {
-        const directions = [
-          { row: -1, col: 0 },
-          { row: 1, col: 0 },
-          { row: 0, col: -1 },
-          { row: 0, col: 1 },
-        ];
+        const firstStep = nextSpiderStep(current);
+        const distAfterFirst = manhattanDistance(firstStep, playerPos);
 
-        const candidates = directions
-          .map((move) => ({
-            row: current.row + move.row,
-            col: current.col + move.col,
-          }))
-          .filter(
-            (next) =>
-              next.row >= 0 &&
-              next.row < GRID_ROWS &&
-              next.col >= 0 &&
-              next.col < GRID_COLS &&
-              !isWall(next.row, next.col, brokenWallSet)
-          );
-
-        if (!candidates.length) return current;
-
-        // aggressive chase:
-        // most of the time, pick the move that gets closest to the player
-        // sometimes pick the 2nd best move so it still feels alive
-        const ranked = [...candidates].sort(
-          (a, b) =>
-            manhattanDistance(a, playerPos) - manhattanDistance(b, playerPos)
-        );
-
-        const roll = Math.random();
-
-        if (roll < 0.75) {
-          return ranked[0];
+        // hunt mode: if close enough, spider gets a second step
+        if (distAfterFirst <= 6) {
+          return nextSpiderStep(firstStep);
         }
 
-        if (roll < 0.92 && ranked[1]) {
-          return ranked[1];
-        }
-
-        return ranked[(Math.random() * ranked.length) | 0];
+        return firstStep;
       });
-    }, 220);
+    }, 160);
 
     return () => clearInterval(interval);
   }, [isPlaying, playerPos, brokenWallSet]);
