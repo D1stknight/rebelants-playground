@@ -608,40 +608,14 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     }, 180);
   }, [playerPos, spiderPos, isPlaying]);
 
-   useLayoutEffect(() => {
-    const wrap = boardScrollRef.current;
+    useLayoutEffect(() => {
     const playerEl = playerTileRef.current;
-
-    if (!wrap || !playerEl) return;
+    if (!playerEl || !isPlaying) return;
 
     const raf = requestAnimationFrame(() => {
-      const wrapRect = wrap.getBoundingClientRect();
-      const playerRect = playerEl.getBoundingClientRect();
-
-      const playerCenterX =
-        playerRect.left - wrapRect.left + wrap.scrollLeft + playerRect.width / 2;
-      const playerCenterY =
-        playerRect.top - wrapRect.top + wrap.scrollTop + playerRect.height / 2;
-
-      const targetLeft = Math.max(
-        0,
-        Math.min(
-          playerCenterX - wrap.clientWidth / 2,
-          wrap.scrollWidth - wrap.clientWidth
-        )
-      );
-
-      const targetTop = Math.max(
-        0,
-        Math.min(
-          playerCenterY - wrap.clientHeight / 2,
-          wrap.scrollHeight - wrap.clientHeight
-        )
-      );
-
-      wrap.scrollTo({
-        left: targetLeft,
-        top: targetTop,
+      playerEl.scrollIntoView({
+        block: "center",
+        inline: "center",
         behavior: "auto",
       });
     });
