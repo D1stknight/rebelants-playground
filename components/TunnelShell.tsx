@@ -139,10 +139,11 @@ export default function TunnelShell() {
   const [showBuyPoints, setShowBuyPoints] = useState(false);
 
   const [boardTheme, setBoardTheme] = useState<BoardTheme>("colony");
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(RUN_SECONDS);
-  const [score, setScore] = useState(0);
-  const [runMessage, setRunMessage] = useState("");
+const [isPlaying, setIsPlaying] = useState(false);
+const [timeLeft, setTimeLeft] = useState(RUN_SECONDS);
+const [score, setScore] = useState(0);
+const [runMessage, setRunMessage] = useState("");
+const [didWinRun, setDidWinRun] = useState(false);
   const [playerPos, setPlayerPos] = useState<Cell>(START_CELL);
    const [crumbs, setCrumbs] = useState<Cell[]>([]);
   const [sugars, setSugars] = useState<Cell[]>([]);
@@ -194,9 +195,10 @@ export default function TunnelShell() {
     setScore(0);
     setTimeLeft(RUN_SECONDS);
     setWallBreaksLeft(WALL_BREAKS_PER_RUN);
-    setFacing("right");
-    setRunMessage("");
-    lastHitRef.current = 0;
+setFacing("right");
+setRunMessage("");
+setDidWinRun(false);
+lastHitRef.current = 0;
   }
 
   function startRun() {
@@ -226,13 +228,22 @@ export default function TunnelShell() {
     return () => clearInterval(interval);
   }, [isPlaying]);
 
-  useEffect(() => {
+    useEffect(() => {
     if (!isPlaying) return;
     if (timeLeft > 0) return;
 
     setIsPlaying(false);
     setRunMessage(`Run complete. Final score: ${score}`);
   }, [timeLeft, isPlaying, score]);
+
+  useEffect(() => {
+    if (!isPlaying) return;
+    if (crystals.length > 0) return;
+
+    setIsPlaying(false);
+    setDidWinRun(true);
+    setRunMessage(`Crystal sweep complete! Final score: ${score} 👑`);
+  }, [crystals.length, isPlaying, score]);
 
     useEffect(() => {
     if (!isPlaying) return;
@@ -594,7 +605,23 @@ export default function TunnelShell() {
               </div>
 
               <div style={{ padding: 18 }}>
-                {runMessage ? <div style={runMessageStyle}>{runMessage}</div> : null}
+               {runMessage ? (
+  <div
+    style={{
+      ...runMessageStyle,
+      border: didWinRun
+        ? "1px solid rgba(250,204,21,0.35)"
+        : runMessageStyle.border,
+      background: didWinRun
+        ? "rgba(250,204,21,0.10)"
+        : runMessageStyle.background,
+      color: didWinRun ? "#fde68a" : "white",
+      fontWeight: didWinRun ? 800 : 500,
+    }}
+  >
+    {runMessage}
+  </div>
+) : null}
 
                                <div
                   ref={boardScrollRef}
@@ -710,13 +737,14 @@ export default function TunnelShell() {
                     })}
                   </div>
 
-                                   <div style={boardLegendStyle}>
-                    <span>Crumb = 1</span>
-                    <span>Sugar = 5</span>
-                    <span>Crystal = 20</span>
-                    <span>Spider hit = -3 sec</span>
-                    <span>Wall breaks = 5</span>
-                  </div>
+                                 <div style={boardLegendStyle}>
+  <span>Crumb = 1</span>
+  <span>Sugar = 5</span>
+  <span>Crystal = 20</span>
+  <span>Spider hit = -3 sec</span>
+  <span>Wall breaks = 5</span>
+  <span>Collect all crystals to win early</span>
+</div>
                 </div>
               </div>
               </div>
