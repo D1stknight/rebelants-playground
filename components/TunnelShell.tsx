@@ -8,6 +8,12 @@ import SharedEconomyPanel from "./SharedEconomyPanel";
 type Cell = { row: number; col: number };
 type Facing = "up" | "down" | "left" | "right";
 type BoardTheme = "colony" | "neon" | "mythic";
+type PickupBurst = {
+  id: number;
+  row: number;
+  col: number;
+  kind: "crumb" | "sugar" | "crystal";
+};
 
 const GRID_ROWS = 14;
 const GRID_COLS = 22;
@@ -139,6 +145,12 @@ function manhattanDistance(a: Cell, b: Cell) {
   return Math.abs(a.row - b.row) + Math.abs(a.col - b.col);
 }
 
+function burstColor(kind: "crumb" | "sugar" | "crystal") {
+  if (kind === "crumb") return "#22c55e";
+  if (kind === "sugar") return "#facc15";
+  return "#3b82f6";
+}
+
 export default function TunnelShell() {
   const initialProfile = loadProfile();
   const initialName = (initialProfile?.name || "guest").trim() || "guest";
@@ -159,12 +171,13 @@ const [didWinRun, setDidWinRun] = useState(false);
    const [crumbs, setCrumbs] = useState<Cell[]>([]);
   const [sugars, setSugars] = useState<Cell[]>([]);
   const [crystals, setCrystals] = useState<Cell[]>([]);
-  const [spiderPos, setSpiderPos] = useState<Cell>({ row: 1, col: 10 });
+    const [spiderPos, setSpiderPos] = useState<Cell>({ row: 1, col: 10 });
   const [wallBreaksLeft, setWallBreaksLeft] = useState(
-  DEFAULT_TUNNEL_CONFIG.tunnelWallBreaks
-);
+    DEFAULT_TUNNEL_CONFIG.tunnelWallBreaks
+  );
   const [brokenWalls, setBrokenWalls] = useState<string[]>([]);
   const [facing, setFacing] = useState<Facing>("right");
+  const [pickupBursts, setPickupBursts] = useState<PickupBurst[]>([]);
 
   const lastHitRef = useRef(0);
   const boardScrollRef = useRef<HTMLDivElement | null>(null);
@@ -180,8 +193,17 @@ const [didWinRun, setDidWinRun] = useState(false);
     earn,
     spend,
   } = usePoints(effectivePlayerId);
-  const theme = themeMap[boardTheme];
+    const theme = themeMap[boardTheme];
   const brokenWallSet = useMemo(() => new Set(brokenWalls), [brokenWalls]);
+
+  function triggerPickupBurst(row: number, col: number, kind: "crumb" | "sugar" | "crystal") {
+    const id = Date.now() + Math.floor(Math.random() * 100000);
+    setPickupBursts((prev) => [...prev, { id, row, col, kind }]);
+
+    window.setTimeout(() => {
+      setPickupBursts((prev) => prev.filter((b) => b.id !== id));
+    }, 260);
+  }
 
    useEffect(() => {
     let cancelled = false;
@@ -571,21 +593,30 @@ const [didWinRun, setDidWinRun] = useState(false);
         if (isWall(nextRow, nextCol, brokenWallSet)) return prev;
         if (nextRow === prev.row && nextCol === prev.col) return prev;
 
-        setCrumbs((current) => {
+               setCrumbs((current) => {
           const found = current.some((c) => c.row === nextRow && c.col === nextCol);
-          if (found) setScore((s) => s + 1);
+          if (found) {
+            setScore((s) => s + 1);
+            triggerPickupBurst(nextRow, nextCol, "crumb");
+          }
           return current.filter((c) => !(c.row === nextRow && c.col === nextCol));
         });
 
         setSugars((current) => {
           const found = current.some((c) => c.row === nextRow && c.col === nextCol);
-          if (found) setScore((s) => s + 5);
+          if (found) {
+            setScore((s) => s + 5);
+            triggerPickupBurst(nextRow, nextCol, "sugar");
+          }
           return current.filter((c) => !(c.row === nextRow && c.col === nextCol));
         });
 
         setCrystals((current) => {
           const found = current.some((c) => c.row === nextRow && c.col === nextCol);
-          if (found) setScore((s) => s + 20);
+          if (found) {
+            setScore((s) => s + 20);
+            triggerPickupBurst(nextRow, nextCol, "crystal");
+          }
           return current.filter((c) => !(c.row === nextRow && c.col === nextCol));
         });
 
@@ -790,8 +821,9 @@ const [didWinRun, setDidWinRun] = useState(false);
                       const hasCrumb = crumbs.some((c) => c.row === row && c.col === col);
                       const hasSugar = sugars.some((c) => c.row === row && c.col === col);
                       const hasCrystal = crystals.some((c) => c.row === row && c.col === col);
-                      const isPlayer = playerPos.row === row && playerPos.col === col;
+                                            const isPlayer = playerPos.row === row && playerPos.col === col;
                       const isSpider = spiderPos?.row === row && spiderPos?.col === col;
+                      const burst = pickupBursts.find((b) => b.row === row && b.col === col);
 
                       return (
                                                <div
@@ -868,6 +900,31 @@ const [didWinRun, setDidWinRun] = useState(false);
   </div>
 )}
 
+                                                 {!wall && burst && (
+                            <div
+                              className="pickupBurst"
+                              style={{
+                                position: "absolute",
+                                inset: 0,
+                                display: "grid",
+                                placeItems: "center",
+                                pointerEvents: "none",
+                                zIndex: 1,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: 34,
+                                  height: 34,
+                                  borderRadius: 999,
+                                  background: `${burstColor(burst.kind)}22`,
+                                  boxShadow: `0 0 10px ${burstColor(burst.kind)}, 0 0 24px ${burstColor(burst.kind)}`,
+                                  border: `1px solid ${burstColor(burst.kind)}66`,
+                                }}
+                              />
+                            </div>
+                          )}
+
                           {!wall && isSpider && (
                             <div
                               className="spiderBob"
@@ -941,8 +998,12 @@ const [didWinRun, setDidWinRun] = useState(false);
           animation: antFloat 1.3s ease-in-out infinite;
         }
 
-        .spiderBob {
+               .spiderBob {
           animation: spiderBob 0.9s ease-in-out infinite;
+        }
+
+        .pickupBurst {
+          animation: pickupBurst 0.26s ease-out forwards;
         }
 
         @keyframes crumbPulse {
@@ -969,10 +1030,21 @@ const [didWinRun, setDidWinRun] = useState(false);
           100% { transform: translateY(0px); }
         }
 
-        @keyframes spiderBob {
+              @keyframes spiderBob {
           0% { transform: translateY(0px); }
           50% { transform: translateY(-1px); }
           100% { transform: translateY(0px); }
+        }
+
+        @keyframes pickupBurst {
+          0% {
+            transform: scale(0.65);
+            opacity: 0.95;
+          }
+          100% {
+            transform: scale(1.45);
+            opacity: 0;
+          }
         }
       `}</style>
     </>
