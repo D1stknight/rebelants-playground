@@ -9,6 +9,15 @@ type PointsConfigShape = {
   shuffleCost: number;
   dailyClaim: number;
   dailyEarnCap: number;
+
+  tunnelCost: number;
+  tunnelRunSeconds: number;
+  tunnelCrystalCount: number;
+  tunnelSugarCount: number;
+  tunnelCrumbCount: number;
+  tunnelWallBreaks: number;
+  tunnelSpiderSpeedMs: number;
+
   rewards: { none: number; common: number; rare: number; ultra: number };
 
   ultraMinReward: number;
@@ -122,6 +131,15 @@ const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
   shuffleCost: defaultConfig.shuffleCost,
   dailyClaim: defaultConfig.dailyClaim,
   dailyEarnCap: defaultConfig.dailyEarnCap,
+
+  tunnelCost: (defaultConfig as any).tunnelCost ?? 50,
+  tunnelRunSeconds: (defaultConfig as any).tunnelRunSeconds ?? 60,
+  tunnelCrystalCount: (defaultConfig as any).tunnelCrystalCount ?? 8,
+  tunnelSugarCount: (defaultConfig as any).tunnelSugarCount ?? 18,
+  tunnelCrumbCount: (defaultConfig as any).tunnelCrumbCount ?? 95,
+  tunnelWallBreaks: (defaultConfig as any).tunnelWallBreaks ?? 5,
+  tunnelSpiderSpeedMs: (defaultConfig as any).tunnelSpiderSpeedMs ?? 160,
+
   rewards: { ...defaultConfig.rewards },
 
   ultraMinReward: Number((defaultConfig as any).ultraMinReward ?? 50),
@@ -1079,13 +1097,76 @@ String(c.status).toUpperCase()==="PENDING"
             </label>
 
             <label style={{ fontSize: 12, opacity: 0.9 }}>
-              Currency
-              <input
-                value={cfg.currency}
-                onChange={(e) => setCfg((c) => ({ ...c, currency: e.target.value || c.currency }))}
-                style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
-              />
-            </label>
+  Currency
+  <input
+    value={cfg.currency}
+    onChange={(e) => setCfg((c) => ({ ...c, currency: e.target.value || c.currency }))}
+    style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
+  />
+</label>
+
+<label style={{ fontSize: 12, opacity: 0.9 }}>
+  Tunnel Cost
+  <input
+    value={cfg.tunnelCost}
+    onChange={(e) => setCfg((c) => ({ ...c, tunnelCost: safeNum(e.target.value, c.tunnelCost) }))}
+    style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
+  />
+</label>
+
+<label style={{ fontSize: 12, opacity: 0.9 }}>
+  Tunnel Run Seconds
+  <input
+    value={cfg.tunnelRunSeconds}
+    onChange={(e) => setCfg((c) => ({ ...c, tunnelRunSeconds: safeNum(e.target.value, c.tunnelRunSeconds) }))}
+    style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
+  />
+</label>
+
+<label style={{ fontSize: 12, opacity: 0.9 }}>
+  Tunnel Crystal Count
+  <input
+    value={cfg.tunnelCrystalCount}
+    onChange={(e) => setCfg((c) => ({ ...c, tunnelCrystalCount: safeNum(e.target.value, c.tunnelCrystalCount) }))}
+    style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
+  />
+</label>
+
+<label style={{ fontSize: 12, opacity: 0.9 }}>
+  Tunnel Sugar Count
+  <input
+    value={cfg.tunnelSugarCount}
+    onChange={(e) => setCfg((c) => ({ ...c, tunnelSugarCount: safeNum(e.target.value, c.tunnelSugarCount) }))}
+    style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
+  />
+</label>
+
+<label style={{ fontSize: 12, opacity: 0.9 }}>
+  Tunnel Crumb Count
+  <input
+    value={cfg.tunnelCrumbCount}
+    onChange={(e) => setCfg((c) => ({ ...c, tunnelCrumbCount: safeNum(e.target.value, c.tunnelCrumbCount) }))}
+    style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
+  />
+</label>
+
+<label style={{ fontSize: 12, opacity: 0.9 }}>
+  Tunnel Wall Breaks
+  <input
+    value={cfg.tunnelWallBreaks}
+    onChange={(e) => setCfg((c) => ({ ...c, tunnelWallBreaks: safeNum(e.target.value, c.tunnelWallBreaks) }))}
+    style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
+  />
+</label>
+
+<label style={{ fontSize: 12, opacity: 0.9 }}>
+  Tunnel Spider Speed (ms)
+  <input
+    value={cfg.tunnelSpiderSpeedMs}
+    onChange={(e) => setCfg((c) => ({ ...c, tunnelSpiderSpeedMs: safeNum(e.target.value, c.tunnelSpiderSpeedMs) }))}
+    style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
+  />
+</label>
 
 <label style={{ fontSize: 12, opacity: 0.9 }}>
   Ultra Min Reward
