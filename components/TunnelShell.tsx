@@ -435,17 +435,108 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     }
   }
 
-  function fireMobileKey(key: "ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight" | " ") {
+    function handleTunnelAction(action: "up" | "down" | "left" | "right" | "break") {
     if (!isPlaying) return;
 
-    const evt = new KeyboardEvent("keydown", {
-      key,
-      code: key === " " ? "Space" : key,
-      bubbles: true,
-      cancelable: true,
-    });
+    if (action === "break") {
+      if (wallBreaksLeft <= 0) {
+        setRunMessage("No wall breakers left.");
+        return;
+      }
 
-    window.dispatchEvent(evt);
+      const target = { row: playerPos.row, col: playerPos.col };
+
+      if (facing === "up") target.row -= 1;
+      if (facing === "down") target.row += 1;
+      if (facing === "left") target.col -= 1;
+      if (facing === "right") target.col += 1;
+
+      if (
+        target.row < 0 ||
+        target.row >= GRID_ROWS ||
+        target.col < 0 ||
+        target.col >= GRID_COLS
+      ) {
+        return;
+      }
+
+      if (!isBreakableBaseWall(target.row, target.col, layoutIndex)) {
+        setRunMessage("No breakable wall in front of you.");
+        return;
+      }
+
+      const key = cellKey(target);
+      if (brokenWallSet.has(key)) {
+        setRunMessage("That wall is already broken.");
+        return;
+      }
+
+      setBrokenWalls((prev) => [...prev, key]);
+      setWallBreaksLeft((n) => Math.max(0, n - 1));
+      triggerWallBurst(target.row, target.col);
+      setRunMessage("Wall broken ✅");
+      return;
+    }
+
+    setPlayerPos((prev) => {
+      let nextRow = prev.row;
+      let nextCol = prev.col;
+      let nextFacing: Facing = facing;
+
+      if (action === "up") {
+        nextRow -= 1;
+        nextFacing = "up";
+      }
+      if (action === "down") {
+        nextRow += 1;
+        nextFacing = "down";
+      }
+      if (action === "left") {
+        nextCol -= 1;
+        nextFacing = "left";
+      }
+      if (action === "right") {
+        nextCol += 1;
+        nextFacing = "right";
+      }
+
+      setFacing(nextFacing);
+
+      nextRow = Math.max(0, Math.min(GRID_ROWS - 1, nextRow));
+      nextCol = Math.max(0, Math.min(GRID_COLS - 1, nextCol));
+
+      if (isWall(nextRow, nextCol, brokenWallSet, layoutIndex)) return prev;
+      if (nextRow === prev.row && nextCol === prev.col) return prev;
+
+      setCrumbs((current) => {
+        const found = current.some((c) => c.row === nextRow && c.col === nextCol);
+        if (found) {
+          setScore((s) => s + 1);
+          triggerPickupBurst(nextRow, nextCol, "crumb");
+        }
+        return current.filter((c) => !(c.row === nextRow && c.col === nextCol));
+      });
+
+      setSugars((current) => {
+        const found = current.some((c) => c.row === nextRow && c.col === nextCol);
+        if (found) {
+          setScore((s) => s + 5);
+          triggerPickupBurst(nextRow, nextCol, "sugar");
+        }
+        return current.filter((c) => !(c.row === nextRow && c.col === nextCol));
+      });
+
+      setCrystals((current) => {
+        const found = current.some((c) => c.row === nextRow && c.col === nextCol);
+        if (found) {
+          setScore((s) => s + 20);
+          triggerPickupBurst(nextRow, nextCol, "crystal");
+        }
+        return current.filter((c) => !(c.row === nextRow && c.col === nextCol));
+      });
+
+      return { row: nextRow, col: nextCol };
+    });
   }
 
    useEffect(() => {
@@ -764,7 +855,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     return () => cancelAnimationFrame(raf);
   }, [playerPos, isPlaying]);
   
-  useEffect(() => {
+    useEffect(() => {
     if (!isPlaying) return;
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -776,110 +867,19 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
       e.preventDefault();
 
       if (isBreak) {
-        if (wallBreaksLeft <= 0) {
-          setRunMessage("No wall breakers left.");
-          return;
-        }
-
-        const target = { row: playerPos.row, col: playerPos.col };
-
-        if (facing === "up") target.row -= 1;
-        if (facing === "down") target.row += 1;
-        if (facing === "left") target.col -= 1;
-        if (facing === "right") target.col += 1;
-
-        if (
-          target.row < 0 ||
-          target.row >= GRID_ROWS ||
-          target.col < 0 ||
-          target.col >= GRID_COLS
-        ) {
-          return;
-        }
-
-              if (!isBreakableBaseWall(target.row, target.col, layoutIndex)) {
-          setRunMessage("No breakable wall in front of you.");
-          return;
-        }
-
-        const key = cellKey(target);
-        if (brokenWallSet.has(key)) {
-          setRunMessage("That wall is already broken.");
-          return;
-        }
-
-               setBrokenWalls((prev) => [...prev, key]);
-        setWallBreaksLeft((n) => Math.max(0, n - 1));
-        triggerWallBurst(target.row, target.col);
-        setRunMessage("Wall broken ✅");
+        handleTunnelAction("break");
         return;
       }
 
-      setPlayerPos((prev) => {
-        let nextRow = prev.row;
-        let nextCol = prev.col;
-        let nextFacing: Facing = facing;
-
-        if (e.key === "ArrowUp") {
-          nextRow -= 1;
-          nextFacing = "up";
-        }
-        if (e.key === "ArrowDown") {
-          nextRow += 1;
-          nextFacing = "down";
-        }
-        if (e.key === "ArrowLeft") {
-          nextCol -= 1;
-          nextFacing = "left";
-        }
-        if (e.key === "ArrowRight") {
-          nextCol += 1;
-          nextFacing = "right";
-        }
-
-        setFacing(nextFacing);
-
-        nextRow = Math.max(0, Math.min(GRID_ROWS - 1, nextRow));
-        nextCol = Math.max(0, Math.min(GRID_COLS - 1, nextCol));
-
-                if (isWall(nextRow, nextCol, brokenWallSet, layoutIndex)) return prev;
-        if (nextRow === prev.row && nextCol === prev.col) return prev;
-
-               setCrumbs((current) => {
-          const found = current.some((c) => c.row === nextRow && c.col === nextCol);
-          if (found) {
-            setScore((s) => s + 1);
-            triggerPickupBurst(nextRow, nextCol, "crumb");
-          }
-          return current.filter((c) => !(c.row === nextRow && c.col === nextCol));
-        });
-
-        setSugars((current) => {
-          const found = current.some((c) => c.row === nextRow && c.col === nextCol);
-          if (found) {
-            setScore((s) => s + 5);
-            triggerPickupBurst(nextRow, nextCol, "sugar");
-          }
-          return current.filter((c) => !(c.row === nextRow && c.col === nextCol));
-        });
-
-        setCrystals((current) => {
-          const found = current.some((c) => c.row === nextRow && c.col === nextCol);
-          if (found) {
-            setScore((s) => s + 20);
-            triggerPickupBurst(nextRow, nextCol, "crystal");
-          }
-          return current.filter((c) => !(c.row === nextRow && c.col === nextCol));
-        });
-
-        return { row: nextRow, col: nextCol };
-      });
+      if (e.key === "ArrowUp") handleTunnelAction("up");
+      if (e.key === "ArrowDown") handleTunnelAction("down");
+      if (e.key === "ArrowLeft") handleTunnelAction("left");
+      if (e.key === "ArrowRight") handleTunnelAction("right");
     };
 
     window.addEventListener("keydown", onKeyDown, { passive: false });
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isPlaying, facing, playerPos, wallBreaksLeft, brokenWallSet, layoutIndex]);
-
   return (
     <>
       <main
@@ -1287,14 +1287,14 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               </div>
             </div>
 
-                      {isPlaying && (
+                                {isPlaying && (
               <div className="mobileOnlyControls">
                 <div style={mobileControlsGridStyle}>
                   <div />
                   <button
                     type="button"
                     style={mobileControlButtonStyle}
-                    onClick={() => fireMobileKey("ArrowUp")}
+                    onPointerDown={() => handleTunnelAction("up")}
                   >
                     ↑
                   </button>
@@ -1303,7 +1303,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                   <button
                     type="button"
                     style={mobileControlButtonStyle}
-                    onClick={() => fireMobileKey("ArrowLeft")}
+                    onPointerDown={() => handleTunnelAction("left")}
                   >
                     ←
                   </button>
@@ -1311,7 +1311,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                   <button
                     type="button"
                     style={mobileBreakButtonStyle}
-                    onClick={() => fireMobileKey(" ")}
+                    onPointerDown={() => handleTunnelAction("break")}
                   >
                     Break
                   </button>
@@ -1319,7 +1319,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                   <button
                     type="button"
                     style={mobileControlButtonStyle}
-                    onClick={() => fireMobileKey("ArrowRight")}
+                    onPointerDown={() => handleTunnelAction("right")}
                   >
                     →
                   </button>
@@ -1328,7 +1328,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                   <button
                     type="button"
                     style={mobileControlButtonStyle}
-                    onClick={() => fireMobileKey("ArrowDown")}
+                    onPointerDown={() => handleTunnelAction("down")}
                   >
                     ↓
                   </button>
@@ -1491,23 +1491,22 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           animation: hitShake 0.18s linear;
         }
 
-        .mobileOnlyControls {
+                .mobileOnlyControls {
           display: none;
         }
 
         @media (max-width: 900px) {
           .mobileOnlyControls {
             position: fixed;
-            left: 50%;
-            bottom: max(14px, env(safe-area-inset-bottom));
-            transform: translateX(-50%);
+            left: max(10px, env(safe-area-inset-left));
+            bottom: max(10px, env(safe-area-inset-bottom));
             z-index: 120;
             display: block;
-            padding: 10px;
-            border-radius: 20px;
-            background: rgba(2, 6, 23, 0.34);
-            backdrop-filter: blur(10px);
-            box-shadow: 0 12px 30px rgba(0,0,0,0.35);
+            padding: 8px;
+            border-radius: 18px;
+            background: rgba(2, 6, 23, 0.18);
+            backdrop-filter: blur(6px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.18);
           }
         }
 
@@ -2062,35 +2061,35 @@ const tunnelRulesListStyle: React.CSSProperties = {
 
 const mobileControlsGridStyle: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "64px 64px 64px",
+  gridTemplateColumns: "58px 58px 58px",
   justifyContent: "center",
-  gap: 10,
+  gap: 8,
 };
 
 const mobileControlButtonStyle: React.CSSProperties = {
-  width: 64,
-  height: 64,
+  width: 58,
+  height: 58,
   borderRadius: 16,
-  border: "1px solid rgba(255,255,255,0.16)",
-  background: "rgba(15,23,42,0.88)",
+  border: "1px solid rgba(255,255,255,0.14)",
+  background: "rgba(15,23,42,0.56)",
   color: "white",
-  fontSize: 28,
+  fontSize: 26,
   fontWeight: 900,
   cursor: "pointer",
-  boxShadow: "0 8px 20px rgba(0,0,0,0.35)",
-  backdropFilter: "blur(8px)",
+  boxShadow: "0 6px 16px rgba(0,0,0,0.22)",
+  backdropFilter: "blur(6px)",
 };
 
 const mobileBreakButtonStyle: React.CSSProperties = {
-  width: 64,
-  height: 64,
+  width: 58,
+  height: 58,
   borderRadius: 16,
-  border: "1px solid rgba(250,204,21,0.30)",
-  background: "rgba(250,204,21,0.18)",
+  border: "1px solid rgba(250,204,21,0.24)",
+  background: "rgba(250,204,21,0.14)",
   color: "#fde68a",
-  fontSize: 12,
+  fontSize: 11,
   fontWeight: 900,
   cursor: "pointer",
-  boxShadow: "0 8px 20px rgba(0,0,0,0.35)",
-  backdropFilter: "blur(8px)",
+  boxShadow: "0 6px 16px rgba(0,0,0,0.22)",
+  backdropFilter: "blur(6px)",
 };
