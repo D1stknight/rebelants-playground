@@ -11,9 +11,18 @@ type BoardTheme = "colony" | "neon" | "mythic";
 
 const GRID_ROWS = 14;
 const GRID_COLS = 22;
-const RUN_SECONDS = 60;
-const TUNNEL_COST = 50;
-const WALL_BREAKS_PER_RUN = 5;
+
+const DEFAULT_TUNNEL_CONFIG = {
+  currency: "REBEL",
+  dailyClaim: 200,
+  tunnelCost: 50,
+  tunnelRunSeconds: 60,
+  tunnelCrystalCount: 8,
+  tunnelSugarCount: 18,
+  tunnelCrumbCount: 95,
+  tunnelWallBreaks: 5,
+  tunnelSpiderSpeedMs: 160,
+};
 
 const START_CELL: Cell = { row: 2, col: 2 };
 
@@ -135,13 +144,14 @@ export default function TunnelShell() {
   const initialName = (initialProfile?.name || "guest").trim() || "guest";
   const initialEffectiveId = getEffectivePlayerId(initialProfile);
 
-  const [playerName, setPlayerName] = useState(initialName);
+    const [playerName, setPlayerName] = useState(initialName);
   const [effectivePlayerId] = useState(initialEffectiveId);
   const [showBuyPoints, setShowBuyPoints] = useState(false);
+  const [tunnelCfg, setTunnelCfg] = useState(DEFAULT_TUNNEL_CONFIG);
 
   const [boardTheme, setBoardTheme] = useState<BoardTheme>("colony");
 const [isPlaying, setIsPlaying] = useState(false);
-const [timeLeft, setTimeLeft] = useState(RUN_SECONDS);
+const [timeLeft, setTimeLeft] = useState(DEFAULT_TUNNEL_CONFIG.tunnelRunSeconds);
 const [score, setScore] = useState(0);
 const [runMessage, setRunMessage] = useState("");
 const [didWinRun, setDidWinRun] = useState(false);
@@ -171,6 +181,40 @@ const [didWinRun, setDidWinRun] = useState(false);
   const theme = themeMap[boardTheme];
   const brokenWallSet = useMemo(() => new Set(brokenWalls), [brokenWalls]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadTunnelConfig = async () => {
+      try {
+        const r = await fetch("/api/config", { cache: "no-store" });
+        const j = await r.json().catch(() => null);
+        const cfg = j?.pointsConfig || {};
+
+        if (cancelled) return;
+
+        setTunnelCfg({
+          currency: String(cfg?.currency || DEFAULT_TUNNEL_CONFIG.currency),
+          dailyClaim: Number(cfg?.dailyClaim || DEFAULT_TUNNEL_CONFIG.dailyClaim),
+          tunnelCost: Number(cfg?.tunnelCost || DEFAULT_TUNNEL_CONFIG.tunnelCost),
+          tunnelRunSeconds: Number(cfg?.tunnelRunSeconds || DEFAULT_TUNNEL_CONFIG.tunnelRunSeconds),
+          tunnelCrystalCount: Number(cfg?.tunnelCrystalCount || DEFAULT_TUNNEL_CONFIG.tunnelCrystalCount),
+          tunnelSugarCount: Number(cfg?.tunnelSugarCount || DEFAULT_TUNNEL_CONFIG.tunnelSugarCount),
+          tunnelCrumbCount: Number(cfg?.tunnelCrumbCount || DEFAULT_TUNNEL_CONFIG.tunnelCrumbCount),
+          tunnelWallBreaks: Number(cfg?.tunnelWallBreaks || DEFAULT_TUNNEL_CONFIG.tunnelWallBreaks),
+          tunnelSpiderSpeedMs: Number(cfg?.tunnelSpiderSpeedMs || DEFAULT_TUNNEL_CONFIG.tunnelSpiderSpeedMs),
+        });
+      } catch {
+        // keep defaults
+      }
+    };
+
+    void loadTunnelConfig();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   function setupNewRun() {
     const nextBrokenWalls: string[] = [];
     const nextBrokenWallSet = new Set(nextBrokenWalls);
@@ -181,13 +225,13 @@ const [didWinRun, setDidWinRun] = useState(false);
       cellKey({ row: 1, col: 10 }),
     ]);
 
-    const crumbCells = pickRandomCells(openCells, 95, excluded);
+        const crumbCells = pickRandomCells(openCells, tunnelCfg.tunnelCrumbCount, excluded);
     crumbCells.forEach((c) => excluded.add(cellKey(c)));
 
-    const sugarCells = pickRandomCells(openCells, 18, excluded);
+    const sugarCells = pickRandomCells(openCells, tunnelCfg.tunnelSugarCount, excluded);
     sugarCells.forEach((c) => excluded.add(cellKey(c)));
 
-    const crystalCells = pickRandomCells(openCells, 8, excluded);
+    const crystalCells = pickRandomCells(openCells, tunnelCfg.tunnelCrystalCount, excluded);
 
     setBrokenWalls(nextBrokenWalls);
     setPlayerPos(START_CELL);
@@ -195,24 +239,24 @@ const [didWinRun, setDidWinRun] = useState(false);
     setSugars(sugarCells);
     setCrystals(crystalCells);
        setSpiderPos({ row: 1, col: 10 });
-    setScore(0);
-    setTimeLeft(RUN_SECONDS);
-    setWallBreaksLeft(WALL_BREAKS_PER_RUN);
-setFacing("right");
-setRunMessage("");
-setDidWinRun(false);
-lastHitRef.current = 0;
+        setScore(0);
+    setTimeLeft(tunnelCfg.tunnelRunSeconds);
+    setWallBreaksLeft(tunnelCfg.tunnelWallBreaks);
+    setFacing("right");
+    setRunMessage("");
+    setDidWinRun(false);
+    lastHitRef.current = 0;
   }
 
    async function startRun() {
     if (isPlaying) return;
 
-    if (Number(totalEarnRoom || 0) < TUNNEL_COST) {
+        if (Number(totalEarnRoom || 0) < tunnelCfg.tunnelCost) {
       setRunMessage("No plays left today. Buy points to add bonus plays.");
       return;
     }
 
-    if (balance < TUNNEL_COST) {
+    if (balance < tunnelCfg.tunnelCost) {
       setRunMessage("Not enough points to start a Tunnel run.");
       return;
     }
@@ -220,7 +264,7 @@ lastHitRef.current = 0;
     setRunMessage("Starting run...");
 
     try {
-      const spendRes: any = await spend(TUNNEL_COST, "tunnel");
+      const spendRes: any = await spend(tunnelCfg.tunnelCost, "tunnel");
 
       if (!spendRes?.ok) {
         setRunMessage(spendRes?.error || "Could not start Tunnel run.");
@@ -371,22 +415,21 @@ lastHitRef.current = 0;
       return ranked[(Math.random() * ranked.length) | 0];
     };
 
-    const interval = setInterval(() => {
+       const interval = setInterval(() => {
       setSpiderPos((current) => {
         const firstStep = nextSpiderStep(current);
         const distAfterFirst = manhattanDistance(firstStep, playerPos);
 
-        // hunt mode: if close enough, spider gets a second step
         if (distAfterFirst <= 6) {
           return nextSpiderStep(firstStep);
         }
 
         return firstStep;
       });
-    }, 160);
+    }, tunnelCfg.tunnelSpiderSpeedMs);
 
     return () => clearInterval(interval);
-  }, [isPlaying, playerPos, brokenWallSet]);
+  }, [isPlaying, playerPos, brokenWallSet, tunnelCfg.tunnelSpiderSpeedMs]);
   useEffect(() => {
     if (!isPlaying) return;
 
@@ -569,19 +612,18 @@ lastHitRef.current = 0;
             Samurai Rebel Ants. Underground tunnels. Crumbs, sugar, crystals, danger, and breakable walls.
           </p>
 
-                                    <SharedEconomyPanel
+                                             <SharedEconomyPanel
             playerId={effectivePlayerId}
             balance={balance}
             totalPlaysLeft={totalEarnRoom}
             dailyPlaysLeft={remainingDaily}
             bonusPlayBank={capBank}
             dailyCap={Number(dailyCap || 0)}
-            currency="REBEL"
-            dailyClaimAmount={1000}
+            currency={tunnelCfg.currency}
+            dailyClaimAmount={tunnelCfg.dailyClaim}
             onOpenBuyPoints={() => setShowBuyPoints(true)}
             onRefresh={refresh}
           />
-
                   <div
             style={{
               marginTop: 18,
@@ -660,14 +702,14 @@ lastHitRef.current = 0;
                       🎯 Score: <b>{score}</b>
                     </div>
 
-                    <div style={statusPillStyle}>
-                      🧱 Wall Breaks: <b>{wallBreaksLeft}</b>
+                                        <div style={statusPillStyle}>
+                      🧱 Wall Breaks: <b>{wallBreaksLeft}</b> / {tunnelCfg.tunnelWallBreaks}
                     </div>
                   </div>
                 </div>
 
-                <div style={boardBadgeStyle}>
-                  Cost: {TUNNEL_COST}
+                               <div style={boardBadgeStyle}>
+                  Cost: {tunnelCfg.tunnelCost}
                 </div>
               </div>
 
@@ -806,12 +848,12 @@ lastHitRef.current = 0;
                     })}
                   </div>
 
-                                 <div style={boardLegendStyle}>
+                              <div style={boardLegendStyle}>
   <span>Crumb = 1</span>
   <span>Sugar = 5</span>
   <span>Crystal = 20</span>
   <span>Spider hit = -3 sec</span>
-  <span>Wall breaks = 5</span>
+  <span>Wall breaks = {tunnelCfg.tunnelWallBreaks}</span>
   <span>Collect all crystals to win early</span>
 </div>
                 </div>
