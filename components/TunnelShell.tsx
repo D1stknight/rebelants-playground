@@ -450,28 +450,45 @@ const [didWinRun, setDidWinRun] = useState(false);
     setRunMessage("Spider hit! -3 seconds");
   }, [playerPos, spiderPos, isPlaying]);
 
-  useLayoutEffect(() => {
+   useLayoutEffect(() => {
     const wrap = boardScrollRef.current;
     const playerEl = playerTileRef.current;
 
     if (!wrap || !playerEl) return;
 
-    const wrapRect = wrap.getBoundingClientRect();
-    const playerRect = playerEl.getBoundingClientRect();
+    const raf = requestAnimationFrame(() => {
+      const wrapRect = wrap.getBoundingClientRect();
+      const playerRect = playerEl.getBoundingClientRect();
 
-    const playerCenterX =
-      playerRect.left - wrapRect.left + wrap.scrollLeft + playerRect.width / 2;
-    const playerCenterY =
-      playerRect.top - wrapRect.top + wrap.scrollTop + playerRect.height / 2;
+      const playerCenterX =
+        playerRect.left - wrapRect.left + wrap.scrollLeft + playerRect.width / 2;
+      const playerCenterY =
+        playerRect.top - wrapRect.top + wrap.scrollTop + playerRect.height / 2;
 
-    const targetLeft = Math.max(0, playerCenterX - wrap.clientWidth / 2);
-    const targetTop = Math.max(0, playerCenterY - wrap.clientHeight / 2);
+      const targetLeft = Math.max(
+        0,
+        Math.min(
+          playerCenterX - wrap.clientWidth / 2,
+          wrap.scrollWidth - wrap.clientWidth
+        )
+      );
 
-    wrap.scrollTo({
-      left: targetLeft,
-      top: targetTop,
-      behavior: "smooth",
+      const targetTop = Math.max(
+        0,
+        Math.min(
+          playerCenterY - wrap.clientHeight / 2,
+          wrap.scrollHeight - wrap.clientHeight
+        )
+      );
+
+      wrap.scrollTo({
+        left: targetLeft,
+        top: targetTop,
+        behavior: "auto",
+      });
     });
+
+    return () => cancelAnimationFrame(raf);
   }, [playerPos, isPlaying]);
   
   useEffect(() => {
