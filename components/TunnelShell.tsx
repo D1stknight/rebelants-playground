@@ -21,6 +21,29 @@ type WallBurst = {
   col: number;
 };
 
+type TunnelScoreRow = {
+  rank: number;
+  playerId: string;
+  playerName: string;
+  score: number;
+};
+
+type TunnelFastestRow = {
+  rank: number;
+  playerId: string;
+  playerName: string;
+  clearTimeMs: number;
+};
+
+type TunnelPersonalStats = {
+  playerId: string;
+  playerName: string;
+  bestScore: number;
+  bestClearTimeMs: number;
+  totalRuns: number;
+  totalCrystals: number;
+};
+
 const GRID_ROWS = 14;
 const GRID_COLS = 22;
 
@@ -157,6 +180,12 @@ function burstColor(kind: "crumb" | "sugar" | "crystal") {
   return "#3b82f6";
 }
 
+function formatMs(ms: number) {
+  const safe = Math.max(0, Number(ms || 0));
+  const totalSeconds = safe / 1000;
+  return `${totalSeconds.toFixed(2)}s`;
+}
+
 export default function TunnelShell() {
   const initialProfile = loadProfile();
   const initialName = (initialProfile?.name || "guest").trim() || "guest";
@@ -185,10 +214,15 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
   );
   const [brokenWalls, setBrokenWalls] = useState<string[]>([]);
   const [facing, setFacing] = useState<Facing>("right");
-   const [pickupBursts, setPickupBursts] = useState<PickupBurst[]>([]);
+    const [pickupBursts, setPickupBursts] = useState<PickupBurst[]>([]);
   const [wallBursts, setWallBursts] = useState<WallBurst[]>([]);
   const [hitFlash, setHitFlash] = useState(false);
   const [hitShake, setHitShake] = useState(false);
+
+  const [topScoreRows, setTopScoreRows] = useState<TunnelScoreRow[]>([]);
+  const [fastestClearRows, setFastestClearRows] = useState<TunnelFastestRow[]>([]);
+  const [personalStats, setPersonalStats] = useState<TunnelPersonalStats | null>(null);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
 
   const lastHitRef = useRef(0);
   const boardScrollRef = useRef<HTMLDivElement | null>(null);
@@ -216,13 +250,36 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     }, 260);
   }
 
-    function triggerWallBurst(row: number, col: number) {
+      function triggerWallBurst(row: number, col: number) {
     const id = Date.now() + Math.floor(Math.random() * 100000);
     setWallBursts((prev) => [...prev, { id, row, col }]);
 
     window.setTimeout(() => {
       setWallBursts((prev) => prev.filter((b) => b.id !== id));
     }, 260);
+  }
+
+  async function loadTunnelLeaderboard() {
+    try {
+      setLeaderboardLoading(true);
+
+      const r = await fetch(
+        `/api/tunnel/leaderboard?playerId=${encodeURIComponent(effectivePlayerId)}&top=5`,
+        { cache: "no-store" }
+      );
+
+      const j = await r.json().catch(() => null);
+
+      if (!r.ok || !j?.ok) return;
+
+      setTopScoreRows(Array.isArray(j.topScore) ? j.topScore : []);
+      setFastestClearRows(Array.isArray(j.fastestClear) ? j.fastestClear : []);
+      setPersonalStats(j.personalStats || null);
+    } catch {
+      // ignore for now
+    } finally {
+      setLeaderboardLoading(false);
+    }
   }
 
   async function recordTunnelRun(params: {
@@ -293,6 +350,11 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
       cancelled = true;
     };
   }, [isPlaying]);
+
+  useEffect(() => {
+    void loadTunnelLeaderboard();
+  }, [effectivePlayerId]);
+
   function setupNewRun() {
     const nextBrokenWalls: string[] = [];
     const nextBrokenWallSet = new Set(nextBrokenWalls);
@@ -379,12 +441,13 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
         const finishRun = async () => {
       setIsPlaying(false);
 
-      const crystalsCollected = Math.max(0, runCrystalTarget - crystals.length);
+            const crystalsCollected = Math.max(0, runCrystalTarget - crystals.length);
       await recordTunnelRun({
         score,
         fullClear: false,
         crystalsCollected,
       });
+      await loadTunnelLeaderboard();
 
       if (score <= 0) {
         setRunMessage("Run complete. No points earned this time.");
@@ -427,11 +490,12 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
       setIsPlaying(false);
       setDidWinRun(true);
 
-      await recordTunnelRun({
+            await recordTunnelRun({
         score,
         fullClear: true,
         crystalsCollected: runCrystalTarget,
       });
+      await loadTunnelLeaderboard();
 
       if (score <= 0) {
         setRunMessage("Crystal sweep complete! No points earned this time.");
@@ -1106,6 +1170,112 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                 </div>
               </div>
               </div>
+                       </div>
+          </div>
+
+          <div style={tunnelLeaderboardWrapStyle}>
+            <div style={tunnelLeaderboardGridStyle}>
+              <div style={leaderboardCardBlueStyle}>
+                <div style={leaderboardCardHeaderStyle}>
+                  <div>
+                    <div style={leaderboardTitleStyle}>Top Score</div>
+                    <div style={leaderboardSubtitleStyle}>All-Time Tunnel Leaders</div>
+                  </div>
+                  <div style={leaderboardBadgeBlueStyle}>Top 5</div>
+                </div>
+
+                <div style={leaderboardScrollStyle}>
+                  {leaderboardLoading ? (
+                    <div style={leaderboardEmptyStyle}>Loading...</div>
+                  ) : topScoreRows.length === 0 ? (
+                    <div style={leaderboardEmptyStyle}>No Tunnel scores yet.</div>
+                  ) : (
+                    topScoreRows.map((row) => (
+                      <div
+                        key={`score-${row.playerId}-${row.rank}`}
+                        style={leaderboardRowStyle(row.rank, "#60a5fa")}
+                      >
+                        <div style={leaderboardRankStyle(row.rank)}>#{row.rank}</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={leaderboardNameStyle}>{row.playerName || row.playerId}</div>
+                        </div>
+                        <div style={leaderboardValueStyle}>{Number(row.score || 0).toLocaleString()}</div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div style={leaderboardCardGoldStyle}>
+                <div style={leaderboardCardHeaderStyle}>
+                  <div>
+                    <div style={leaderboardTitleStyle}>Fastest Clear</div>
+                    <div style={leaderboardSubtitleStyle}>Full Crystal Sweep Only</div>
+                  </div>
+                  <div style={leaderboardBadgeGoldStyle}>Top 5</div>
+                </div>
+
+                <div style={leaderboardScrollStyle}>
+                  {leaderboardLoading ? (
+                    <div style={leaderboardEmptyStyle}>Loading...</div>
+                  ) : fastestClearRows.length === 0 ? (
+                    <div style={leaderboardEmptyStyle}>No full clears yet.</div>
+                  ) : (
+                    fastestClearRows.map((row) => (
+                      <div
+                        key={`fast-${row.playerId}-${row.rank}`}
+                        style={leaderboardRowStyle(row.rank, "#facc15")}
+                      >
+                        <div style={leaderboardRankStyle(row.rank)}>#{row.rank}</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={leaderboardNameStyle}>{row.playerName || row.playerId}</div>
+                        </div>
+                        <div style={leaderboardValueStyle}>{formatMs(row.clearTimeMs)}</div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div style={leaderboardCardRedStyle}>
+              <div style={leaderboardCardHeaderStyle}>
+                <div>
+                  <div style={leaderboardTitleStyle}>Your Tunnel Stats</div>
+                  <div style={leaderboardSubtitleStyle}>Personal Progress</div>
+                </div>
+                <div style={leaderboardBadgeRedStyle}>You</div>
+              </div>
+
+              <div style={personalStatsGridStyle}>
+                <div style={personalStatBoxStyle("#60a5fa")}>
+                  <div style={personalStatLabelStyle}>Best Score</div>
+                  <div style={personalStatValueStyle}>
+                    {Number(personalStats?.bestScore || 0).toLocaleString()}
+                  </div>
+                </div>
+
+                <div style={personalStatBoxStyle("#facc15")}>
+                  <div style={personalStatLabelStyle}>Best Clear Time</div>
+                  <div style={personalStatValueStyle}>
+                    {personalStats?.bestClearTimeMs ? formatMs(personalStats.bestClearTimeMs) : "--"}
+                  </div>
+                </div>
+
+                <div style={personalStatBoxStyle("#22c55e")}>
+                  <div style={personalStatLabelStyle}>Total Runs</div>
+                  <div style={personalStatValueStyle}>
+                    {Number(personalStats?.totalRuns || 0).toLocaleString()}
+                  </div>
+                </div>
+
+                <div style={personalStatBoxStyle("#f43f5e")}>
+                  <div style={personalStatLabelStyle}>Total Crystals</div>
+                  <div style={personalStatValueStyle}>
+                    {Number(personalStats?.totalCrystals || 0).toLocaleString()}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1443,4 +1613,198 @@ const boardLegendStyle: React.CSSProperties = {
   flexWrap: "wrap",
   fontSize: 12,
   opacity: 0.9,
+};
+
+const tunnelLeaderboardWrapStyle: React.CSSProperties = {
+  marginTop: 26,
+  display: "flex",
+  flexDirection: "column",
+  gap: 18,
+};
+
+const tunnelLeaderboardGridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: 18,
+};
+
+const leaderboardBaseCardStyle: React.CSSProperties = {
+  borderRadius: 20,
+  padding: 16,
+  border: "1px solid rgba(255,255,255,0.12)",
+  background: "rgba(9,12,22,0.92)",
+  boxShadow: "0 18px 40px rgba(0,0,0,0.32)",
+  overflow: "hidden",
+};
+
+const leaderboardCardBlueStyle: React.CSSProperties = {
+  ...leaderboardBaseCardStyle,
+  boxShadow: "0 0 0 1px rgba(96,165,250,0.18), 0 0 24px rgba(96,165,250,0.14), 0 18px 40px rgba(0,0,0,0.32)",
+};
+
+const leaderboardCardGoldStyle: React.CSSProperties = {
+  ...leaderboardBaseCardStyle,
+  boxShadow: "0 0 0 1px rgba(250,204,21,0.18), 0 0 24px rgba(250,204,21,0.12), 0 18px 40px rgba(0,0,0,0.32)",
+};
+
+const leaderboardCardRedStyle: React.CSSProperties = {
+  ...leaderboardBaseCardStyle,
+  boxShadow: "0 0 0 1px rgba(244,63,94,0.18), 0 0 24px rgba(244,63,94,0.12), 0 18px 40px rgba(0,0,0,0.32)",
+};
+
+const leaderboardCardHeaderStyle: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 12,
+  marginBottom: 14,
+};
+
+const leaderboardTitleStyle: React.CSSProperties = {
+  fontSize: 20,
+  fontWeight: 900,
+  letterSpacing: 0.2,
+};
+
+const leaderboardSubtitleStyle: React.CSSProperties = {
+  fontSize: 12,
+  opacity: 0.72,
+  marginTop: 2,
+};
+
+const leaderboardBadgeBlueStyle: React.CSSProperties = {
+  padding: "7px 10px",
+  borderRadius: 999,
+  fontSize: 12,
+  fontWeight: 800,
+  background: "rgba(96,165,250,0.14)",
+  border: "1px solid rgba(96,165,250,0.28)",
+  color: "#93c5fd",
+};
+
+const leaderboardBadgeGoldStyle: React.CSSProperties = {
+  padding: "7px 10px",
+  borderRadius: 999,
+  fontSize: 12,
+  fontWeight: 800,
+  background: "rgba(250,204,21,0.14)",
+  border: "1px solid rgba(250,204,21,0.28)",
+  color: "#fde68a",
+};
+
+const leaderboardBadgeRedStyle: React.CSSProperties = {
+  padding: "7px 10px",
+  borderRadius: 999,
+  fontSize: 12,
+  fontWeight: 800,
+  background: "rgba(244,63,94,0.14)",
+  border: "1px solid rgba(244,63,94,0.28)",
+  color: "#fda4af",
+};
+
+const leaderboardScrollStyle: React.CSSProperties = {
+  maxHeight: 310,
+  overflowY: "auto",
+  paddingRight: 4,
+  display: "flex",
+  flexDirection: "column",
+  gap: 10,
+};
+
+function leaderboardRowStyle(rank: number, glow: string): React.CSSProperties {
+  return {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    padding: "12px 12px",
+    borderRadius: 14,
+    background:
+      rank === 1
+        ? "rgba(255,255,255,0.08)"
+        : rank === 2
+        ? "rgba(255,255,255,0.06)"
+        : rank === 3
+        ? "rgba(255,255,255,0.05)"
+        : "rgba(255,255,255,0.035)",
+    border:
+      rank === 1
+        ? `1px solid ${glow}55`
+        : "1px solid rgba(255,255,255,0.06)",
+    boxShadow:
+      rank === 1
+        ? `0 0 18px ${glow}22`
+        : "none",
+  };
+}
+
+function leaderboardRankStyle(rank: number): React.CSSProperties {
+  return {
+    minWidth: 42,
+    height: 42,
+    borderRadius: 12,
+    display: "grid",
+    placeItems: "center",
+    fontWeight: 900,
+    fontSize: 14,
+    background:
+      rank === 1
+        ? "rgba(250,204,21,0.16)"
+        : rank === 2
+        ? "rgba(148,163,184,0.18)"
+        : rank === 3
+        ? "rgba(251,146,60,0.16)"
+        : "rgba(255,255,255,0.05)",
+    border: "1px solid rgba(255,255,255,0.08)",
+  };
+}
+
+const leaderboardNameStyle: React.CSSProperties = {
+  fontWeight: 800,
+  fontSize: 14,
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+};
+
+const leaderboardValueStyle: React.CSSProperties = {
+  fontWeight: 900,
+  fontSize: 15,
+  opacity: 0.95,
+};
+
+const leaderboardEmptyStyle: React.CSSProperties = {
+  padding: "18px 10px",
+  borderRadius: 14,
+  background: "rgba(255,255,255,0.035)",
+  border: "1px solid rgba(255,255,255,0.06)",
+  opacity: 0.8,
+  textAlign: "center",
+};
+
+const personalStatsGridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+  gap: 14,
+};
+
+function personalStatBoxStyle(accent: string): React.CSSProperties {
+  return {
+    borderRadius: 16,
+    padding: 16,
+    background: "rgba(255,255,255,0.04)",
+    border: `1px solid ${accent}33`,
+    boxShadow: `0 0 18px ${accent}12`,
+  };
+}
+
+const personalStatLabelStyle: React.CSSProperties = {
+  fontSize: 12,
+  opacity: 0.72,
+  marginBottom: 8,
+};
+
+const personalStatValueStyle: React.CSSProperties = {
+  fontSize: 24,
+  fontWeight: 900,
+  lineHeight: 1.1,
 };
