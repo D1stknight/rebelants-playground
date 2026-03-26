@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePoints } from "../lib/usePoints";
 import { loadProfile, getEffectivePlayerId, saveProfile } from "../lib/profile";
@@ -151,11 +151,13 @@ export default function TunnelShell() {
   const [sugars, setSugars] = useState<Cell[]>([]);
   const [crystals, setCrystals] = useState<Cell[]>([]);
   const [spiderIndex, setSpiderIndex] = useState(0);
-  const [wallBreaksLeft, setWallBreaksLeft] = useState(WALL_BREAKS_PER_RUN);
+    const [wallBreaksLeft, setWallBreaksLeft] = useState(WALL_BREAKS_PER_RUN);
   const [brokenWalls, setBrokenWalls] = useState<string[]>([]);
   const [facing, setFacing] = useState<Facing>("right");
 
   const lastHitRef = useRef(0);
+  const boardScrollRef = useRef<HTMLDivElement | null>(null);
+  const playerTileRef = useRef<HTMLDivElement | null>(null);
 
   const {
     balance,
@@ -259,6 +261,30 @@ export default function TunnelShell() {
     setRunMessage("Spider hit! -3 seconds");
   }, [playerPos, spiderPos, isPlaying]);
 
+  useLayoutEffect(() => {
+    const wrap = boardScrollRef.current;
+    const playerEl = playerTileRef.current;
+
+    if (!wrap || !playerEl) return;
+
+    const wrapRect = wrap.getBoundingClientRect();
+    const playerRect = playerEl.getBoundingClientRect();
+
+    const playerCenterX =
+      playerRect.left - wrapRect.left + wrap.scrollLeft + playerRect.width / 2;
+    const playerCenterY =
+      playerRect.top - wrapRect.top + wrap.scrollTop + playerRect.height / 2;
+
+    const targetLeft = Math.max(0, playerCenterX - wrap.clientWidth / 2);
+    const targetTop = Math.max(0, playerCenterY - wrap.clientHeight / 2);
+
+    wrap.scrollTo({
+      left: targetLeft,
+      top: targetTop,
+      behavior: "smooth",
+    });
+  }, [playerPos, isPlaying]);
+  
   useEffect(() => {
     if (!isPlaying) return;
 
@@ -527,10 +553,14 @@ export default function TunnelShell() {
               <div style={{ padding: 18 }}>
                 {runMessage ? <div style={runMessageStyle}>{runMessage}</div> : null}
 
-                <div style={{ ...boardPreviewStyle, background: theme.bg }}>
+                               <div
+                  ref={boardScrollRef}
+                  style={{ ...boardPreviewStyle, background: theme.bg }}
+                >
                   <div style={previewGlowStyle(theme.accent)} />
 
-                  <div style={previewGridStyle}>
+                  <div style={previewInnerStyle}>
+                    <div style={previewGridStyle}>
                     {Array.from({ length: GRID_ROWS * GRID_COLS }, (_, i) => {
                       const row = Math.floor(i / GRID_COLS);
                       const col = i % GRID_COLS;
@@ -543,8 +573,9 @@ export default function TunnelShell() {
                       const isSpider = spiderPos?.row === row && spiderPos?.col === col;
 
                       return (
-                        <div
+                                               <div
                           key={i}
+                          ref={isPlayer ? playerTileRef : null}
                           style={{
                             ...tileStyle,
                             background: wall ? theme.wall : theme.floor,
@@ -636,7 +667,7 @@ export default function TunnelShell() {
                     })}
                   </div>
 
-                  <div style={boardLegendStyle}>
+                                   <div style={boardLegendStyle}>
                     <span>Crumb = 1</span>
                     <span>Sugar = 5</span>
                     <span>Crystal = 20</span>
@@ -644,6 +675,7 @@ export default function TunnelShell() {
                     <span>Wall breaks = 5</span>
                   </div>
                 </div>
+              </div>
               </div>
             </div>
           </div>
@@ -861,10 +893,13 @@ const runMessageStyle: React.CSSProperties = {
 
 const boardPreviewStyle: React.CSSProperties = {
   position: "relative",
-  overflow: "hidden",
+  overflow: "auto",
   borderRadius: 18,
   padding: 20,
-  minHeight: 920,
+  height: "78vh",
+  minHeight: 760,
+  maxHeight: 980,
+  scrollBehavior: "smooth",
 };
 
 function previewGlowStyle(accent: string): React.CSSProperties {
@@ -875,6 +910,12 @@ function previewGlowStyle(accent: string): React.CSSProperties {
     background: `radial-gradient(circle at 20% 20%, ${accent}18, transparent 22%), radial-gradient(circle at 75% 30%, ${accent}12, transparent 24%), radial-gradient(circle at 50% 80%, ${accent}10, transparent 24%)`,
   };
 }
+
+const previewInnerStyle: React.CSSProperties = {
+  position: "relative",
+  minWidth: 1500,
+  minHeight: 1100,
+};
 
 const previewGridStyle: React.CSSProperties = {
   position: "relative",
