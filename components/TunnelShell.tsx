@@ -436,6 +436,14 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     }
   }
 
+  function pressMobileControl(
+    e: React.MouseEvent<HTMLButtonElement> | React.TouchEvent<HTMLButtonElement>,
+    action: "up" | "down" | "left" | "right" | "break"
+  ) {
+    e.preventDefault();
+    e.stopPropagation();
+    handleTunnelAction(action);
+  }  
     function handleTunnelAction(action: "up" | "down" | "left" | "right" | "break") {
     if (!isPlaying) return;
 
@@ -1333,18 +1341,15 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               </div>
             </div>
 
-            {isPlaying && (
+                     {isPlaying && (
               <div className="mobileOnlyControls">
                 <div style={mobileControlsGridStyle}>
                   <div />
                   <button
                     type="button"
                     style={mobileControlButtonStyle}
-                    onPointerDown={(e) => {
-                      e.preventDefault();
-                      handleTunnelAction("up");
-                    }}
-                    onTouchStart={(e) => e.preventDefault()}
+                    onTouchStart={(e) => pressMobileControl(e, "up")}
+                    onMouseDown={(e) => pressMobileControl(e, "up")}
                   >
                     ↑
                   </button>
@@ -1353,11 +1358,8 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                   <button
                     type="button"
                     style={mobileControlButtonStyle}
-                    onPointerDown={(e) => {
-                      e.preventDefault();
-                      handleTunnelAction("left");
-                    }}
-                    onTouchStart={(e) => e.preventDefault()}
+                    onTouchStart={(e) => pressMobileControl(e, "left")}
+                    onMouseDown={(e) => pressMobileControl(e, "left")}
                   >
                     ←
                   </button>
@@ -1365,11 +1367,8 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                   <button
                     type="button"
                     style={mobileBreakButtonStyle}
-                    onPointerDown={(e) => {
-                      e.preventDefault();
-                      handleTunnelAction("break");
-                    }}
-                    onTouchStart={(e) => e.preventDefault()}
+                    onTouchStart={(e) => pressMobileControl(e, "break")}
+                    onMouseDown={(e) => pressMobileControl(e, "break")}
                   >
                     Break
                   </button>
@@ -1377,11 +1376,8 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                   <button
                     type="button"
                     style={mobileControlButtonStyle}
-                    onPointerDown={(e) => {
-                      e.preventDefault();
-                      handleTunnelAction("right");
-                    }}
-                    onTouchStart={(e) => e.preventDefault()}
+                    onTouchStart={(e) => pressMobileControl(e, "right")}
+                    onMouseDown={(e) => pressMobileControl(e, "right")}
                   >
                     →
                   </button>
@@ -1390,11 +1386,8 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                   <button
                     type="button"
                     style={mobileControlButtonStyle}
-                    onPointerDown={(e) => {
-                      e.preventDefault();
-                      handleTunnelAction("down");
-                    }}
-                    onTouchStart={(e) => e.preventDefault()}
+                    onTouchStart={(e) => pressMobileControl(e, "down")}
+                    onMouseDown={(e) => pressMobileControl(e, "down")}
                   >
                     ↓
                   </button>
@@ -2175,37 +2168,39 @@ const mobileControlButtonStyle: React.CSSProperties = {
   height: 58,
   borderRadius: 16,
   border: "1px solid rgba(255,255,255,0.10)",
-  background: "rgba(15,23,42,0.36)",
+  background: "rgba(15,23,42,0.28)",
   color: "white",
   fontSize: 26,
   fontWeight: 900,
   cursor: "pointer",
-  boxShadow: "0 4px 12px rgba(0,0,0,0.16)",
-  backdropFilter: "blur(4px)",
-  WebkitBackdropFilter: "blur(4px)",
+  boxShadow: "0 4px 12px rgba(0,0,0,0.14)",
+  backdropFilter: "blur(3px)",
+  WebkitBackdropFilter: "blur(3px)",
   userSelect: "none",
   WebkitUserSelect: "none",
   WebkitTouchCallout: "none",
   WebkitTapHighlightColor: "transparent",
-  touchAction: "manipulation",
+  touchAction: "none",
+  outline: "none",
 };
 
 const mobileBreakButtonStyle: React.CSSProperties = {
   width: 58,
   height: 58,
   borderRadius: 16,
-  border: "1px solid rgba(250,204,21,0.18)",
-  background: "rgba(250,204,21,0.10)",
+  border: "1px solid rgba(250,204,21,0.16)",
+  background: "rgba(250,204,21,0.08)",
   color: "#fde68a",
   fontSize: 11,
   fontWeight: 900,
   cursor: "pointer",
-  boxShadow: "0 4px 12px rgba(0,0,0,0.16)",
-  backdropFilter: "blur(4px)",
-  WebkitBackdropFilter: "blur(4px)",
+  boxShadow: "0 4px 12px rgba(0,0,0,0.14)",
+  backdropFilter: "blur(3px)",
+  WebkitBackdropFilter: "blur(3px)",
   userSelect: "none",
   WebkitUserSelect: "none",
   WebkitTouchCallout: "none",
   WebkitTapHighlightColor: "transparent",
-  touchAction: "manipulation",
+  touchAction: "none",
+  outline: "none",
 };
