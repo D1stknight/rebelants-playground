@@ -350,9 +350,11 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [isMobileView, setIsMobileView] = useState(false);
 
-  const lastHitRef = useRef(0);
+    const lastHitRef = useRef(0);
   const boardScrollRef = useRef<HTMLDivElement | null>(null);
   const playerTileRef = useRef<HTMLDivElement | null>(null);
+  const touchStartXRef = useRef<number | null>(null);
+  const touchStartYRef = useRef<number | null>(null);
 
      const {
     balance,
@@ -436,15 +438,53 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     }
   }
 
-  function pressMobileControl(
-    e: React.MouseEvent<HTMLButtonElement> | React.TouchEvent<HTMLButtonElement>,
-    action: "up" | "down" | "left" | "right" | "break"
+    function handleSwipeStart(e: React.TouchEvent<HTMLDivElement>) {
+    if (!isMobileView || !isPlaying) return;
+    const touch = e.touches[0];
+    if (!touch) return;
+    touchStartXRef.current = touch.clientX;
+    touchStartYRef.current = touch.clientY;
+  }
+
+  function handleSwipeEnd(e: React.TouchEvent<HTMLDivElement>) {
+    if (!isMobileView || !isPlaying) return;
+
+    const startX = touchStartXRef.current;
+    const startY = touchStartYRef.current;
+    const touch = e.changedTouches[0];
+
+    touchStartXRef.current = null;
+    touchStartYRef.current = null;
+
+    if (startX == null || startY == null || !touch) return;
+
+    const dx = touch.clientX - startX;
+    const dy = touch.clientY - startY;
+
+    const absX = Math.abs(dx);
+    const absY = Math.abs(dy);
+    const minSwipe = 22;
+
+    if (absX < minSwipe && absY < minSwipe) return;
+
+    if (absX > absY) {
+      if (dx > 0) handleTunnelAction("right");
+      else handleTunnelAction("left");
+    } else {
+      if (dy > 0) handleTunnelAction("down");
+      else handleTunnelAction("up");
+    }
+  }
+
+  function pressMobileBreak(
+    e: React.MouseEvent<HTMLButtonElement> | React.TouchEvent<HTMLButtonElement>
   ) {
     e.preventDefault();
     e.stopPropagation();
-    handleTunnelAction(action);
-  }  
-    function handleTunnelAction(action: "up" | "down" | "left" | "right" | "break") {
+    handleTunnelAction("break");
+  }
+
+  function handleTunnelAction(action: "up" | "down" | "left" | "right" | "break") {
     if (!isPlaying) return;
 
     if (action === "break") {
@@ -1014,7 +1054,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                 <div>
                   <div style={{ fontSize: 20, fontWeight: 900 }}>{theme.name}</div>
                   <div style={{ fontSize: 13, opacity: 0.82 }}>
-                    Arrow keys move. Space breaks a wall in front of you.
+                                       Desktop: arrow keys move, Space breaks. Mobile: swipe to move, tap Break to smash walls.
                   </div>
 
                                   <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
@@ -1084,9 +1124,11 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
   </div>
 ) : null}
 
-                                                             <div
+                                                                            <div
                   ref={boardScrollRef}
                   className={hitShake ? "hitShake" : ""}
+                  onTouchStart={handleSwipeStart}
+                  onTouchEnd={handleSwipeEnd}
                   style={{
                     ...boardPreviewStyle,
                     ...(isMobileView ? boardPreviewMobileStyle : null),
@@ -1343,58 +1385,16 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               </div>
             </div>
 
-                     {isPlaying && (
+                                {isPlaying && isMobileView && (
               <div className="mobileOnlyControls">
-                <div style={mobileControlsGridStyle}>
-                  <div />
-                  <button
-                    type="button"
-                    style={mobileControlButtonStyle}
-                    onTouchStart={(e) => pressMobileControl(e, "up")}
-                    onMouseDown={(e) => pressMobileControl(e, "up")}
-                  >
-                    ↑
-                  </button>
-                  <div />
-
-                  <button
-                    type="button"
-                    style={mobileControlButtonStyle}
-                    onTouchStart={(e) => pressMobileControl(e, "left")}
-                    onMouseDown={(e) => pressMobileControl(e, "left")}
-                  >
-                    ←
-                  </button>
-
-                  <button
-                    type="button"
-                    style={mobileBreakButtonStyle}
-                    onTouchStart={(e) => pressMobileControl(e, "break")}
-                    onMouseDown={(e) => pressMobileControl(e, "break")}
-                  >
-                    Break
-                  </button>
-
-                  <button
-                    type="button"
-                    style={mobileControlButtonStyle}
-                    onTouchStart={(e) => pressMobileControl(e, "right")}
-                    onMouseDown={(e) => pressMobileControl(e, "right")}
-                  >
-                    →
-                  </button>
-
-                  <div />
-                  <button
-                    type="button"
-                    style={mobileControlButtonStyle}
-                    onTouchStart={(e) => pressMobileControl(e, "down")}
-                    onMouseDown={(e) => pressMobileControl(e, "down")}
-                  >
-                    ↓
-                  </button>
-                  <div />
-                </div>
+                <button
+                  type="button"
+                  style={mobileBreakButtonStyle}
+                  onTouchStart={pressMobileBreak}
+                  onMouseDown={pressMobileBreak}
+                >
+                  Break
+                </button>
               </div>
             )}
           </div>
@@ -1562,23 +1562,23 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           animation: hitShake 0.18s linear;
         }
 
-                       .mobileOnlyControls {
+                             .mobileOnlyControls {
           display: none;
         }
 
         @media (max-width: 900px) {
           .mobileOnlyControls {
             position: fixed;
-            left: max(8px, env(safe-area-inset-left));
-            bottom: max(8px, env(safe-area-inset-bottom));
+            right: max(10px, env(safe-area-inset-right));
+            bottom: max(10px, env(safe-area-inset-bottom));
             z-index: 120;
             display: block;
-            padding: 6px;
-            border-radius: 18px;
-            background: rgba(2, 6, 23, 0.08);
-            backdrop-filter: blur(3px);
-            -webkit-backdrop-filter: blur(3px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.10);
+            padding: 4px;
+            border-radius: 999px;
+            background: rgba(2, 6, 23, 0.06);
+            backdrop-filter: blur(2px);
+            -webkit-backdrop-filter: blur(2px);
+            box-shadow: 0 3px 10px rgba(0,0,0,0.08);
           }
         }
 
@@ -2158,45 +2158,17 @@ const tunnelRulesListStyle: React.CSSProperties = {
   opacity: 0.9,
 };
 
-const mobileControlsGridStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "58px 58px 58px",
-  justifyContent: "center",
-  gap: 6,
-};
-
-const mobileControlButtonStyle: React.CSSProperties = {
-  width: 58,
-  height: 58,
-  borderRadius: 16,
-  border: "1px solid rgba(255,255,255,0.10)",
-  background: "rgba(15,23,42,0.28)",
-  color: "white",
-  fontSize: 26,
-  fontWeight: 900,
-  cursor: "pointer",
-  boxShadow: "0 4px 12px rgba(0,0,0,0.14)",
-  backdropFilter: "blur(3px)",
-  WebkitBackdropFilter: "blur(3px)",
-  userSelect: "none",
-  WebkitUserSelect: "none",
-  WebkitTouchCallout: "none",
-  WebkitTapHighlightColor: "transparent",
-  touchAction: "none",
-  outline: "none",
-};
-
 const mobileBreakButtonStyle: React.CSSProperties = {
-  width: 58,
-  height: 58,
-  borderRadius: 16,
-  border: "1px solid rgba(250,204,21,0.16)",
-  background: "rgba(250,204,21,0.08)",
+  width: 72,
+  height: 72,
+  borderRadius: 999,
+  border: "1px solid rgba(250,204,21,0.18)",
+  background: "rgba(250,204,21,0.10)",
   color: "#fde68a",
-  fontSize: 11,
+  fontSize: 12,
   fontWeight: 900,
   cursor: "pointer",
-  boxShadow: "0 4px 12px rgba(0,0,0,0.14)",
+  boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
   backdropFilter: "blur(3px)",
   WebkitBackdropFilter: "blur(3px)",
   userSelect: "none",
