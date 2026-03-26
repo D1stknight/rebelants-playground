@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePoints } from "../lib/usePoints";
 import { loadProfile, getEffectivePlayerId, saveProfile } from "../lib/profile";
 import BuyPointsModal from "./BuyPointsModal";
+import SharedEconomyPanel from "./SharedEconomyPanel";
 
 type Cell = { row: number; col: number };
 type Facing = "up" | "down" | "left" | "right";
@@ -568,27 +569,17 @@ lastHitRef.current = 0;
             Samurai Rebel Ants. Underground tunnels. Crumbs, sugar, crystals, danger, and breakable walls.
           </p>
 
-          <div style={statsWrapStyle}>
-            <span>
-              Balance: <b>{balance}</b>
-            </span>
-            <span>
-              Cost per run: <b>{TUNNEL_COST}</b>
-            </span>
-            <span style={{ fontWeight: 800, color: theme.accent }}>
-              Total plays left: <b>{Number(totalEarnRoom || 0).toLocaleString()}</b>
-            </span>
-            <span>
-              Daily plays left: <b>{Number(remainingDaily || 0).toLocaleString()}</b>
-            </span>
-            <span>
-              Bonus play bank: <b>{Number(capBank || 0).toLocaleString()}</b>
-            </span>
-          </div>
-
-          <div style={{ fontSize: 12, opacity: 0.75, marginTop: 8 }}>
-            Daily plays reset every 24 hours. Bonus plays are included with point purchases and never expire.
-          </div>
+                  <SharedEconomyPanel
+            playerId={effectivePlayerId}
+            balance={balance}
+            totalPlaysLeft={totalEarnRoom}
+            dailyPlaysLeft={remainingDaily}
+            bonusPlayBank={capBank}
+            currency="REBEL"
+            dailyClaimAmount={1000}
+            onOpenBuyPoints={() => setShowBuyPoints(true)}
+            onRefresh={refresh}
+          />
 
           <div
             style={{
@@ -614,14 +605,6 @@ lastHitRef.current = 0;
                 style={inputStyle}
               />
             </label>
-
-            <button
-              type="button"
-              onClick={() => setShowBuyPoints(true)}
-              style={buttonStyle}
-            >
-              Buy Points / Connect Ape Wallet
-            </button>
 
             <Link href="/shuffle" style={secondaryButtonStyle}>
               Back to Shuffle
