@@ -11,18 +11,17 @@ function capBankKey(playerId: string) {
   return `ra:points:capbank:${playerId}`;
 }
 
-// ✅ Match earn.ts EXACTLY: daily earned key is date-based
+function capBankKey(playerId: string) {
+  return `ra:points:capbank:${playerId}`;
+}
+
+// ✅ Match spend.ts EXACTLY: daily spent key is date-based
 function todayKey(playerId: string) {
   const d = new Date();
   const yyyy = d.getUTCFullYear();
   const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
   const dd = String(d.getUTCDate()).padStart(2, "0");
-  return `ra:points:earned:${playerId}:${yyyy}-${mm}-${dd}`;
-}
-
-// ✅ Back-compat fallback (older key if it exists)
-function legacyEarnedTodayKey(playerId: string) {
-  return `ra:points:earnedToday:${playerId}`;
+  return `ra:points:spent:${playerId}:${yyyy}-${mm}-${dd}`;
 }
 
 // ✅ get LIVE config (Admin -> Redis) via /api/config, fallback to defaults
@@ -64,33 +63,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const balRaw = await redis.get<number>(balKey(pid));
     const balance = Number(balRaw || 0);
 
-    // ✅ Read the SAME key earn.ts writes to
-    const earnedRaw = await redis.get<number>(todayKey(pid));
-    let earnedToday = Number(earnedRaw || 0);
-
-    // ✅ If nothing there, fall back to legacy key (just in case)
-    if (!earnedToday) {
-      const legacyRaw = await redis.get<number>(legacyEarnedTodayKey(pid));
-      const legacyVal = Number(legacyRaw || 0);
-      if (legacyVal > 0) earnedToday = legacyVal;
-    }
+       // ✅ Read the SAME key spend.ts writes to
+    const spentRaw = await redis.get<number>(todayKey(pid));
+    const spentToday = Number(spentRaw || 0);
 
     const capBankRaw = await redis.get<number>(capBankKey(pid));
     const capBank = Number(capBankRaw || 0);
 
     const liveCfg = await getLivePointsConfig(req);
     const dailyCap = Number((liveCfg as any).dailyEarnCap || 0);
-    const remainingDaily = Math.max(0, dailyCap - earnedToday);
-    const totalEarnRoom = remainingDaily + capBank;
+    const remainingDaily = Math.max(0, dailyCap - spentToday);
+    const totalPlayRoom = remainingDaily + capBank;
 
     return res.status(200).json({
       playerId: pid,
       balance,
-      earnedToday,
+      earnedToday: spentToday,
+      spentToday,
       capBank,
       dailyCap,
       remainingDaily,
-      totalEarnRoom,
+      totalPlayRoom,
+      totalEarnRoom: totalPlayRoom,
     });
   } catch (err: any) {
     console.error("balance error:", err);
