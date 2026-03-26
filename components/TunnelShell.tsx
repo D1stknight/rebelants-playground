@@ -5,6 +5,10 @@ import { loadProfile, getEffectivePlayerId, saveProfile } from "../lib/profile";
 import BuyPointsModal from "./BuyPointsModal";
 
 export default function TunnelShell() {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(30);
+  const [score, setScore] = useState(0);
+
   const initialProfile = loadProfile();
   const initialName = (initialProfile?.name || "guest").trim() || "guest";
   const initialEffectiveId = getEffectivePlayerId(initialProfile);
@@ -20,6 +24,27 @@ export default function TunnelShell() {
     totalEarnRoom,
     refresh,
   } = usePoints(effectivePlayerId);
+
+  React.useEffect(() => {
+    if (!isPlaying) return;
+
+    const interval = setInterval(() => {
+      setTimeLeft((t) => {
+        if (t <= 1) {
+          clearInterval(interval);
+          setIsPlaying(false);
+
+          // reward logic goes here later
+          console.log("Run ended. Score:", score);
+
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isPlaying, score]);
 
   const tunnelCost = 200;
 
@@ -79,7 +104,15 @@ export default function TunnelShell() {
             Daily plays reset every 24 hours. Bonus plays are included with point purchases and never expire.
           </div>
 
-          <div style={{ marginTop: 18, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <div
+            style={{
+              marginTop: 18,
+              display: "flex",
+              gap: 10,
+              flexWrap: "wrap",
+              alignItems: "center",
+            }}
+          >
             <label style={{ fontSize: 13, opacity: 0.9 }}>
               Name:&nbsp;
               <input
@@ -117,6 +150,33 @@ export default function TunnelShell() {
                   <div style={{ fontSize: 13, opacity: 0.82 }}>
                     V1 shell is now live. Next step is the real movement board.
                   </div>
+
+                  <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                    {!isPlaying && (
+                      <button
+                        onClick={() => {
+                          if (totalEarnRoom <= 0) {
+                            alert("No plays left");
+                            return;
+                          }
+                          setIsPlaying(true);
+                          setTimeLeft(30);
+                          setScore(0);
+                        }}
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: 10,
+                          fontWeight: 800,
+                          background: "rgba(34,197,94,0.2)",
+                          border: "1px solid rgba(34,197,94,0.4)",
+                          color: "#86efac",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Start Run
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div style={boardBadgeStyle}>
@@ -126,6 +186,7 @@ export default function TunnelShell() {
 
               <div style={boardPreviewStyle}>
                 <div style={previewGlowStyle} />
+
                 <div style={previewGridStyle}>
                   {Array.from({ length: 96 }, (_, i) => (
                     <div
@@ -145,6 +206,14 @@ export default function TunnelShell() {
                 </div>
 
                 <div style={samuraiAntTokenStyle}>🐜</div>
+
+                <div style={{ marginTop: 12, fontSize: 14, fontWeight: 700 }}>
+                  {isPlaying && (
+                    <>
+                      ⏱ Time: {timeLeft}s &nbsp;&nbsp; | &nbsp;&nbsp; 🎯 Score: {score}
+                    </>
+                  )}
+                </div>
 
                 <div style={boardLegendStyle}>
                   <span>Crumb = 1</span>
