@@ -39,9 +39,9 @@ export default function Rules() {
           Prize availability may vary by location. Where required, equivalent alternatives may be offered.
         </p>
 
-        <p>
-          <b>Daily limits:</b> Daily claim and daily earn caps apply to prevent abuse. If a cap is reached,
-          rewards may be reduced or not credited until the next day.
+                <p>
+          <b>Daily limits:</b> Daily claim limits and daily play limits apply to support fair access and prevent abuse.
+          Daily plays reset every 24 hours. Point purchases may include bonus plays, which are used after daily plays are exhausted and do not expire.
         </p>
 
         <p>
