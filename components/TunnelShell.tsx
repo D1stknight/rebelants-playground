@@ -10,11 +10,11 @@ type BoardTheme = "colony" | "neon" | "mythic";
 
 const GRID_ROWS = 14;
 const GRID_COLS = 22;
-const RUN_SECONDS = 30;
+const RUN_SECONDS = 40;
 const TUNNEL_COST = 200;
 const WALL_BREAKS_PER_RUN = 5;
 
-const START_CELL: Cell = { row: 11, col: 2 };
+const START_CELL: Cell = { row: 2, col: 2 };
 
 const themeMap: Record<
   BoardTheme,
