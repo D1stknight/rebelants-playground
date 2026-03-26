@@ -11,7 +11,7 @@ type BoardTheme = "colony" | "neon" | "mythic";
 const GRID_ROWS = 14;
 const GRID_COLS = 22;
 const RUN_SECONDS = 60;
-const TUNNEL_COST = 200;
+const TUNNEL_COST = 50;
 const WALL_BREAKS_PER_RUN = 5;
 
 const START_CELL: Cell = { row: 2, col: 2 };
@@ -185,7 +185,7 @@ const [didWinRun, setDidWinRun] = useState(false);
     const sugarCells = pickRandomCells(openCells, 18, excluded);
     sugarCells.forEach((c) => excluded.add(cellKey(c)));
 
-    const crystalCells = pickRandomCells(openCells, 4, excluded);
+    const crystalCells = pickRandomCells(openCells, 8, excluded);
 
     setBrokenWalls(nextBrokenWalls);
     setPlayerPos(START_CELL);
