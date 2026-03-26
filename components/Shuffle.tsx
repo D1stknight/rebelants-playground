@@ -1534,7 +1534,7 @@ return (
     </div>
   )}
 </div>
-       <div style={{ marginTop: 10, fontSize: 13, opacity: 0.9 }}>
+      <div style={{ marginTop: 10, fontSize: 13, opacity: 0.9 }}>
   <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
     <span>Cost: <b>{pointsConfig.shuffleCost}</b> {pointsConfig.currency}</span>
     <span>Common: <b>+{pointsConfig.rewards.common}</b></span>
@@ -1543,7 +1543,7 @@ return (
     <span>Daily cap: <b>{pointsConfig.dailyEarnCap}</b></span>
   </div>
 
-    <div style={{ marginTop: 8, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+  <div style={{ marginTop: 8, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
     <span
       style={{
         fontWeight: 800,
@@ -1561,12 +1561,12 @@ return (
     </span>
   </div>
 
-{/* ✅ ADD THIS EXACT BLOCK RIGHT HERE */}
-<div style={{ fontSize: 12, opacity: 0.75, marginTop: 6 }}>
-  Daily plays reset every 24 hours. Bonus plays are included with point purchases and never expire.
-</div>       
-        
-     {/* Name + Claim + DRIP (aligned row) */}
+  <div style={{ fontSize: 12, opacity: 0.75, marginTop: 6 }}>
+    Daily plays reset every 24 hours. Bonus plays are included with point purchases and never expire.
+  </div>
+</div>
+
+{/* Name + Claim + DRIP (aligned row) */}
 <div
   style={{
     marginTop: 10,
