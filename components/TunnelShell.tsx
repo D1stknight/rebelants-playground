@@ -158,16 +158,16 @@ const [didWinRun, setDidWinRun] = useState(false);
   const boardScrollRef = useRef<HTMLDivElement | null>(null);
   const playerTileRef = useRef<HTMLDivElement | null>(null);
 
-   const {
-  balance,
-  capBank,
-  remainingDaily,
-  totalEarnRoom,
-  refresh,
-  earn,
-  spend,
-} = usePoints(effectivePlayerId);
-
+    const {
+    balance,
+    capBank,
+    remainingDaily,
+    totalEarnRoom,
+    refresh,
+    earn,
+    spend,
+    pointsConfig,
+  } = usePoints(effectivePlayerId);
   const theme = themeMap[boardTheme];
   const brokenWallSet = useMemo(() => new Set(brokenWalls), [brokenWalls]);
 
@@ -569,19 +569,20 @@ lastHitRef.current = 0;
             Samurai Rebel Ants. Underground tunnels. Crumbs, sugar, crystals, danger, and breakable walls.
           </p>
 
-                  <SharedEconomyPanel
+                           <SharedEconomyPanel
             playerId={effectivePlayerId}
             balance={balance}
             totalPlaysLeft={totalEarnRoom}
             dailyPlaysLeft={remainingDaily}
             bonusPlayBank={capBank}
-            currency="REBEL"
-            dailyClaimAmount={1000}
+            dailyCap={Number(pointsConfig?.dailyEarnCap || 0)}
+            currency={pointsConfig?.currency || "REBEL"}
+            dailyClaimAmount={Number(pointsConfig?.dailyClaim || 0)}
             onOpenBuyPoints={() => setShowBuyPoints(true)}
             onRefresh={refresh}
           />
 
-          <div
+                  <div
             style={{
               marginTop: 18,
               display: "flex",
@@ -605,12 +606,7 @@ lastHitRef.current = 0;
                 style={inputStyle}
               />
             </label>
-
-            <Link href="/shuffle" style={secondaryButtonStyle}>
-              Back to Shuffle
-            </Link>
           </div>
-
           <div style={themeSwitchWrapStyle}>
             <button
               type="button"
