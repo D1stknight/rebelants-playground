@@ -1560,7 +1560,11 @@ return (
       Bonus play bank: <b>{Number(capBank || 0).toLocaleString()}</b>
     </span>
   </div>
-</div>
+
+{/* ✅ ADD THIS EXACT BLOCK RIGHT HERE */}
+<div style={{ fontSize: 12, opacity: 0.75, marginTop: 6 }}>
+  Daily plays reset every 24 hours. Bonus plays are included with point purchases and never expire.
+</div>       
         
      {/* Name + Claim + DRIP (aligned row) */}
 <div
