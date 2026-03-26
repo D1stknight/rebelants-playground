@@ -1287,14 +1287,18 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               </div>
             </div>
 
-                                {isPlaying && (
+            {isPlaying && (
               <div className="mobileOnlyControls">
                 <div style={mobileControlsGridStyle}>
                   <div />
                   <button
                     type="button"
                     style={mobileControlButtonStyle}
-                    onPointerDown={() => handleTunnelAction("up")}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      handleTunnelAction("up");
+                    }}
+                    onTouchStart={(e) => e.preventDefault()}
                   >
                     ↑
                   </button>
@@ -1303,7 +1307,11 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                   <button
                     type="button"
                     style={mobileControlButtonStyle}
-                    onPointerDown={() => handleTunnelAction("left")}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      handleTunnelAction("left");
+                    }}
+                    onTouchStart={(e) => e.preventDefault()}
                   >
                     ←
                   </button>
@@ -1311,7 +1319,11 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                   <button
                     type="button"
                     style={mobileBreakButtonStyle}
-                    onPointerDown={() => handleTunnelAction("break")}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      handleTunnelAction("break");
+                    }}
+                    onTouchStart={(e) => e.preventDefault()}
                   >
                     Break
                   </button>
@@ -1319,7 +1331,11 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                   <button
                     type="button"
                     style={mobileControlButtonStyle}
-                    onPointerDown={() => handleTunnelAction("right")}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      handleTunnelAction("right");
+                    }}
+                    onTouchStart={(e) => e.preventDefault()}
                   >
                     →
                   </button>
@@ -1328,7 +1344,11 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                   <button
                     type="button"
                     style={mobileControlButtonStyle}
-                    onPointerDown={() => handleTunnelAction("down")}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      handleTunnelAction("down");
+                    }}
+                    onTouchStart={(e) => e.preventDefault()}
                   >
                     ↓
                   </button>
@@ -1491,22 +1511,23 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           animation: hitShake 0.18s linear;
         }
 
-                .mobileOnlyControls {
+                       .mobileOnlyControls {
           display: none;
         }
 
         @media (max-width: 900px) {
           .mobileOnlyControls {
             position: fixed;
-            left: max(10px, env(safe-area-inset-left));
-            bottom: max(10px, env(safe-area-inset-bottom));
+            left: max(8px, env(safe-area-inset-left));
+            bottom: max(8px, env(safe-area-inset-bottom));
             z-index: 120;
             display: block;
-            padding: 8px;
+            padding: 6px;
             border-radius: 18px;
-            background: rgba(2, 6, 23, 0.18);
-            backdrop-filter: blur(6px);
-            box-shadow: 0 8px 20px rgba(0,0,0,0.18);
+            background: rgba(2, 6, 23, 0.08);
+            backdrop-filter: blur(3px);
+            -webkit-backdrop-filter: blur(3px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.10);
           }
         }
 
@@ -2063,33 +2084,45 @@ const mobileControlsGridStyle: React.CSSProperties = {
   display: "grid",
   gridTemplateColumns: "58px 58px 58px",
   justifyContent: "center",
-  gap: 8,
+  gap: 6,
 };
 
 const mobileControlButtonStyle: React.CSSProperties = {
   width: 58,
   height: 58,
   borderRadius: 16,
-  border: "1px solid rgba(255,255,255,0.14)",
-  background: "rgba(15,23,42,0.56)",
+  border: "1px solid rgba(255,255,255,0.10)",
+  background: "rgba(15,23,42,0.36)",
   color: "white",
   fontSize: 26,
   fontWeight: 900,
   cursor: "pointer",
-  boxShadow: "0 6px 16px rgba(0,0,0,0.22)",
-  backdropFilter: "blur(6px)",
+  boxShadow: "0 4px 12px rgba(0,0,0,0.16)",
+  backdropFilter: "blur(4px)",
+  WebkitBackdropFilter: "blur(4px)",
+  userSelect: "none",
+  WebkitUserSelect: "none",
+  WebkitTouchCallout: "none",
+  WebkitTapHighlightColor: "transparent",
+  touchAction: "manipulation",
 };
 
 const mobileBreakButtonStyle: React.CSSProperties = {
   width: 58,
   height: 58,
   borderRadius: 16,
-  border: "1px solid rgba(250,204,21,0.24)",
-  background: "rgba(250,204,21,0.14)",
+  border: "1px solid rgba(250,204,21,0.18)",
+  background: "rgba(250,204,21,0.10)",
   color: "#fde68a",
   fontSize: 11,
   fontWeight: 900,
   cursor: "pointer",
-  boxShadow: "0 6px 16px rgba(0,0,0,0.22)",
-  backdropFilter: "blur(6px)",
+  boxShadow: "0 4px 12px rgba(0,0,0,0.16)",
+  backdropFilter: "blur(4px)",
+  WebkitBackdropFilter: "blur(4px)",
+  userSelect: "none",
+  WebkitUserSelect: "none",
+  WebkitTouchCallout: "none",
+  WebkitTapHighlightColor: "transparent",
+  touchAction: "manipulation",
 };
