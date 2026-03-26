@@ -851,25 +851,20 @@ const [didWinRun, setDidWinRun] = useState(false);
 {!wall && hasCrystal && (
   <div
     className="crystalPulse"
- style={{
-  width: 26,
-  height: 26,
-  display: "grid",
-  placeItems: "center",
-  transform: "rotate(45deg)",
-  background: "linear-gradient(135deg, #ffffff, #60a5fa)",
-  boxShadow: `
-    0 0 12px #3b82f6,
-    0 0 28px #3b82f6,
-    0 0 60px rgba(59,130,246,0.9),
-    inset 0 0 10px rgba(255,255,255,0.9)
-  `,
-  clipPath: "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)",
-  fontSize: 13,
-  filter: "drop-shadow(0 0 20px rgba(59,130,246,1))",
-}}
+    style={{
+      width: 26,
+      height: 26,
+      display: "grid",
+      placeItems: "center",
+      fontSize: 16,
+      filter: `
+        drop-shadow(0 0 6px #3b82f6)
+        drop-shadow(0 0 14px #3b82f6)
+        drop-shadow(0 0 28px rgba(59,130,246,1))
+      `,
+    }}
   >
-    <span style={{ transform: "rotate(-45deg)" }}>💎</span>
+    💎
   </div>
 )}
 
