@@ -1026,8 +1026,8 @@ const [didWinRun, setDidWinRun] = useState(false);
                                 src="/ants/samurai.png"
                                 alt="Samurai Ant"
                                 style={{
-                                  width: "140%",
-                                  height: "140%",
+                                  width: "125%",
+                                  height: "125%",
                                   objectFit: "contain",
                                   transform: "translateY(3px)",
                                   filter: "drop-shadow(0 0 6px rgba(0,0,0,0.45)) drop-shadow(0 0 10px rgba(255,255,255,0.12))",
