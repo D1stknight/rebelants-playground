@@ -997,21 +997,34 @@ const [didWinRun, setDidWinRun] = useState(false);
                             </div>
                           )}
 
-                          {!wall && isSpider && (
+                                                   {!wall && isSpider && (
                             <div
                               className="spiderBob"
                               style={{
                                 ...tokenStyle,
-                                width: 34,
-                                height: 34,
-                                borderRadius: 12,
-                                background: "rgba(127,29,29,0.92)",
-                                border: "1px solid rgba(248,113,113,0.28)",
-                                boxShadow: theme.spiderGlow,
-                                fontSize: 18,
+                                width: 44,
+                                height: 44,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                pointerEvents: "none",
+                                overflow: "visible",
                               }}
                             >
-                              🕷️
+                              <img
+                                src="/spiders/spider.png"
+                                alt="Spider"
+                                style={{
+                                  width: "145%",
+                                  height: "145%",
+                                  objectFit: "contain",
+                                  transform: "translateY(2px)",
+                                  filter:
+                                    "drop-shadow(0 0 6px rgba(0,0,0,0.5)) " +
+                                    "drop-shadow(0 0 10px rgba(255,40,40,0.65)) " +
+                                    "drop-shadow(0 0 18px rgba(255,0,0,0.55))",
+                                }}
+                              />
                             </div>
                           )}
 
