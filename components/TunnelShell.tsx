@@ -791,15 +791,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
             onOpenBuyPoints={() => setShowBuyPoints(true)}
             onRefresh={refresh}
           />
-                  <div
-            style={{
-              marginTop: 18,
-              display: "flex",
-              gap: 10,
-              flexWrap: "wrap",
-              alignItems: "center",
-            }}
-          >
+                        <div style={tunnelTopMetaRowStyle}>
             <label style={{ fontSize: 13, opacity: 0.9 }}>
               Name:&nbsp;
               <input
@@ -815,6 +807,82 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                 style={inputStyle}
               />
             </label>
+
+            <div style={tunnelFlavorQuoteStyle}>
+              Move with purpose. Break what stands in your way. In the dark, hesitation is defeat.
+            </div>
+
+            <details style={tunnelInlineRulesWrapStyle}>
+              <summary style={tunnelInlineRulesSummaryStyle}>
+                How to Play + Official Rules
+              </summary>
+
+              <div style={tunnelInlineRulesContentStyle}>
+                <div style={tunnelRulesSectionStyle}>
+                  <div style={tunnelRulesSectionTitleStyle}>How to Play</div>
+                  <ul style={tunnelRulesListStyle}>
+                    <li>Use the arrow keys to move your ant through the tunnel</li>
+                    <li>Press Space to break a wall directly in front of you</li>
+                    <li>Collect crumbs, sugar, and crystals to build your score</li>
+                    <li>Avoid spiders and keep moving under pressure</li>
+                    <li>Finish your run with the highest score possible</li>
+                  </ul>
+                </div>
+
+                <div style={tunnelRulesSectionStyle}>
+                  <div style={tunnelRulesSectionTitleStyle}>Scoring</div>
+                  <ul style={tunnelRulesListStyle}>
+                    <li>Crumbs add light value to your run</li>
+                    <li>Sugar adds more value</li>
+                    <li>Crystals carry the highest value</li>
+                    <li>Efficient movement and smart route choices improve your final result</li>
+                  </ul>
+                </div>
+
+                <div style={tunnelRulesSectionStyle}>
+                  <div style={tunnelRulesSectionTitleStyle}>Full Clear</div>
+                  <p style={tunnelRulesParagraphStyle}>
+                    A Full Clear happens when all crystals in a run are collected. Full Clears qualify
+                    for the Fastest Clear Tunnel leaderboard.
+                  </p>
+                </div>
+
+                <div style={tunnelRulesSectionStyle}>
+                  <div style={tunnelRulesSectionTitleStyle}>Leaderboards</div>
+                  <ul style={tunnelRulesListStyle}>
+                    <li>Top Score tracks the highest score achieved in a single Tunnel run</li>
+                    <li>Fastest Clear tracks the fastest completed Full Clear run</li>
+                    <li>These leaderboards are based on Ant Tunnel performance only</li>
+                  </ul>
+                </div>
+
+                <div style={tunnelRulesSectionStyle}>
+                  <div style={tunnelRulesSectionTitleStyle}>Fair Play</div>
+                  <p style={tunnelRulesParagraphStyle}>
+                    Use of exploits, automation, unintended mechanics, or any method that interferes
+                    with normal gameplay may result in score removal, stat resets, or leaderboard
+                    disqualification.
+                  </p>
+                </div>
+
+                <div style={tunnelRulesSectionStyle}>
+                  <div style={tunnelRulesSectionTitleStyle}>Important Notice</div>
+                  <p style={tunnelRulesParagraphStyle}>
+                    Ant Tunnel is a skill-based interactive game experience. Outcomes are determined by
+                    player input and gameplay decisions. No outcome is determined by chance, and no
+                    wager is placed to participate.
+                  </p>
+                </div>
+
+                <div style={tunnelRulesSectionStyle}>
+                  <div style={tunnelRulesSectionTitleStyle}>Live Updates</div>
+                  <p style={tunnelRulesParagraphStyle}>
+                    Visuals, enemy behavior, scoring balance, pickups, and leaderboard systems may be
+                    refined over time as the Rebel Ants Playground expands. The colony is always adapting.
+                  </p>
+                </div>
+              </div>
+            </details>
           </div>
           <div style={themeSwitchWrapStyle}>
             <button
@@ -1251,95 +1319,6 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                 </div>
               </div>
             </div>
-
-            <details style={tunnelRulesCardStyle}>
-              <summary style={tunnelRulesSummaryStyle}>
-                Ant Tunnel — How to Play + Official Rules
-              </summary>
-
-              <div style={tunnelRulesContentStyle}>
-                <div style={tunnelRulesIntroStyle}>
-                  Only the sharpest ants survive the tunnel. Move with purpose. Break what stands
-                  in your way. Collect everything you can. Because in the dark, hesitation is defeat.
-                </div>
-
-                <div style={tunnelRulesSectionStyle}>
-                  <div style={tunnelRulesSectionTitleStyle}>Enter the Tunnel</div>
-                  <p style={tunnelRulesParagraphStyle}>
-                    Ant Tunnel is a skill-based challenge where every run is shaped by your movement,
-                    timing, pathing, and decision-making. Your objective is simple: move through the
-                    tunnel, collect crystals, avoid danger, and post the strongest run you can.
-                  </p>
-                  <p style={tunnelRulesParagraphStyle}>
-                    There is no luck in the tunnel. Only instinct, control, and survival.
-                  </p>
-                </div>
-
-                <div style={tunnelRulesSectionStyle}>
-                  <div style={tunnelRulesSectionTitleStyle}>How to Play</div>
-                  <ul style={tunnelRulesListStyle}>
-                    <li>Use the arrow keys to move your ant through the tunnel</li>
-                    <li>Press Space to break a wall directly in front of you</li>
-                    <li>Collect crumbs, sugar, and crystals to build your score</li>
-                    <li>Avoid spiders and keep moving under pressure</li>
-                    <li>Finish your run with the highest score possible</li>
-                  </ul>
-                </div>
-
-                <div style={tunnelRulesSectionStyle}>
-                  <div style={tunnelRulesSectionTitleStyle}>Scoring</div>
-                  <ul style={tunnelRulesListStyle}>
-                    <li>Crumbs add light value to your run</li>
-                    <li>Sugar adds more value</li>
-                    <li>Crystals carry the highest value</li>
-                    <li>Efficient movement and smart route choices improve your final result</li>
-                  </ul>
-                </div>
-
-                <div style={tunnelRulesSectionStyle}>
-                  <div style={tunnelRulesSectionTitleStyle}>Full Clear</div>
-                  <p style={tunnelRulesParagraphStyle}>
-                    A Full Clear happens when all crystals in a run are collected. Full Clears qualify
-                    for the Fastest Clear Tunnel leaderboard.
-                  </p>
-                </div>
-
-                <div style={tunnelRulesSectionStyle}>
-                  <div style={tunnelRulesSectionTitleStyle}>Leaderboards</div>
-                  <ul style={tunnelRulesListStyle}>
-                    <li>Top Score tracks the highest score achieved in a single Tunnel run</li>
-                    <li>Fastest Clear tracks the fastest completed Full Clear run</li>
-                    <li>These leaderboards are based on Ant Tunnel performance only</li>
-                  </ul>
-                </div>
-
-                <div style={tunnelRulesSectionStyle}>
-                  <div style={tunnelRulesSectionTitleStyle}>Fair Play</div>
-                  <p style={tunnelRulesParagraphStyle}>
-                    Use of exploits, automation, unintended mechanics, or any method that interferes
-                    with normal gameplay may result in score removal, stat resets, or leaderboard
-                    disqualification.
-                  </p>
-                </div>
-
-                <div style={tunnelRulesSectionStyle}>
-                  <div style={tunnelRulesSectionTitleStyle}>Important Notice</div>
-                  <p style={tunnelRulesParagraphStyle}>
-                    Ant Tunnel is a skill-based interactive game experience. Outcomes are determined by
-                    player input and gameplay decisions. No outcome is determined by chance, and no
-                    wager is placed to participate.
-                  </p>
-                </div>
-
-                <div style={tunnelRulesSectionStyle}>
-                  <div style={tunnelRulesSectionTitleStyle}>Live Updates</div>
-                  <p style={tunnelRulesParagraphStyle}>
-                    Visuals, enemy behavior, scoring balance, pickups, and leaderboard systems may be
-                    refined over time as the Rebel Ants Playground expands. The colony is always adapting.
-                  </p>
-                </div>
-              </div>
-            </details>
           </div>
         </div>
       </main>
@@ -1871,39 +1850,52 @@ const personalStatValueStyle: React.CSSProperties = {
   lineHeight: 1.1,
 };
 
-const tunnelRulesCardStyle: React.CSSProperties = {
-  borderRadius: 20,
+const tunnelTopMetaRowStyle: React.CSSProperties = {
+  marginTop: 18,
+  display: "grid",
+  gridTemplateColumns: "auto 1fr auto",
+  gap: 12,
+  alignItems: "start",
+};
+
+const tunnelFlavorQuoteStyle: React.CSSProperties = {
+  padding: "10px 14px",
+  borderRadius: 14,
+  background: "linear-gradient(135deg, rgba(96,165,250,0.08), rgba(244,63,94,0.06))",
+  border: "1px solid rgba(255,255,255,0.08)",
+  color: "#e5e7eb",
+  fontSize: 13,
+  lineHeight: 1.55,
+  fontWeight: 700,
+  minHeight: 42,
+  display: "flex",
+  alignItems: "center",
+};
+
+const tunnelInlineRulesWrapStyle: React.CSSProperties = {
+  minWidth: 240,
+  borderRadius: 14,
   border: "1px solid rgba(96,165,250,0.18)",
   background: "rgba(9,12,22,0.92)",
-  boxShadow: "0 0 0 1px rgba(96,165,250,0.10), 0 0 22px rgba(96,165,250,0.08), 0 18px 40px rgba(0,0,0,0.32)",
+  boxShadow: "0 0 0 1px rgba(96,165,250,0.10), 0 0 18px rgba(96,165,250,0.08)",
   overflow: "hidden",
 };
 
-const tunnelRulesSummaryStyle: React.CSSProperties = {
+const tunnelInlineRulesSummaryStyle: React.CSSProperties = {
   cursor: "pointer",
   listStyle: "none",
-  padding: "18px 20px",
-  fontSize: 20,
+  padding: "12px 14px",
+  fontSize: 14,
   fontWeight: 900,
-  borderBottom: "1px solid rgba(255,255,255,0.08)",
+  color: "#dbeafe",
 };
 
-const tunnelRulesContentStyle: React.CSSProperties = {
-  padding: 20,
+const tunnelInlineRulesContentStyle: React.CSSProperties = {
+  padding: 14,
   display: "flex",
   flexDirection: "column",
-  gap: 18,
-};
-
-const tunnelRulesIntroStyle: React.CSSProperties = {
-  padding: 16,
-  borderRadius: 16,
-  background: "linear-gradient(135deg, rgba(96,165,250,0.10), rgba(244,63,94,0.08))",
-  border: "1px solid rgba(255,255,255,0.08)",
-  fontSize: 15,
-  lineHeight: 1.6,
-  fontWeight: 700,
-  color: "#e5e7eb",
+  gap: 12,
+  borderTop: "1px solid rgba(255,255,255,0.08)",
 };
 
 const tunnelRulesSectionStyle: React.CSSProperties = {
