@@ -24,6 +24,9 @@ const EVENT_SIG =
 function balKey(playerId: string) {
   return `ra:points:bal:${playerId}`;
 }
+function capBankKey(playerId: string) {
+  return `ra:points:capbank:${playerId}`;
+}
 function claimedKey(txHash: string, logIndex: number) {
   return `ra:shop:claimed:${txHash.toLowerCase()}:${logIndex}`;
 }
@@ -170,11 +173,14 @@ for (const log of matches) {
     await redis.set(walletToPlayerKey(walletAddress), playerId);
     await redis.set(playerToWalletKey(playerId), walletAddress);
 
-    // --------- Credit points to player balance ----------
+        // --------- Credit points to player balance ----------
     const beforeRaw = await redis.get<number>(balKey(playerId));
     const before = Number(beforeRaw || 0);
     const after = before + found.points;
     await redis.set(balKey(playerId), after);
+
+    // --------- Add purchased cap bank (stacks permanently until used) ----------
+    const capBankAfter = await redis.incrby(capBankKey(playerId), found.points);
 
     return res.status(200).json({
       ok: true,
@@ -183,6 +189,7 @@ for (const log of matches) {
       packId: found.packId,
       points: found.points,
       balance: after,
+      capBank: Number(capBankAfter || 0),
     });
   } catch (err: any) {
     console.error("shop/claim error:", err);

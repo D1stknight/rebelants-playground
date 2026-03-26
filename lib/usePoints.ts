@@ -1,10 +1,54 @@
 // lib/usePoints.ts
 import { useCallback, useEffect, useRef, useState } from "react";
 
-type BalanceRes = { playerId: string; balance: number; earnedToday?: number };
-type SpendRes = { ok: boolean; playerId: string; balance: number; earnedToday?: number; error?: string };
-type EarnRes = { ok: boolean; playerId: string; balance: number; earnedToday?: number; added?: number; capped?: boolean; error?: string };
-type DevGrantRes = { ok: boolean; dev: boolean; playerId: string; added: number; balance: number; error?: string };
+type BalanceRes = {
+  playerId: string;
+  balance: number;
+  earnedToday?: number;
+  capBank?: number;
+  dailyCap?: number;
+  remainingDaily?: number;
+  totalEarnRoom?: number;
+};
+
+type SpendRes = {
+  ok: boolean;
+  playerId: string;
+  balance: number;
+  earnedToday?: number;
+  capBank?: number;
+  dailyCap?: number;
+  remainingDaily?: number;
+  totalEarnRoom?: number;
+  error?: string;
+};
+
+type EarnRes = {
+  ok: boolean;
+  playerId: string;
+  balance: number;
+  earnedToday?: number;
+  capBank?: number;
+  dailyCap?: number;
+  remainingDaily?: number;
+  totalEarnRoom?: number;
+  added?: number;
+  capped?: boolean;
+  error?: string;
+};
+
+type DevGrantRes = {
+  ok: boolean;
+  dev: boolean;
+  playerId: string;
+  added: number;
+  balance: number;
+  capBank?: number;
+  dailyCap?: number;
+  remainingDaily?: number;
+  totalEarnRoom?: number;
+  error?: string;
+};
 
 function clampPid(v: string) {
   return (v || "guest").trim().slice(0, 64) || "guest";
@@ -14,8 +58,12 @@ export function usePoints(playerId: string) {
   // ✅ Always operate on the latest playerId (guest -> discord -> wallet)
   const playerIdRef = useRef<string>(clampPid(playerId));
 
-  const [balance, setBalance] = useState(0);
+    const [balance, setBalance] = useState(0);
   const [earnedToday, setEarnedToday] = useState(0);
+  const [capBank, setCapBank] = useState(0);
+  const [dailyCap, setDailyCap] = useState(0);
+  const [remainingDaily, setRemainingDaily] = useState(0);
+  const [totalEarnRoom, setTotalEarnRoom] = useState(0);
 
   const refresh = useCallback(async () => {
     const pid = clampPid(playerIdRef.current);
@@ -25,10 +73,14 @@ export function usePoints(playerId: string) {
       { cache: "no-store" }
     );
 
-    const j = (await r.json().catch(() => null)) as BalanceRes | null;
+        const j = (await r.json().catch(() => null)) as BalanceRes | null;
 
     setBalance(Number(j?.balance || 0));
     setEarnedToday(Number(j?.earnedToday || 0));
+    setCapBank(Number(j?.capBank || 0));
+    setDailyCap(Number(j?.dailyCap || 0));
+    setRemainingDaily(Number(j?.remainingDaily || 0));
+    setTotalEarnRoom(Number(j?.totalEarnRoom || 0));
   }, []);
 
   // ✅ When playerId changes, update ref AND refresh immediately
@@ -49,9 +101,13 @@ export function usePoints(playerId: string) {
 
       const j = (await r.json().catch(() => null)) as SpendRes | null;
 
-      if (r.ok && j && typeof j.balance === "number") {
+           if (r.ok && j && typeof j.balance === "number") {
         setBalance(j.balance);
-        setEarnedToday(j.earnedToday ?? earnedToday);
+        setEarnedToday(Number(j.earnedToday ?? earnedToday));
+        setCapBank(Number(j.capBank || 0));
+        setDailyCap(Number(j.dailyCap || 0));
+        setRemainingDaily(Number(j.remainingDaily || 0));
+        setTotalEarnRoom(Number(j.totalEarnRoom || 0));
         return j;
       }
 
@@ -74,9 +130,13 @@ export function usePoints(playerId: string) {
 
       const j = (await r.json().catch(() => null)) as EarnRes | null;
 
-      if (r.ok && j && typeof j.balance === "number") {
+           if (r.ok && j && typeof j.balance === "number") {
         setBalance(j.balance);
-        setEarnedToday(j.earnedToday ?? earnedToday);
+        setEarnedToday(Number(j.earnedToday ?? earnedToday));
+        setCapBank(Number(j.capBank || 0));
+        setDailyCap(Number(j.dailyCap || 0));
+        setRemainingDaily(Number(j.remainingDaily || 0));
+        setTotalEarnRoom(Number(j.totalEarnRoom || 0));
         return j;
       }
 
@@ -119,5 +179,18 @@ export function usePoints(playerId: string) {
     setBalance(newBalance);
   }, []);
 
-  return { balance, earnedToday, spend, earn, claimDaily, devGrant, set, refresh };
+  return {
+    balance,
+    earnedToday,
+    capBank,
+    dailyCap,
+    remainingDaily,
+    totalEarnRoom,
+    spend,
+    earn,
+    claimDaily,
+    devGrant,
+    set,
+    refresh,
+  };
 }

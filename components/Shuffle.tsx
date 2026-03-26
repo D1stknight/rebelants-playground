@@ -641,8 +641,19 @@ export default function Shuffle() {
     };
   }, []);
 
-const { balance, spend, earn, claimDaily, devGrant, refresh } =
-  usePoints(effectivePlayerId);
+const {
+  balance,
+  earnedToday,
+  capBank,
+  dailyCap,
+  remainingDaily,
+  totalEarnRoom,
+  spend,
+  earn,
+  claimDaily,
+  devGrant,
+  refresh,
+} = usePoints(effectivePlayerId);
 
 // ✅ Keep profile reactive (so UI updates when localStorage changes)
 const [profile, setProfile] = React.useState<any>(() => {
@@ -907,8 +918,21 @@ const runShuffle = async () => {
 
   if (balance < cost) return;
 
-    await spend(cost, "shuffle");
+  if (Number(totalEarnRoom || 0) <= 0) {
+    setWinText("No play room left today. Buy a pack to keep playing.");
+    return;
+  }
 
+  const spendRes = await spend(cost, "shuffle");
+
+  if (!spendRes?.ok) {
+    setWinText(
+      spendRes?.error || "No play room left today. Buy a pack to keep playing."
+    );
+    return;
+  }
+
+  setWinText("");
   setBusy(true);
   setPhase("shuffling");
   setProgress(0);
@@ -1491,11 +1515,12 @@ return (
       }}
     >
       <div style={{ fontWeight: 800, marginBottom: 6 }}>How points work</div>
-   <div style={{ fontSize: 13, opacity: 0.9, lineHeight: 1.4 }}>
+ <div style={{ fontSize: 13, opacity: 0.9, lineHeight: 1.4 }}>
   • Shuffle costs <b>{pointsConfig.shuffleCost}</b> {pointsConfig.currency}.<br />
   • Crates can award <b>REBEL Points</b> and occasionally <b>collectibles/merch</b> when enabled.<br />
   • Daily claim: <b>+{pointsConfig.dailyClaim}</b> {pointsConfig.currency} (once per day).<br />
-  • Daily earn cap: <b>{pointsConfig.dailyEarnCap}</b> {pointsConfig.currency}/day (anti-abuse).<br />
+  • Daily plays reset every 24 hours.<br />
+  • Point purchases may include <b>bonus plays</b>, which are used after daily plays run out and do not expire.<br />
   • Optional: you can buy points with <b>APE</b> (final sale, gas may apply).<br />
   • See <a href="/rules" style={{ textDecoration: "underline" }}>Official Rules</a> for details.
 </div>
@@ -1510,7 +1535,7 @@ return (
     </div>
   )}
 </div>
-        <div style={{ marginTop: 10, fontSize: 13, opacity: 0.9 }}>
+      <div style={{ marginTop: 10, fontSize: 13, opacity: 0.9 }}>
   <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
     <span>Cost: <b>{pointsConfig.shuffleCost}</b> {pointsConfig.currency}</span>
     <span>Common: <b>+{pointsConfig.rewards.common}</b></span>
@@ -1518,9 +1543,31 @@ return (
     <span>Ultra: <b>+{pointsConfig.rewards.ultra}</b></span>
     <span>Daily cap: <b>{pointsConfig.dailyEarnCap}</b></span>
   </div>
+
+  <div style={{ marginTop: 8, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+    <span
+      style={{
+        fontWeight: 800,
+        color: "#60a5fa",
+        textShadow: "0 0 8px rgba(96,165,250,0.25)",
+      }}
+    >
+      Total plays left: <b>{Number(totalEarnRoom || 0).toLocaleString()}</b>
+    </span>
+    <span>
+      Daily plays left: <b>{Number(remainingDaily || 0).toLocaleString()}</b>
+    </span>
+    <span>
+      Bonus play bank: <b>{Number(capBank || 0).toLocaleString()}</b>
+    </span>
+  </div>
+
+  <div style={{ fontSize: 12, opacity: 0.75, marginTop: 6 }}>
+    Daily plays reset every 24 hours. Bonus plays are included with point purchases and never expire.
+  </div>
 </div>
-        
-     {/* Name + Claim + DRIP (aligned row) */}
+
+{/* Name + Claim + DRIP (aligned row) */}
 <div
   style={{
     marginTop: 10,

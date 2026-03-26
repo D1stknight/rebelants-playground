@@ -15,6 +15,9 @@ function todayKey(playerId: string) {
 function balKey(playerId: string) {
   return `ra:points:bal:${playerId}`;
 }
+function capBankKey(playerId: string) {
+  return `ra:points:capbank:${playerId}`;
+}
 
 // ✅ get LIVE config (Admin -> Redis) via /api/config, fallback to defaults
 async function getLivePointsConfig(req: NextApiRequest) {
@@ -59,11 +62,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const cap = Number((liveCfg as any).dailyEarnCap || 0);
 
     const earnedKey = todayKey(pid);
-    const earnedTodayRaw = await redis.get<number>(earnedKey);
-    const earnedToday = Number(earnedTodayRaw || 0);
+const earnedTodayRaw = await redis.get<number>(earnedKey);
+const earnedToday = Number(earnedTodayRaw || 0);
 
-    const remaining = Math.max(0, cap - earnedToday);
-    const toAdd = Math.max(0, Math.min(amt, remaining));
+// NEW: get cap bank
+const capBankRaw = await redis.get<number>(capBankKey(pid));
+const capBank = Number(capBankRaw || 0);
+
+// how much room is left in daily cap
+const remainingDaily = Math.max(0, cap - earnedToday);
+
+// total allowed (daily + capBank)
+const totalAvailable = remainingDaily + capBank;
+
+// how much we can actually add
+const toAdd = Math.max(0, Math.min(amt, totalAvailable));
 
     if (toAdd <= 0) {
       const balNowRaw = await redis.get<number>(balKey(pid));
@@ -79,10 +92,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    const newEarnedToday = await redis.incrby(earnedKey, toAdd);
-    await redis.expire(earnedKey, 60 * 60 * 48);
+    let useFromDaily = Math.min(toAdd, remainingDaily);
+let useFromBank = Math.max(0, toAdd - useFromDaily);
 
-    const newBalance = await redis.incrby(balKey(pid), toAdd);
+// update daily earned
+let newEarnedToday = earnedToday;
+if (useFromDaily > 0) {
+  newEarnedToday = await redis.incrby(earnedKey, useFromDaily);
+  await redis.expire(earnedKey, 60 * 60 * 48);
+}
+
+// reduce cap bank
+if (useFromBank > 0) {
+  await redis.decrby(capBankKey(pid), useFromBank);
+}
+
+// update balance
+const newBalance = await redis.incrby(balKey(pid), toAdd);
 
 // ✅ lifetime earned leaderboard (gameplay only)
 await addToEarnedTotal(pid, toAdd);
@@ -90,15 +116,18 @@ await addToEarnedTotal(pid, toAdd);
 // ✅ keep balance leaderboard accurate
 await updateBalanceLeaderboard(pid, Number(newBalance || 0));
     
-    return res.status(200).json({
-      ok: true,
-      playerId: pid,
-      added: toAdd,
-      capped: toAdd < amt,
-      earnedToday: Number(newEarnedToday || 0),
-      cap,
-      balance: Number(newBalance || 0),
-    });
+    const updatedCapBankRaw = await redis.get<number>(capBankKey(pid));
+
+return res.status(200).json({
+  ok: true,
+  playerId: pid,
+  added: toAdd,
+  capped: toAdd < amt,
+  earnedToday: Number(newEarnedToday || 0),
+  cap,
+  capBank: Number(updatedCapBankRaw || 0),
+  balance: Number(newBalance || 0),
+});
   } catch (err: any) {
     console.error("earn error:", err);
     return res.status(500).json({ error: "Server error" });
