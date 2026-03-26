@@ -344,11 +344,12 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
   const [hitFlash, setHitFlash] = useState(false);
   const [hitShake, setHitShake] = useState(false);
 
-   const [topScoreRows, setTopScoreRows] = useState<TunnelScoreRow[]>([]);
+    const [topScoreRows, setTopScoreRows] = useState<TunnelScoreRow[]>([]);
   const [fastestClearRows, setFastestClearRows] = useState<TunnelFastestRow[]>([]);
   const [personalStats, setPersonalStats] = useState<TunnelPersonalStats | null>(null);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [isMobileView, setIsMobileView] = useState(false);
+  const [isLandscape, setIsLandscape] = useState(true);
 
     const lastHitRef = useRef(0);
   const boardScrollRef = useRef<HTMLDivElement | null>(null);
@@ -629,7 +630,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     };
   }, [isPlaying]);
 
-   useEffect(() => {
+    useEffect(() => {
     void loadTunnelLeaderboard();
   }, [effectivePlayerId]);
 
@@ -637,12 +638,39 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     const updateMobileView = () => {
       if (typeof window === "undefined") return;
       setIsMobileView(window.innerWidth <= 900);
+      setIsLandscape(window.innerWidth >= window.innerHeight);
     };
 
     updateMobileView();
     window.addEventListener("resize", updateMobileView);
-    return () => window.removeEventListener("resize", updateMobileView);
+    window.addEventListener("orientationchange", updateMobileView);
+
+    return () => {
+      window.removeEventListener("resize", updateMobileView);
+      window.removeEventListener("orientationchange", updateMobileView);
+    };
   }, []);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const lockRunMode = isPlaying && isMobileView;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevBodyTouchAction = document.body.style.touchAction;
+
+    if (lockRunMode) {
+      document.documentElement.style.overflow = "hidden";
+      document.body.style.overflow = "hidden";
+      document.body.style.touchAction = "none";
+    }
+
+    return () => {
+      document.documentElement.style.overflow = prevHtmlOverflow;
+      document.body.style.overflow = prevBodyOverflow;
+      document.body.style.touchAction = prevBodyTouchAction;
+    };
+  }, [isPlaying, isMobileView]);
 
   function setupNewRun() {
     const nextLayoutIndex = Math.floor(Math.random() * TUNNEL_LAYOUTS.length);
