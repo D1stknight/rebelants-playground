@@ -160,7 +160,9 @@ const [didWinRun, setDidWinRun] = useState(false);
   const [sugars, setSugars] = useState<Cell[]>([]);
   const [crystals, setCrystals] = useState<Cell[]>([]);
   const [spiderPos, setSpiderPos] = useState<Cell>({ row: 1, col: 10 });
-  const [wallBreaksLeft, setWallBreaksLeft] = useState(WALL_BREAKS_PER_RUN);
+  const [wallBreaksLeft, setWallBreaksLeft] = useState(
+  DEFAULT_TUNNEL_CONFIG.tunnelWallBreaks
+);
   const [brokenWalls, setBrokenWalls] = useState<string[]>([]);
   const [facing, setFacing] = useState<Facing>("right");
 
