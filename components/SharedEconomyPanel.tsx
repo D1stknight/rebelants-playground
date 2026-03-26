@@ -6,6 +6,7 @@ type Props = {
   totalPlaysLeft: number;
   dailyPlaysLeft: number;
   bonusPlayBank: number;
+  dailyCap: number;
   currency?: string;
   dailyClaimAmount: number;
   onOpenBuyPoints: () => void;
@@ -18,6 +19,7 @@ export default function SharedEconomyPanel({
   totalPlaysLeft,
   dailyPlaysLeft,
   bonusPlayBank,
+  dailyCap,
   currency = "REBEL",
   dailyClaimAmount,
   onOpenBuyPoints,
@@ -110,9 +112,12 @@ export default function SharedEconomyPanel({
 
   return (
     <div style={panelStyle}>
-      <div style={statsWrapStyle}>
+            <div style={statsWrapStyle}>
         <span>
           Balance: <b>{Number(balance || 0).toLocaleString()}</b> {currency}
+        </span>
+        <span>
+          Daily cap: <b>{Number(dailyCap || 0).toLocaleString()}</b>
         </span>
         <span style={{ fontWeight: 800, color: "#60a5fa" }}>
           Total plays left: <b>{Number(totalPlaysLeft || 0).toLocaleString()}</b>
