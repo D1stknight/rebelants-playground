@@ -344,10 +344,11 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
   const [hitFlash, setHitFlash] = useState(false);
   const [hitShake, setHitShake] = useState(false);
 
-  const [topScoreRows, setTopScoreRows] = useState<TunnelScoreRow[]>([]);
+   const [topScoreRows, setTopScoreRows] = useState<TunnelScoreRow[]>([]);
   const [fastestClearRows, setFastestClearRows] = useState<TunnelFastestRow[]>([]);
   const [personalStats, setPersonalStats] = useState<TunnelPersonalStats | null>(null);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [isMobileView, setIsMobileView] = useState(false);
 
   const lastHitRef = useRef(0);
   const boardScrollRef = useRef<HTMLDivElement | null>(null);
@@ -580,11 +581,22 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     };
   }, [isPlaying]);
 
-  useEffect(() => {
+   useEffect(() => {
     void loadTunnelLeaderboard();
   }, [effectivePlayerId]);
 
-    function setupNewRun() {
+  useEffect(() => {
+    const updateMobileView = () => {
+      if (typeof window === "undefined") return;
+      setIsMobileView(window.innerWidth <= 900);
+    };
+
+    updateMobileView();
+    window.addEventListener("resize", updateMobileView);
+    return () => window.removeEventListener("resize", updateMobileView);
+  }, []);
+
+  function setupNewRun() {
     const nextLayoutIndex = Math.floor(Math.random() * TUNNEL_LAYOUTS.length);
     setLayoutIndex(nextLayoutIndex);
 
@@ -932,7 +944,12 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
             onOpenBuyPoints={() => setShowBuyPoints(true)}
             onRefresh={refresh}
           />
-                        <div style={tunnelTopMetaRowStyle}>
+                                <div
+            style={{
+              ...tunnelTopMetaRowStyle,
+              ...(isMobileView ? tunnelTopMetaRowMobileStyle : null),
+            }}
+          >
             <label style={{ fontSize: 13, opacity: 0.9 }}>
               Name:&nbsp;
               <input
@@ -1057,10 +1074,14 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
   </div>
 ) : null}
 
-                                              <div
+                                                             <div
                   ref={boardScrollRef}
                   className={hitShake ? "hitShake" : ""}
-                  style={{ ...boardPreviewStyle, background: theme.bg }}
+                  style={{
+                    ...boardPreviewStyle,
+                    ...(isMobileView ? boardPreviewMobileStyle : null),
+                    background: theme.bg,
+                  }}
                 >
                   <div style={previewGlowStyle(theme.accent)} />
 
@@ -1079,8 +1100,18 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
   />
 )}
 
-                  <div style={previewInnerStyle}>
-                    <div style={previewGridStyle}>
+                                   <div
+                    style={{
+                      ...previewInnerStyle,
+                      ...(isMobileView ? previewInnerMobileStyle : null),
+                    }}
+                  >
+                    <div
+                      style={{
+                        ...previewGridStyle,
+                        ...(isMobileView ? previewGridMobileStyle : null),
+                      }}
+                    >
                     {Array.from({ length: GRID_ROWS * GRID_COLS }, (_, i) => {
                       const row = Math.floor(i / GRID_COLS);
                       const col = i % GRID_COLS;
@@ -1109,41 +1140,49 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                               : "inset 0 0 8px rgba(255,255,255,0.02)",
                           }}
                         >
-                     {!wall && hasCrumb && (
+                   {!wall && hasCrumb && (
   <div
     className="crumbPulse"
     style={{
-  width: 16,
-  height: 16,
-  display: "grid",
-  placeItems: "center",
-  borderRadius: "40% 60% 55% 45%",
-  background: "#22c55e",
-  boxShadow: "0 0 10px #22c55e, 0 0 20px rgba(34,197,94,0.6)",
-  transform: "rotate(15deg)",
-  fontSize: 10,
-  filter: "drop-shadow(0 0 6px rgba(34,197,94,0.8))",
-}}
+      width: isMobileView ? 12 : 16,
+      height: isMobileView ? 12 : 16,
+      display: "grid",
+      placeItems: "center",
+      borderRadius: "40% 60% 55% 45%",
+      background: "#22c55e",
+      boxShadow: isMobileView
+        ? "0 0 6px #22c55e, 0 0 12px rgba(34,197,94,0.45)"
+        : "0 0 10px #22c55e, 0 0 20px rgba(34,197,94,0.6)",
+      transform: "rotate(15deg)",
+      fontSize: isMobileView ? 8 : 10,
+      filter: isMobileView
+        ? "drop-shadow(0 0 4px rgba(34,197,94,0.6))"
+        : "drop-shadow(0 0 6px rgba(34,197,94,0.8))",
+    }}
   >
     🍞
   </div>
 )}
 
-                        {!wall && hasSugar && (
+                                               {!wall && hasSugar && (
   <div
     className="sugarPulse"
     style={{
-  width: 20,
-  height: 20,
-  display: "grid",
-  placeItems: "center",
-  borderRadius: "50%",
-  background: "radial-gradient(circle at 30% 30%, #fff7cc, #facc15)",
-  boxShadow: "0 0 16px #facc15, 0 0 30px rgba(250,204,21,0.6)",
-  border: "1px solid rgba(255,255,255,0.4)",
-  fontSize: 12,
-  filter: "drop-shadow(0 0 10px rgba(250,204,21,0.9))",
-}}
+      width: isMobileView ? 16 : 20,
+      height: isMobileView ? 16 : 20,
+      display: "grid",
+      placeItems: "center",
+      borderRadius: "50%",
+      background: "radial-gradient(circle at 30% 30%, #fff7cc, #facc15)",
+      boxShadow: isMobileView
+        ? "0 0 10px #facc15, 0 0 18px rgba(250,204,21,0.45)"
+        : "0 0 16px #facc15, 0 0 30px rgba(250,204,21,0.6)",
+      border: "1px solid rgba(255,255,255,0.4)",
+      fontSize: isMobileView ? 10 : 12,
+      filter: isMobileView
+        ? "drop-shadow(0 0 6px rgba(250,204,21,0.7))"
+        : "drop-shadow(0 0 10px rgba(250,204,21,0.9))",
+    }}
   >
     🍬
   </div>
@@ -1153,16 +1192,22 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
   <div
     className="crystalPulse"
     style={{
-      width: 26,
-      height: 26,
+      width: isMobileView ? 20 : 26,
+      height: isMobileView ? 20 : 26,
       display: "grid",
       placeItems: "center",
-      fontSize: 16,
-      filter: `
-        drop-shadow(0 0 6px #3b82f6)
-        drop-shadow(0 0 14px #3b82f6)
-        drop-shadow(0 0 28px rgba(59,130,246,1))
-      `,
+      fontSize: isMobileView ? 13 : 16,
+      filter: isMobileView
+        ? `
+          drop-shadow(0 0 4px #3b82f6)
+          drop-shadow(0 0 8px #3b82f6)
+          drop-shadow(0 0 16px rgba(59,130,246,0.8))
+        `
+        : `
+          drop-shadow(0 0 6px #3b82f6)
+          drop-shadow(0 0 14px #3b82f6)
+          drop-shadow(0 0 28px rgba(59,130,246,1))
+        `,
     }}
   >
     💎
@@ -1220,13 +1265,13 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                             </div>
                           )}
 
-                                                   {!wall && isSpider && (
+                                                                            {!wall && isSpider && (
                             <div
                               className="spiderBob"
                               style={{
                                 ...tokenStyle,
-                                width: 44,
-                                height: 44,
+                                width: isMobileView ? 34 : 44,
+                                height: isMobileView ? 34 : 44,
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
@@ -1238,26 +1283,25 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                                 src="/spiders/spider.png"
                                 alt="Spider"
                                 style={{
-                                  width: "145%",
-                                  height: "145%",
+                                  width: isMobileView ? "125%" : "145%",
+                                  height: isMobileView ? "125%" : "145%",
                                   objectFit: "contain",
                                   transform: "translateY(2px)",
-                                  filter:
-                                    "drop-shadow(0 0 6px rgba(0,0,0,0.5)) " +
-                                    "drop-shadow(0 0 10px rgba(255,40,40,0.65)) " +
-                                    "drop-shadow(0 0 18px rgba(255,0,0,0.55))",
+                                  filter: isMobileView
+                                    ? "drop-shadow(0 0 4px rgba(0,0,0,0.45)) drop-shadow(0 0 6px rgba(255,40,40,0.45))"
+                                    : "drop-shadow(0 0 6px rgba(0,0,0,0.5)) drop-shadow(0 0 10px rgba(255,40,40,0.65)) drop-shadow(0 0 18px rgba(255,0,0,0.55))",
                                 }}
                               />
                             </div>
                           )}
 
-                                                                           {!wall && isPlayer && (
+                                                                                                    {!wall && isPlayer && (
                             <div
                               className="antFloat"
                               style={{
                                 ...tokenStyle,
-                                width: 42,
-                                height: 42,
+                                width: isMobileView ? 34 : 42,
+                                height: isMobileView ? 34 : 42,
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
@@ -1269,11 +1313,13 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                                 src="/ants/samurai.png"
                                 alt="Samurai Ant"
                                 style={{
-                                  width: "125%",
-                                  height: "125%",
+                                  width: isMobileView ? "110%" : "125%",
+                                  height: isMobileView ? "110%" : "125%",
                                   objectFit: "contain",
                                   transform: "translateY(3px)",
-                                  filter: "drop-shadow(0 0 6px rgba(0,0,0,0.45)) drop-shadow(0 0 10px rgba(255,255,255,0.12))",
+                                  filter: isMobileView
+                                    ? "drop-shadow(0 0 4px rgba(0,0,0,0.35))"
+                                    : "drop-shadow(0 0 6px rgba(0,0,0,0.45)) drop-shadow(0 0 10px rgba(255,255,255,0.12))",
                                 }}
                               />
                             </div>
@@ -1359,7 +1405,12 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           </div>
 
           <div style={tunnelLeaderboardWrapStyle}>
-            <div style={tunnelLeaderboardGridStyle}>
+                       <div
+              style={{
+                ...tunnelLeaderboardGridStyle,
+                ...(isMobileView ? tunnelLeaderboardGridMobileStyle : null),
+              }}
+            >
               <div style={leaderboardCardBlueStyle}>
                 <div style={leaderboardCardHeaderStyle}>
                   <div>
@@ -1432,7 +1483,12 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                 <div style={leaderboardBadgeRedStyle}>You</div>
               </div>
 
-              <div style={personalStatsGridStyle}>
+                           <div
+                style={{
+                  ...personalStatsGridStyle,
+                  ...(isMobileView ? personalStatsGridMobileStyle : null),
+                }}
+              >
                 <div style={personalStatBoxStyle("#60a5fa")}>
                   <div style={personalStatLabelStyle}>Best Score</div>
                   <div style={personalStatValueStyle}>
@@ -1767,6 +1823,22 @@ const boardPreviewStyle: React.CSSProperties = {
   scrollBehavior: "smooth",
 };
 
+const boardPreviewMobileStyle: React.CSSProperties = {
+  padding: 10,
+  height: "62vh",
+  minHeight: 420,
+  maxHeight: 560,
+};
+
+const previewInnerMobileStyle: React.CSSProperties = {
+  minWidth: 920,
+  minHeight: 700,
+};
+
+const previewGridMobileStyle: React.CSSProperties = {
+  gap: 6,
+};
+
 function previewGlowStyle(accent: string): React.CSSProperties {
   return {
     position: "absolute",
@@ -1830,6 +1902,10 @@ const tunnelLeaderboardGridStyle: React.CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
   gap: 18,
+};
+
+const tunnelLeaderboardGridMobileStyle: React.CSSProperties = {
+  gridTemplateColumns: "1fr",
 };
 
 const leaderboardBaseCardStyle: React.CSSProperties = {
@@ -1991,6 +2067,10 @@ const personalStatsGridStyle: React.CSSProperties = {
   gap: 14,
 };
 
+const personalStatsGridMobileStyle: React.CSSProperties = {
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+};
+
 function personalStatBoxStyle(accent: string): React.CSSProperties {
   return {
     borderRadius: 16,
@@ -2021,6 +2101,9 @@ const tunnelTopMetaRowStyle: React.CSSProperties = {
   alignItems: "start",
 };
 
+const tunnelTopMetaRowMobileStyle: React.CSSProperties = {
+  gridTemplateColumns: "1fr",
+};
 const tunnelFlavorQuoteStyle: React.CSSProperties = {
   padding: "10px 14px",
   borderRadius: 14,
