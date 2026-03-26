@@ -157,12 +157,13 @@ const [didWinRun, setDidWinRun] = useState(false);
   const boardScrollRef = useRef<HTMLDivElement | null>(null);
   const playerTileRef = useRef<HTMLDivElement | null>(null);
 
-  const {
+    const {
     balance,
     capBank,
     remainingDaily,
     totalEarnRoom,
     refresh,
+    earn,
   } = usePoints(effectivePlayerId);
 
   const theme = themeMap[boardTheme];
@@ -228,22 +229,88 @@ lastHitRef.current = 0;
     return () => clearInterval(interval);
   }, [isPlaying]);
 
-    useEffect(() => {
+      useEffect(() => {
     if (!isPlaying) return;
     if (timeLeft > 0) return;
 
-    setIsPlaying(false);
-    setRunMessage(`Run complete. Final score: ${score}`);
-  }, [timeLeft, isPlaying, score]);
+    let cancelled = false;
 
-  useEffect(() => {
+    const finishRun = async () => {
+      setIsPlaying(false);
+
+      if (score <= 0) {
+        setRunMessage("Run complete. No points earned this time.");
+        return;
+      }
+
+      setRunMessage(`Run complete. Claiming ${score} REBEL Points...`);
+
+      try {
+        const earnRes: any = await earn(score);
+
+        if (cancelled) return;
+
+        if (!earnRes?.ok) {
+          setRunMessage(earnRes?.error || "Run complete, but reward claim failed.");
+          return;
+        }
+
+        setRunMessage(`Run complete. +${earnRes?.added ?? score} REBEL Points credited ✅`);
+        await refresh();
+      } catch (e: any) {
+        if (cancelled) return;
+        setRunMessage(e?.message || "Run complete, but reward claim failed.");
+      }
+    };
+
+    void finishRun();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [timeLeft, isPlaying, score, earn, refresh]);
+
+   useEffect(() => {
     if (!isPlaying) return;
     if (crystals.length > 0) return;
 
-    setIsPlaying(false);
-    setDidWinRun(true);
-    setRunMessage(`Crystal sweep complete! Final score: ${score} 👑`);
-  }, [crystals.length, isPlaying, score]);
+    let cancelled = false;
+
+    const finishCrystalRun = async () => {
+      setIsPlaying(false);
+      setDidWinRun(true);
+
+      if (score <= 0) {
+        setRunMessage("Crystal sweep complete! No points earned this time.");
+        return;
+      }
+
+      setRunMessage(`Crystal sweep complete! Claiming ${score} REBEL Points... 👑`);
+
+      try {
+        const earnRes: any = await earn(score);
+
+        if (cancelled) return;
+
+        if (!earnRes?.ok) {
+          setRunMessage(earnRes?.error || "Crystal sweep complete, but reward claim failed.");
+          return;
+        }
+
+        setRunMessage(`Crystal sweep complete! +${earnRes?.added ?? score} REBEL Points credited 👑`);
+        await refresh();
+      } catch (e: any) {
+        if (cancelled) return;
+        setRunMessage(e?.message || "Crystal sweep complete, but reward claim failed.");
+      }
+    };
+
+    void finishCrystalRun();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [crystals.length, isPlaying, score, earn, refresh]);
 
     useEffect(() => {
     if (!isPlaying) return;
