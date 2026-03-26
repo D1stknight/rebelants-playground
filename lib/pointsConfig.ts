@@ -51,8 +51,16 @@ export type PointsConfig = {
 
   prizePools: PrizePools;
 
-  dailyClaim: number;
+    dailyClaim: number;
   dailyEarnCap: number;
+
+  tunnelCost: number;
+  tunnelRunSeconds: number;
+  tunnelCrystalCount: number;
+  tunnelSugarCount: number;
+  tunnelCrumbCount: number;
+  tunnelWallBreaks: number;
+  tunnelSpiderSpeedMs: number;
 };
 
 export const pointsConfig: PointsConfig = {
@@ -122,6 +130,14 @@ export const pointsConfig: PointsConfig = {
     ],
   },
 
-  dailyClaim: 200,
+   dailyClaim: 200,
   dailyEarnCap: 500,
+
+  tunnelCost: 50,
+  tunnelRunSeconds: 60,
+  tunnelCrystalCount: 8,
+  tunnelSugarCount: 18,
+  tunnelCrumbCount: 95,
+  tunnelWallBreaks: 5,
+  tunnelSpiderSpeedMs: 160,
 };

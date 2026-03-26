@@ -1535,13 +1535,12 @@ return (
     </div>
   )}
 </div>
-      <div style={{ marginTop: 10, fontSize: 13, opacity: 0.9 }}>
+    <div style={{ marginTop: 10, fontSize: 13, opacity: 0.9 }}>
   <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
     <span>Cost: <b>{pointsConfig.shuffleCost}</b> {pointsConfig.currency}</span>
     <span>Common: <b>+{pointsConfig.rewards.common}</b></span>
     <span>Rare: <b>+{pointsConfig.rewards.rare}</b></span>
     <span>Ultra: <b>+{pointsConfig.rewards.ultra}</b></span>
-    <span>Daily cap: <b>{pointsConfig.dailyEarnCap}</b></span>
   </div>
 
   <div style={{ marginTop: 8, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
@@ -1555,7 +1554,10 @@ return (
       Total plays left: <b>{Number(totalEarnRoom || 0).toLocaleString()}</b>
     </span>
     <span>
-      Daily plays left: <b>{Number(remainingDaily || 0).toLocaleString()}</b>
+      Daily plays left:{" "}
+      <b>
+        {Number(remainingDaily || 0).toLocaleString()} / {Number(dailyCap || 0).toLocaleString()}
+      </b>
     </span>
     <span>
       Bonus play bank: <b>{Number(capBank || 0).toLocaleString()}</b>

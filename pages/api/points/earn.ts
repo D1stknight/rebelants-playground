@@ -4,19 +4,20 @@ import { redis } from "../../../lib/server/redis";
 import { pointsConfig as defaultPointsConfig } from "../../../lib/pointsConfig";
 import { addToEarnedTotal, updateBalanceLeaderboard } from "../../../lib/server/leaderboards";
 
-function todayKey(playerId: string) {
+function balKey(playerId: string) {
+  return `ra:points:bal:${playerId}`;
+}
+
+function capBankKey(playerId: string) {
+  return `ra:points:capbank:${playerId}`;
+}
+
+function spentTodayKey(playerId: string) {
   const d = new Date();
   const yyyy = d.getUTCFullYear();
   const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
   const dd = String(d.getUTCDate()).padStart(2, "0");
-  return `ra:points:earned:${playerId}:${yyyy}-${mm}-${dd}`;
-}
-
-function balKey(playerId: string) {
-  return `ra:points:bal:${playerId}`;
-}
-function capBankKey(playerId: string) {
-  return `ra:points:capbank:${playerId}`;
+  return `ra:points:spent:${playerId}:${yyyy}-${mm}-${dd}`;
 }
 
 // ✅ get LIVE config (Admin -> Redis) via /api/config, fallback to defaults
@@ -26,15 +27,19 @@ async function getLivePointsConfig(req: NextApiRequest) {
     const host = req.headers.host;
     const url = `${proto}://${host}/api/config`;
 
-    const r = await fetch(url, { method: "GET", headers: { "Cache-Control": "no-store" } });
+    const r = await fetch(url, {
+      method: "GET",
+      headers: { "Cache-Control": "no-store" },
+    });
     const j: any = await r.json().catch(() => null);
 
     if (r.ok && j?.pointsConfig) {
       return { ...defaultPointsConfig, ...j.pointsConfig };
     }
-  } catch (e) {
+  } catch {
     // ignore; fallback below
   }
+
   return defaultPointsConfig;
 }
 
@@ -57,77 +62,41 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: "Invalid amount" });
     }
 
-    // ✅ Use LIVE cap from Admin/Redis
+    // ✅ Rewards only increase BALANCE now
+    const newBalance = await redis.incrby(balKey(pid), amt);
+
+    // ✅ Keep lifetime earned leaderboard accurate
+    await addToEarnedTotal(pid, amt);
+
+    // ✅ Keep balance leaderboard accurate
+    await updateBalanceLeaderboard(pid, Number(newBalance || 0));
+
+    // ✅ Return play-cap info WITHOUT modifying it
+    const spentRaw = await redis.get<number>(spentTodayKey(pid));
+    const spentToday = Number(spentRaw || 0);
+
+    const capBankRaw = await redis.get<number>(capBankKey(pid));
+    const capBank = Number(capBankRaw || 0);
+
     const liveCfg = await getLivePointsConfig(req);
-    const cap = Number((liveCfg as any).dailyEarnCap || 0);
+    const dailyCap = Number((liveCfg as any).dailyEarnCap || 0);
+    const remainingDaily = Math.max(0, dailyCap - spentToday);
+    const totalPlayRoom = remainingDaily + capBank;
 
-    const earnedKey = todayKey(pid);
-const earnedTodayRaw = await redis.get<number>(earnedKey);
-const earnedToday = Number(earnedTodayRaw || 0);
-
-// NEW: get cap bank
-const capBankRaw = await redis.get<number>(capBankKey(pid));
-const capBank = Number(capBankRaw || 0);
-
-// how much room is left in daily cap
-const remainingDaily = Math.max(0, cap - earnedToday);
-
-// total allowed (daily + capBank)
-const totalAvailable = remainingDaily + capBank;
-
-// how much we can actually add
-const toAdd = Math.max(0, Math.min(amt, totalAvailable));
-
-    if (toAdd <= 0) {
-      const balNowRaw = await redis.get<number>(balKey(pid));
-      const balNow = Number(balNowRaw || 0);
-      return res.status(200).json({
-        ok: true,
-        playerId: pid,
-        added: 0,
-        capped: true,
-        earnedToday,
-        cap,
-        balance: balNow,
-      });
-    }
-
-    let useFromDaily = Math.min(toAdd, remainingDaily);
-let useFromBank = Math.max(0, toAdd - useFromDaily);
-
-// update daily earned
-let newEarnedToday = earnedToday;
-if (useFromDaily > 0) {
-  newEarnedToday = await redis.incrby(earnedKey, useFromDaily);
-  await redis.expire(earnedKey, 60 * 60 * 48);
-}
-
-// reduce cap bank
-if (useFromBank > 0) {
-  await redis.decrby(capBankKey(pid), useFromBank);
-}
-
-// update balance
-const newBalance = await redis.incrby(balKey(pid), toAdd);
-
-// ✅ lifetime earned leaderboard (gameplay only)
-await addToEarnedTotal(pid, toAdd);
-
-// ✅ keep balance leaderboard accurate
-await updateBalanceLeaderboard(pid, Number(newBalance || 0));
-    
-    const updatedCapBankRaw = await redis.get<number>(capBankKey(pid));
-
-return res.status(200).json({
-  ok: true,
-  playerId: pid,
-  added: toAdd,
-  capped: toAdd < amt,
-  earnedToday: Number(newEarnedToday || 0),
-  cap,
-  capBank: Number(updatedCapBankRaw || 0),
-  balance: Number(newBalance || 0),
-});
+    return res.status(200).json({
+      ok: true,
+      playerId: pid,
+      added: amt,
+      capped: false,
+      balance: Number(newBalance || 0),
+      earnedToday: spentToday,
+      spentToday,
+      dailyCap,
+      remainingDaily,
+      capBank,
+      totalPlayRoom,
+      totalEarnRoom: totalPlayRoom,
+    });
   } catch (err: any) {
     console.error("earn error:", err);
     return res.status(500).json({ error: "Server error" });
