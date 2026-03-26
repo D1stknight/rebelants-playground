@@ -125,6 +125,10 @@ function pickRandomCells(source: Cell[], count: number, excluded: Set<string>) {
   return pool.slice(0, count);
 }
 
+function manhattanDistance(a: Cell, b: Cell) {
+  return Math.abs(a.row - b.row) + Math.abs(a.col - b.col);
+}
+
 export default function TunnelShell() {
   const initialProfile = loadProfile();
   const initialName = (initialProfile?.name || "guest").trim() || "guest";
@@ -242,37 +246,43 @@ export default function TunnelShell() {
           { row: 0, col: 1 },
         ];
 
-        const dx = playerPos.col - current.col;
-        const dy = playerPos.row - current.row;
+        const candidates = directions
+          .map((move) => ({
+            row: current.row + move.row,
+            col: current.col + move.col,
+          }))
+          .filter(
+            (next) =>
+              next.row >= 0 &&
+              next.row < GRID_ROWS &&
+              next.col >= 0 &&
+              next.col < GRID_COLS &&
+              !isWall(next.row, next.col, brokenWallSet)
+          );
 
-        const preferred: { row: number; col: number }[] = [];
+        if (!candidates.length) return current;
 
-        if (Math.abs(dx) > Math.abs(dy)) {
-          preferred.push({ row: 0, col: dx > 0 ? 1 : -1 });
-        } else {
-          preferred.push({ row: dy > 0 ? 1 : -1, col: 0 });
+        // aggressive chase:
+        // most of the time, pick the move that gets closest to the player
+        // sometimes pick the 2nd best move so it still feels alive
+        const ranked = [...candidates].sort(
+          (a, b) =>
+            manhattanDistance(a, playerPos) - manhattanDistance(b, playerPos)
+        );
+
+        const roll = Math.random();
+
+        if (roll < 0.75) {
+          return ranked[0];
         }
 
-        const moves = [...preferred, ...directions];
-
-        for (const move of moves) {
-          const nextRow = current.row + move.row;
-          const nextCol = current.col + move.col;
-
-          if (
-            nextRow >= 0 &&
-            nextRow < GRID_ROWS &&
-            nextCol >= 0 &&
-            nextCol < GRID_COLS &&
-            !isWall(nextRow, nextCol, brokenWallSet)
-          ) {
-            return { row: nextRow, col: nextCol };
-          }
+        if (roll < 0.92 && ranked[1]) {
+          return ranked[1];
         }
 
-        return current;
+        return ranked[(Math.random() * ranked.length) | 0];
       });
-    }, 300);
+    }, 220);
 
     return () => clearInterval(interval);
   }, [isPlaying, playerPos, brokenWallSet]);
