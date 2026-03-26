@@ -122,35 +122,113 @@ function isOuterBorder(row: number, col: number) {
   return row === 0 || row === GRID_ROWS - 1 || col === 0 || col === GRID_COLS - 1;
 }
 
-function baseWall(row: number, col: number) {
+const TUNNEL_LAYOUTS: string[][] = [
+  [
+    "2:4","2:5","2:6","2:15","2:16","2:17",
+    "4:3","4:4","4:9","4:10","4:11","4:17","4:18",
+    "6:5","6:6","6:7","6:14","6:15","6:16",
+    "8:4","8:5","8:13","8:14","8:15",
+    "10:6","10:7","10:8","10:16","10:17",
+  ],
+  [
+    "2:7","2:8","2:9","2:14","2:15",
+    "3:4","3:5","3:16","3:17",
+    "5:6","5:7","5:8","5:13","5:14","5:15",
+    "7:4","7:5","7:10","7:11","7:16","7:17",
+    "9:7","9:8","9:13","9:14",
+    "10:3","10:4","10:17","10:18",
+  ],
+  [
+    "2:5","2:6","2:13","2:14","2:15",
+    "4:7","4:8","4:9","4:15","4:16",
+    "5:3","5:4","5:11","5:12","5:17","5:18",
+    "7:6","7:7","7:14","7:15",
+    "9:4","9:5","9:10","9:11","9:16","9:17",
+    "10:8","10:9","10:13","10:14",
+  ],
+  [
+    "2:3","2:4","2:10","2:11","2:17","2:18",
+    "4:6","4:7","4:13","4:14",
+    "5:9","5:10","5:11",
+    "6:4","6:5","6:15","6:16","6:17",
+    "8:7","8:8","8:12","8:13",
+    "10:5","10:6","10:14","10:15","10:16",
+  ],
+  [
+    "2:6","2:7","2:15","2:16",
+    "3:10","3:11",
+    "4:4","4:5","4:6","4:14","4:15","4:16",
+    "6:8","6:9","6:13","6:14",
+    "7:3","7:4","7:17","7:18",
+    "9:6","9:7","9:8","9:14","9:15",
+    "10:11","10:12",
+  ],
+  [
+    "2:8","2:9","2:10","2:13","2:14",
+    "4:5","4:6","4:16","4:17",
+    "5:11","5:12",
+    "6:3","6:4","6:8","6:9","6:15","6:16",
+    "8:6","8:7","8:13","8:14","8:18",
+    "10:4","10:5","10:10","10:11","10:15","10:16",
+  ],
+  [
+    "2:5","2:6","2:17","2:18",
+    "3:8","3:9","3:13","3:14",
+    "5:4","5:5","5:10","5:11","5:16","5:17",
+    "7:7","7:8","7:14","7:15",
+    "8:3","8:4","8:17","8:18",
+    "10:6","10:7","10:12","10:13","10:14",
+  ],
+  [
+    "2:9","2:10","2:11",
+    "3:5","3:6","3:15","3:16",
+    "4:13","4:14",
+    "6:4","6:5","6:10","6:11","6:17","6:18",
+    "8:7","8:8","8:14","8:15",
+    "9:3","9:4","9:12","9:13","9:17",
+    "10:9","10:10",
+  ],
+  [
+    "2:4","2:5","2:14","2:15","2:16",
+    "4:8","4:9","4:17","4:18",
+    "5:3","5:4","5:12","5:13",
+    "6:15","6:16",
+    "7:6","7:7","7:10","7:11",
+    "9:5","9:6","9:14","9:15","9:16",
+    "10:8","10:9","10:17","10:18",
+  ],
+  [
+    "2:6","2:7","2:8","2:15",
+    "3:12","3:13",
+    "4:4","4:5","4:16","4:17",
+    "6:9","6:10","6:11","6:14","6:15",
+    "7:3","7:4","7:17","7:18",
+    "8:7","8:8","8:13","8:14",
+    "10:5","10:6","10:15","10:16",
+  ],
+];
+
+function baseWall(row: number, col: number, layoutIndex: number) {
   if (isOuterBorder(row, col)) return true;
-
-  if ((row === 2 || row === 11) && ((col >= 3 && col <= 7) || (col >= 14 && col <= 18))) return true;
-  if ((row === 4 || row === 9) && ((col >= 2 && col <= 5) || (col >= 8 && col <= 12) || (col >= 16 && col <= 19))) return true;
-  if (row === 6 && ((col >= 4 && col <= 9) || (col >= 13 && col <= 17))) return true;
-  if (row === 7 && ((col >= 4 && col <= 6) || (col >= 15 && col <= 17))) return true;
-
-  if ((col === 6 || col === 15) && ((row >= 2 && row <= 4) || (row >= 9 && row <= 11))) return true;
-  if (col === 10 && row >= 5 && row <= 8) return true;
-
-  return false;
+  const layout = TUNNEL_LAYOUTS[layoutIndex] || TUNNEL_LAYOUTS[0];
+  return layout.includes(`${row}:${col}`);
 }
 
-function isBreakableBaseWall(row: number, col: number) {
+function isBreakableBaseWall(row: number, col: number, layoutIndex: number) {
   if (isOuterBorder(row, col)) return false;
-  return baseWall(row, col);
+  return baseWall(row, col, layoutIndex);
 }
 
-function isWall(row: number, col: number, brokenWallSet: Set<string>) {
-  if (!baseWall(row, col)) return false;
+function isWall(row: number, col: number, brokenWallSet: Set<string>, layoutIndex: number) {
+  if (!baseWall(row, col, layoutIndex)) return false;
   return !brokenWallSet.has(cellKey({ row, col }));
 }
 
-function getOpenCells(brokenWallSet: Set<string>) {
+function getOpenCells(brokenWallSet: Set<string>, layoutIndex: number) {
   const open: Cell[] = [];
   for (let row = 0; row < GRID_ROWS; row++) {
     for (let col = 0; col < GRID_COLS; col++) {
-      if (!isWall(row, col, brokenWallSet)) {
+      if (!isWall(row, col, brokenWallSet, layoutIndex)) {
         open.push({ row, col });
       }
     }
@@ -196,7 +274,8 @@ export default function TunnelShell() {
   const [showBuyPoints, setShowBuyPoints] = useState(false);
   const [tunnelCfg, setTunnelCfg] = useState(DEFAULT_TUNNEL_CONFIG);
 
-  const [boardTheme, setBoardTheme] = useState<BoardTheme>("colony");
+    const [boardTheme, setBoardTheme] = useState<BoardTheme>("colony");
+  const [layoutIndex, setLayoutIndex] = useState(0);
 const [isPlaying, setIsPlaying] = useState(false);
 const [timeLeft, setTimeLeft] = useState(DEFAULT_TUNNEL_CONFIG.tunnelRunSeconds);
 const [score, setScore] = useState(0);
@@ -355,10 +434,13 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     void loadTunnelLeaderboard();
   }, [effectivePlayerId]);
 
-  function setupNewRun() {
+    function setupNewRun() {
+    const nextLayoutIndex = Math.floor(Math.random() * TUNNEL_LAYOUTS.length);
+    setLayoutIndex(nextLayoutIndex);
+
     const nextBrokenWalls: string[] = [];
     const nextBrokenWallSet = new Set(nextBrokenWalls);
-    const openCells = getOpenCells(nextBrokenWallSet);
+    const openCells = getOpenCells(nextBrokenWallSet, nextLayoutIndex);
 
        const excluded = new Set<string>([
       cellKey(START_CELL),
@@ -551,7 +633,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
             next.row < GRID_ROWS &&
             next.col >= 0 &&
             next.col < GRID_COLS &&
-            !isWall(next.row, next.col, brokenWallSet)
+                      !isWall(next.row, next.col, brokenWallSet, layoutIndex)
         );
 
       if (!candidates.length) return current;
@@ -585,7 +667,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     }, tunnelCfg.tunnelSpiderSpeedMs);
 
     return () => clearInterval(interval);
-  }, [isPlaying, playerPos, brokenWallSet, tunnelCfg.tunnelSpiderSpeedMs]);
+   }, [isPlaying, playerPos, brokenWallSet, tunnelCfg.tunnelSpiderSpeedMs, layoutIndex]);
     useEffect(() => {
     if (!isPlaying) return;
 
@@ -656,7 +738,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           return;
         }
 
-        if (!isBreakableBaseWall(target.row, target.col)) {
+              if (!isBreakableBaseWall(target.row, target.col, layoutIndex)) {
           setRunMessage("No breakable wall in front of you.");
           return;
         }
@@ -701,7 +783,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
         nextRow = Math.max(0, Math.min(GRID_ROWS - 1, nextRow));
         nextCol = Math.max(0, Math.min(GRID_COLS - 1, nextCol));
 
-        if (isWall(nextRow, nextCol, brokenWallSet)) return prev;
+                if (isWall(nextRow, nextCol, brokenWallSet, layoutIndex)) return prev;
         if (nextRow === prev.row && nextCol === prev.col) return prev;
 
                setCrumbs((current) => {
@@ -737,7 +819,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
 
     window.addEventListener("keydown", onKeyDown, { passive: false });
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isPlaying, facing, playerPos, wallBreaksLeft, brokenWallSet]);
+  }, [isPlaying, facing, playerPos, wallBreaksLeft, brokenWallSet, layoutIndex]);
 
   return (
     <>
@@ -944,7 +1026,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                       const row = Math.floor(i / GRID_COLS);
                       const col = i % GRID_COLS;
 
-                      const wall = isWall(row, col, brokenWallSet);
+                                           const wall = isWall(row, col, brokenWallSet, layoutIndex);
                       const hasCrumb = crumbs.some((c) => c.row === row && c.col === col);
                       const hasSugar = sugars.some((c) => c.row === row && c.col === col);
                       const hasCrystal = crystals.some((c) => c.row === row && c.col === col);
