@@ -834,19 +834,20 @@ const [didWinRun, setDidWinRun] = useState(false);
                                 >
                   <div style={previewGlowStyle(theme.accent)} />
 
-                  {hitFlash && (
-                    <div
-                      className="hitFlash"
-                      style={{
-                        position: "absolute",
-                        inset: 0,
-                        pointerEvents: "none",
-                        zIndex: 3,
-                        background:
-                          "radial-gradient(circle at center, rgba(239,68,68,0.18), rgba(127,29,29,0.10) 45%, transparent 70%)",
-                      }}
-                    />
-                  )}
+                 {hitFlash && (
+  <div
+    className="hitFlash"
+    style={{
+      position: "absolute",
+      inset: 0,
+      pointerEvents: "none",
+      zIndex: 3,
+      background:
+        "radial-gradient(circle at center, rgba(239,68,68,0.45), rgba(127,29,29,0.25) 45%, transparent 70%)",
+      mixBlendMode: "screen",
+    }}
+  />
+)}
 
                   <div style={previewInnerStyle}>
                     <div style={previewGridStyle}>
@@ -1130,14 +1131,20 @@ const [didWinRun, setDidWinRun] = useState(false);
           }
         }
 
-        @keyframes hitFlash {
-          0% {
-            opacity: 1;
-          }
-          100% {
-            opacity: 0;
-          }
-        }
+       @keyframes hitFlash {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  40% {
+    opacity: 0.85;
+    transform: scale(1.03);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
       `}</style>
     </>
   );
