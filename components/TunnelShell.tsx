@@ -173,6 +173,8 @@ const [timeLeft, setTimeLeft] = useState(DEFAULT_TUNNEL_CONFIG.tunnelRunSeconds)
 const [score, setScore] = useState(0);
 const [runMessage, setRunMessage] = useState("");
 const [didWinRun, setDidWinRun] = useState(false);
+const [runStartedAt, setRunStartedAt] = useState<number | null>(null);
+const [runCrystalTarget, setRunCrystalTarget] = useState(0);
   const [playerPos, setPlayerPos] = useState<Cell>(START_CELL);
    const [crumbs, setCrumbs] = useState<Cell[]>([]);
   const [sugars, setSugars] = useState<Cell[]>([]);
@@ -214,13 +216,41 @@ const [didWinRun, setDidWinRun] = useState(false);
     }, 260);
   }
 
-  function triggerWallBurst(row: number, col: number) {
+    function triggerWallBurst(row: number, col: number) {
     const id = Date.now() + Math.floor(Math.random() * 100000);
     setWallBursts((prev) => [...prev, { id, row, col }]);
 
     window.setTimeout(() => {
       setWallBursts((prev) => prev.filter((b) => b.id !== id));
     }, 260);
+  }
+
+  async function recordTunnelRun(params: {
+    score: number;
+    fullClear: boolean;
+    crystalsCollected: number;
+  }) {
+    try {
+      const clearTimeMs =
+        params.fullClear && runStartedAt
+          ? Math.max(0, Date.now() - runStartedAt)
+          : 0;
+
+      await fetch("/api/tunnel/record", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          playerId: effectivePlayerId,
+          playerName,
+          score: params.score,
+          fullClear: params.fullClear,
+          clearTimeMs,
+          crystalsCollected: params.crystalsCollected,
+        }),
+      });
+    } catch {
+      // do not block gameplay if stats save fails
+    }
   }
 
    useEffect(() => {
@@ -285,14 +315,16 @@ const [didWinRun, setDidWinRun] = useState(false);
     setPlayerPos(START_CELL);
     setCrumbs(crumbCells);
     setSugars(sugarCells);
-    setCrystals(crystalCells);
-       setSpiderPos({ row: 1, col: 10 });
-        setScore(0);
+       setCrystals(crystalCells);
+    setRunCrystalTarget(crystalCells.length);
+    setSpiderPos({ row: 1, col: 10 });
+    setScore(0);
     setTimeLeft(tunnelCfg.tunnelRunSeconds);
     setWallBreaksLeft(tunnelCfg.tunnelWallBreaks);
     setFacing("right");
     setRunMessage("");
     setDidWinRun(false);
+    setRunStartedAt(Date.now());
     lastHitRef.current = 0;
   }
 
@@ -344,8 +376,15 @@ const [didWinRun, setDidWinRun] = useState(false);
 
     let cancelled = false;
 
-    const finishRun = async () => {
+        const finishRun = async () => {
       setIsPlaying(false);
+
+      const crystalsCollected = Math.max(0, runCrystalTarget - crystals.length);
+      await recordTunnelRun({
+        score,
+        fullClear: false,
+        crystalsCollected,
+      });
 
       if (score <= 0) {
         setRunMessage("Run complete. No points earned this time.");
@@ -356,7 +395,6 @@ const [didWinRun, setDidWinRun] = useState(false);
 
       try {
         const earnRes: any = await earn(score);
-
         if (cancelled) return;
 
         if (!earnRes?.ok) {
@@ -377,7 +415,7 @@ const [didWinRun, setDidWinRun] = useState(false);
     return () => {
       cancelled = true;
     };
-  }, [timeLeft, isPlaying, score, earn, refresh]);
+  }, [timeLeft, isPlaying, score, earn, refresh, runCrystalTarget, crystals.length, runStartedAt, effectivePlayerId, playerName]);
 
    useEffect(() => {
     if (!isPlaying) return;
@@ -385,9 +423,15 @@ const [didWinRun, setDidWinRun] = useState(false);
 
     let cancelled = false;
 
-    const finishCrystalRun = async () => {
+       const finishCrystalRun = async () => {
       setIsPlaying(false);
       setDidWinRun(true);
+
+      await recordTunnelRun({
+        score,
+        fullClear: true,
+        crystalsCollected: runCrystalTarget,
+      });
 
       if (score <= 0) {
         setRunMessage("Crystal sweep complete! No points earned this time.");
@@ -419,7 +463,7 @@ const [didWinRun, setDidWinRun] = useState(false);
     return () => {
       cancelled = true;
     };
-  }, [crystals.length, isPlaying, score, earn, refresh]);
+   }, [crystals.length, isPlaying, score, earn, refresh, runCrystalTarget, runStartedAt, effectivePlayerId, playerName]);
 
     useEffect(() => {
     if (!isPlaying) return;
