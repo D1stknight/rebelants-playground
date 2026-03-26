@@ -183,9 +183,10 @@ const [didWinRun, setDidWinRun] = useState(false);
   );
   const [brokenWalls, setBrokenWalls] = useState<string[]>([]);
   const [facing, setFacing] = useState<Facing>("right");
-  const [pickupBursts, setPickupBursts] = useState<PickupBurst[]>([]);
+   const [pickupBursts, setPickupBursts] = useState<PickupBurst[]>([]);
   const [wallBursts, setWallBursts] = useState<WallBurst[]>([]);
   const [hitFlash, setHitFlash] = useState(false);
+  const [hitShake, setHitShake] = useState(false);
 
   const lastHitRef = useRef(0);
   const boardScrollRef = useRef<HTMLDivElement | null>(null);
@@ -477,7 +478,7 @@ const [didWinRun, setDidWinRun] = useState(false);
 
     return () => clearInterval(interval);
   }, [isPlaying, playerPos, brokenWallSet, tunnelCfg.tunnelSpiderSpeedMs]);
-   useEffect(() => {
+    useEffect(() => {
     if (!isPlaying) return;
 
     const now = Date.now();
@@ -488,9 +489,14 @@ const [didWinRun, setDidWinRun] = useState(false);
     setTimeLeft((t) => Math.max(0, t - 3));
     setRunMessage("Spider hit! -3 seconds");
     setHitFlash(true);
+    setHitShake(true);
 
     window.setTimeout(() => {
       setHitFlash(false);
+    }, 220);
+
+    window.setTimeout(() => {
+      setHitShake(false);
     }, 180);
   }, [playerPos, spiderPos, isPlaying]);
 
@@ -828,10 +834,11 @@ const [didWinRun, setDidWinRun] = useState(false);
   </div>
 ) : null}
 
-                               <div
+                                              <div
                   ref={boardScrollRef}
+                  className={hitShake ? "hitShake" : ""}
                   style={{ ...boardPreviewStyle, background: theme.bg }}
-                                >
+                >
                   <div style={previewGlowStyle(theme.accent)} />
 
                  {hitFlash && (
@@ -841,9 +848,9 @@ const [didWinRun, setDidWinRun] = useState(false);
       position: "absolute",
       inset: 0,
       pointerEvents: "none",
-      zIndex: 3,
+      zIndex: 4,
       background:
-        "radial-gradient(circle at center, rgba(239,68,68,0.45), rgba(127,29,29,0.25) 45%, transparent 70%)",
+        "radial-gradient(circle at center, rgba(255,70,70,0.62), rgba(180,20,20,0.38) 42%, rgba(80,0,0,0.16) 68%, transparent 78%)",
       mixBlendMode: "screen",
     }}
   />
@@ -1085,8 +1092,12 @@ const [didWinRun, setDidWinRun] = useState(false);
           animation: wallBurst 0.26s ease-out forwards;
         }
 
-        .hitFlash {
-          animation: hitFlash 0.18s ease-out forwards;
+                .hitFlash {
+          animation: hitFlash 0.22s ease-out forwards;
+        }
+
+        .hitShake {
+          animation: hitShake 0.18s linear;
         }
 
         @keyframes crumbPulse {
@@ -1141,19 +1152,28 @@ const [didWinRun, setDidWinRun] = useState(false);
           }
         }
 
-       @keyframes hitFlash {
+     @keyframes hitFlash {
   0% {
     opacity: 1;
     transform: scale(1);
   }
-  40% {
-    opacity: 0.85;
-    transform: scale(1.03);
+  35% {
+    opacity: 0.95;
+    transform: scale(1.045);
   }
   100% {
     opacity: 0;
     transform: scale(1);
   }
+}
+
+@keyframes hitShake {
+  0% { transform: translate(0, 0); }
+  20% { transform: translate(-4px, 2px); }
+  40% { transform: translate(4px, -2px); }
+  60% { transform: translate(-3px, 1px); }
+  80% { transform: translate(3px, -1px); }
+  100% { transform: translate(0, 0); }
 }
       `}</style>
     </>
