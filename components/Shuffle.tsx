@@ -1555,7 +1555,10 @@ return (
       Total plays left: <b>{Number(totalEarnRoom || 0).toLocaleString()}</b>
     </span>
     <span>
-      Daily plays left: <b>{Number(remainingDaily || 0).toLocaleString()}</b>
+      Daily plays left:{" "}
+      <b>
+        {Number(remainingDaily || 0).toLocaleString()} / {Number(dailyCap || 0).toLocaleString()}
+      </b>
     </span>
     <span>
       Bonus play bank: <b>{Number(capBank || 0).toLocaleString()}</b>
