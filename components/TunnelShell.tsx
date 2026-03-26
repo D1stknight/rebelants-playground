@@ -140,11 +140,11 @@ export default function TunnelShell() {
   const [score, setScore] = useState(0);
   const [runMessage, setRunMessage] = useState("");
   const [playerPos, setPlayerPos] = useState<Cell>(START_CELL);
-  const [crumbs, setCrumbs] = useState<Cell[]>([]);
+   const [crumbs, setCrumbs] = useState<Cell[]>([]);
   const [sugars, setSugars] = useState<Cell[]>([]);
   const [crystals, setCrystals] = useState<Cell[]>([]);
- const [spiderPos, setSpiderPos] = useState<Cell>({ row: 1, col: 10 });
-    const [wallBreaksLeft, setWallBreaksLeft] = useState(WALL_BREAKS_PER_RUN);
+  const [spiderPos, setSpiderPos] = useState<Cell>({ row: 1, col: 10 });
+  const [wallBreaksLeft, setWallBreaksLeft] = useState(WALL_BREAKS_PER_RUN);
   const [brokenWalls, setBrokenWalls] = useState<string[]>([]);
   const [facing, setFacing] = useState<Facing>("right");
 
@@ -161,7 +161,6 @@ export default function TunnelShell() {
   } = usePoints(effectivePlayerId);
 
   const theme = themeMap[boardTheme];
-  const spiderPos: Cell = { row: 1, col: 10 };
   const brokenWallSet = useMemo(() => new Set(brokenWalls), [brokenWalls]);
 
   function setupNewRun() {
@@ -169,9 +168,9 @@ export default function TunnelShell() {
     const nextBrokenWallSet = new Set(nextBrokenWalls);
     const openCells = getOpenCells(nextBrokenWallSet);
 
-    const excluded = new Set<string>([
+       const excluded = new Set<string>([
       cellKey(START_CELL),
-      ...spiderPath.map(cellKey),
+      cellKey({ row: 1, col: 10 }),
     ]);
 
     const crumbCells = pickRandomCells(openCells, 95, excluded);
@@ -187,8 +186,7 @@ export default function TunnelShell() {
     setCrumbs(crumbCells);
     setSugars(sugarCells);
     setCrystals(crystalCells);
-    // spawn spider somewhere near top but not fixed
-setSpiderIndex(0);
+       setSpiderPos({ row: 1, col: 10 });
     setScore(0);
     setTimeLeft(RUN_SECONDS);
     setWallBreaksLeft(WALL_BREAKS_PER_RUN);
@@ -232,57 +230,52 @@ setSpiderIndex(0);
     setRunMessage(`Run complete. Final score: ${score}`);
   }, [timeLeft, isPlaying, score]);
 
- useEffect(() => {
-  if (!isPlaying) return;
+  useEffect(() => {
+    if (!isPlaying) return;
 
-  const interval = setInterval(() => {
-    setSpiderIndex((prev) => {
-      const current = spiderPos;
+    const interval = setInterval(() => {
+      setSpiderPos((current) => {
+        const directions = [
+          { row: -1, col: 0 },
+          { row: 1, col: 0 },
+          { row: 0, col: -1 },
+          { row: 0, col: 1 },
+        ];
 
-      const directions = [
-        { row: -1, col: 0 },
-        { row: 1, col: 0 },
-        { row: 0, col: -1 },
-        { row: 0, col: 1 },
-      ];
+        const dx = playerPos.col - current.col;
+        const dy = playerPos.row - current.row;
 
-      // bias toward player
-      const dx = playerPos.col - current.col;
-      const dy = playerPos.row - current.row;
+        const preferred: { row: number; col: number }[] = [];
 
-      const preferred: { row: number; col: number }[] = [];
-
-      if (Math.abs(dx) > Math.abs(dy)) {
-        preferred.push({ row: 0, col: dx > 0 ? 1 : -1 });
-      } else {
-        preferred.push({ row: dy > 0 ? 1 : -1, col: 0 });
-      }
-
-      // mix in randomness
-      const moves = [...preferred, ...directions];
-
-      for (let move of moves) {
-        const nextRow = current.row + move.row;
-        const nextCol = current.col + move.col;
-
-        if (
-          nextRow >= 0 &&
-          nextRow < GRID_ROWS &&
-          nextCol >= 0 &&
-          nextCol < GRID_COLS &&
-          !isWall(nextRow, nextCol, brokenWallSet)
-        ) {
-          return { row: nextRow, col: nextCol } as any;
+        if (Math.abs(dx) > Math.abs(dy)) {
+          preferred.push({ row: 0, col: dx > 0 ? 1 : -1 });
+        } else {
+          preferred.push({ row: dy > 0 ? 1 : -1, col: 0 });
         }
-      }
 
-      return prev;
-    });
-  }, 300);
+        const moves = [...preferred, ...directions];
 
-  return () => clearInterval(interval);
-}, [isPlaying, playerPos, spiderPos, brokenWallSet]);
+        for (const move of moves) {
+          const nextRow = current.row + move.row;
+          const nextCol = current.col + move.col;
 
+          if (
+            nextRow >= 0 &&
+            nextRow < GRID_ROWS &&
+            nextCol >= 0 &&
+            nextCol < GRID_COLS &&
+            !isWall(nextRow, nextCol, brokenWallSet)
+          ) {
+            return { row: nextRow, col: nextCol };
+          }
+        }
+
+        return current;
+      });
+    }, 300);
+
+    return () => clearInterval(interval);
+  }, [isPlaying, playerPos, brokenWallSet]);
   useEffect(() => {
     if (!isPlaying) return;
 
