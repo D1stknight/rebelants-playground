@@ -860,7 +860,9 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     }, 180);
   }, [playerPos, spiderPos, isPlaying]);
 
-      useLayoutEffect(() => {
+       useLayoutEffect(() => {
+    if (isMobileView) return;
+
     const playerEl = playerTileRef.current;
     if (!playerEl || !isPlaying) return;
 
@@ -873,7 +875,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     });
 
     return () => cancelAnimationFrame(raf);
-  }, [playerPos, isPlaying]);
+  }, [playerPos, isPlaying, isMobileView]);
   
     useEffect(() => {
     if (!isPlaying) return;
