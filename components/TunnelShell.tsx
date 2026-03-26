@@ -791,46 +791,64 @@ const [didWinRun, setDidWinRun] = useState(false);
                               : "inset 0 0 8px rgba(255,255,255,0.02)",
                           }}
                         >
-                         {!wall && hasCrumb && (
+                     {!wall && hasCrumb && (
   <div
     className="crumbPulse"
     style={{
-      width: 10,
-      height: 10,
+      width: 16,
+      height: 16,
+      display: "grid",
+      placeItems: "center",
       borderRadius: "40% 60% 55% 45%",
       background: theme.crumb,
-      boxShadow: `0 0 6px ${theme.crumb}`,
+      boxShadow: `0 0 10px ${theme.crumb}`,
       transform: "rotate(15deg)",
+      fontSize: 10,
+      filter: "drop-shadow(0 0 6px rgba(255,255,255,0.6))",
     }}
-  />
+  >
+    🍞
+  </div>
 )}
 
-                         {!wall && hasSugar && (
+                        {!wall && hasSugar && (
   <div
     className="sugarPulse"
     style={{
-      width: 16,
-      height: 16,
+      width: 20,
+      height: 20,
+      display: "grid",
+      placeItems: "center",
       borderRadius: "50%",
       background: `radial-gradient(circle at 30% 30%, white, ${theme.sugar})`,
       boxShadow: `0 0 18px ${theme.sugar}`,
       border: "1px solid rgba(255,255,255,0.4)",
+      fontSize: 12,
+      filter: "drop-shadow(0 0 8px rgba(255,255,255,0.7))",
     }}
-  />
+  >
+    🍬
+  </div>
 )}
 
-                         {!wall && hasCrystal && (
+{!wall && hasCrystal && (
   <div
     className="crystalPulse"
     style={{
-      width: 20,
-      height: 20,
+      width: 24,
+      height: 24,
+      display: "grid",
+      placeItems: "center",
       transform: "rotate(45deg)",
       background: `linear-gradient(135deg, white, ${theme.crystal})`,
       boxShadow: `0 0 22px ${theme.crystal}, inset 0 0 6px rgba(255,255,255,0.6)`,
       clipPath: "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)",
+      fontSize: 12,
+      filter: "drop-shadow(0 0 10px rgba(255,255,255,0.9))",
     }}
-  />
+  >
+    <span style={{ transform: "rotate(-45deg)" }}>💎</span>
+  </div>
 )}
 
                           {!wall && isSpider && (
