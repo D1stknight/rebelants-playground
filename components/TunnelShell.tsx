@@ -657,45 +657,47 @@ lastHitRef.current = 0;
                               : "inset 0 0 8px rgba(255,255,255,0.02)",
                           }}
                         >
-                          {!wall && hasCrumb && (
-                            <div
-                              className="crumbPulse"
-                              style={{
-                                ...pickupDotStyle,
-                                width: 10,
-                                height: 10,
-                                background: theme.crumb,
-                                boxShadow: `0 0 10px ${theme.crumb}`,
-                              }}
-                            />
-                          )}
+                         {!wall && hasCrumb && (
+  <div
+    className="crumbPulse"
+    style={{
+      width: 10,
+      height: 10,
+      borderRadius: "40% 60% 55% 45%",
+      background: theme.crumb,
+      boxShadow: `0 0 6px ${theme.crumb}`,
+      transform: "rotate(15deg)",
+    }}
+  />
+)}
 
-                          {!wall && hasSugar && (
-                            <div
-                              className="sugarPulse"
-                              style={{
-                                ...pickupDotStyle,
-                                width: 14,
-                                height: 14,
-                                background: theme.sugar,
-                                boxShadow: `0 0 14px ${theme.sugar}`,
-                              }}
-                            />
-                          )}
+                         {!wall && hasSugar && (
+  <div
+    className="sugarPulse"
+    style={{
+      width: 16,
+      height: 16,
+      borderRadius: "50%",
+      background: `radial-gradient(circle at 30% 30%, white, ${theme.sugar})`,
+      boxShadow: `0 0 18px ${theme.sugar}`,
+      border: "1px solid rgba(255,255,255,0.4)",
+    }}
+  />
+)}
 
-                          {!wall && hasCrystal && (
-                            <div
-                              className="crystalPulse"
-                              style={{
-                                width: 18,
-                                height: 18,
-                                transform: "rotate(45deg)",
-                                borderRadius: 4,
-                                background: theme.crystal,
-                                boxShadow: `0 0 18px ${theme.crystal}`,
-                              }}
-                            />
-                          )}
+                         {!wall && hasCrystal && (
+  <div
+    className="crystalPulse"
+    style={{
+      width: 20,
+      height: 20,
+      transform: "rotate(45deg)",
+      background: `linear-gradient(135deg, white, ${theme.crystal})`,
+      boxShadow: `0 0 22px ${theme.crystal}, inset 0 0 6px rgba(255,255,255,0.6)`,
+      clipPath: "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)",
+    }}
+  />
+)}
 
                           {!wall && isSpider && (
                             <div
