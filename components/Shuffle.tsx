@@ -1515,11 +1515,12 @@ return (
       }}
     >
       <div style={{ fontWeight: 800, marginBottom: 6 }}>How points work</div>
-   <div style={{ fontSize: 13, opacity: 0.9, lineHeight: 1.4 }}>
+ <div style={{ fontSize: 13, opacity: 0.9, lineHeight: 1.4 }}>
   • Shuffle costs <b>{pointsConfig.shuffleCost}</b> {pointsConfig.currency}.<br />
   • Crates can award <b>REBEL Points</b> and occasionally <b>collectibles/merch</b> when enabled.<br />
   • Daily claim: <b>+{pointsConfig.dailyClaim}</b> {pointsConfig.currency} (once per day).<br />
-  • Daily earn cap: <b>{pointsConfig.dailyEarnCap}</b> {pointsConfig.currency}/day (anti-abuse).<br />
+  • Daily plays reset every 24 hours.<br />
+  • Point purchases may include <b>bonus plays</b>, which are used after daily plays run out and do not expire.<br />
   • Optional: you can buy points with <b>APE</b> (final sale, gas may apply).<br />
   • See <a href="/rules" style={{ textDecoration: "underline" }}>Official Rules</a> for details.
 </div>
