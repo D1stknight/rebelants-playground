@@ -112,26 +112,26 @@ export default function SharedEconomyPanel({
 
   return (
     <div style={panelStyle}>
-            <div style={statsWrapStyle}>
+                 <div style={statsWrapStyle}>
         <span>
           Balance: <b>{Number(balance || 0).toLocaleString()}</b> {currency}
-        </span>
-        <span>
-          Daily cap: <b>{Number(dailyCap || 0).toLocaleString()}</b>
         </span>
         <span style={{ fontWeight: 800, color: "#60a5fa" }}>
           Total plays left: <b>{Number(totalPlaysLeft || 0).toLocaleString()}</b>
         </span>
         <span>
-          Daily plays left: <b>{Number(dailyPlaysLeft || 0).toLocaleString()}</b>
+          Daily plays left:{" "}
+          <b>
+            {Number(dailyPlaysLeft || 0).toLocaleString()} / {Number(dailyCap || 0).toLocaleString()}
+          </b>
         </span>
         <span>
           Bonus play bank: <b>{Number(bonusPlayBank || 0).toLocaleString()}</b>
         </span>
       </div>
 
-      <div style={{ fontSize: 12, opacity: 0.75, marginTop: 8 }}>
-        Daily plays reset every 24 hours. Bonus plays are included with point purchases and never expire.
+            <div style={{ fontSize: 12, opacity: 0.75, marginTop: 8 }}>
+        Daily plays left goes down as you start runs. Bonus plays are included with point purchases and never expire.
       </div>
 
       <div
