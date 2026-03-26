@@ -690,8 +690,8 @@ const [didWinRun, setDidWinRun] = useState(false);
                     Arrow keys move. Space breaks a wall in front of you.
                   </div>
 
-                  <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-                                       {!isPlaying && (
+                                  <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                    {!isPlaying && (
                       <button
                         onClick={() => {
                           void startRun();
@@ -710,13 +710,30 @@ const [didWinRun, setDidWinRun] = useState(false);
                       🎯 Score: <b>{score}</b>
                     </div>
 
-                                        <div style={statusPillStyle}>
-                      🧱 Wall Breaks: <b>{wallBreaksLeft}</b> / {tunnelCfg.tunnelWallBreaks}
+                    <div style={statusPillStyle}>
+                      🧱 Wall Break Charges: <b>{wallBreaksLeft}</b> / {tunnelCfg.tunnelWallBreaks}
                     </div>
+                  </div>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 14,
+                      flexWrap: "wrap",
+                      marginTop: 8,
+                      fontSize: 12,
+                      opacity: 0.85,
+                    }}
+                  >
+                    <span>🍞 Crumb = 1</span>
+                    <span>🍬 Sugar = 5</span>
+                    <span>💎 Crystal = 20</span>
+                    <span>🕷️ Hit = -3 sec</span>
+                    <span>Collect all crystals to win early</span>
                   </div>
                 </div>
 
-                               <div style={boardBadgeStyle}>
+                <div style={boardBadgeStyle}>
                   Cost: {tunnelCfg.tunnelCost}
                 </div>
               </div>
@@ -855,15 +872,6 @@ const [didWinRun, setDidWinRun] = useState(false);
                       );
                     })}
                   </div>
-
-                              <div style={boardLegendStyle}>
-  <span>Crumb = 1</span>
-  <span>Sugar = 5</span>
-  <span>Crystal = 20</span>
-  <span>Spider hit = -3 sec</span>
-  <span>Wall breaks = {tunnelCfg.tunnelWallBreaks}</span>
-  <span>Collect all crystals to win early</span>
-</div>
                 </div>
               </div>
               </div>
