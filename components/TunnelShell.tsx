@@ -157,14 +157,15 @@ const [didWinRun, setDidWinRun] = useState(false);
   const boardScrollRef = useRef<HTMLDivElement | null>(null);
   const playerTileRef = useRef<HTMLDivElement | null>(null);
 
-    const {
-    balance,
-    capBank,
-    remainingDaily,
-    totalEarnRoom,
-    refresh,
-    earn,
-  } = usePoints(effectivePlayerId);
+   const {
+  balance,
+  capBank,
+  remainingDaily,
+  totalEarnRoom,
+  refresh,
+  earn,
+  spend,
+} = usePoints(effectivePlayerId);
 
   const theme = themeMap[boardTheme];
   const brokenWallSet = useMemo(() => new Set(brokenWalls), [brokenWalls]);
@@ -202,7 +203,7 @@ setDidWinRun(false);
 lastHitRef.current = 0;
   }
 
-  function startRun() {
+   async function startRun() {
     if (isPlaying) return;
 
     if (Number(totalEarnRoom || 0) < TUNNEL_COST) {
@@ -215,8 +216,23 @@ lastHitRef.current = 0;
       return;
     }
 
-    setupNewRun();
-    setIsPlaying(true);
+    setRunMessage("Starting run...");
+
+    try {
+      const spendRes: any = await spend(TUNNEL_COST, "tunnel");
+
+      if (!spendRes?.ok) {
+        setRunMessage(spendRes?.error || "Could not start Tunnel run.");
+        return;
+      }
+
+      await refresh();
+      setupNewRun();
+      setIsPlaying(true);
+      setRunMessage("");
+    } catch (e: any) {
+      setRunMessage(e?.message || "Could not start Tunnel run.");
+    }
   }
 
   useEffect(() => {
@@ -646,8 +662,13 @@ lastHitRef.current = 0;
                   </div>
 
                   <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-                    {!isPlaying && (
-                      <button onClick={startRun} style={startRunButtonStyle}>
+                                       {!isPlaying && (
+                      <button
+                        onClick={() => {
+                          void startRun();
+                        }}
+                        style={startRunButtonStyle}
+                      >
                         Start Run
                       </button>
                     )}
