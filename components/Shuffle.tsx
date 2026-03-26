@@ -1543,15 +1543,15 @@ return (
     <span>Daily cap: <b>{pointsConfig.dailyEarnCap}</b></span>
   </div>
 
-  <div style={{ marginTop: 8, display: "flex", gap: 12, flexWrap: "wrap" }}>
+   <div style={{ marginTop: 8, display: "flex", gap: 12, flexWrap: "wrap" }}>
     <span>
-      Earn room left: <b>{Number(totalEarnRoom || 0).toLocaleString()}</b>
+      Play room left: <b>{Number(totalEarnRoom || 0).toLocaleString()}</b>
     </span>
     <span>
-      Daily cap left: <b>{Number(remainingDaily || 0).toLocaleString()}</b>
+      Daily play left: <b>{Number(remainingDaily || 0).toLocaleString()}</b>
     </span>
     <span>
-      Bonus cap bank: <b>{Number(capBank || 0).toLocaleString()}</b>
+      Bonus play bank: <b>{Number(capBank || 0).toLocaleString()}</b>
     </span>
   </div>
 </div>
