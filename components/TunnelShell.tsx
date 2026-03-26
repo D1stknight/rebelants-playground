@@ -812,17 +812,17 @@ const [didWinRun, setDidWinRun] = useState(false);
   <div
     className="crumbPulse"
     style={{
-      width: 16,
-      height: 16,
-      display: "grid",
-      placeItems: "center",
-      borderRadius: "40% 60% 55% 45%",
-      background: theme.crumb,
-      boxShadow: `0 0 10px ${theme.crumb}`,
-      transform: "rotate(15deg)",
-      fontSize: 10,
-      filter: "drop-shadow(0 0 6px rgba(255,255,255,0.6))",
-    }}
+  width: 16,
+  height: 16,
+  display: "grid",
+  placeItems: "center",
+  borderRadius: "40% 60% 55% 45%",
+  background: "#22c55e",
+  boxShadow: "0 0 10px #22c55e, 0 0 20px rgba(34,197,94,0.6)",
+  transform: "rotate(15deg)",
+  fontSize: 10,
+  filter: "drop-shadow(0 0 6px rgba(34,197,94,0.8))",
+}}
   >
     🍞
   </div>
@@ -832,17 +832,17 @@ const [didWinRun, setDidWinRun] = useState(false);
   <div
     className="sugarPulse"
     style={{
-      width: 20,
-      height: 20,
-      display: "grid",
-      placeItems: "center",
-      borderRadius: "50%",
-      background: `radial-gradient(circle at 30% 30%, white, ${theme.sugar})`,
-      boxShadow: `0 0 18px ${theme.sugar}`,
-      border: "1px solid rgba(255,255,255,0.4)",
-      fontSize: 12,
-      filter: "drop-shadow(0 0 8px rgba(255,255,255,0.7))",
-    }}
+  width: 20,
+  height: 20,
+  display: "grid",
+  placeItems: "center",
+  borderRadius: "50%",
+  background: "radial-gradient(circle at 30% 30%, #fff7cc, #facc15)",
+  boxShadow: "0 0 16px #facc15, 0 0 30px rgba(250,204,21,0.6)",
+  border: "1px solid rgba(255,255,255,0.4)",
+  fontSize: 12,
+  filter: "drop-shadow(0 0 10px rgba(250,204,21,0.9))",
+}}
   >
     🍬
   </div>
@@ -851,18 +851,18 @@ const [didWinRun, setDidWinRun] = useState(false);
 {!wall && hasCrystal && (
   <div
     className="crystalPulse"
-    style={{
-      width: 24,
-      height: 24,
-      display: "grid",
-      placeItems: "center",
-      transform: "rotate(45deg)",
-      background: `linear-gradient(135deg, white, ${theme.crystal})`,
-      boxShadow: `0 0 22px ${theme.crystal}, inset 0 0 6px rgba(255,255,255,0.6)`,
-      clipPath: "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)",
-      fontSize: 12,
-      filter: "drop-shadow(0 0 10px rgba(255,255,255,0.9))",
-    }}
+  style={{
+  width: 24,
+  height: 24,
+  display: "grid",
+  placeItems: "center",
+  transform: "rotate(45deg)",
+  background: "linear-gradient(135deg, #e0f2ff, #3b82f6)",
+  boxShadow: "0 0 18px #3b82f6, 0 0 40px rgba(59,130,246,0.8), inset 0 0 8px rgba(255,255,255,0.8)",
+  clipPath: "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)",
+  fontSize: 12,
+  filter: "drop-shadow(0 0 14px rgba(59,130,246,1))",
+}}
   >
     <span style={{ transform: "rotate(-45deg)" }}>💎</span>
   </div>
