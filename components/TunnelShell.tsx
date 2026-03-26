@@ -158,15 +158,15 @@ const [didWinRun, setDidWinRun] = useState(false);
   const boardScrollRef = useRef<HTMLDivElement | null>(null);
   const playerTileRef = useRef<HTMLDivElement | null>(null);
 
-    const {
+     const {
     balance,
     capBank,
     remainingDaily,
     totalEarnRoom,
+    dailyCap,
     refresh,
     earn,
     spend,
-    pointsConfig,
   } = usePoints(effectivePlayerId);
   const theme = themeMap[boardTheme];
   const brokenWallSet = useMemo(() => new Set(brokenWalls), [brokenWalls]);
@@ -569,15 +569,15 @@ lastHitRef.current = 0;
             Samurai Rebel Ants. Underground tunnels. Crumbs, sugar, crystals, danger, and breakable walls.
           </p>
 
-                           <SharedEconomyPanel
+                                    <SharedEconomyPanel
             playerId={effectivePlayerId}
             balance={balance}
             totalPlaysLeft={totalEarnRoom}
             dailyPlaysLeft={remainingDaily}
             bonusPlayBank={capBank}
-            dailyCap={Number(pointsConfig?.dailyEarnCap || 0)}
-            currency={pointsConfig?.currency || "REBEL"}
-            dailyClaimAmount={Number(pointsConfig?.dailyClaim || 0)}
+            dailyCap={Number(dailyCap || 0)}
+            currency="REBEL"
+            dailyClaimAmount={1000}
             onOpenBuyPoints={() => setShowBuyPoints(true)}
             onRefresh={refresh}
           />
