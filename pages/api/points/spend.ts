@@ -79,7 +79,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         const liveCfg = await getLivePointsConfig();
     const expectedShuffleCost = Number(liveCfg.shuffleCost || 0);
-    const expectedTunnelCost = 200;
+    const expectedTunnelCost = 50;
 
     // ✅ Shuffle uses live configured cost
     if (reason === "shuffle") {
