@@ -77,10 +77,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const amountRaw = body.amount;
     const reason = String(body.reason || "").trim();
 
-    const liveCfg = await getLivePointsConfig();
+        const liveCfg = await getLivePointsConfig();
     const expectedShuffleCost = Number(liveCfg.shuffleCost || 0);
+    const expectedTunnelCost = 200;
 
-    // ✅ If this is a shuffle spend, enforce live configured cost
+    // ✅ Shuffle uses live configured cost
     if (reason === "shuffle") {
       const got = Number(amountRaw || 0);
       if (!Number.isFinite(expectedShuffleCost) || expectedShuffleCost <= 0) {
@@ -91,6 +92,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           ok: false,
           error: `Invalid shuffle cost. Expected ${expectedShuffleCost}, got ${got}`,
           expected: expectedShuffleCost,
+          got,
+        });
+      }
+    }
+
+    // ✅ Tunnel uses fixed cost for now
+    if (reason === "tunnel") {
+      const got = Number(amountRaw || 0);
+      if (!Number.isFinite(got) || got !== expectedTunnelCost) {
+        return res.status(400).json({
+          ok: false,
+          error: `Invalid tunnel cost. Expected ${expectedTunnelCost}, got ${got}`,
+          expected: expectedTunnelCost,
           got,
         });
       }
@@ -109,14 +123,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ ok: false, error: "Insufficient balance", balance: bal });
     }
 
-    // ✅ Play-cap enforcement for shuffle spends
+       // ✅ Shared play-cap enforcement for all gameplay spends
     let spentToday = 0;
     let capBank = 0;
     let dailyCap = Number(liveCfg.dailyEarnCap || 0);
     let remainingDaily = dailyCap;
     let totalPlayRoom = dailyCap;
 
-    if (reason === "shuffle") {
+    if (reason === "shuffle" || reason === "tunnel") {
       const spentRaw = await redis.get<number>(spentTodayKey(playerId));
       spentToday = Number(spentRaw || 0);
 
