@@ -11,10 +11,6 @@ function capBankKey(playerId: string) {
   return `ra:points:capbank:${playerId}`;
 }
 
-function capBankKey(playerId: string) {
-  return `ra:points:capbank:${playerId}`;
-}
-
 // ✅ Match spend.ts EXACTLY: daily spent key is date-based
 function todayKey(playerId: string) {
   const d = new Date();
