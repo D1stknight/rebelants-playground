@@ -15,6 +15,12 @@ type PickupBurst = {
   kind: "crumb" | "sugar" | "crystal";
 };
 
+type WallBurst = {
+  id: number;
+  row: number;
+  col: number;
+};
+
 const GRID_ROWS = 14;
 const GRID_COLS = 22;
 
@@ -172,12 +178,14 @@ const [didWinRun, setDidWinRun] = useState(false);
   const [sugars, setSugars] = useState<Cell[]>([]);
   const [crystals, setCrystals] = useState<Cell[]>([]);
     const [spiderPos, setSpiderPos] = useState<Cell>({ row: 1, col: 10 });
-  const [wallBreaksLeft, setWallBreaksLeft] = useState(
+   const [wallBreaksLeft, setWallBreaksLeft] = useState(
     DEFAULT_TUNNEL_CONFIG.tunnelWallBreaks
   );
   const [brokenWalls, setBrokenWalls] = useState<string[]>([]);
   const [facing, setFacing] = useState<Facing>("right");
   const [pickupBursts, setPickupBursts] = useState<PickupBurst[]>([]);
+  const [wallBursts, setWallBursts] = useState<WallBurst[]>([]);
+  const [hitFlash, setHitFlash] = useState(false);
 
   const lastHitRef = useRef(0);
   const boardScrollRef = useRef<HTMLDivElement | null>(null);
@@ -196,12 +204,21 @@ const [didWinRun, setDidWinRun] = useState(false);
     const theme = themeMap[boardTheme];
   const brokenWallSet = useMemo(() => new Set(brokenWalls), [brokenWalls]);
 
-  function triggerPickupBurst(row: number, col: number, kind: "crumb" | "sugar" | "crystal") {
+   function triggerPickupBurst(row: number, col: number, kind: "crumb" | "sugar" | "crystal") {
     const id = Date.now() + Math.floor(Math.random() * 100000);
     setPickupBursts((prev) => [...prev, { id, row, col, kind }]);
 
     window.setTimeout(() => {
       setPickupBursts((prev) => prev.filter((b) => b.id !== id));
+    }, 260);
+  }
+
+  function triggerWallBurst(row: number, col: number) {
+    const id = Date.now() + Math.floor(Math.random() * 100000);
+    setWallBursts((prev) => [...prev, { id, row, col }]);
+
+    window.setTimeout(() => {
+      setWallBursts((prev) => prev.filter((b) => b.id !== id));
     }, 260);
   }
 
@@ -460,7 +477,7 @@ const [didWinRun, setDidWinRun] = useState(false);
 
     return () => clearInterval(interval);
   }, [isPlaying, playerPos, brokenWallSet, tunnelCfg.tunnelSpiderSpeedMs]);
-  useEffect(() => {
+   useEffect(() => {
     if (!isPlaying) return;
 
     const now = Date.now();
@@ -470,6 +487,11 @@ const [didWinRun, setDidWinRun] = useState(false);
     lastHitRef.current = now;
     setTimeLeft((t) => Math.max(0, t - 3));
     setRunMessage("Spider hit! -3 seconds");
+    setHitFlash(true);
+
+    window.setTimeout(() => {
+      setHitFlash(false);
+    }, 180);
   }, [playerPos, spiderPos, isPlaying]);
 
    useLayoutEffect(() => {
@@ -557,8 +579,9 @@ const [didWinRun, setDidWinRun] = useState(false);
           return;
         }
 
-        setBrokenWalls((prev) => [...prev, key]);
+               setBrokenWalls((prev) => [...prev, key]);
         setWallBreaksLeft((n) => Math.max(0, n - 1));
+        triggerWallBurst(target.row, target.col);
         setRunMessage("Wall broken ✅");
         return;
       }
@@ -808,8 +831,22 @@ const [didWinRun, setDidWinRun] = useState(false);
                                <div
                   ref={boardScrollRef}
                   style={{ ...boardPreviewStyle, background: theme.bg }}
-                >
+                                >
                   <div style={previewGlowStyle(theme.accent)} />
+
+                  {hitFlash && (
+                    <div
+                      className="hitFlash"
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        pointerEvents: "none",
+                        zIndex: 3,
+                        background:
+                          "radial-gradient(circle at center, rgba(239,68,68,0.18), rgba(127,29,29,0.10) 45%, transparent 70%)",
+                      }}
+                    />
+                  )}
 
                   <div style={previewInnerStyle}>
                     <div style={previewGridStyle}>
@@ -821,9 +858,10 @@ const [didWinRun, setDidWinRun] = useState(false);
                       const hasCrumb = crumbs.some((c) => c.row === row && c.col === col);
                       const hasSugar = sugars.some((c) => c.row === row && c.col === col);
                       const hasCrystal = crystals.some((c) => c.row === row && c.col === col);
-                                            const isPlayer = playerPos.row === row && playerPos.col === col;
+                                                                  const isPlayer = playerPos.row === row && playerPos.col === col;
                       const isSpider = spiderPos?.row === row && spiderPos?.col === col;
                       const burst = pickupBursts.find((b) => b.row === row && b.col === col);
+                      const wallBurst = wallBursts.find((b) => b.row === row && b.col === col);
 
                       return (
                                                <div
@@ -900,7 +938,7 @@ const [didWinRun, setDidWinRun] = useState(false);
   </div>
 )}
 
-                                                 {!wall && burst && (
+                                                                         {!wall && burst && (
                             <div
                               className="pickupBurst"
                               style={{
@@ -920,6 +958,32 @@ const [didWinRun, setDidWinRun] = useState(false);
                                   background: `${burstColor(burst.kind)}22`,
                                   boxShadow: `0 0 10px ${burstColor(burst.kind)}, 0 0 24px ${burstColor(burst.kind)}`,
                                   border: `1px solid ${burstColor(burst.kind)}66`,
+                                }}
+                              />
+                            </div>
+                          )}
+
+                          {wallBurst && (
+                            <div
+                              className="wallBurst"
+                              style={{
+                                position: "absolute",
+                                inset: 0,
+                                display: "grid",
+                                placeItems: "center",
+                                pointerEvents: "none",
+                                zIndex: 1,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: 38,
+                                  height: 38,
+                                  borderRadius: 999,
+                                  background: "rgba(180, 120, 60, 0.18)",
+                                  boxShadow:
+                                    "0 0 10px rgba(180,120,60,0.45), 0 0 24px rgba(120,70,30,0.55)",
+                                  border: "1px solid rgba(210,160,90,0.45)",
                                 }}
                               />
                             </div>
@@ -998,12 +1062,20 @@ const [didWinRun, setDidWinRun] = useState(false);
           animation: antFloat 1.3s ease-in-out infinite;
         }
 
-               .spiderBob {
+                      .spiderBob {
           animation: spiderBob 0.9s ease-in-out infinite;
         }
 
         .pickupBurst {
           animation: pickupBurst 0.26s ease-out forwards;
+        }
+
+        .wallBurst {
+          animation: wallBurst 0.26s ease-out forwards;
+        }
+
+        .hitFlash {
+          animation: hitFlash 0.18s ease-out forwards;
         }
 
         @keyframes crumbPulse {
@@ -1036,13 +1108,33 @@ const [didWinRun, setDidWinRun] = useState(false);
           100% { transform: translateY(0px); }
         }
 
-        @keyframes pickupBurst {
+              @keyframes pickupBurst {
           0% {
             transform: scale(0.65);
             opacity: 0.95;
           }
           100% {
             transform: scale(1.45);
+            opacity: 0;
+          }
+        }
+
+        @keyframes wallBurst {
+          0% {
+            transform: scale(0.55);
+            opacity: 0.95;
+          }
+          100% {
+            transform: scale(1.55);
+            opacity: 0;
+          }
+        }
+
+        @keyframes hitFlash {
+          0% {
+            opacity: 1;
+          }
+          100% {
             opacity: 0;
           }
         }
