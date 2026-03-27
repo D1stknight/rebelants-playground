@@ -2011,8 +2011,8 @@ function previewGlowStyle(accent: string): React.CSSProperties {
 
 const previewInnerStyle: React.CSSProperties = {
   position: "relative",
-  minWidth: 1100,
-  minHeight: 850,
+  minWidth: 1050,
+  minHeight: 820,
 };
 
 const previewGridStyle: React.CSSProperties = {
