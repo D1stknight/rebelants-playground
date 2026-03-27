@@ -352,6 +352,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
   const [isLandscape, setIsLandscape] = useState(true);
 
     const lastHitRef = useRef(0);
+  const gameBoardTopRef = useRef<HTMLDivElement | null>(null);
   const boardScrollRef = useRef<HTMLDivElement | null>(null);
   const playerTileRef = useRef<HTMLDivElement | null>(null);
   const touchStartXRef = useRef<number | null>(null);
@@ -411,6 +412,17 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     }
   }
 
+  function scrollBackToBoardHeader() {
+    if (typeof window === "undefined") return;
+
+    requestAnimationFrame(() => {
+      gameBoardTopRef.current?.scrollIntoView({
+        block: "start",
+        behavior: "auto",
+      });
+    });
+  }
+  
    async function recordTunnelRun(params: {
     score: number;
     fullClear: boolean;
@@ -836,9 +848,9 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
       });
       await loadTunnelLeaderboard();
 
-           if (score <= 0) {
+                 if (score <= 0) {
         setRunMessage("Run complete. No points earned this time.");
-        resetDesktopBoardView();
+        scrollBackToBoardHeader();
         return;
       }
 
@@ -853,9 +865,9 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           return;
         }
 
-                setRunMessage(`Run complete. +${earnRes?.added ?? score} REBEL Points credited ✅`);
+                       setRunMessage(`Run complete. +${earnRes?.added ?? score} REBEL Points credited ✅`);
         await refresh();
-        resetDesktopBoardView();
+        scrollBackToBoardHeader();
       } catch (e: any) {
         if (cancelled) return;
         setRunMessage(e?.message || "Run complete, but reward claim failed.");
@@ -886,9 +898,9 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
       });
       await loadTunnelLeaderboard();
 
-          if (score <= 0) {
+               if (score <= 0) {
         setRunMessage("Crystal sweep complete! No points earned this time.");
-        resetDesktopBoardView();
+        scrollBackToBoardHeader();
         return;
       }
 
@@ -904,9 +916,9 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           return;
         }
 
-                setRunMessage(`Crystal sweep complete! +${earnRes?.added ?? score} REBEL Points credited 👑`);
+                       setRunMessage(`Crystal sweep complete! +${earnRes?.added ?? score} REBEL Points credited 👑`);
         await refresh();
-        resetDesktopBoardView();
+        scrollBackToBoardHeader();
       } catch (e: any) {
         if (cancelled) return;
         setRunMessage(e?.message || "Crystal sweep complete, but reward claim failed.");
@@ -1163,7 +1175,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
             </div>
           )}
 
-          <div style={gameBoardWrapStyle}>
+                   <div ref={gameBoardTopRef} style={gameBoardWrapStyle}>
             <div style={gameBoardStyle}>
               <div style={boardHeaderStyle}>
                 <div>
