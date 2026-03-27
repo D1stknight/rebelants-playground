@@ -963,16 +963,32 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     }, 180);
   }, [playerPos, spiderPos, isPlaying]);
 
-       useLayoutEffect(() => {
+             useLayoutEffect(() => {
     if (isMobileView) return;
 
+    const wrap = boardScrollRef.current;
     const playerEl = playerTileRef.current;
-    if (!playerEl || !isPlaying) return;
+    if (!wrap || !playerEl || !isPlaying) return;
 
     const raf = requestAnimationFrame(() => {
-      playerEl.scrollIntoView({
-        block: "center",
-        inline: "center",
+      const wrapRect = wrap.getBoundingClientRect();
+      const playerRect = playerEl.getBoundingClientRect();
+
+      const targetLeft =
+        wrap.scrollLeft +
+        (playerRect.left - wrapRect.left) -
+        wrap.clientWidth / 2 +
+        playerRect.width / 2;
+
+      const targetTop =
+        wrap.scrollTop +
+        (playerRect.top - wrapRect.top) -
+        wrap.clientHeight / 2 +
+        playerRect.height / 2;
+
+      wrap.scrollTo({
+        left: Math.max(0, Math.min(targetLeft, wrap.scrollWidth - wrap.clientWidth)),
+        top: Math.max(0, Math.min(targetTop, wrap.scrollHeight - wrap.clientHeight)),
         behavior: "auto",
       });
     });
