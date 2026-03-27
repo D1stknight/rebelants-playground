@@ -972,11 +972,11 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
   }, [isPlaying, facing, playerPos, wallBreaksLeft, brokenWallSet, layoutIndex]);
   return (
     <>
-      <main
+            <main
         style={{
           maxWidth: 1600,
           margin: "0 auto",
-          padding: "32px 16px",
+          padding: isPlaying && isMobileView ? "10px 8px" : "32px 16px",
         }}
       >
         <header style={{ marginBottom: 18 }}>
@@ -1002,79 +1002,97 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           </nav>
         </header>
 
-        <div style={cardStyle}>
-          <div style={{ fontSize: 30, fontWeight: 900, marginBottom: 6 }}>
-            Ant Tunnel
-          </div>
-          <p style={{ opacity: 0.88, marginBottom: 18 }}>
-            Samurai Rebel Ants. Underground tunnels. Crumbs, sugar, crystals, danger, and breakable walls.
-          </p>
+              <div
+          style={{
+            ...cardStyle,
+            ...(isPlaying && isMobileView ? mobileRunCardStyle : null),
+          }}
+        >
+          {!(isPlaying && isMobileView) && (
+            <>
+              <div style={{ fontSize: 30, fontWeight: 900, marginBottom: 6 }}>
+                Ant Tunnel
+              </div>
+              <p style={{ opacity: 0.88, marginBottom: 18 }}>
+                Samurai Rebel Ants. Underground tunnels. Crumbs, sugar, crystals, danger, and breakable walls.
+              </p>
 
-                                             <SharedEconomyPanel
-            playerId={effectivePlayerId}
-            balance={balance}
-            totalPlaysLeft={totalEarnRoom}
-            dailyPlaysLeft={remainingDaily}
-            bonusPlayBank={capBank}
-            dailyCap={Number(dailyCap || 0)}
-            currency={tunnelCfg.currency}
-            dailyClaimAmount={tunnelCfg.dailyClaim}
-            onOpenBuyPoints={() => setShowBuyPoints(true)}
-            onRefresh={refresh}
-          />
-                                <div
-            style={{
-              ...tunnelTopMetaRowStyle,
-              ...(isMobileView ? tunnelTopMetaRowMobileStyle : null),
-            }}
-          >
-            <label style={{ fontSize: 13, opacity: 0.9 }}>
-              Name:&nbsp;
-              <input
-                value={playerName}
-                onChange={(e) => {
-                  const v = (e.target.value.slice(0, 18) || "guest").trim() || "guest";
-                  setPlayerName(v);
-
-                  const p = loadProfile();
-                  const id = (p?.id || "guest").trim() || "guest";
-                  saveProfile({ name: v, id });
-                }}
-                style={inputStyle}
+              <SharedEconomyPanel
+                playerId={effectivePlayerId}
+                balance={balance}
+                totalPlaysLeft={totalEarnRoom}
+                dailyPlaysLeft={remainingDaily}
+                bonusPlayBank={capBank}
+                dailyCap={Number(dailyCap || 0)}
+                currency={tunnelCfg.currency}
+                dailyClaimAmount={tunnelCfg.dailyClaim}
+                onOpenBuyPoints={() => setShowBuyPoints(true)}
+                onRefresh={refresh}
               />
-            </label>
+              <div
+                style={{
+                  ...tunnelTopMetaRowStyle,
+                  ...(isMobileView ? tunnelTopMetaRowMobileStyle : null),
+                }}
+              >
+                <label style={{ fontSize: 13, opacity: 0.9 }}>
+                  Name:&nbsp;
+                  <input
+                    value={playerName}
+                    onChange={(e) => {
+                      const v = (e.target.value.slice(0, 18) || "guest").trim() || "guest";
+                      setPlayerName(v);
 
-            <div style={tunnelFlavorQuoteStyle}>
-              Move with purpose. Break what stands in your way. In the dark, hesitation is defeat.
+                      const p = loadProfile();
+                      const id = (p?.id || "guest").trim() || "guest";
+                      saveProfile({ name: v, id });
+                    }}
+                    style={inputStyle}
+                  />
+                </label>
+
+                <div style={tunnelFlavorQuoteStyle}>
+                  Move with purpose. Break what stands in your way. In the dark, hesitation is defeat.
+                </div>
+
+                <Link href="/tunnel-rules" style={tunnelRulesLinkStyle}>
+                  How to Play + Official Rules
+                </Link>
+              </div>
+              <div style={themeSwitchWrapStyle}>
+                <button
+                  type="button"
+                  onClick={() => setBoardTheme("colony")}
+                  style={boardTheme === "colony" ? themeButtonActiveStyle(themeMap.colony.accent) : themeButtonStyle}
+                >
+                  Colony Tunnel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBoardTheme("neon")}
+                  style={boardTheme === "neon" ? themeButtonActiveStyle(themeMap.neon.accent) : themeButtonStyle}
+                >
+                  Neon Sci-Fi
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBoardTheme("mythic")}
+                  style={boardTheme === "mythic" ? themeButtonActiveStyle(themeMap.mythic.accent) : themeButtonStyle}
+                >
+                  Dark Mythic
+                </button>
+              </div>
+            </>
+          )}
+
+          {isPlaying && isMobileView && (
+            <div style={mobileRunTopBarStyle}>
+              <div style={mobileRunStatPillStyle}>⏱ {timeLeft}s</div>
+              <div style={mobileRunStatPillStyle}>🎯 {score}</div>
+              <div style={mobileRunStatPillStyle}>🧱 {wallBreaksLeft}</div>
+              <div style={mobileRunStatPillStyle}>💎 {crystals.length}</div>
             </div>
-
-                       <Link href="/tunnel-rules" style={tunnelRulesLinkStyle}>
-              How to Play + Official Rules
-            </Link>
-          </div>
-          <div style={themeSwitchWrapStyle}>
-            <button
-              type="button"
-              onClick={() => setBoardTheme("colony")}
-              style={boardTheme === "colony" ? themeButtonActiveStyle(themeMap.colony.accent) : themeButtonStyle}
-            >
-              Colony Tunnel
-            </button>
-            <button
-              type="button"
-              onClick={() => setBoardTheme("neon")}
-              style={boardTheme === "neon" ? themeButtonActiveStyle(themeMap.neon.accent) : themeButtonStyle}
-            >
-              Neon Sci-Fi
-            </button>
-            <button
-              type="button"
-              onClick={() => setBoardTheme("mythic")}
-              style={boardTheme === "mythic" ? themeButtonActiveStyle(themeMap.mythic.accent) : themeButtonStyle}
-            >
-              Dark Mythic
-            </button>
-          </div>
+          )}
 
           <div style={gameBoardWrapStyle}>
             <div style={gameBoardStyle}>
@@ -1833,6 +1851,29 @@ const runMessageStyle: React.CSSProperties = {
   border: "1px solid rgba(255,255,255,0.10)",
   fontSize: 13,
   opacity: 0.95,
+};
+
+const mobileRunCardStyle: React.CSSProperties = {
+  padding: 10,
+  minHeight: "100dvh",
+};
+
+const mobileRunTopBarStyle: React.CSSProperties = {
+  display: "flex",
+  gap: 8,
+  flexWrap: "wrap",
+  alignItems: "center",
+  justifyContent: "center",
+  marginBottom: 10,
+};
+
+const mobileRunStatPillStyle: React.CSSProperties = {
+  padding: "8px 10px",
+  borderRadius: 12,
+  fontSize: 13,
+  fontWeight: 800,
+  background: "rgba(255,255,255,0.06)",
+  border: "1px solid rgba(255,255,255,0.10)",
 };
 
 const boardPreviewStyle: React.CSSProperties = {
