@@ -439,16 +439,23 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     }
   }
 
-    function handleSwipeStart(e: React.TouchEvent<HTMLDivElement>) {
+       function handleSwipeStart(e: React.TouchEvent<HTMLDivElement>) {
     if (!isMobileView || !isPlaying) return;
+    e.preventDefault();
     const touch = e.touches[0];
     if (!touch) return;
     touchStartXRef.current = touch.clientX;
     touchStartYRef.current = touch.clientY;
   }
 
+  function handleSwipeMove(e: React.TouchEvent<HTMLDivElement>) {
+    if (!isMobileView || !isPlaying) return;
+    e.preventDefault();
+  }
+
   function handleSwipeEnd(e: React.TouchEvent<HTMLDivElement>) {
     if (!isMobileView || !isPlaying) return;
+    e.preventDefault();
 
     const startX = touchStartXRef.current;
     const startY = touchStartYRef.current;
@@ -733,10 +740,16 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
         return;
       }
 
-      await refresh();
+           await refresh();
       setupNewRun();
       setIsPlaying(true);
       setRunMessage("");
+
+      if (typeof window !== "undefined" && window.innerWidth <= 900) {
+        requestAnimationFrame(() => {
+          window.scrollTo({ top: 0, behavior: "auto" });
+        });
+      }
     } catch (e: any) {
       setRunMessage(e?.message || "Could not start Tunnel run.");
     }
@@ -1171,17 +1184,30 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
 ) : null}
 
                                                                             <div
+                                                                                              <div
                   ref={boardScrollRef}
                   className={hitShake ? "hitShake" : ""}
                   onTouchStart={handleSwipeStart}
+                  onTouchMove={handleSwipeMove}
                   onTouchEnd={handleSwipeEnd}
                   style={{
                     ...boardPreviewStyle,
                     ...(isMobileView ? boardPreviewMobileStyle : null),
+                    ...(isPlaying && isMobileView ? boardPreviewMobileRunStyle : null),
                     background: theme.bg,
+                    overflow: isPlaying && isMobileView ? "hidden" : undefined,
+                    touchAction: isPlaying && isMobileView ? "none" : undefined,
                   }}
                 >
-                  <div style={previewGlowStyle(theme.accent)} />
+                                   <div style={previewGlowStyle(theme.accent)} />
+
+                  {isPlaying && isMobileView && !isLandscape && (
+                    <div style={mobileRotateOverlayStyle}>
+                      <div style={mobileRotateCardStyle}>
+                        Rotate your phone to landscape for a better game experience
+                      </div>
+                    </div>
+                  )}
 
                  {hitFlash && (
   <div
@@ -1198,16 +1224,18 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
   />
 )}
 
-                                   <div
+                                                                    <div
                     style={{
                       ...previewInnerStyle,
                       ...(isMobileView ? previewInnerMobileStyle : null),
+                      ...(isPlaying && isMobileView ? previewInnerMobileRunStyle : null),
                     }}
                   >
                     <div
                       style={{
                         ...previewGridStyle,
                         ...(isMobileView ? previewGridMobileStyle : null),
+                        ...(isPlaying && isMobileView ? previewGridMobileRunStyle : null),
                       }}
                     >
                     {Array.from({ length: GRID_ROWS * GRID_COLS }, (_, i) => {
@@ -1901,6 +1929,47 @@ const previewInnerMobileStyle: React.CSSProperties = {
 
 const previewGridMobileStyle: React.CSSProperties = {
   gap: 6,
+};
+
+const boardPreviewMobileRunStyle: React.CSSProperties = {
+  padding: 8,
+  height: "calc(100dvh - 140px)",
+  minHeight: "calc(100dvh - 140px)",
+  maxHeight: "calc(100dvh - 140px)",
+  overflow: "hidden",
+};
+
+const previewInnerMobileRunStyle: React.CSSProperties = {
+  minWidth: "100%",
+  width: "100%",
+  minHeight: 0,
+};
+
+const previewGridMobileRunStyle: React.CSSProperties = {
+  gap: 4,
+};
+
+const mobileRotateOverlayStyle: React.CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  zIndex: 6,
+  display: "grid",
+  placeItems: "center",
+  background: "rgba(2,6,23,0.58)",
+  pointerEvents: "none",
+};
+
+const mobileRotateCardStyle: React.CSSProperties = {
+  padding: "14px 16px",
+  borderRadius: 16,
+  background: "rgba(15,23,42,0.92)",
+  border: "1px solid rgba(96,165,250,0.25)",
+  color: "#dbeafe",
+  fontSize: 15,
+  fontWeight: 900,
+  textAlign: "center",
+  boxShadow: "0 12px 30px rgba(0,0,0,0.28)",
+  maxWidth: 280,
 };
 
 function previewGlowStyle(accent: string): React.CSSProperties {
