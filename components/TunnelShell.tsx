@@ -963,7 +963,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     }, 180);
   }, [playerPos, spiderPos, isPlaying]);
 
-             useLayoutEffect(() => {
+                 useLayoutEffect(() => {
     if (isMobileView) return;
 
     const wrap = boardScrollRef.current;
@@ -971,17 +971,27 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     if (!wrap || !playerEl || !isPlaying) return;
 
     const raf = requestAnimationFrame(() => {
+      const wrapRect = wrap.getBoundingClientRect();
+      const playerRect = playerEl.getBoundingClientRect();
+
+      const relativeLeft = playerRect.left - wrapRect.left + wrap.scrollLeft;
+      const relativeTop = playerRect.top - wrapRect.top + wrap.scrollTop;
+
       const targetLeft =
-        playerEl.offsetLeft - wrap.clientWidth / 2 + playerEl.offsetWidth / 2;
+        relativeLeft - wrap.clientWidth / 2 + playerRect.width / 2;
 
       const targetTop =
-        playerEl.offsetTop - wrap.clientHeight / 2 + playerEl.offsetHeight / 2;
+        relativeTop - wrap.clientHeight / 2 + playerRect.height / 2;
 
-      wrap.scrollTo({
-        left: Math.max(0, Math.min(targetLeft, wrap.scrollWidth - wrap.clientWidth)),
-        top: Math.max(0, Math.min(targetTop, wrap.scrollHeight - wrap.clientHeight)),
-        behavior: "auto",
-      });
+      wrap.scrollLeft = Math.max(
+        0,
+        Math.min(targetLeft, wrap.scrollWidth - wrap.clientWidth)
+      );
+
+      wrap.scrollTop = Math.max(
+        0,
+        Math.min(targetTop, wrap.scrollHeight - wrap.clientHeight)
+      );
     });
 
     return () => cancelAnimationFrame(raf);
@@ -1948,6 +1958,7 @@ const boardPreviewStyle: React.CSSProperties = {
   minHeight: 760,
   maxHeight: 980,
   scrollBehavior: "smooth",
+  overscrollBehavior: "contain",
 };
 
 const boardPreviewMobileStyle: React.CSSProperties = {
