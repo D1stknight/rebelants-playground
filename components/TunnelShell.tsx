@@ -658,7 +658,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     };
   }, []);
 
-  useEffect(() => {
+   useEffect(() => {
     if (typeof document === "undefined") return;
 
     const lockRunMode = isPlaying && isMobileView;
@@ -678,6 +678,19 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
       document.body.style.touchAction = prevBodyTouchAction;
     };
   }, [isPlaying, isMobileView]);
+
+  useEffect(() => {
+    if (!isPlaying || !isMobileView || !isLandscape) return;
+
+    const id = requestAnimationFrame(() => {
+      boardScrollRef.current?.scrollIntoView({
+        block: "center",
+        behavior: "auto",
+      });
+    });
+
+    return () => cancelAnimationFrame(id);
+  }, [isPlaying, isMobileView, isLandscape]);
 
   function setupNewRun() {
     const nextLayoutIndex = Math.floor(Math.random() * TUNNEL_LAYOUTS.length);
