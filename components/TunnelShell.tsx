@@ -492,6 +492,38 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     handleTunnelAction("break");
   }
 
+  function resetDesktopBoardView() {
+    if (isMobileView) return;
+
+    const wrap = boardScrollRef.current;
+    const playerEl = playerTileRef.current;
+    if (!wrap || !playerEl) return;
+
+    requestAnimationFrame(() => {
+      const wrapRect = wrap.getBoundingClientRect();
+      const playerRect = playerEl.getBoundingClientRect();
+
+      const relativeLeft = playerRect.left - wrapRect.left + wrap.scrollLeft;
+      const relativeTop = playerRect.top - wrapRect.top + wrap.scrollTop;
+
+      const targetLeft =
+        relativeLeft - wrap.clientWidth / 2 + playerRect.width / 2;
+
+      const targetTop =
+        relativeTop - wrap.clientHeight / 2 + playerRect.height / 2;
+
+      wrap.scrollLeft = Math.max(
+        0,
+        Math.min(targetLeft, wrap.scrollWidth - wrap.clientWidth)
+      );
+
+      wrap.scrollTop = Math.max(
+        0,
+        Math.min(targetTop, wrap.scrollHeight - wrap.clientHeight)
+      );
+    });
+  }
+  
   function handleTunnelAction(action: "up" | "down" | "left" | "right" | "break") {
     if (!isPlaying) return;
 
@@ -804,8 +836,9 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
       });
       await loadTunnelLeaderboard();
 
-      if (score <= 0) {
+           if (score <= 0) {
         setRunMessage("Run complete. No points earned this time.");
+        resetDesktopBoardView();
         return;
       }
 
@@ -820,8 +853,9 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           return;
         }
 
-        setRunMessage(`Run complete. +${earnRes?.added ?? score} REBEL Points credited ✅`);
+                setRunMessage(`Run complete. +${earnRes?.added ?? score} REBEL Points credited ✅`);
         await refresh();
+        resetDesktopBoardView();
       } catch (e: any) {
         if (cancelled) return;
         setRunMessage(e?.message || "Run complete, but reward claim failed.");
@@ -852,8 +886,9 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
       });
       await loadTunnelLeaderboard();
 
-      if (score <= 0) {
+          if (score <= 0) {
         setRunMessage("Crystal sweep complete! No points earned this time.");
+        resetDesktopBoardView();
         return;
       }
 
@@ -869,8 +904,9 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           return;
         }
 
-        setRunMessage(`Crystal sweep complete! +${earnRes?.added ?? score} REBEL Points credited 👑`);
+                setRunMessage(`Crystal sweep complete! +${earnRes?.added ?? score} REBEL Points credited 👑`);
         await refresh();
+        resetDesktopBoardView();
       } catch (e: any) {
         if (cancelled) return;
         setRunMessage(e?.message || "Crystal sweep complete, but reward claim failed.");
