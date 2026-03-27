@@ -1944,9 +1944,9 @@ const boardPreviewStyle: React.CSSProperties = {
   overflow: "auto",
   borderRadius: 18,
   padding: 20,
-  height: "68vh",
-  minHeight: 620,
-  maxHeight: 760,
+  height: "78vh",
+  minHeight: 760,
+  maxHeight: 980,
   scrollBehavior: "smooth",
 };
 
@@ -2018,13 +2018,8 @@ function previewGlowStyle(accent: string): React.CSSProperties {
 
 const previewInnerStyle: React.CSSProperties = {
   position: "relative",
-  minWidth: 1100,
-  minHeight: 870,
-  paddingTop: 90,
-  paddingBottom: 140,
-  paddingLeft: 40,
-  paddingRight: 40,
-  boxSizing: "border-box",
+  minWidth: 1350,
+  minHeight: 1020,
 };
 
 const previewGridStyle: React.CSSProperties = {
