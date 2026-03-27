@@ -971,20 +971,11 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     if (!wrap || !playerEl || !isPlaying) return;
 
     const raf = requestAnimationFrame(() => {
-      const wrapRect = wrap.getBoundingClientRect();
-      const playerRect = playerEl.getBoundingClientRect();
-
       const targetLeft =
-        wrap.scrollLeft +
-        (playerRect.left - wrapRect.left) -
-        wrap.clientWidth / 2 +
-        playerRect.width / 2;
+        playerEl.offsetLeft - wrap.clientWidth / 2 + playerEl.offsetWidth / 2;
 
       const targetTop =
-        wrap.scrollTop +
-        (playerRect.top - wrapRect.top) -
-        wrap.clientHeight / 2 +
-        playerRect.height / 2;
+        playerEl.offsetTop - wrap.clientHeight / 2 + playerEl.offsetHeight / 2;
 
       wrap.scrollTo({
         left: Math.max(0, Math.min(targetLeft, wrap.scrollWidth - wrap.clientWidth)),
