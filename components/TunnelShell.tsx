@@ -1944,9 +1944,9 @@ const boardPreviewStyle: React.CSSProperties = {
   overflow: "auto",
   borderRadius: 18,
   padding: 20,
-  height: "78vh",
-  minHeight: 760,
-  maxHeight: 980,
+  height: "68vh",
+  minHeight: 620,
+  maxHeight: 760,
   scrollBehavior: "smooth",
 };
 
