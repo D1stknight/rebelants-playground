@@ -999,51 +999,20 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     }, 180);
   }, [playerPos, spiderPos, isPlaying]);
 
-                useLayoutEffect(() => {
-  const playerEl = playerTileRef.current;
-  if (!playerEl || !isPlaying) return;
-
-  const raf = requestAnimationFrame(() => {
-    playerEl.scrollIntoView({
-      block: "center",
-      inline: "center",
-      behavior: "auto",
-    });
-  });
-
-  return () => cancelAnimationFrame(raf);
-}, [playerPos, isPlaying]);
-
-    const wrap = boardScrollRef.current;
+                  useLayoutEffect(() => {
     const playerEl = playerTileRef.current;
-    if (!wrap || !playerEl || !isPlaying) return;
+    if (!playerEl || !isPlaying) return;
 
     const raf = requestAnimationFrame(() => {
-      const wrapRect = wrap.getBoundingClientRect();
-      const playerRect = playerEl.getBoundingClientRect();
-
-      const relativeLeft = playerRect.left - wrapRect.left + wrap.scrollLeft;
-      const relativeTop = playerRect.top - wrapRect.top + wrap.scrollTop;
-
-      const targetLeft =
-        relativeLeft - wrap.clientWidth / 2 + playerRect.width / 2;
-
-      const targetTop =
-        relativeTop - wrap.clientHeight / 2 + playerRect.height / 2;
-
-      wrap.scrollLeft = Math.max(
-        0,
-        Math.min(targetLeft, wrap.scrollWidth - wrap.clientWidth)
-      );
-
-      wrap.scrollTop = Math.max(
-        0,
-        Math.min(targetTop, wrap.scrollHeight - wrap.clientHeight)
-      );
+      playerEl.scrollIntoView({
+        block: "center",
+        inline: "center",
+        behavior: "auto",
+      });
     });
 
     return () => cancelAnimationFrame(raf);
-  }, [playerPos, isPlaying, isMobileView]);
+  }, [playerPos, isPlaying]);
   
     useEffect(() => {
     if (!isPlaying) return;
