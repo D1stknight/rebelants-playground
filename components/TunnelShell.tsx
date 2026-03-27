@@ -740,10 +740,19 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
         return;
       }
 
-           await refresh();
+             await refresh();
       setupNewRun();
       setIsPlaying(true);
       setRunMessage("");
+
+      if (typeof window !== "undefined" && window.innerWidth <= 900) {
+        requestAnimationFrame(() => {
+          boardScrollRef.current?.scrollIntoView({
+            block: "start",
+            behavior: "auto",
+          });
+        });
+      }
 
       if (typeof window !== "undefined" && window.innerWidth <= 900) {
         requestAnimationFrame(() => {
@@ -1586,7 +1595,15 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               </div>
             </div>
           </div>
-        </div>
+               </div>
+
+        {isPlaying && isMobileView && !isLandscape && (
+          <div style={mobileRotatePromptWrapStyle}>
+            <div style={mobileRotatePromptCardStyle}>
+              Rotate your phone to landscape for a better game experience
+            </div>
+          </div>
+        )}
       </main>
       <BuyPointsModal
         open={showBuyPoints}
@@ -2313,4 +2330,28 @@ const mobileBreakButtonStyle: React.CSSProperties = {
   WebkitTapHighlightColor: "transparent",
   touchAction: "none",
   outline: "none",
+};
+
+const mobileRotatePromptWrapStyle: React.CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  zIndex: 300,
+  display: "grid",
+  placeItems: "center",
+  background: "rgba(2,6,23,0.68)",
+  padding: 24,
+};
+
+const mobileRotatePromptCardStyle: React.CSSProperties = {
+  maxWidth: 320,
+  padding: "16px 18px",
+  borderRadius: 18,
+  background: "rgba(15,23,42,0.96)",
+  border: "1px solid rgba(96,165,250,0.26)",
+  color: "#dbeafe",
+  fontSize: 16,
+  fontWeight: 900,
+  lineHeight: 1.45,
+  textAlign: "center",
+  boxShadow: "0 16px 40px rgba(0,0,0,0.32)",
 };
