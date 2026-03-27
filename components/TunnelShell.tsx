@@ -999,8 +999,20 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     }, 180);
   }, [playerPos, spiderPos, isPlaying]);
 
-                 useLayoutEffect(() => {
-    if (isMobileView) return;
+                useLayoutEffect(() => {
+  const playerEl = playerTileRef.current;
+  if (!playerEl || !isPlaying) return;
+
+  const raf = requestAnimationFrame(() => {
+    playerEl.scrollIntoView({
+      block: "center",
+      inline: "center",
+      behavior: "auto",
+    });
+  });
+
+  return () => cancelAnimationFrame(raf);
+}, [playerPos, isPlaying]);
 
     const wrap = boardScrollRef.current;
     const playerEl = playerTileRef.current;
@@ -2065,8 +2077,8 @@ function previewGlowStyle(accent: string): React.CSSProperties {
 
 const previewInnerStyle: React.CSSProperties = {
   position: "relative",
-  minWidth: 1350,
-  minHeight: 1020,
+  minWidth: 1400,
+  minHeight: 1040,
 };
 
 const previewGridStyle: React.CSSProperties = {
