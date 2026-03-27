@@ -1182,9 +1182,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     {runMessage}
   </div>
 ) : null}
-
                                                                             <div
-                                                                                              <div
                   ref={boardScrollRef}
                   className={hitShake ? "hitShake" : ""}
                   onTouchStart={handleSwipeStart}
