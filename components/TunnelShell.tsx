@@ -2020,6 +2020,11 @@ const previewInnerStyle: React.CSSProperties = {
   position: "relative",
   minWidth: 1100,
   minHeight: 870,
+  paddingTop: 90,
+  paddingBottom: 140,
+  paddingLeft: 40,
+  paddingRight: 40,
+  boxSizing: "border-box",
 };
 
 const previewGridStyle: React.CSSProperties = {
