@@ -8,7 +8,7 @@ const ExpeditionPage: NextPage = () => {
     <>
       <Head>
         <title>The Raid — Rebel Ants Playground</title>
-        <meta name="description" content="Assemble your squad. Launch a raid. Win loot." />
+        <meta name="description" content="Assemble 20 ants. Launch a brutal raid. Win loot or die trying." />
       </Head>
       <Raid />
     </>
