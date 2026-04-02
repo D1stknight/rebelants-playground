@@ -662,7 +662,7 @@ export default function Raid() {
     addWin({
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       ts: Date.now(),
-      game: "raid",
+      game: "expedition",
       playerId: pid,
       playerName: pname,
       rarity: r,
@@ -675,7 +675,7 @@ export default function Raid() {
       body: JSON.stringify({
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         ts: Date.now(),
-        game: "raid",
+        game: "expedition",
         playerId: effectivePlayerId || pid,
         playerName: prof?.discordName || prof?.name || pname,
         rarity: r,
