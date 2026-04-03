@@ -1178,6 +1178,9 @@ String(c.status).toUpperCase()==="PENDING"
   />
 </label>
 
+            
+            </div>
+
             {/* ✅ Raid Settings */}
             <div style={{ marginTop: 14, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,.12)" }}>
               <div style={{ fontWeight: 900, marginBottom: 10, color: "#f87171" }}>⚔️ Raid Settings</div>
@@ -1212,6 +1215,9 @@ String(c.status).toUpperCase()==="PENDING"
                 </label>
               </div>
             </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            
 
 <label style={{ fontSize: 12, opacity: 0.9 }}>
   Ultra Min Reward
