@@ -64,6 +64,19 @@ const ROLE_META: Record<AntRole, {
   bomber:  { emoji: "💥", label: "Bomber",  desc: "Dies but clears path for next 3 ants",  color: "#f472b6", bgColor: "rgba(244,114,182,0.15)",  survivalDisplay: "8%"  },
 };
 
+// Role costs (REBEL) - added to squad total before raid launch
+const ROLE_COST: Record<AntRole, number> = {
+  scout:   10,
+  soldier: 15,
+  guard:   20,
+  carrier: 30,
+  bomber:   5,
+};
+
+function calcSquadCost(squad: AntRole[]): number {
+  return squad.reduce((sum, role) => sum + ROLE_COST[role], 0);
+}
+
 const DEFAULT_SQUAD: AntRole[] = [
   "scout","scout","soldier","soldier","bomber",
   "guard","carrier","guard","carrier","soldier",
@@ -151,7 +164,7 @@ function RolePicker({ squad, onChange, disabled }: {
   return (
     <div style={{ marginTop: 16 }}>
       <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 10, opacity: 0.9, letterSpacing: "0.05em" }}>
-        🐜 ASSEMBLE YOUR SQUAD — {squad.length}/{SQUAD_SIZE} ANTS
+        🐜 ASSEMBLE YOUR SQUAD — {squad.length}/{SQUAD_SIZE} ANTS · Squad Cost: {calcSquadCost(squad)} REBEL
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 6, marginBottom: 12 }}>
@@ -173,6 +186,7 @@ function RolePicker({ squad, onChange, disabled }: {
               <div style={{ fontSize: 22, marginBottom: 2 }}>{m.emoji}</div>
               <div style={{ color: m.color, fontSize: 10, fontWeight: 900 }}>{m.label}</div>
               <div style={{ opacity: 0.55, fontSize: 9, marginTop: 1 }}>survive: {m.survivalDisplay}</div>
+              <div style={{ color: m.color, fontSize: 9, marginTop: 1, fontWeight: 900 }}>{ROLE_COST[role]} REBEL</div>
               <div style={{ marginTop: 4, fontSize: 13, fontWeight: 900, color: count > 0 ? m.color : "rgba(255,255,255,.3)" }}>×{count}</div>
             </button>
           );
@@ -747,7 +761,9 @@ export default function Raid() {
 
   const cfg        = pointsConfig as any;
   const cost       = Number(cfg?.raidCost ?? 600);
-  const needMore   = Math.max(0, cost - balance);
+  const squadCost  = calcSquadCost(squad);
+  const totalCost  = cost + squadCost;
+  const needMore   = Math.max(0, totalCost - balance);
   const ultraCarriersThreshold = Number(cfg?.raidUltraCarriers ?? DEFAULT_ULTRA_CARRIERS);
   const ultraRatioThreshold    = Number(cfg?.raidUltraRatio    ?? DEFAULT_ULTRA_RATIO);
   const rareCarriersThreshold  = Number(cfg?.raidRareCarriers  ?? DEFAULT_RARE_CARRIERS);
@@ -797,7 +813,7 @@ export default function Raid() {
     setBusy(true); setPhase("launching");
     setSlots([]); setRevealedCount(0); setShowResult(false);
 
-    await spend(cost,"expedition");
+    await spend(totalCost,"expedition");
     await new Promise(r=>setTimeout(r,900));
 
     const battleSlots = simulateBattle(squad, cfg);
@@ -903,7 +919,7 @@ export default function Raid() {
             style={{ minWidth:240, height:48, fontSize:14, fontWeight:900, display:"inline-flex", alignItems:"center", justifyContent:"center", position:"relative", background:busy?"rgba(15,23,42,.7)":"linear-gradient(135deg,rgba(248,113,113,.18),rgba(96,165,250,.18))", border:"1px solid rgba(248,113,113,.35)", color:"#f87171" }}>
             <span style={{ visibility:"hidden" }}>Launch Raid (-{cost} {cfg?.currency})</span>
             <span style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center" }}>
-              {phase==="launching"?"🐜 Marching…":phase==="battling"?"⚔️ Battle in progress…":squad.length<SQUAD_SIZE?`🐜 Need ${SQUAD_SIZE-squad.length} more ants`:`⚔️ Launch Raid (-${cost} ${cfg?.currency})`}
+              {phase==="launching"?"🐜 Marching…":phase==="battling"?"⚔️ Battle in progress…":squad.length<SQUAD_SIZE?`🐜 Need ${SQUAD_SIZE-squad.length} more ants`:`⚔️ Launch Raid (-${totalCost} ${cfg?.currency})`}
             </span>
           </button>
 
@@ -932,7 +948,7 @@ export default function Raid() {
 
         <div style={{ marginTop:10, fontSize:12, opacity:0.8, display:"flex", gap:14, flexWrap:"wrap" }}>
           <span>🐜 Balance: <b>{balance}</b> {cfg?.currency}</span>
-          <span>⚔️ Cost: <b>{cost}</b> {cfg?.currency}</span>
+          <span>⚔️ Launch: <b>{cost}</b> + Squad: <b>{squadCost}</b> = <b>{totalCost}</b> {cfg?.currency}</span>
           {needMore>0 && <span style={{ color:"#f87171" }}>Need {needMore} more {cfg?.currency}</span>}
         </div>
         <div style={{ marginTop:6, fontSize:11, opacity:0.55, display:"flex", gap:10, flexWrap:"wrap" }}>
@@ -950,7 +966,7 @@ export default function Raid() {
               onChange={e=>{ const v=(e.target.value.slice(0,18)||"guest").trim()||"guest"; setPlayerName(v); const p=loadProfile(); saveProfile({name:v,id:(p?.id||playerId||"guest").trim()||"guest"}); }}
               style={{ padding:"6px 10px", borderRadius:10, border:"1px solid rgba(255,255,255,.18)", background:"rgba(15,23,42,.55)", color:"inherit" }}
             />
-            <div style={{ fontSize:10, opacity:0.55, marginTop:3 }}>ID: {effectivePlayerId}</div>
+            <div style={{ fontSize:10, opacity:0.55, marginTop:3 }}>ID: {profile?.discordName || playerName}</div>
           </label>
 
           <button className="btn" type="button" onClick={claimDailyNow} disabled={claimBusy||dailyClaimed} style={{ padding:"8px 12px", fontSize:12 }}>
