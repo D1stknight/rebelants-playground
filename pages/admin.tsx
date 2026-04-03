@@ -18,6 +18,12 @@ type PointsConfigShape = {
   tunnelWallBreaks: number;
   tunnelSpiderSpeedMs: number;
 
+  // ✅ Raid settings
+  raidCost: number;
+  raidCarrierSurvival: number;
+  raidUltraCarriers: number;
+  raidUltraRatio: number;
+
   rewards: { none: number; common: number; rare: number; ultra: number };
 
   ultraMinReward: number;
@@ -139,6 +145,10 @@ const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
   tunnelCrumbCount: (defaultConfig as any).tunnelCrumbCount ?? 95,
   tunnelWallBreaks: (defaultConfig as any).tunnelWallBreaks ?? 5,
   tunnelSpiderSpeedMs: (defaultConfig as any).tunnelSpiderSpeedMs ?? 160,
+  raidCost: (defaultConfig as any).raidCost ?? 600,
+  raidCarrierSurvival: (defaultConfig as any).raidCarrierSurvival ?? 0.20,
+  raidUltraCarriers: (defaultConfig as any).raidUltraCarriers ?? 4,
+  raidUltraRatio: (defaultConfig as any).raidUltraRatio ?? 0.65,
 
   rewards: { ...defaultConfig.rewards },
 
@@ -1167,6 +1177,41 @@ String(c.status).toUpperCase()==="PENDING"
     style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
   />
 </label>
+
+            {/* ✅ Raid Settings */}
+            <div style={{ marginTop: 14, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,.12)" }}>
+              <div style={{ fontWeight: 900, marginBottom: 10, color: "#f87171" }}>⚔️ Raid Settings</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <label style={{ fontSize: 12, opacity: 0.9 }}>
+                  Raid Cost (REBEL)
+                  <input value={cfg.raidCost} onChange={e => setCfg(c => ({ ...c, raidCost: safeNum(e.target.value, c.raidCost) }))}
+                    style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} />
+                  <div style={{ fontSize: 10, opacity: 0.6, marginTop: 3 }}>How much it costs to launch one raid</div>
+                </label>
+                <label style={{ fontSize: 12, opacity: 0.9 }}>
+                  Carrier Survival % (0–100)
+                  <input
+                    value={Math.round((cfg.raidCarrierSurvival ?? 0.20) * 100)}
+                    onChange={e => { const pct = Math.min(100, Math.max(0, safeNum(e.target.value, 20))); setCfg(c => ({ ...c, raidCarrierSurvival: pct / 100 })); }}
+                    style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} />
+                  <div style={{ fontSize: 10, opacity: 0.6, marginTop: 3 }}>Base survival chance for Carrier ants. Lower = harder.</div>
+                </label>
+                <label style={{ fontSize: 12, opacity: 0.9 }}>
+                  Ultra Carriers Required
+                  <input value={cfg.raidUltraCarriers} onChange={e => setCfg(c => ({ ...c, raidUltraCarriers: safeNum(e.target.value, c.raidUltraCarriers) }))}
+                    style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} />
+                  <div style={{ fontSize: 10, opacity: 0.6, marginTop: 3 }}>Min carriers home needed for Ultra crate (default 4)</div>
+                </label>
+                <label style={{ fontSize: 12, opacity: 0.9 }}>
+                  Ultra Squad Survival % (0–100)
+                  <input
+                    value={Math.round((cfg.raidUltraRatio ?? 0.65) * 100)}
+                    onChange={e => { const pct = Math.min(100, Math.max(0, safeNum(e.target.value, 65))); setCfg(c => ({ ...c, raidUltraRatio: pct / 100 })); }}
+                    style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} />
+                  <div style={{ fontSize: 10, opacity: 0.6, marginTop: 3 }}>% of squad that must survive for Ultra (default 65%)</div>
+                </label>
+              </div>
+            </div>
 
 <label style={{ fontSize: 12, opacity: 0.9 }}>
   Ultra Min Reward
