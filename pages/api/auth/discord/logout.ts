@@ -27,6 +27,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   res.setHeader("Set-Cookie", cookies);
 
   // Go back to Shuffle
-  res.writeHead(302, { Location: "/shuffle" });
+  const referer = String(req.headers.referer || req.headers.referrer || "");
+  const host = String(req.headers.host || "");
+  const destination = referer && host && referer.includes(host) ? referer : "/";
+  res.writeHead(302, { Location: destination });
   res.end();
 }
