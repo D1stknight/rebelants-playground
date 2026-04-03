@@ -1,4 +1,4 @@
-// components/Raid.tsx — THE RAID (Epic Edition)
+// components/Raid.tsx — THE RAID (Epic Edition v2)
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { pointsConfig as defaultPointsConfig } from "../lib/pointsConfig";
@@ -26,33 +26,32 @@ type Prize =
   | { type: "merch"; label: string; meta?: any };
 
 type RaidLeaderboards = {
-  topCommanders: { playerId: string; playerName: string; score: number }[];
-  brutalRaids:   { playerId: string; playerName: string; score: number }[];
-  ultraHaul:     { playerId: string; playerName: string; ts: number }[];
-  recentRaids:   { playerId: string; playerName: string; rarity: Rarity; survivors: number; ts: number; pointsAwarded: number }[];
+  topCommanders: { playerId: string; playerName?: string; score: number }[];
+  brutalRaids:   { playerId: string; playerName?: string; score: number }[];
+  ultraHaul:     { playerId: string; playerName?: string; ts: number }[];
+  recentRaids:   { playerId: string; playerName?: string; rarity: Rarity; survivors: number; ts: number; pointsAwarded: number }[];
 };
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const RAID_COST    = 600;
 const SQUAD_SIZE   = 20;
-const REVEAL_MS    = 420;
+const REVEAL_MS    = 700; // slower = more drama
 
-// BRUTAL difficulty survival odds
-const ROLE_SURVIVAL: Record<AntRole, number> = {
+// Default survival odds (can be overridden by admin via pointsConfig)
+const BASE_SURVIVAL: Record<AntRole, number> = {
   scout:   0.62,
   soldier: 0.48,
-  carrier: 0.30,
+  carrier: 0.20, // brutal — needs guards
   guard:   0.58,
   bomber:  0.08,
 };
 
-// Crate thresholds (brutal)
-const ULTRA_CARRIERS   = 3;
-const ULTRA_RATIO      = 0.65;
-const RARE_CARRIERS    = 1;
-const RARE_RATIO       = 0.40;
-const COMMON_SURVIVORS = 5;
+// Default crate thresholds (can be overridden by admin)
+const DEFAULT_ULTRA_CARRIERS   = 4;
+const DEFAULT_ULTRA_RATIO      = 0.65;
+const DEFAULT_RARE_CARRIERS    = 1;
+const DEFAULT_RARE_RATIO       = 0.40;
+const DEFAULT_COMMON_SURVIVORS = 5;
 
 const ROLE_META: Record<AntRole, {
   emoji: string; label: string; desc: string;
@@ -60,7 +59,7 @@ const ROLE_META: Record<AntRole, {
 }> = {
   scout:   { emoji: "🔍", label: "Scout",   desc: "Reveals path, boosts squad behind it",  color: "#60a5fa", bgColor: "rgba(96,165,250,0.15)",  survivalDisplay: "62%" },
   soldier: { emoji: "⚔️",  label: "Soldier", desc: "Fights through enemy guards",           color: "#f87171", bgColor: "rgba(248,113,113,0.15)",  survivalDisplay: "48%" },
-  carrier: { emoji: "🎒", label: "Carrier", desc: "Brings loot — MUST survive for crates", color: "#fbbf24", bgColor: "rgba(251,191,36,0.15)",   survivalDisplay: "30%" },
+  carrier: { emoji: "🎒", label: "Carrier", desc: "Brings loot — MUST survive for crates", color: "#fbbf24", bgColor: "rgba(251,191,36,0.15)",   survivalDisplay: "20%" },
   guard:   { emoji: "🛡️",  label: "Guard",   desc: "Protects adjacent Carriers (+25%)",     color: "#34d399", bgColor: "rgba(52,211,153,0.15)",   survivalDisplay: "58%" },
   bomber:  { emoji: "💥", label: "Bomber",  desc: "Dies but clears path for next 3 ants",  color: "#f472b6", bgColor: "rgba(244,114,182,0.15)",  survivalDisplay: "8%"  },
 };
@@ -74,15 +73,24 @@ const DEFAULT_SQUAD: AntRole[] = [
 
 // ── Battle Engine ─────────────────────────────────────────────────────────────
 
-function simulateBattle(squad: AntRole[]): AntSlot[] {
+function simulateBattle(squad: AntRole[], cfg: any): AntSlot[] {
   const slots: AntSlot[] = squad.map(role => ({ role, survived: null, boosted: false }));
+
+  // Pull survival overrides from admin config if present
+  const carrierSurvival = Number(cfg?.raidCarrierSurvival ?? BASE_SURVIVAL.carrier);
+
+  const survival: Record<AntRole, number> = {
+    ...BASE_SURVIVAL,
+    carrier: carrierSurvival,
+  };
+
   const frontScouts = squad.slice(0, 4).filter(r => r === "scout").length;
   const scoutBonus = frontScouts * 0.04;
   let bomberBoostRemaining = 0;
 
   for (let i = 0; i < slots.length; i++) {
     const role = slots[i].role;
-    let chance = ROLE_SURVIVAL[role] + scoutBonus;
+    let chance = survival[role] + scoutBonus;
 
     if (bomberBoostRemaining > 0 && role !== "bomber") {
       chance += 0.30;
@@ -107,21 +115,27 @@ function simulateBattle(squad: AntRole[]): AntSlot[] {
   return slots;
 }
 
-function calcPrize(slots: AntSlot[], pointsConfig: any): { rarity: Rarity; prize: Prize } {
-  const currency  = pointsConfig?.currency || "REBEL";
+function calcPrize(slots: AntSlot[], cfg: any): { rarity: Rarity; prize: Prize } {
+  const currency  = cfg?.currency || "REBEL";
   const survivors = slots.filter(s => s.survived).length;
   const carriers  = slots.filter(s => s.role === "carrier" && s.survived).length;
   const ratio     = survivors / slots.length;
 
+  const ultraCarriers = Number(cfg?.raidUltraCarriers ?? DEFAULT_ULTRA_CARRIERS);
+  const ultraRatio    = Number(cfg?.raidUltraRatio    ?? DEFAULT_ULTRA_RATIO);
+  const rareCarriers  = Number(cfg?.raidRareCarriers  ?? DEFAULT_RARE_CARRIERS);
+  const rareRatio     = Number(cfg?.raidRareRatio     ?? DEFAULT_RARE_RATIO);
+  const commonMin     = Number(cfg?.raidCommonSurvivors ?? DEFAULT_COMMON_SURVIVORS);
+
   let rarity: Rarity = "none";
-  if (carriers >= ULTRA_CARRIERS && ratio >= ULTRA_RATIO)    rarity = "ultra";
-  else if (carriers >= RARE_CARRIERS && ratio >= RARE_RATIO) rarity = "rare";
-  else if (survivors >= COMMON_SURVIVORS)                     rarity = "common";
+  if (carriers >= ultraCarriers && ratio >= ultraRatio)    rarity = "ultra";
+  else if (carriers >= rareCarriers && ratio >= rareRatio) rarity = "rare";
+  else if (survivors >= commonMin)                          rarity = "common";
 
   const pts =
-    rarity === "ultra"  ? Number(pointsConfig?.rewards?.ultra  ?? 300) :
-    rarity === "rare"   ? Number(pointsConfig?.rewards?.rare   ?? 100) :
-    rarity === "common" ? Number(pointsConfig?.rewards?.common ?? 50)  : 0;
+    rarity === "ultra"  ? Number(cfg?.rewards?.ultra  ?? 300) :
+    rarity === "rare"   ? Number(cfg?.rewards?.rare   ?? 100) :
+    rarity === "common" ? Number(cfg?.rewards?.common ?? 50)  : 0;
 
   if (pts > 0) return { rarity, prize: { type: "points", label: `+${pts} ${currency}`, points: pts } };
   return { rarity: "none", prize: { type: "none", label: "The colony repelled your forces." } };
@@ -159,9 +173,7 @@ function RolePicker({ squad, onChange, disabled }: {
               <div style={{ fontSize: 22, marginBottom: 2 }}>{m.emoji}</div>
               <div style={{ color: m.color, fontSize: 10, fontWeight: 900 }}>{m.label}</div>
               <div style={{ opacity: 0.55, fontSize: 9, marginTop: 1 }}>survive: {m.survivalDisplay}</div>
-              <div style={{ marginTop: 4, fontSize: 13, fontWeight: 900, color: count > 0 ? m.color : "rgba(255,255,255,.3)" }}>
-                ×{count}
-              </div>
+              <div style={{ marginTop: 4, fontSize: 13, fontWeight: 900, color: count > 0 ? m.color : "rgba(255,255,255,.3)" }}>×{count}</div>
             </button>
           );
         })}
@@ -174,7 +186,7 @@ function RolePicker({ squad, onChange, disabled }: {
       <div style={{
         display: "flex", gap: 3, flexWrap: "wrap",
         padding: 10, borderRadius: 12,
-        background: "rgba(0,0,0,.3)", border: "1px solid rgba(255,255,255,.08)", minHeight: 54,
+        background: "rgba(0,0,0,.35)", border: "1px solid rgba(255,255,255,.08)", minHeight: 54,
       }}>
         {squad.map((role, i) => {
           const m = ROLE_META[role];
@@ -184,8 +196,8 @@ function RolePicker({ squad, onChange, disabled }: {
               onClick={() => { if (!disabled) { const n=[...squad]; n.splice(i,1); onChange(n); }}}
               style={{
                 width: 32, height: 38, borderRadius: 8,
-                border: `1px solid ${m.color}44`,
-                background: m.bgColor, cursor: disabled ? "default" : "pointer",
+                border: `1px solid ${m.color}44`, background: m.bgColor,
+                cursor: disabled ? "default" : "pointer",
                 fontSize: 14, display: "flex", flexDirection: "column",
                 alignItems: "center", justifyContent: "center", position: "relative",
               }}>
@@ -220,8 +232,9 @@ function RolePicker({ squad, onChange, disabled }: {
 
 // ── Battle Scene ──────────────────────────────────────────────────────────────
 
-function BattleScene({ slots, revealedCount, phase }: {
+function BattleScene({ slots, revealedCount, phase, ultraCarriers, ultraRatio }: {
   slots: AntSlot[]; revealedCount: number; phase: Phase;
+  ultraCarriers: number; ultraRatio: number;
 }) {
   const survivors = slots.slice(0, revealedCount).filter(s => s.survived).length;
   const carriers  = slots.slice(0, revealedCount).filter(s => s.role === "carrier" && s.survived).length;
@@ -230,13 +243,13 @@ function BattleScene({ slots, revealedCount, phase }: {
     <div style={{
       marginTop: 16, borderRadius: 16,
       border: "1px solid rgba(255,255,255,.1)",
-      background: "linear-gradient(180deg, rgba(5,10,25,.95) 0%, rgba(10,20,40,.95) 100%)",
+      background: "rgba(0,0,0,.55)",
       padding: 16, overflow: "hidden", position: "relative",
     }}>
       <div style={{ position: "absolute", inset: 0, pointerEvents: "none",
-        background: "radial-gradient(ellipse at 50% 0%, rgba(96,165,250,.06) 0%, transparent 70%)" }} />
+        background: "radial-gradient(ellipse at 50% 0%, rgba(96,165,250,.05) 0%, transparent 70%)" }} />
 
-      <div style={{ display: "flex", gap: 16, marginBottom: 12, fontSize: 12, position: "relative" }}>
+      <div style={{ display: "flex", gap: 16, marginBottom: 12, fontSize: 12, position: "relative", flexWrap: "wrap" }}>
         <span style={{ color: "#60a5fa", fontWeight: 800 }}>🐜 {revealedCount}/{slots.length} revealed</span>
         <span style={{ color: "#34d399", fontWeight: 800 }}>✅ {survivors} survived</span>
         <span style={{ color: "#fbbf24", fontWeight: 800 }}>🎒 {carriers} carrier{carriers !== 1 ? "s" : ""} home</span>
@@ -252,18 +265,19 @@ function BattleScene({ slots, revealedCount, phase }: {
           return (
             <div key={i} style={{
               width: 44, height: 52, borderRadius: 10,
-              border: `1px solid ${!isRevealed ? "rgba(255,255,255,.08)" : survived ? `${m.color}66` : "rgba(239,68,68,.35)"}`,
+              border: `1px solid ${!isRevealed ? "rgba(255,255,255,.07)" : survived ? `${m.color}66` : "rgba(239,68,68,.35)"}`,
               background: !isRevealed ? "rgba(255,255,255,.03)" : survived ? m.bgColor : "rgba(239,68,68,.08)",
               display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
               fontSize: 18, position: "relative",
-              transition: "all 0.35s cubic-bezier(.34,1.56,.64,1)",
-              opacity: !isRevealed ? 0.22 : 1,
-              transform: isActive ? "scale(1.18)" : "scale(1)",
-              boxShadow: isActive ? `0 0 22px ${m.color}99` : survived && isRevealed ? `0 0 8px ${m.color}33` : "none",
+              transition: "all 0.4s cubic-bezier(.34,1.56,.64,1)",
+              opacity: !isRevealed ? 0.2 : 1,
+              transform: isActive ? "scale(1.2)" : "scale(1)",
+              boxShadow: isActive ? `0 0 24px ${m.color}aa` : survived && isRevealed ? `0 0 8px ${m.color}33` : "none",
             }}>
-              <span style={{ filter: !isRevealed ? "grayscale(1)" : !survived ? "grayscale(.9) brightness(.5)" : "none", fontSize: isActive ? 22 : 18, transition: "font-size .2s ease" }}>
-                {m.emoji}
-              </span>
+              <span style={{
+                filter: !isRevealed ? "grayscale(1)" : !survived ? "grayscale(.9) brightness(.5)" : "none",
+                fontSize: isActive ? 22 : 18, transition: "font-size .2s ease",
+              }}>{m.emoji}</span>
               {isRevealed && <span style={{ fontSize: 9, marginTop: 1, fontWeight: 900 }}>{survived ? "✅" : "💀"}</span>}
               {slot.boosted && isRevealed && survived && (
                 <div style={{ position: "absolute", top: -6, right: -4, fontSize: 8, background: "#f472b6", borderRadius: 4, padding: "1px 3px", color: "white", fontWeight: 900 }}>💥</div>
@@ -275,12 +289,12 @@ function BattleScene({ slots, revealedCount, phase }: {
       </div>
 
       {phase === "battling" && revealedCount > 0 && (
-        <div style={{ marginTop: 12, padding: "8px 12px", borderRadius: 10, background: "rgba(0,0,0,.3)", border: "1px solid rgba(255,255,255,.08)", fontSize: 11, display: "flex", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ marginTop: 12, padding: "8px 12px", borderRadius: 10, background: "rgba(0,0,0,.4)", border: "1px solid rgba(255,255,255,.07)", fontSize: 11, display: "flex", gap: 12, flexWrap: "wrap" }}>
           <span style={{ color: "#fbbf24", fontWeight: 800 }}>
-            🎒 Ultra needs {ULTRA_CARRIERS} carriers {carriers >= ULTRA_CARRIERS ? "✅" : `(${carriers}/${ULTRA_CARRIERS})`}
+            🎒 Ultra needs {ultraCarriers} carriers {carriers >= ultraCarriers ? "✅" : `(${carriers}/${ultraCarriers})`}
           </span>
           <span style={{ color: "#60a5fa", fontWeight: 800 }}>
-            👥 Ultra needs {Math.ceil(ULTRA_RATIO * SQUAD_SIZE)} survivors {survivors >= Math.ceil(ULTRA_RATIO * SQUAD_SIZE) ? "✅" : `(${survivors}/${Math.ceil(ULTRA_RATIO * SQUAD_SIZE)})`}
+            👥 Ultra needs {Math.ceil(ultraRatio * SQUAD_SIZE)} survivors {survivors >= Math.ceil(ultraRatio * SQUAD_SIZE) ? "✅" : `(${survivors}/${Math.ceil(ultraRatio * SQUAD_SIZE)})`}
           </span>
         </div>
       )}
@@ -294,10 +308,10 @@ function LaunchAnimation() {
   return (
     <div style={{
       marginTop: 16, padding: 28, borderRadius: 16,
-      background: "linear-gradient(180deg, rgba(5,10,25,.95) 0%, rgba(10,20,40,.95) 100%)",
+      background: "rgba(0,0,0,.55)",
       border: "1px solid rgba(96,165,250,.2)",
       textAlign: "center",
-      boxShadow: "0 0 40px rgba(96,165,250,.08)",
+      boxShadow: "0 0 40px rgba(96,165,250,.06)",
     }}>
       <div style={{ fontSize: 13, fontWeight: 800, color: "#60a5fa", marginBottom: 14, letterSpacing: "0.1em" }}>
         ⚔️ SQUAD MARCHING INTO ENEMY TERRITORY
@@ -307,18 +321,21 @@ function LaunchAnimation() {
           <span key={i} style={{ fontSize: 18, display: "inline-block", animation: `march 0.55s ease-in-out ${i * 0.06}s infinite alternate` }}>🐜</span>
         ))}
       </div>
-      <div style={{ marginTop: 12, fontSize: 11, opacity: 0.55, letterSpacing: "0.08em" }}>
+      <div style={{ marginTop: 12, fontSize: 11, opacity: 0.5, letterSpacing: "0.08em" }}>
         No retreat. No surrender. 🐜
       </div>
-      <style>{`@keyframes march { from { transform: translateY(0px); } to { transform: translateY(-7px); } }`}</style>
+      <style>{`@keyframes march { from{transform:translateY(0px)} to{transform:translateY(-8px)} }`}</style>
     </div>
   );
 }
 
 // ── Result Modal ──────────────────────────────────────────────────────────────
 
-function RaidResultModal({ slots, rarity, prize, onClose }: {
+function RaidResultModal({ slots, rarity, prize, onClose, ultraCarriers, ultraRatio, rareCarriers, rareRatio, commonSurvivors }: {
   slots: AntSlot[]; rarity: Rarity; prize: Prize | null; onClose: () => void;
+  ultraCarriers: number; ultraRatio: number;
+  rareCarriers: number; rareRatio: number;
+  commonSurvivors: number;
 }) {
   const survivors = slots.filter(s => s.survived).length;
   const carriers  = slots.filter(s => s.role === "carrier" && s.survived).length;
@@ -342,7 +359,7 @@ function RaidResultModal({ slots, rarity, prize, onClose }: {
   })) : [];
 
   return (
-    <div style={{ position: "fixed", inset: 0, display: "grid", placeItems: "center", background: "rgba(0,0,0,.78)", zIndex: 2147483647, backdropFilter: "blur(5px)" }}
+    <div style={{ position: "fixed", inset: 0, display: "grid", placeItems: "center", background: "rgba(0,0,0,.82)", zIndex: 2147483647, backdropFilter: "blur(6px)" }}
       role="dialog" aria-modal="true">
       <div style={{
         position: "relative", width: "min(520px, 94vw)",
@@ -350,7 +367,7 @@ function RaidResultModal({ slots, rarity, prize, onClose }: {
         background: "linear-gradient(180deg, rgba(10,18,40,.99) 0%, rgba(5,10,25,.99) 100%)",
         border: `1px solid ${titleColor}44`,
         boxShadow: `0 0 60px ${titleColor}22, 0 28px 60px rgba(0,0,0,.7)`,
-        overflow: "visible",
+        overflow: "visible", maxHeight: "90vh", overflowY: "auto",
       }}>
         {sparks.map((s, i) => (
           <span key={i} style={{
@@ -369,9 +386,9 @@ function RaidResultModal({ slots, rarity, prize, onClose }: {
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 16, textAlign: "center" }}>
           {[
-            { label: "SURVIVED",      value: `${survivors}/${slots.length}`, color: "#34d399", emoji: "🐜" },
-            { label: "CARRIERS HOME", value: String(carriers),               color: "#fbbf24", emoji: "🎒" },
-            { label: "FELL IN BATTLE",value: String(slots.length-survivors), color: "#f87171", emoji: "💀" },
+            { label: "SURVIVED",       value: `${survivors}/${slots.length}`, color: "#34d399", emoji: "🐜" },
+            { label: "CARRIERS HOME",  value: String(carriers),               color: "#fbbf24", emoji: "🎒" },
+            { label: "FELL IN BATTLE", value: String(slots.length-survivors), color: "#f87171", emoji: "💀" },
           ].map(stat => (
             <div key={stat.label} style={{ padding: "10px 6px", borderRadius: 12, background: "rgba(0,0,0,.3)", border: `1px solid ${stat.color}22` }}>
               <div style={{ fontSize: 18 }}>{stat.emoji}</div>
@@ -404,7 +421,7 @@ function RaidResultModal({ slots, rarity, prize, onClose }: {
             <img src={`/crates/${rarity}.png`} alt={`${rarity} crate`}
               style={{ display: "block", width: 130, height: "auto", margin: "0 auto 12px" }} />
             <div style={{ textAlign: "center", fontSize: 15, fontWeight: 900, color: titleColor, marginBottom: 16 }}>
-              {prize?.type === "points" && (prize as any).points > 0 ? prize.label : prize?.label}
+              {prize?.type === "points" ? (prize as any).label : prize?.label}
             </div>
           </>
         )}
@@ -416,10 +433,11 @@ function RaidResultModal({ slots, rarity, prize, onClose }: {
         )}
 
         <div style={{ marginBottom: 16, padding: "10px 14px", borderRadius: 12, background: "rgba(0,0,0,.4)", border: "1px solid rgba(255,255,255,.07)", fontSize: 11, opacity: 0.8 }}>
-          <div style={{ fontWeight: 800, marginBottom: 4, opacity: 0.9 }}>🎯 Crate Requirements</div>
-          <div>🏆 Ultra: {ULTRA_CARRIERS}+ carriers home + {Math.round(ULTRA_RATIO*100)}%+ squad survives</div>
-          <div>⚔️ Rare: {RARE_CARRIERS}+ carrier home + {Math.round(RARE_RATIO*100)}%+ squad survives</div>
-          <div>✅ Common: {COMMON_SURVIVORS}+ ants survive (any role)</div>
+          <div style={{ fontWeight: 800, marginBottom: 4, opacity: 0.9 }}>🎯 How to win crates</div>
+          <div>🏆 Ultra: {ultraCarriers}+ carriers home AND {Math.round(ultraRatio*100)}%+ of squad survives</div>
+          <div>⚔️ Rare: {rareCarriers}+ carrier home AND {Math.round(rareRatio*100)}%+ of squad survives</div>
+          <div>✅ Common: {commonSurvivors}+ ants survive (any role)</div>
+          <div style={{ marginTop: 4, opacity: 0.7 }}>💡 Guards placed next to Carriers give +25% survival to that Carrier</div>
         </div>
 
         <button className="btn" onClick={onClose}
@@ -427,23 +445,14 @@ function RaidResultModal({ slots, rarity, prize, onClose }: {
           {isWin ? "🐜 Claim Loot & Return to Base" : "🐜 Return to Base"}
         </button>
       </div>
-      <style>{`@keyframes pmSpark { 0%{transform:scale(0.3);opacity:0} 20%{opacity:1} 55%{transform:scale(1.15);opacity:.9} 85%{transform:scale(0.6);opacity:.6} 100%{transform:scale(0.2);opacity:0} }`}</style>
+      <style>{`@keyframes pmSpark{0%{transform:scale(0.3);opacity:0}20%{opacity:1}55%{transform:scale(1.15);opacity:.9}85%{transform:scale(0.6);opacity:.6}100%{transform:scale(0.2);opacity:0}}`}</style>
     </div>
   );
 }
 
-// ── Leaderboard Panel ─────────────────────────────────────────────────────────
+// ── Leaderboards (4 panels always visible) ────────────────────────────────────
 
 function RaidLeaderboardPanel({ lb }: { lb: RaidLeaderboards }) {
-  const [tab, setTab] = useState<"commanders"|"brutal"|"ultra"|"recent">("commanders");
-
-  const tabs = [
-    { key: "commanders" as const, label: "Top Commanders", emoji: "🏆" },
-    { key: "brutal"     as const, label: "Most Brutal",    emoji: "💀" },
-    { key: "ultra"      as const, label: "Ultra Hall",      emoji: "✨" },
-    { key: "recent"     as const, label: "Recent Raids",    emoji: "🐜" },
-  ];
-
   function shortId(id: string, name?: string) {
     if (name && name !== "guest") return name;
     if (id.startsWith("discord:")) return id.slice(8,18) + "…";
@@ -460,90 +469,121 @@ function RaidLeaderboardPanel({ lb }: { lb: RaidLeaderboards }) {
   }
 
   const rarityColor: Record<Rarity, string> = { ultra:"#fbbf24", rare:"#60a5fa", common:"#34d399", none:"#f87171" };
+  const medals = ["🥇","🥈","🥉","4.","5."];
+
+  const panelStyle: React.CSSProperties = {
+    flex: "1 1 220px",
+    borderRadius: 14,
+    border: "1px solid rgba(255,255,255,.1)",
+    background: "rgba(0,0,0,.35)",
+    overflow: "hidden",
+    minWidth: 0,
+  };
+
+  const headerStyle: React.CSSProperties = {
+    padding: "10px 12px",
+    borderBottom: "1px solid rgba(255,255,255,.08)",
+    fontSize: 11, fontWeight: 900,
+    letterSpacing: "0.06em",
+    background: "rgba(0,0,0,.2)",
+  };
+
+  const rowStyle: React.CSSProperties = {
+    display: "flex", justifyContent: "space-between", alignItems: "center",
+    padding: "6px 12px", borderBottom: "1px solid rgba(255,255,255,.04)",
+    fontSize: 12,
+  };
+
+  const emptyStyle: React.CSSProperties = {
+    padding: "20px 12px", fontSize: 12, opacity: 0.35, textAlign: "center",
+  };
+
+  const scrollStyle: React.CSSProperties = {
+    maxHeight: 180, overflowY: "auto",
+  };
 
   return (
-    <div style={{ marginTop: 20, borderRadius: 16, border: "1px solid rgba(255,255,255,.1)", background: "rgba(5,10,25,.6)", overflow: "hidden" }}>
-      <div style={{ display: "flex", borderBottom: "1px solid rgba(255,255,255,.08)" }}>
-        {tabs.map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)}
-            style={{
-              flex: 1, padding: "10px 4px", fontSize: 10, fontWeight: 800,
-              background: tab === t.key ? "rgba(96,165,250,.1)" : "transparent",
-              border: "none", color: tab === t.key ? "#60a5fa" : "rgba(255,255,255,.45)",
-              cursor: "pointer",
-              borderBottom: tab === t.key ? "2px solid #60a5fa" : "2px solid transparent",
-              letterSpacing: "0.04em", textAlign: "center",
-            }}>
-            {t.emoji}<br/>{t.label}
-          </button>
-        ))}
+    <div style={{ marginTop: 20 }}>
+      <div style={{ fontSize: 12, fontWeight: 800, opacity: 0.7, marginBottom: 10, letterSpacing: "0.06em" }}>
+        ⚔️ RAID LEADERBOARDS
       </div>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
 
-      <div style={{ padding: 12, minHeight: 120 }}>
-        {tab === "commanders" && (
-          <div>
-            <div style={{ fontSize: 10, opacity: 0.45, fontWeight: 800, letterSpacing: "0.08em", marginBottom: 8 }}>🏆 MOST REBEL EARNED FROM RAIDS</div>
+        {/* Top Commanders */}
+        <div style={panelStyle}>
+          <div style={{ ...headerStyle, color: "#fbbf24" }}>🏆 Top Commanders</div>
+          <div style={{ ...scrollStyle }}>
             {lb.topCommanders.length === 0
-              ? <div style={{ fontSize: 12, opacity: 0.35, textAlign: "center", padding: 24 }}>No raids yet. Be the first commander. 🐜</div>
+              ? <div style={emptyStyle}>No raids yet. Be first. 🐜</div>
               : lb.topCommanders.slice(0,5).map((e,i) => (
-                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid rgba(255,255,255,.05)", fontSize: 12 }}>
-                  <span style={{ opacity: 0.5, width: 22, fontWeight: 900 }}>{i===0?"🥇":i===1?"🥈":i===2?"🥉":`${i+1}.`}</span>
-                  <span style={{ flex: 1, marginLeft: 8 }}>{shortId(e.playerId, e.playerName)}</span>
-                  <span style={{ color: "#fbbf24", fontWeight: 900 }}>{e.score} REBEL</span>
+                <div key={i} style={rowStyle}>
+                  <span style={{ opacity: 0.55, width: 22 }}>{medals[i]}</span>
+                  <span style={{ flex: 1, marginLeft: 6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{shortId(e.playerId, e.playerName)}</span>
+                  <span style={{ color: "#fbbf24", fontWeight: 900, marginLeft: 8, whiteSpace: "nowrap" }}>{e.score} REBEL</span>
                 </div>
               ))
             }
           </div>
-        )}
+          <div style={{ padding: "4px 12px 8px", fontSize: 9, opacity: 0.35 }}>Total REBEL earned across all games</div>
+        </div>
 
-        {tab === "brutal" && (
-          <div>
-            <div style={{ fontSize: 10, opacity: 0.45, fontWeight: 800, letterSpacing: "0.08em", marginBottom: 8 }}>💀 HIGHEST SINGLE-RAID SURVIVOR COUNT</div>
+        {/* Most Brutal */}
+        <div style={panelStyle}>
+          <div style={{ ...headerStyle, color: "#34d399" }}>💀 Most Brutal</div>
+          <div style={scrollStyle}>
             {lb.brutalRaids.length === 0
-              ? <div style={{ fontSize: 12, opacity: 0.35, textAlign: "center", padding: 24 }}>No brutal raids yet. 🐜</div>
+              ? <div style={emptyStyle}>No raids yet. 🐜</div>
               : lb.brutalRaids.slice(0,5).map((e,i) => (
-                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid rgba(255,255,255,.05)", fontSize: 12 }}>
-                  <span style={{ opacity: 0.5, width: 22, fontWeight: 900 }}>{i===0?"🥇":i===1?"🥈":i===2?"🥉":`${i+1}.`}</span>
-                  <span style={{ flex: 1, marginLeft: 8 }}>{shortId(e.playerId, e.playerName)}</span>
-                  <span style={{ color: "#34d399", fontWeight: 900 }}>{e.score}/{SQUAD_SIZE} 🐜</span>
+                <div key={i} style={rowStyle}>
+                  <span style={{ opacity: 0.55, width: 22 }}>{medals[i]}</span>
+                  <span style={{ flex: 1, marginLeft: 6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{shortId(e.playerId, e.playerName)}</span>
+                  <span style={{ color: "#34d399", fontWeight: 900, marginLeft: 8, whiteSpace: "nowrap" }}>{e.score} wins 🐜</span>
                 </div>
               ))
             }
           </div>
-        )}
+          <div style={{ padding: "4px 12px 8px", fontSize: 9, opacity: 0.35 }}>Most total wins across all games</div>
+        </div>
 
-        {tab === "ultra" && (
-          <div>
-            <div style={{ fontSize: 10, opacity: 0.45, fontWeight: 800, letterSpacing: "0.08em", marginBottom: 8 }}>✨ ULTRA HAUL HALL OF FAME</div>
+        {/* Ultra Hall */}
+        <div style={panelStyle}>
+          <div style={{ ...headerStyle, color: "#fbbf24" }}>✨ Ultra Hall of Fame</div>
+          <div style={scrollStyle}>
             {lb.ultraHaul.length === 0
-              ? <div style={{ fontSize: 12, opacity: 0.35, textAlign: "center", padding: 24 }}>No Ultra hauls yet. Can you be the first? 🏆</div>
-              : lb.ultraHaul.slice(0,8).map((e,i) => (
-                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid rgba(255,255,255,.05)", fontSize: 12 }}>
+              ? <div style={emptyStyle}>No Ultra hauls yet. Can you be first? 🏆</div>
+              : lb.ultraHaul.slice(0,5).map((e,i) => (
+                <div key={i} style={rowStyle}>
                   <span style={{ fontSize: 14 }}>✨</span>
-                  <span style={{ flex: 1, marginLeft: 8 }}>{shortId(e.playerId, e.playerName)}</span>
-                  <span style={{ color: "#fbbf24", fontWeight: 900, fontSize: 10 }}>{timeAgo(e.ts)}</span>
+                  <span style={{ flex: 1, marginLeft: 8, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{shortId(e.playerId, e.playerName)}</span>
+                  <span style={{ color: "#fbbf24", fontWeight: 900, fontSize: 10, marginLeft: 8, whiteSpace: "nowrap" }}>{timeAgo(e.ts)}</span>
                 </div>
               ))
             }
           </div>
-        )}
+          <div style={{ padding: "4px 12px 8px", fontSize: 9, opacity: 0.35 }}>Players who landed an Ultra crate on this game</div>
+        </div>
 
-        {tab === "recent" && (
-          <div>
-            <div style={{ fontSize: 10, opacity: 0.45, fontWeight: 800, letterSpacing: "0.08em", marginBottom: 8 }}>🐜 LIVE RAID FEED</div>
+        {/* Recent Raids */}
+        <div style={panelStyle}>
+          <div style={{ ...headerStyle, color: "#60a5fa" }}>🐜 Recent Raids</div>
+          <div style={scrollStyle}>
             {lb.recentRaids.length === 0
-              ? <div style={{ fontSize: 12, opacity: 0.35, textAlign: "center", padding: 24 }}>Quiet at the front. For now. 🐜</div>
-              : lb.recentRaids.slice(0,8).map((e,i) => (
-                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid rgba(255,255,255,.05)", fontSize: 11 }}>
-                  <span style={{ color: rarityColor[e.rarity], fontSize: 13 }}>{e.rarity==="ultra"?"🏆":e.rarity==="rare"?"⚔️":e.rarity==="common"?"✅":"💀"}</span>
-                  <span style={{ flex: 1, marginLeft: 6 }}>{shortId(e.playerId, e.playerName)}</span>
-                  <span style={{ color: "#34d399", fontSize: 10 }}>{e.survivors}/{SQUAD_SIZE} 🐜</span>
-                  <span style={{ opacity: 0.35, fontSize: 9, marginLeft: 8 }}>{timeAgo(e.ts)}</span>
+              ? <div style={emptyStyle}>Quiet at the front. For now. 🐜</div>
+              : lb.recentRaids.slice(0,5).map((e,i) => (
+                <div key={i} style={rowStyle}>
+                  <span style={{ color: rarityColor[e.rarity], fontSize: 13, width: 18 }}>
+                    {e.rarity==="ultra"?"🏆":e.rarity==="rare"?"⚔️":e.rarity==="common"?"✅":"💀"}
+                  </span>
+                  <span style={{ flex: 1, marginLeft: 6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 11 }}>{shortId(e.playerId, e.playerName)}</span>
+                  <span style={{ color: "#34d399", fontSize: 10, marginLeft: 4, whiteSpace: "nowrap" }}>{e.survivors}/{SQUAD_SIZE}🐜</span>
+                  <span style={{ opacity: 0.35, fontSize: 9, marginLeft: 6, whiteSpace: "nowrap" }}>{timeAgo(e.ts)}</span>
                 </div>
               ))
             }
           </div>
-        )}
+          <div style={{ padding: "4px 12px 8px", fontSize: 9, opacity: 0.35 }}>Latest raids on this game only</div>
+        </div>
+
       </div>
     </div>
   );
@@ -587,9 +627,9 @@ export default function Raid() {
 
   const [profile, setProfile] = useState<any>(()=>{ try{return loadProfile();}catch{return {};} });
   useEffect(() => {
-    const s = () => { try{setProfile(loadProfile());}catch{setProfile({});} };
+    const s = ()=>{ try{setProfile(loadProfile());}catch{setProfile({});} };
     s(); window.addEventListener("ra:identity-changed",s);
-    return () => window.removeEventListener("ra:identity-changed",s);
+    return ()=>window.removeEventListener("ra:identity-changed",s);
   }, []);
   useEffect(() => {
     if (typeof window==="undefined") return;
@@ -605,6 +645,35 @@ export default function Raid() {
     lastPidRef.current=effectivePlayerId; refresh().catch(()=>{});
   }, [effectivePlayerId, refresh]);
 
+  // Discord auto-link (mirrors Shuffle)
+  const didDiscordLinkRef = useRef(false);
+  useEffect(() => {
+    if (didDiscordLinkRef.current) return;
+    didDiscordLinkRef.current = true;
+    let cancelled = false;
+    (async () => {
+      try {
+        const gate = loadProfile();
+        if ((gate as any)?.discordSkipLink) return;
+        const sr = await fetch("/api/auth/discord/session",{cache:"no-store"});
+        const sj = await sr.json().catch(()=>null);
+        if (!sr.ok||!sj?.ok||!sj?.discordUserId) return;
+        const prof = loadProfile();
+        const fromId = getEffectivePlayerId(prof);
+        const toId = `discord:${sj.discordUserId}`;
+        if (String(prof.primaryId||"")===toId) return;
+        const lr = await fetch("/api/identity/link-discord",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({fromId})});
+        const lj = await lr.json().catch(()=>null);
+        if (!lr.ok||!lj?.ok) return;
+        saveProfile({discordUserId:sj.discordUserId,discordName:sj.discordName,primaryId:toId,name:sj.discordName||prof.name,discordSkipLink:false});
+        if (typeof window!=="undefined") window.dispatchEvent(new Event("ra:identity-changed"));
+        if (!cancelled) await refresh();
+      } catch {}
+    })();
+    return ()=>{ cancelled=true; };
+  }, []);
+
+  // Daily claim
   const [dailyClaimed, setDailyClaimed] = useState(false);
   const [claimStatus, setClaimStatus]   = useState("");
   const [claimBusy, setClaimBusy]       = useState(false);
@@ -620,15 +689,52 @@ export default function Raid() {
     setClaimBusy(true); setClaimStatus("");
     try {
       const r = await fetch("/api/points/claim",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({playerId:effectivePlayerId,amount:pointsConfig.dailyClaim})});
+        body:JSON.stringify({playerId:effectivePlayerId,amount:(pointsConfig as any).dailyClaim})});
       const j = await r.json().catch(()=>null);
       if (!r.ok||!j?.ok){setClaimStatus(j?.error||"Claim failed.");return;}
-      setClaimStatus(j?.alreadyClaimed?"Already claimed ✅":`+${j?.added||pointsConfig.dailyClaim} ${pointsConfig.currency} ✅`);
+      setClaimStatus(j?.alreadyClaimed?"Already claimed ✅":`+${j?.added||(pointsConfig as any).dailyClaim} ${(pointsConfig as any).currency} ✅`);
       setDailyClaimed(true); await refresh();
     } catch(e:any){setClaimStatus(e?.message||"Error");}
     finally{setClaimBusy(false);}
   }
 
+  // DRIP migrate (mirrors Shuffle)
+  const [showDripMigrate, setShowDripMigrate] = useState(false);
+  const [dripBalance, setDripBalance]         = useState<number|null>(null);
+  const [dripAmount, setDripAmount]           = useState<number>(0);
+  const [dripBusy, setDripBusy]               = useState(false);
+  const [dripStatus, setDripStatus]           = useState("");
+
+  async function openDripModal() {
+    setDripStatus(""); setDripBusy(true); setDripBalance(null);
+    try {
+      const r = await fetch("/api/drip/balance",{cache:"no-store"});
+      const j = await r.json().catch(()=>null);
+      if (!r.ok||!j?.ok){setDripStatus(j?.error||"Could not load DRIP balance.");setShowDripMigrate(true);return;}
+      setDripBalance(Number(j.balance||0)); setDripAmount(0); setShowDripMigrate(true);
+    } catch(e:any){setDripStatus(e?.message||"DRIP error");setShowDripMigrate(true);}
+    finally{setDripBusy(false);}
+  }
+
+  async function migrateDripNow() {
+    const amt = Math.floor(Number(dripAmount||0));
+    if (!amt||amt<=0){setDripStatus("Enter an amount greater than 0.");return;}
+    setDripBusy(true); setDripStatus("Migrating…");
+    try {
+      const idem = `${Date.now()}-${Math.random().toString(36).slice(2,10)}`;
+      const r = await fetch("/api/drip/migrate",{method:"POST",headers:{"Content-Type":"application/json","x-idempotency-key":idem},body:JSON.stringify({amount:amt,playerId:effectivePlayerId,idempotencyKey:idem})});
+      const j = await r.json().catch(()=>null);
+      if (!r.ok||!j?.ok){setDripStatus(j?.error||"Migrate failed.");if(typeof j?.dripBalance==="number")setDripBalance(j.dripBalance);return;}
+      setDripStatus(`✅ Migrated ${amt} points into the game.`);
+      await refresh();
+      const br = await fetch("/api/drip/balance",{cache:"no-store"});
+      const bj = await br.json().catch(()=>null);
+      if(br.ok&&bj?.ok)setDripBalance(Number(bj.balance||0));
+    } catch(e:any){setDripStatus(e?.message||"Migrate error");}
+    finally{setDripBusy(false);}
+  }
+
+  // Game state
   const [squad, setSquad]                 = useState<AntRole[]>([...DEFAULT_SQUAD]);
   const [phase, setPhase]                 = useState<Phase>("idle");
   const [busy, setBusy]                   = useState(false);
@@ -639,21 +745,42 @@ export default function Raid() {
   const [showResult, setShowResult]       = useState(false);
   const [showBuyPoints, setShowBuyPoints] = useState(false);
 
-  const cost     = RAID_COST;
-  const needMore = Math.max(0, cost - balance);
+  const cfg        = pointsConfig as any;
+  const cost       = Number(cfg?.raidCost ?? 600);
+  const needMore   = Math.max(0, cost - balance);
+  const ultraCarriersThreshold = Number(cfg?.raidUltraCarriers ?? DEFAULT_ULTRA_CARRIERS);
+  const ultraRatioThreshold    = Number(cfg?.raidUltraRatio    ?? DEFAULT_ULTRA_RATIO);
+  const rareCarriersThreshold  = Number(cfg?.raidRareCarriers  ?? DEFAULT_RARE_CARRIERS);
+  const rareRatioThreshold     = Number(cfg?.raidRareRatio     ?? DEFAULT_RARE_RATIO);
+  const commonSurvivorsThreshold = Number(cfg?.raidCommonSurvivors ?? DEFAULT_COMMON_SURVIVORS);
 
+  // Leaderboards
   const [lb, setLb] = useState<RaidLeaderboards>({ topCommanders:[], brutalRaids:[], ultraHaul:[], recentRaids:[] });
 
   const loadLb = useCallback(async () => {
     try {
-      const r = await fetch("/api/leaderboard/summary?game=expedition",{cache:"no-store"});
+      const r = await fetch("/api/leaderboard/summary",{cache:"no-store"});
       const j = await r.json().catch(()=>null);
       if (!r.ok||!j?.ok) return;
+
+      // Filter recentWins to expedition only
+      const allRecent = Array.isArray(j.recentWins) ? j.recentWins : [];
+      const raidRecent = allRecent.filter((w:any) => w?.game === "expedition");
+
+      // Ultra haul: expedition wins with ultra rarity
+      const ultraWins = raidRecent
+        .filter((w:any) => w?.rarity === "ultra")
+        .map((w:any) => ({ playerId: w.playerId, playerName: w.playerName, ts: w.ts }));
+
       setLb({
         topCommanders: Array.isArray(j.earned) ? j.earned : [],
         brutalRaids:   Array.isArray(j.wins)   ? j.wins   : [],
-        ultraHaul:     Array.isArray(j.recentWins) ? j.recentWins.filter((w:any)=>w.rarity==="ultra").map((w:any)=>({playerId:w.playerId,playerName:w.playerName,ts:w.ts})) : [],
-        recentRaids:   Array.isArray(j.recentWins) ? j.recentWins.map((w:any)=>({playerId:w.playerId,playerName:w.playerName,rarity:w.rarity,survivors:w.survivors||0,ts:w.ts,pointsAwarded:w.pointsAwarded||0})) : [],
+        ultraHaul:     ultraWins,
+        recentRaids:   raidRecent.map((w:any) => ({
+          playerId: w.playerId, playerName: w.playerName,
+          rarity: w.rarity, survivors: w.survivors||0,
+          ts: w.ts, pointsAwarded: w.pointsAwarded||0,
+        })),
       });
     } catch {}
   }, []);
@@ -662,7 +789,7 @@ export default function Raid() {
   useEffect(() => {
     const h = () => loadLb();
     window.addEventListener("ra:leaderboards-refresh",h);
-    return () => window.removeEventListener("ra:leaderboards-refresh",h);
+    return ()=>window.removeEventListener("ra:leaderboards-refresh",h);
   }, [loadLb]);
 
   async function launchRaid() {
@@ -671,21 +798,21 @@ export default function Raid() {
     setSlots([]); setRevealedCount(0); setShowResult(false);
 
     await spend(cost,"expedition");
-    await new Promise(r=>setTimeout(r,800));
+    await new Promise(r=>setTimeout(r,900));
 
-    const battleSlots = simulateBattle(squad);
+    const battleSlots = simulateBattle(squad, cfg);
     setSlots(battleSlots); setPhase("battling");
 
     for (let i=1; i<=SQUAD_SIZE; i++) {
       await new Promise(r=>setTimeout(r,REVEAL_MS));
       setRevealedCount(i);
     }
-    await new Promise(r=>setTimeout(r,600));
+    await new Promise(r=>setTimeout(r,800));
 
     const prof  = loadProfile();
     const pid   = String(effectivePlayerId||getEffectivePlayerId(prof)||prof?.id||"guest").trim().slice(0,64)||"guest";
     const pname = (prof?.discordName||playerName||prof?.name||"guest").trim()||"guest";
-    const { rarity: r, prize: pz } = calcPrize(battleSlots, pointsConfig);
+    const { rarity: r, prize: pz } = calcPrize(battleSlots, cfg);
 
     if (pz.type==="points"&&(pz as any).points>0) { await earn((pz as any).points); await refresh(); }
 
@@ -724,7 +851,8 @@ export default function Raid() {
 
   return (
     <>
-      <div className="ant-colony-bg" aria-hidden="true" style={{ backgroundImage:`linear-gradient(140deg, rgba(4,9,22,0.93), rgba(7,13,30,0.97))` }} />
+      {/* Epic background */}
+      <div className="ant-colony-bg" aria-hidden="true" />
 
       <header className="page-head" role="banner">
         <div className="site-title"><Link href="/">Rebel Ants Playground</Link></div>
@@ -748,15 +876,18 @@ export default function Raid() {
         </div>
 
         {/* Difficulty warning */}
-        <div style={{ marginTop:10, padding:"8px 14px", borderRadius:10, background:"rgba(248,113,113,.07)", border:"1px solid rgba(248,113,113,.22)", fontSize:11, color:"#f87171", fontWeight:700, textAlign:"center", letterSpacing:"0.04em" }}>
-          ⚠️ BRUTAL DIFFICULTY — Carriers only have 30% survival. Guard them wisely. 🛡️
+        <div style={{ marginTop:10, padding:"8px 14px", borderRadius:10, background:"rgba(248,113,113,.07)", border:"1px solid rgba(248,113,113,.2)", fontSize:11, color:"#f87171", fontWeight:700, textAlign:"center", letterSpacing:"0.04em" }}>
+          ⚠️ BRUTAL DIFFICULTY — Carriers only have 20% survival. Place 🛡️ Guards next to them to boost their odds.
         </div>
 
         <RolePicker squad={squad} onChange={setSquad} disabled={isBattling} />
 
         {phase==="launching" && <LaunchAnimation />}
         {(phase==="battling"||phase==="revealed") && slots.length>0 && (
-          <BattleScene slots={slots} revealedCount={revealedCount} phase={phase} />
+          <BattleScene
+            slots={slots} revealedCount={revealedCount} phase={phase}
+            ultraCarriers={ultraCarriersThreshold} ultraRatio={ultraRatioThreshold}
+          />
         )}
         {phase==="battling" && (
           <div style={{ marginTop:8, fontSize:12, opacity:0.65, textAlign:"center", fontWeight:700, letterSpacing:"0.06em" }}>
@@ -770,9 +901,9 @@ export default function Raid() {
             disabled={busy||squad.length<SQUAD_SIZE||needMore>0}
             title={squad.length<SQUAD_SIZE?`Need ${SQUAD_SIZE} ants`:needMore>0?"Not enough points":""}
             style={{ minWidth:240, height:48, fontSize:14, fontWeight:900, display:"inline-flex", alignItems:"center", justifyContent:"center", position:"relative", background:busy?"rgba(15,23,42,.7)":"linear-gradient(135deg,rgba(248,113,113,.18),rgba(96,165,250,.18))", border:"1px solid rgba(248,113,113,.35)", color:"#f87171" }}>
-            <span style={{ visibility:"hidden" }}>Launch Raid (-{cost} {pointsConfig.currency})</span>
+            <span style={{ visibility:"hidden" }}>Launch Raid (-{cost} {cfg?.currency})</span>
             <span style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center" }}>
-              {phase==="launching"?"🐜 Marching…":phase==="battling"?"⚔️ Battle in progress…":squad.length<SQUAD_SIZE?`🐜 Need ${SQUAD_SIZE-squad.length} more ants`:`⚔️ Launch Raid (-${cost} ${pointsConfig.currency})`}
+              {phase==="launching"?"🐜 Marching…":phase==="battling"?"⚔️ Battle in progress…":squad.length<SQUAD_SIZE?`🐜 Need ${SQUAD_SIZE-squad.length} more ants`:`⚔️ Launch Raid (-${cost} ${cfg?.currency})`}
             </span>
           </button>
 
@@ -780,23 +911,38 @@ export default function Raid() {
 
           {isDiscordConnected
             ? <button className="btn" type="button" onClick={disconnectDiscord} style={{ padding:"10px 14px", fontSize:12 }}>Disconnect Discord</button>
-            : <button className="btn" type="button" onClick={()=>{ try{saveProfile({discordSkipLink:false});window.dispatchEvent(new Event("ra:identity-changed"));}catch{} window.location.href="/api/auth/discord/login"; }} style={{ padding:"10px 14px", fontSize:12 }}>Connect Discord</button>
+            : <button className="btn" type="button"
+                onClick={()=>{ try{saveProfile({discordSkipLink:false});window.dispatchEvent(new Event("ra:identity-changed"));}catch{} window.location.href="/api/auth/discord/login"; }}
+                style={{ padding:"10px 14px", fontSize:12 }}>Connect Discord</button>
           }
+
+          <button
+            className="btn"
+            type="button"
+            onClick={async()=>{ if(!isDiscordConnected)return; await openDripModal(); }}
+            disabled={dripBusy||!isDiscordConnected}
+            style={{ padding:"10px 14px", fontSize:12 }}
+            title={isDiscordConnected?"Move points from Discord (DRIP) into the game.":"Connect Discord to migrate DRIP points."}
+          >
+            {dripBusy?"Loading DRIP…":isDiscordConnected?"Migrate DRIP Points":"Connect Discord for DRIP"}
+          </button>
+
           <div style={{ fontSize:11, opacity:0.65 }}>Discord: <b>{isDiscordConnected?"✅":"❌"}</b></div>
         </div>
 
         <div style={{ marginTop:10, fontSize:12, opacity:0.8, display:"flex", gap:14, flexWrap:"wrap" }}>
-          <span>🐜 Balance: <b>{balance}</b> {pointsConfig.currency}</span>
-          <span>⚔️ Cost: <b>{cost}</b> {pointsConfig.currency}</span>
-          {needMore>0 && <span style={{ color:"#f87171" }}>Need {needMore} more {pointsConfig.currency}</span>}
+          <span>🐜 Balance: <b>{balance}</b> {cfg?.currency}</span>
+          <span>⚔️ Cost: <b>{cost}</b> {cfg?.currency}</span>
+          {needMore>0 && <span style={{ color:"#f87171" }}>Need {needMore} more {cfg?.currency}</span>}
         </div>
         <div style={{ marginTop:6, fontSize:11, opacity:0.55, display:"flex", gap:10, flexWrap:"wrap" }}>
-          <span>🏆 Ultra: +{pointsConfig.rewards.ultra}</span>
-          <span>⚔️ Rare: +{pointsConfig.rewards.rare}</span>
-          <span>✅ Common: +{pointsConfig.rewards.common}</span>
-          <span>📅 Daily cap: {pointsConfig.dailyEarnCap}</span>
+          <span>🏆 Ultra: +{cfg?.rewards?.ultra}</span>
+          <span>⚔️ Rare: +{cfg?.rewards?.rare}</span>
+          <span>✅ Common: +{cfg?.rewards?.common}</span>
+          <span>📅 Daily cap: {cfg?.dailyEarnCap}</span>
         </div>
 
+        {/* Name + claim */}
         <div style={{ marginTop:12, display:"flex", gap:10, flexWrap:"wrap", alignItems:"center" }}>
           <label style={{ fontSize:12, opacity:0.85 }}>
             🐜 Commander:&nbsp;
@@ -806,9 +952,11 @@ export default function Raid() {
             />
             <div style={{ fontSize:10, opacity:0.55, marginTop:3 }}>ID: {effectivePlayerId}</div>
           </label>
+
           <button className="btn" type="button" onClick={claimDailyNow} disabled={claimBusy||dailyClaimed} style={{ padding:"8px 12px", fontSize:12 }}>
-            {dailyClaimed?"🐜 Claimed Today ✅":`🐜 Daily +${pointsConfig.dailyClaim} ${pointsConfig.currency}`}
+            {dailyClaimed?"🐜 Claimed Today ✅":`🐜 Daily +${cfg?.dailyClaim} ${cfg?.currency}`}
           </button>
+
           {process.env.NODE_ENV!=="production" && (
             <button className="btn" type="button" onClick={async()=>{ await devGrant(5000); await refresh(); alert("Dev grant ✅"); }} style={{ padding:"8px 12px", fontSize:12 }}>Dev +5000</button>
           )}
@@ -822,24 +970,86 @@ export default function Raid() {
         <RaidLeaderboardPanel lb={lb} />
 
         {showResult && slots.length>0 && (
-          <RaidResultModal slots={slots} rarity={rarity} prize={prize} onClose={resetRaid} />
+          <RaidResultModal
+            slots={slots} rarity={rarity} prize={prize} onClose={resetRaid}
+            ultraCarriers={ultraCarriersThreshold} ultraRatio={ultraRatioThreshold}
+            rareCarriers={rareCarriersThreshold} rareRatio={rareRatioThreshold}
+            commonSurvivors={commonSurvivorsThreshold}
+          />
         )}
+
         <BuyPointsModal open={showBuyPoints} onClose={()=>setShowBuyPoints(false)} playerId={effectivePlayerId} onClaimed={async()=>{ await refresh(); }} />
+
+        {/* DRIP Modal */}
+        {showDripMigrate && (
+          <div style={{ position:"fixed", inset:0, zIndex:2500, background:"rgba(0,0,0,.6)", display:"grid", placeItems:"center", padding:16 }} role="dialog" aria-modal="true">
+            <div style={{ width:"min(520px, 95vw)", borderRadius:16, border:"1px solid rgba(255,255,255,.18)", background:"rgba(15,23,42,.96)", boxShadow:"0 28px 60px rgba(0,0,0,.55)", padding:16, color:"white" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", gap:12, alignItems:"center" }}>
+                <div style={{ fontWeight:900, fontSize:16 }}>Migrate DRIP Points → Game</div>
+                <button className="btn" onClick={()=>setShowDripMigrate(false)} style={{ padding:"8px 12px" }}>Close</button>
+              </div>
+              <div style={{ marginTop:10, fontSize:13, opacity:0.9, lineHeight:1.4 }}>
+                This will <b>deduct</b> points from DRIP (Discord) and <b>credit</b> the same amount into the game. No double-dipping.
+              </div>
+              <div style={{ marginTop:12, fontSize:13, opacity:0.95 }}>DRIP Balance: <b>{typeof dripBalance==="number"?dripBalance:"—"}</b></div>
+              <div style={{ marginTop:12, display:"grid", gap:8 }}>
+                <label style={{ fontSize:12, opacity:0.9 }}>Amount to migrate</label>
+                <input value={dripAmount===0?"":String(dripAmount)} onChange={e=>{ const raw=String(e.target.value||"").replace(/^0+/,""); setDripAmount(Number(raw||0)); }} type="number" min={0} step={1}
+                  style={{ padding:"10px 12px", borderRadius:12, border:"1px solid rgba(255,255,255,.18)", background:"rgba(15,23,42,.7)", color:"white", outline:"none", fontWeight:800 }} />
+                <button className="btn" type="button" onClick={migrateDripNow} disabled={dripBusy} style={{ padding:"12px 12px" }}>
+                  <div style={{ fontWeight:900 }}>{dripBusy?"Working…":"Migrate Now"}</div>
+                  <div style={{ fontSize:12, opacity:0.9 }}>Deduct from DRIP → Credit to <b>{effectivePlayerId}</b></div>
+                </button>
+              </div>
+              {dripStatus && <div style={{ marginTop:12, fontSize:12, opacity:0.9, whiteSpace:"pre-wrap" }}>{dripStatus}</div>}
+            </div>
+          </div>
+        )}
       </div>
 
       <style>{`
-        .ant-colony-bg { position:fixed; inset:0; pointer-events:none; z-index:0; background-size:cover; background-position:center; }
-        .page-head { position:relative; z-index:10; max-width:980px; margin:24px auto 14px; padding:4px 2px; }
-        .site-title { font-size:22px; font-weight:800; margin-bottom:8px; }
-        .site-title a { color:inherit; text-decoration:none; }
-        .tabs { display:flex; gap:8px; flex-wrap:wrap; }
-        .tab { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; font-size:13px; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.15); backdrop-filter:blur(4px); transition:transform .06s ease,background .2s ease; color:inherit; text-decoration:none; }
-        .tab:hover { transform:translateY(-1px); background:rgba(255,255,255,.11); }
-        .tab-active { background:rgba(248,113,113,.14); border-color:rgba(248,113,113,.32); color:#f87171; }
-        .ant-card { position:relative; z-index:5; max-width:980px; margin:0 auto 40px; padding:20px; border-radius:20px; background:rgba(8,14,32,.88); border:1px solid rgba(255,255,255,.1); backdrop-filter:blur(12px); box-shadow:0 24px 60px rgba(0,0,0,.5); }
-        .btn { border-radius:12px; border:1px solid rgba(255,255,255,.18); background:rgba(15,23,42,.7); color:white; font-weight:800; cursor:pointer; padding:10px 16px; transition:background .15s,transform .08s; }
-        .btn:hover:not(:disabled) { background:rgba(15,23,42,.95); transform:translateY(-1px); }
-        .btn:disabled { opacity:.42; cursor:not-allowed; transform:none; }
+        .ant-colony-bg {
+          position: fixed; inset: 0; pointer-events: none; z-index: 0;
+          background-image: url('/ui/raid-bg.jpg');
+          background-size: cover; background-position: center;
+        }
+        .ant-colony-bg::after {
+          content: ''; position: absolute; inset: 0;
+          background: linear-gradient(140deg, rgba(4,9,22,0.78), rgba(7,13,30,0.85));
+        }
+        .page-head {
+          position: relative; z-index: 10;
+          max-width: 980px; margin: 24px auto 14px; padding: 4px 2px;
+        }
+        .site-title { font-size: 22px; font-weight: 800; margin-bottom: 8px; }
+        .site-title a { color: inherit; text-decoration: none; }
+        .tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+        .tab {
+          display: inline-flex; align-items: center; gap: 6px;
+          padding: 6px 10px; border-radius: 999px; font-size: 13px;
+          background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.15);
+          backdrop-filter: blur(4px); transition: transform .06s ease, background .2s ease;
+          color: inherit; text-decoration: none;
+        }
+        .tab:hover { transform: translateY(-1px); background: rgba(255,255,255,.11); }
+        .tab-active { background: rgba(248,113,113,.14); border-color: rgba(248,113,113,.32); color: #f87171; }
+        .ant-card {
+          position: relative; z-index: 5;
+          max-width: 980px; margin: 0 auto 40px;
+          padding: 20px; border-radius: 20px;
+          background: rgba(8,14,32,.88);
+          border: 1px solid rgba(255,255,255,.1);
+          backdrop-filter: blur(14px);
+          box-shadow: 0 24px 60px rgba(0,0,0,.5);
+        }
+        .btn {
+          border-radius: 12px; border: 1px solid rgba(255,255,255,.18);
+          background: rgba(15,23,42,.7); color: white;
+          font-weight: 800; cursor: pointer; padding: 10px 16px;
+          transition: background .15s, transform .08s;
+        }
+        .btn:hover:not(:disabled) { background: rgba(15,23,42,.95); transform: translateY(-1px); }
+        .btn:disabled { opacity: .42; cursor: not-allowed; transform: none; }
       `}</style>
     </>
   );
