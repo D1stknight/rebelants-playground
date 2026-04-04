@@ -353,6 +353,15 @@ export default function TunnelShell() {
 
     const [playerName, setPlayerName] = useState(initialName);
   const [effectivePlayerId, setEffectivePlayerId] = useState(initialEffectiveId);
+
+  // ✅ Keep effectivePlayerId in sync when identity changes (Discord connect/disconnect/wallet)
+  React.useEffect(() => {
+    const update = () => setEffectivePlayerId(getEffectivePlayerId(loadProfile()));
+    update();
+    window.addEventListener("ra:identity-changed", update);
+    return () => window.removeEventListener("ra:identity-changed", update);
+  }, []);
+
   const [dailyClaimed,   setDailyClaimed]   = useState(false);
   const [nextClaimTs,    setNextClaimTs]    = useState<number|null>(null);
   const [countdownStr,   setCountdownStr]   = useState("");
