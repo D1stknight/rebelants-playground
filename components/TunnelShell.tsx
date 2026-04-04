@@ -111,19 +111,18 @@ const themeMap: Record<string,
     antGlow: "0 0 26px rgba(244,63,94,0.28)",
     spiderGlow: "0 0 22px rgba(251,191,36,0.22)",
   },
-};
 
-function cellKey(cell: Cell) {
-  return `${cell.row}:${cell.col}`;
-},
   lava:   { name:"Lava Caves",   bg:"#1a0500",floor:"#2d0a00",wall:"#8b1a00",accent:"#ff4500",crumb:"#ff6b35",sugar:"#ff8c00",crystal:"#ffcc00",antGlow:"#ff4500",spiderGlow:"#ff0000",neon:false },
   ice:    { name:"Ice Caverns",  bg:"#000d1a",floor:"#001a33",wall:"#003366",accent:"#00ccff",crumb:"#80e5ff",sugar:"#ffffff",crystal:"#00ffff",antGlow:"#00ccff",spiderGlow:"#0080ff",neon:true  },
   golden: { name:"Golden Vault", bg:"#1a1000",floor:"#2d1f00",wall:"#8b6914",accent:"#ffd700",crumb:"#ffec8b",sugar:"#ffe066",crystal:"#ffa500",antGlow:"#ffd700",spiderGlow:"#ff8c00",neon:false },
   shadow: { name:"Shadow Realm", bg:"#050005",floor:"#0d000d",wall:"#1a001a",accent:"#9900ff",crumb:"#cc66ff",sugar:"#ff00ff",crystal:"#ff66ff",antGlow:"#cc00ff",spiderGlow:"#ff00ff",neon:true  },
   amber:  { name:"Amber Ruins",  bg:"#1a0d00",floor:"#261300",wall:"#7a3d00",accent:"#ff8c00",crumb:"#ffaa44",sugar:"#ffcc77",crystal:"#ff6600",antGlow:"#ff8c00",spiderGlow:"#cc4400",neon:false },
   toxic:  { name:"Toxic Depths", bg:"#001a00",floor:"#002600",wall:"#004d00",accent:"#00ff41",crumb:"#66ff66",sugar:"#00ff99",crystal:"#ff00ff",antGlow:"#00ff41",spiderGlow:"#ff00ff",neon:true  },
-  void:   { name:"Void Core",    bg:"#000000",floor:"#030303",wall:"#0a0a0a",accent:"#ffffff",crumb:"#cccccc",sugar:"#888888",crystal:"#ff0080",antGlow:"#ffffff",spiderGlow:"#ff0080",neon:true  }
-
+  void:   { name:"Void Core",    bg:"#000000",floor:"#030303",wall:"#0a0a0a",accent:"#ffffff",crumb:"#cccccc",sugar:"#888888",crystal:"#ff0080",antGlow:"#ffffff",spiderGlow:"#ff0080",neon:true  },
+};
+function cellKey(cell: Cell) {
+  return `${cell.row}:${cell.col}`;
+}
 function isOuterBorder(row: number, col: number) {
   return row === 0 || row === GRID_ROWS - 1 || col === 0 || col === GRID_COLS - 1;
 }
