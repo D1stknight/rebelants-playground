@@ -1062,6 +1062,54 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     window.addEventListener("keydown", onKeyDown, { passive: false });
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isPlaying, facing, playerPos, wallBreaksLeft, brokenWallSet, layoutIndex]);
+
+  // ── Daily claim countdown ─────────────────────────────────────────────────
+  function formatCountdown(ms: number): string {
+    if (ms <= 0) return "00:00:00";
+    const s = Math.floor(ms / 1000);
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+    return [h, m, sec].map(n => String(n).padStart(2, "0")).join(":");
+  }
+  React.useEffect(() => {
+    if (!effectivePlayerId) return;
+    (async () => {
+      try {
+        const r = await fetch(`/api/points/claim?playerId=${encodeURIComponent(effectivePlayerId)}`, { cache: "no-store" });
+        const j = await r.json().catch(() => null);
+        if (r.ok && j?.ok) {
+          setDailyClaimed(!!j.claimed);
+          if (j.msUntilNextClaim) setNextClaimTs(Date.now() + Number(j.msUntilNextClaim));
+        }
+      } catch {}
+    })();
+  }, [effectivePlayerId, dailyClaimed]);
+
+  React.useEffect(() => {
+    if (!nextClaimTs) return;
+    const tick = () => {
+      const rem = nextClaimTs - Date.now();
+      if (rem <= 0) { setCountdownStr(""); setDailyClaimed(false); setNextClaimTs(null); }
+      else setCountdownStr(formatCountdown(rem));
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [nextClaimTs]);
+
+  async function claimDailyNow() {
+    if (dailyClaimed || !effectivePlayerId) return;
+    try {
+      const r = await fetch("/api/points/claim", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ playerId: effectivePlayerId }) });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) { setDailyClaimed(true); if (j.msUntilNextClaim) setNextClaimTs(Date.now() + Number(j.msUntilNextClaim)); }
+    } catch {}
+  }
+const p = loadProfile();
+                      const id = (p?.id || "guest").trim() || "guest";
+                      saveProfile({ name: v, id });
+                    }}
+                    style={inputStyle}
+
   return (
     <>
             <main
@@ -1169,52 +1217,6 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     setShowDisconnect(!!(p as any)?.discordUserId);
   }, [effectivePlayerId]);
 
-  // ── Daily claim countdown ─────────────────────────────────────────────────
-  function formatCountdown(ms: number): string {
-    if (ms <= 0) return "00:00:00";
-    const s = Math.floor(ms / 1000);
-    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
-    return [h, m, sec].map(n => String(n).padStart(2, "0")).join(":");
-  }
-  React.useEffect(() => {
-    if (!effectivePlayerId) return;
-    (async () => {
-      try {
-        const r = await fetch(`/api/points/claim?playerId=${encodeURIComponent(effectivePlayerId)}`, { cache: "no-store" });
-        const j = await r.json().catch(() => null);
-        if (r.ok && j?.ok) {
-          setDailyClaimed(!!j.claimed);
-          if (j.msUntilNextClaim) setNextClaimTs(Date.now() + Number(j.msUntilNextClaim));
-        }
-      } catch {}
-    })();
-  }, [effectivePlayerId, dailyClaimed]);
-
-  React.useEffect(() => {
-    if (!nextClaimTs) return;
-    const tick = () => {
-      const rem = nextClaimTs - Date.now();
-      if (rem <= 0) { setCountdownStr(""); setDailyClaimed(false); setNextClaimTs(null); }
-      else setCountdownStr(formatCountdown(rem));
-    };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [nextClaimTs]);
-
-  async function claimDailyNow() {
-    if (dailyClaimed || !effectivePlayerId) return;
-    try {
-      const r = await fetch("/api/points/claim", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ playerId: effectivePlayerId }) });
-      const j = await r.json().catch(() => null);
-      if (r.ok && j?.ok) { setDailyClaimed(true); if (j.msUntilNextClaim) setNextClaimTs(Date.now() + Number(j.msUntilNextClaim)); }
-    } catch {}
-  }
-const p = loadProfile();
-                      const id = (p?.id || "guest").trim() || "guest";
-                      saveProfile({ name: v, id });
-                    }}
-                    style={inputStyle}
                   />
                 </label>
 
