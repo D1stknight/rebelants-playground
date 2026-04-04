@@ -65,6 +65,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   ]);
 
   // go back to Shuffle
-  const returnTo = (() => { try { return decodeURIComponent(String(req.cookies?.ra_return_to || "/")); } catch { return "/"; } })();
-  res.redirect(appUrl ? `${appUrl}${returnTo}?discord=1` : `${returnTo}?discord=1`);
+  const rawReturn = (() => { try { return decodeURIComponent(String(req.cookies?.ra_return_to || "/")); } catch { return "/"; } })();
+  const returnPath = (() => { try { return new URL(rawReturn).pathname || "/"; } catch { return rawReturn.startsWith("/") ? rawReturn : "/"; } })();
+  res.redirect(appUrl ? `${appUrl}${returnPath}?discord=1` : `${returnPath}?discord=1`);
 }
