@@ -1305,6 +1305,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
             ...(isPlaying && isMobileView ? mobileRunCardStyle : null),
           }}
         >
+            <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.85) 60%, rgba(9,12,22,0.97) 100%)",borderRadius:"inherit",zIndex:0,pointerEvents:"none"}}/>
           {!(isPlaying && isMobileView) && (
             <>
               <div style={{ fontSize: 30, fontWeight: 900, marginBottom: 6 }}>
@@ -2100,6 +2101,12 @@ const cardStyle: React.CSSProperties = {
   boxShadow: "0 24px 60px rgba(0,0,0,0.35)",
   padding: 20,
   color: "white",
+
+  backgroundImage: "url('/bg/tunnel-bg.png')",
+  backgroundSize: "cover",
+  backgroundPosition: "center top",
+  backgroundRepeat: "no-repeat",
+  position: "relative" as const,
 };
 
 const tabStyle: React.CSSProperties = {
