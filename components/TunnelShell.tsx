@@ -245,45 +245,25 @@ const TUNNEL_LAYOUTS = [
     "9:4","9:6","9:14","9:16",
     "10:4","10:5","10:6","10:7","10:8","10:9","10:10","10:11","10:12","10:13","10:14","10:15","10:16",
   ],,
-  // 11) Pincer
   ["2:4","2:5","2:6","2:16","2:17","2:18","3:6","3:16","4:6","4:7","4:8","4:14","4:15","4:16","5:8","5:14","6:8","6:9","6:10","6:12","6:13","6:14","7:10","7:12","8:8","8:9","8:10","8:12","8:13","8:14","9:8","9:14","10:6","10:7","10:8","10:14","10:15","10:16"],
-  // 12) Catacomb
   ["2:4","2:5","2:9","2:10","2:14","2:15","2:19","3:4","3:9","3:14","3:19","4:4","4:5","4:6","4:9","4:10","4:14","4:15","4:19","5:6","5:19","6:4","6:5","6:6","6:9","6:12","6:13","6:14","6:17","6:18","6:19","7:4","7:9","7:12","7:17","8:4","8:5","8:9","8:10","8:12","8:13","8:17","8:18","9:5","9:13","9:18","10:5","10:6","10:9","10:10","10:13","10:14","10:18","10:19"],
-  // 13) River
   ["2:4","2:5","2:6","2:7","2:8","2:9","3:4","3:9","3:14","3:15","3:16","3:17","3:18","4:4","4:9","4:18","5:4","5:5","5:9","5:10","5:14","5:18","6:5","6:10","6:14","6:15","6:18","7:5","7:6","7:10","7:15","7:18","7:19","8:6","8:10","8:11","8:15","8:19","9:6","9:7","9:11","9:15","9:16","9:19","10:7","10:8","10:11","10:12","10:16","10:17","10:19"],
-  // 14) Fortress
   ["2:4","2:5","2:6","2:7","2:8","2:9","2:10","2:11","2:12","2:13","2:14","2:15","2:16","2:17","3:4","3:17","4:4","4:6","4:7","4:8","4:9","4:10","4:11","4:12","4:13","4:14","4:15","4:17","5:4","5:6","5:15","5:17","6:4","6:6","6:8","6:9","6:10","6:11","6:12","6:13","6:15","6:17","7:4","7:6","7:8","7:13","7:15","7:17","8:4","8:6","8:8","8:9","8:10","8:11","8:12","8:13","8:15","8:17","9:4","9:6","9:15","9:17","10:4","10:5","10:6","10:7","10:8","10:9","10:12","10:13","10:14","10:15","10:17"],
-  // 15) Zipper
   ["2:4","2:5","2:11","2:12","3:5","3:11","4:5","4:6","4:11","4:12","4:17","4:18","5:6","5:12","5:17","6:6","6:7","6:12","6:13","6:17","6:18","7:7","7:13","7:18","8:7","8:8","8:13","8:14","8:18","8:19","9:8","9:14","9:19","10:4","10:8","10:9","10:14","10:15","10:19"],
-  // 16) Labyrinth
   ["2:4","2:5","2:6","2:7","2:8","2:14","2:15","2:16","2:17","2:18","3:4","3:8","3:14","3:18","4:4","4:8","4:9","4:10","4:12","4:13","4:14","4:18","5:4","5:10","5:12","5:18","6:4","6:5","6:6","6:10","6:12","6:15","6:16","6:18","7:6","7:10","7:12","7:15","7:18","8:6","8:7","8:8","8:10","8:12","8:15","8:18","8:19","9:8","9:10","9:15","9:19","10:8","10:9","10:10","10:11","10:12","10:15","10:16","10:19"],
-  // 17) Cross Fire
   ["2:8","2:9","2:10","2:11","2:12","3:5","3:6","3:16","3:17","4:5","4:6","4:7","4:15","4:16","4:17","5:6","5:7","5:8","5:14","5:15","5:16","6:7","6:8","6:14","6:15","7:7","7:8","7:14","7:15","8:6","8:7","8:8","8:14","8:15","8:16","9:5","9:6","9:7","9:15","9:16","9:17","10:8","10:9","10:10","10:11","10:12"],
-  // 18) The Trap
   ["2:6","2:7","2:8","2:9","2:10","2:11","2:12","2:13","2:14","2:15","3:6","3:15","4:6","4:8","4:9","4:10","4:11","4:12","4:13","4:15","5:6","5:8","5:13","5:15","6:6","6:8","6:10","6:11","6:13","6:15","7:6","7:8","7:13","7:15","8:6","8:8","8:9","8:10","8:11","8:12","8:13","8:15","9:6","9:15","10:6","10:7","10:8","10:9","10:12","10:13","10:14","10:15"],
-  // 19) Checkers
   ["2:4","2:6","2:8","2:10","2:12","2:14","2:16","2:18","3:5","3:9","3:13","3:17","4:4","4:6","4:8","4:10","4:12","4:14","4:16","4:18","5:5","5:7","5:11","5:15","5:19","6:4","6:6","6:8","6:10","6:12","6:14","6:16","6:18","7:5","7:9","7:13","7:17","8:4","8:6","8:8","8:10","8:12","8:14","8:16","8:18","9:5","9:7","9:11","9:15","9:19","10:4","10:6","10:8","10:10","10:12","10:14","10:16","10:18"],
-  // 20) Spine
   ["2:4","2:5","2:17","2:18","3:5","3:10","3:11","3:12","3:17","4:5","4:6","4:10","4:12","4:17","4:18","5:6","5:10","5:12","5:18","6:6","6:7","6:10","6:11","6:12","6:15","6:16","7:7","7:15","8:7","8:8","8:10","8:11","8:12","8:15","8:16","9:8","9:10","9:12","9:16","10:8","10:9","10:10","10:12","10:13","10:16","10:17"],
-  // 21) Corridor Wars
   ["2:5","2:6","2:7","2:8","2:9","2:10","2:11","2:12","2:13","2:14","2:15","2:16","3:5","3:16","4:5","4:7","4:8","4:9","4:13","4:14","4:15","4:16","5:5","5:7","5:13","6:5","6:7","6:8","6:9","6:11","6:12","6:13","6:16","7:5","7:9","7:11","7:16","8:5","8:7","8:9","8:10","8:11","8:13","8:14","8:16","9:5","9:7","9:13","9:16","10:5","10:6","10:7","10:13","10:14","10:15","10:16"],
-  // 22) Diamond
   ["2:11","3:9","3:10","3:12","3:13","4:7","4:8","4:14","4:15","5:5","5:6","5:16","5:17","6:4","6:5","6:17","6:18","7:5","7:6","7:16","7:17","8:7","8:8","8:14","8:15","9:9","9:10","9:12","9:13","10:11"],
-  // 23) Snake Pit
   ["2:4","2:5","2:6","2:7","2:8","2:9","2:10","2:11","2:12","2:13","2:14","2:15","2:16","2:17","2:18","3:4","3:18","4:4","4:6","4:7","4:8","4:9","4:10","4:11","4:12","4:13","4:14","4:15","4:16","4:18","5:4","5:6","5:16","5:18","6:4","6:6","6:8","6:9","6:10","6:11","6:12","6:14","6:16","6:18","7:4","7:8","7:14","7:18","8:4","8:6","8:8","8:10","8:11","8:12","8:14","8:16","8:18","9:4","9:6","9:12","9:16","9:18","10:4","10:6","10:7","10:8","10:9","10:10","10:12","10:16","10:18"],
-  // 24) Pillars
   ["2:4","2:5","2:8","2:9","2:12","2:13","2:16","2:17","3:4","3:8","3:12","3:16","4:4","4:5","4:8","4:9","4:12","4:13","4:16","4:17","6:4","6:5","6:8","6:9","6:12","6:13","6:16","6:17","7:4","7:8","7:12","7:16","8:4","8:5","8:8","8:9","8:12","8:13","8:16","8:17","10:4","10:5","10:8","10:9","10:12","10:13","10:16","10:17"],
-  // 25) Archipelago
   ["2:5","2:6","2:7","2:13","2:14","3:5","3:13","4:5","4:6","4:9","4:10","4:11","4:13","4:14","4:17","4:18","5:6","5:9","5:11","5:14","5:17","6:6","6:7","6:9","6:11","6:14","6:15","6:17","6:18","7:7","7:9","7:11","7:15","7:18","8:7","8:8","8:9","8:11","8:12","8:15","8:18","8:19","9:8","9:12","9:15","9:19","10:8","10:9","10:12","10:13","10:15","10:16","10:19"],
-  // 26) Cascade
   ["2:4","2:5","2:6","2:7","3:7","3:12","3:13","3:14","3:15","4:7","4:15","5:5","5:6","5:7","5:15","5:16","5:17","5:18","6:5","6:18","7:5","7:6","7:7","7:8","7:9","7:10","7:18","8:5","8:10","8:18","9:5","9:10","9:11","9:14","9:15","9:16","9:17","9:18","10:5","10:6","10:11","10:14"],
-  // 27) Honeycomb
   ["2:5","2:6","2:9","2:10","2:13","2:14","2:17","2:18","3:6","3:9","3:13","3:17","4:6","4:7","4:9","4:10","4:13","4:14","4:17","4:18","5:7","5:10","5:14","5:18","6:5","6:6","6:7","6:10","6:11","6:14","6:15","6:18","6:19","7:5","7:11","7:15","7:19","8:5","8:6","8:9","8:10","8:11","8:15","8:16","8:19","9:6","9:9","9:16","9:19","10:6","10:7","10:9","10:10","10:16","10:17","10:19"],
-  // 28) Staircase
   ["2:4","2:5","2:6","2:7","2:8","2:9","2:10","3:4","3:10","4:4","4:6","4:7","4:8","4:9","4:10","4:11","4:12","4:13","5:4","5:6","5:13","6:4","6:6","6:8","6:9","6:10","6:11","6:12","6:13","6:14","6:15","7:4","7:8","7:15","8:4","8:8","8:10","8:11","8:12","8:13","8:14","8:15","8:16","8:17","9:4","9:10","9:17","10:4","10:10","10:12","10:13","10:14","10:15","10:16","10:17","10:18"],
-  // 29) Vortex
   ["2:7","2:8","2:9","2:10","2:11","2:12","2:13","2:14","2:15","3:7","3:15","4:7","4:9","4:10","4:11","4:12","4:13","4:15","5:7","5:9","5:13","5:15","6:7","6:9","6:11","6:13","6:15","7:7","7:9","7:11","7:15","8:7","8:9","8:10","8:11","8:12","8:13","8:14","8:15","9:7","9:15","10:7","10:8","10:9","10:10","10:11","10:12","10:13","10:14","10:15"],
-  // 30) Final Boss
   ["2:3","2:4","2:5","2:6","2:7","2:8","2:9","2:10","2:11","2:12","2:13","2:14","2:15","2:16","2:17","2:18","3:3","3:18","4:3","4:5","4:6","4:7","4:11","4:12","4:13","4:15","4:16","4:18","5:3","5:5","5:9","5:10","5:13","5:16","5:18","6:3","6:5","6:7","6:8","6:9","6:13","6:14","6:16","6:18","7:3","7:5","7:7","7:11","7:14","7:16","7:18","8:3","8:5","8:7","8:8","8:9","8:10","8:11","8:14","8:16","8:18","9:3","9:5","9:9","9:14","9:16","9:18","10:3","10:5","10:6","10:7","10:8","10:9","10:14","10:16","10:17","10:18"]
 ];
 
@@ -1420,10 +1400,8 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           )}
               {/* Layout chooser */}
               <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:8,flexWrap:"wrap"}}>
-                <button onClick={()=>{setLayoutMode("random");setSelectedLayout(null);}}
-                  style={{padding:"5px 14px",borderRadius:20,fontSize:12,fontWeight:700,cursor:"pointer",transition:"all 0.2s",border:layoutMode==="random"?"2px solid rgba(96,165,250,0.8)":"2px solid rgba(255,255,255,0.15)",background:layoutMode==="random"?"rgba(96,165,250,0.15)":"rgba(255,255,255,0.06)",color:layoutMode==="random"?"#93c5fd":"rgba(255,255,255,0.5)"}}>🎲 Random Layout</button>
-                <button onClick={()=>setLayoutMode("pick")}
-                  style={{padding:"5px 14px",borderRadius:20,fontSize:12,fontWeight:700,cursor:"pointer",transition:"all 0.2s",border:layoutMode==="pick"?"2px solid rgba(250,204,21,0.8)":"2px solid rgba(255,255,255,0.15)",background:layoutMode==="pick"?"rgba(250,204,21,0.12)":"rgba(255,255,255,0.06)",color:layoutMode==="pick"?"#fde68a":"rgba(255,255,255,0.5)"}}>🗺️ Choose Layout</button>
+                <button onClick={()=>{setLayoutMode("random");setSelectedLayout(null);}} style={{padding:"5px 14px",borderRadius:20,fontSize:12,fontWeight:700,cursor:"pointer",transition:"all 0.2s",border:layoutMode==="random"?"2px solid rgba(96,165,250,0.8)":"2px solid rgba(255,255,255,0.15)",background:layoutMode==="random"?"rgba(96,165,250,0.15)":"rgba(255,255,255,0.06)",color:layoutMode==="random"?"#93c5fd":"rgba(255,255,255,0.5)"}}>🎲 Random Layout</button>
+                <button onClick={()=>setLayoutMode("pick")} style={{padding:"5px 14px",borderRadius:20,fontSize:12,fontWeight:700,cursor:"pointer",transition:"all 0.2s",border:layoutMode==="pick"?"2px solid rgba(250,204,21,0.8)":"2px solid rgba(255,255,255,0.15)",background:layoutMode==="pick"?"rgba(250,204,21,0.12)":"rgba(255,255,255,0.06)",color:layoutMode==="pick"?"#fde68a":"rgba(255,255,255,0.5)"}}>🗺️ Choose Layout</button>
                 {layoutMode==="pick"&&selectedLayout!==null&&<span style={{fontSize:12,opacity:0.75}}>Playing: <b style={{color:"#fde68a"}}>#{selectedLayout+1} {LAYOUT_NAMES[selectedLayout]}</b></span>}
               </div>
               {layoutMode==="pick"&&(
@@ -1871,7 +1849,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           <div style={tunnelLeaderboardWrapStyle}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
               <div>
-                <div style={{fontSize:20,fontWeight:900,letterSpacing:0.5}}>🏆 Tunnel Leaderboards</div>
+                <div style={{fontSize:20,fontWeight:900}}>🏆 Tunnel Leaderboards</div>
                 <div style={{fontSize:12,opacity:0.55,marginTop:2}}>Top scores, fastest clears &amp; personal stats across all 30 layouts</div>
               </div>
               <button onClick={()=>void loadTunnelLeaderboard()} style={{padding:"6px 12px",borderRadius:20,border:"1px solid rgba(255,255,255,0.15)",background:"rgba(255,255,255,0.06)",cursor:"pointer",fontSize:12,fontWeight:700,color:"rgba(255,255,255,0.7)"}}>↻ Refresh</button>
@@ -1879,42 +1857,47 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
             <div style={{...tunnelLeaderboardGridStyle,...(isMobileView?tunnelLeaderboardGridMobileStyle:null)}}>
               <div style={leaderboardCardBlueStyle}>
                 <div style={leaderboardCardHeaderStyle}>
-                  <div><div style={{...leaderboardTitleStyle,color:"#60a5fa"}}>🏆 Top Score</div><div style={leaderboardSubtitleStyle}>All-time highest single-run score</div></div>
+                  <div>
+                    <div style={{...leaderboardTitleStyle,color:"#60a5fa"}}>🏆 Top Score</div>
+                    <div style={leaderboardSubtitleStyle}>All-time highest single-run score</div>
+                  </div>
                   <div style={leaderboardBadgeBlueStyle}>TOP 5</div>
                 </div>
                 <div style={leaderboardScrollStyle}>
-                  {leaderboardLoading?<div style={leaderboardEmptyStyle}>Loading...</div>:topScoreRows.length===0?<div style={leaderboardEmptyStyle}>No scores yet — be the first! 🐜</div>:
-                    topScoreRows.map(row=>(
-                      <div key={`s-${row.rank}`} style={leaderboardRowStyle(row.rank,"#60a5fa")}>
-                        <div style={leaderboardRankStyle(row.rank)}>{row.rank===1?"🥇":row.rank===2?"🥈":row.rank===3?"🥉":"#"+row.rank}</div>
-                        <div style={{flex:1,minWidth:0}}><div style={leaderboardNameStyle}>{row.playerName||row.playerId}</div></div>
-                        <div style={{...leaderboardValueStyle,color:"#93c5fd"}}>{Number(row.score||0).toLocaleString()}</div>
-                      </div>
-                    ))
-                  }
+                  {leaderboardLoading?(<div style={leaderboardEmptyStyle}>Loading...</div>):topScoreRows.length===0?(<div style={leaderboardEmptyStyle}>No scores yet — be the first! 🐜</div>):topScoreRows.map(row=>(
+                    <div key={`s-${row.rank}`} style={leaderboardRowStyle(row.rank,"#60a5fa")}>
+                      <div style={leaderboardRankStyle(row.rank)}>{row.rank===1?"🥇":row.rank===2?"🥈":row.rank===3?"🥉":"#"+row.rank}</div>
+                      <div style={{flex:1,minWidth:0}}><div style={leaderboardNameStyle}>{row.playerName||row.playerId}</div></div>
+                      <div style={{...leaderboardValueStyle,color:"#93c5fd"}}>{Number(row.score||0).toLocaleString()}</div>
+                    </div>
+                  ))}
                 </div>
               </div>
               <div style={leaderboardCardGoldStyle}>
                 <div style={leaderboardCardHeaderStyle}>
-                  <div><div style={{...leaderboardTitleStyle,color:"#facc15"}}>⚡ Fastest Clear</div><div style={leaderboardSubtitleStyle}>Crystal sweep speedrun — full board only</div></div>
+                  <div>
+                    <div style={{...leaderboardTitleStyle,color:"#facc15"}}>⚡ Fastest Clear</div>
+                    <div style={leaderboardSubtitleStyle}>Crystal sweep speedrun — full board only</div>
+                  </div>
                   <div style={leaderboardBadgeGoldStyle}>TOP 5</div>
                 </div>
                 <div style={leaderboardScrollStyle}>
-                  {leaderboardLoading?<div style={leaderboardEmptyStyle}>Loading...</div>:fastestClearRows.length===0?<div style={leaderboardEmptyStyle}>Collect all 💎 to set a record!</div>:
-                    fastestClearRows.map(row=>(
-                      <div key={`f-${row.rank}`} style={leaderboardRowStyle(row.rank,"#facc15")}>
-                        <div style={leaderboardRankStyle(row.rank)}>{row.rank===1?"🥇":row.rank===2?"🥈":row.rank===3?"🥉":"#"+row.rank}</div>
-                        <div style={{flex:1,minWidth:0}}><div style={leaderboardNameStyle}>{row.playerName||row.playerId}</div></div>
-                        <div style={{...leaderboardValueStyle,color:"#fde68a"}}>{formatMs(row.clearTimeMs)}</div>
-                      </div>
-                    ))
-                  }
+                  {leaderboardLoading?(<div style={leaderboardEmptyStyle}>Loading...</div>):fastestClearRows.length===0?(<div style={leaderboardEmptyStyle}>Collect all 💎 to set a record!</div>):fastestClearRows.map(row=>(
+                    <div key={`f-${row.rank}`} style={leaderboardRowStyle(row.rank,"#facc15")}>
+                      <div style={leaderboardRankStyle(row.rank)}>{row.rank===1?"🥇":row.rank===2?"🥈":row.rank===3?"🥉":"#"+row.rank}</div>
+                      <div style={{flex:1,minWidth:0}}><div style={leaderboardNameStyle}>{row.playerName||row.playerId}</div></div>
+                      <div style={{...leaderboardValueStyle,color:"#fde68a"}}>{formatMs(row.clearTimeMs)}</div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
             <div style={{...leaderboardCardRedStyle,marginTop:14}}>
               <div style={leaderboardCardHeaderStyle}>
-                <div><div style={{...leaderboardTitleStyle,color:"#f87171"}}>🐜 Your Stats</div><div style={leaderboardSubtitleStyle}>Personal progress across all runs</div></div>
+                <div>
+                  <div style={{...leaderboardTitleStyle,color:"#f87171"}}>🐜 Your Stats</div>
+                  <div style={leaderboardSubtitleStyle}>Personal progress across all runs</div>
+                </div>
                 <div style={leaderboardBadgeRedStyle}>YOU</div>
               </div>
               <div style={{display:"grid",gridTemplateColumns:isMobileView?"repeat(2,1fr)":"repeat(5,1fr)",gap:12,marginBottom:14}}>
@@ -1922,7 +1905,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                 <div style={personalStatBoxStyle("#facc15")}><div style={personalStatLabelStyle}>⚡ Best Clear</div><div style={personalStatValueStyle}>{personalStats?.bestClearTimeMs?formatMs(personalStats.bestClearTimeMs):"--"}</div></div>
                 <div style={personalStatBoxStyle("#22c55e")}><div style={personalStatLabelStyle}>🏃 Total Runs</div><div style={personalStatValueStyle}>{Number(personalStats?.totalRuns||0).toLocaleString()}</div></div>
                 <div style={personalStatBoxStyle("#f43f5e")}><div style={personalStatLabelStyle}>💎 Crystals</div><div style={personalStatValueStyle}>{Number(personalStats?.totalCrystals||0).toLocaleString()}</div></div>
-                <div style={personalStatBoxStyle("#a78bfa")}><div style={personalStatLabelStyle}>🗺️ Layouts</div><div style={personalStatValueStyle}>{layoutsExplored}<span style={{fontSize:12,opacity:0.5,fontWeight:600}}>/30</span></div></div>
+                <div style={personalStatBoxStyle("#a78bfa")}><div style={personalStatLabelStyle}>🗺️ Layouts</div><div style={personalStatValueStyle}>{layoutsExplored}<span style={{fontSize:12,opacity:0.5}}>/30</span></div></div>
               </div>
               <div style={{padding:"10px 12px",borderRadius:12,background:"rgba(167,139,250,0.08)",border:"1px solid rgba(167,139,250,0.2)"}}>
                 <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
@@ -1930,20 +1913,17 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                   <span style={{fontSize:12,opacity:0.6}}>{layoutsExplored} / 30 layouts cleared</span>
                 </div>
                 <div style={{height:7,borderRadius:99,background:"rgba(255,255,255,0.08)"}}>
-                  <div style={{height:"100%",borderRadius:99,width:`${Math.min(100,(layoutsExplored/30)*100)}%`,background:"linear-gradient(90deg,#7c3aed,#a78bfa)",boxShadow:"0 0 8px rgba(167,139,250,0.5)",transition:"width 0.6s ease"}}/>
+                  <div style={{height:"100%",borderRadius:99,width:`${Math.min(100,(layoutsExplored/30)*100)}%`,background:"linear-gradient(90deg,#7c3aed,#a78bfa)",transition:"width 0.6s ease"}}/>
                 </div>
-                {layoutsExplored===30&&<div style={{marginTop:6,fontSize:12,fontWeight:800,color:"#fde68a",textAlign:"center"}}>🏆 All 30 layouts conquered! Legend status. 🐜</div>}
+                {layoutsExplored===30&&(<div style={{marginTop:6,fontSize:12,fontWeight:800,color:"#fde68a",textAlign:"center"}}>🏆 All 30 layouts conquered! Legend status. 🐜</div>)}
               </div>
             </div>
+          </div>
           </div>
         {isPlaying && isMobileView && !isLandscape && (
           <div style={mobileRotatePromptWrapStyle}>
             <div style={mobileRotatePromptCardStyle}>
               Rotate your phone to landscape for a better game experience
-          </div>
-          </div>
-          </div>
-          </div>
             </div>
           </div>
         )}
