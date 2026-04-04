@@ -328,6 +328,7 @@ export default function TunnelShell() {
   const [nextClaimTs,    setNextClaimTs]    = useState<number|null>(null);
   const [countdownStr,   setCountdownStr]   = useState("");
   const [dripAmount,     setDripAmount]     = useState(0);
+  const [profileVersion, setProfileVersion] = useState(0);
   const [dripPanelOpen,  setDripPanelOpen]  = useState(false);
   const [dripBusy,       setDripBusy]       = useState(false);
   const [dripBalance,    setDripBalance]    = useState<number|null>(null);
@@ -1150,6 +1151,13 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           name: sj.discordName || (prof as any)?.name,
           discordSkipLink: false,
         } as any);
+        setProfileVersion(v => v + 1);
+        // Reload DRIP balance now that discord is connected
+        try {
+          const br = await fetch("/api/drip/balance", { cache: "no-store" });
+          const bj = await br.json().catch(() => null);
+          if (br.ok && bj?.ok) setDripBalance(Number(bj.balance || 0));
+        } catch {}
       } catch {}
     })();
     return () => { cancelled = true; };
@@ -1266,11 +1274,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                 onOpenBuyPoints={() => setShowBuyPoints(true)}
                 onRefresh={refresh}
               />
-              {discordUserId && (
-                <div style={{fontSize:12, opacity:0.6, marginTop:4}}>
-                  ID: {identityDisplay}
-                </div>
-              )}
+
 
           {/* ── Economy buttons — exact Raid.tsx pattern ─────────── */}
           <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:12,marginTop:8,alignItems:"center"}}>
@@ -1313,8 +1317,8 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
 
             {/* Discord status — shown when connected */}
             {showDisconnect && (
-              <div style={{fontSize:13,fontWeight:700,color:"#22c55e",display:"flex",alignItems:"center",gap:4}}>
-                Discord: <span style={{maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{discordName}</span> ✅
+              <div style={{fontSize:13,fontWeight:700,color:"#22c55e"}}>
+                Discord: Connected ✅
               </div>
             )}
 
@@ -1401,6 +1405,11 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                   How to Play + Official Rules
                 </Link>
               </div>
+              {discordUserId && (
+                <div style={{fontSize:11,opacity:0.6,marginTop:4}}>
+                  ID: {identityDisplay}
+                </div>
+              )}
               <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:14,marginTop:8}}>
             {(["colony","neon","mythic","lava","ice","golden","shadow","amber","toxic","void"] as BoardTheme[]).map(key => {
               const d = DIFFICULTY[key]; const th = themeMap[key]; const active = boardTheme === key;
