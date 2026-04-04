@@ -853,22 +853,9 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
 
              await refresh();
       setupNewRun();
-      // 3-2-1 countdown using chained setTimeout for reliable React re-renders
-      await new Promise<void>(resolve => {
-        setCountdown(3);
-        setTimeout(() => {
-          setCountdown(2);
-          setTimeout(() => {
-            setCountdown(1);
-            setTimeout(() => {
-              setCountdown(null);
-              resolve();
-            }, 1000);
-          }, 1000);
-        }, 1000);
-      });
-      setIsPlaying(true);
-      setRunMessage("");
+      // Trigger countdown — useEffect handles the tick and then starts the game
+      setCountdown(3);
+      return; // useEffect will call startActualRun after countdown
 
       if (typeof window !== "undefined" && window.innerWidth <= 900) {
         requestAnimationFrame(() => {
@@ -1251,6 +1238,20 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
       window.history.replaceState({}, "", url.toString());
     }
   }, []);
+
+
+  // ── Countdown tick + game start ─────────────────────────────────────
+  React.useEffect(() => {
+    if (countdown === null) return;
+    if (countdown === 0) {
+      setCountdown(null);
+      setIsPlaying(true);
+      setRunMessage("");
+      return;
+    }
+    const id = window.setTimeout(() => setCountdown(c => c !== null ? c - 1 : null), 1000);
+    return () => window.clearTimeout(id);
+  }, [countdown]);
 
 
   return (
