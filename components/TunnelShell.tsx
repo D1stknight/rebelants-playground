@@ -323,7 +323,7 @@ export default function TunnelShell() {
   const initialEffectiveId = getEffectivePlayerId(initialProfile);
 
     const [playerName, setPlayerName] = useState(initialName);
-  const [effectivePlayerId] = useState(initialEffectiveId);
+  const [effectivePlayerId, setEffectivePlayerId] = useState(initialEffectiveId);
   const [dailyClaimed,   setDailyClaimed]   = useState(false);
   const [nextClaimTs,    setNextClaimTs]    = useState<number|null>(null);
   const [countdownStr,   setCountdownStr]   = useState("");
@@ -1152,6 +1152,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           discordSkipLink: false,
         } as any);
         setProfileVersion(v => v + 1);
+        setEffectivePlayerId(`discord:${sj.discordUserId}`);
         // Reload DRIP balance now that discord is connected
         try {
           const br = await fetch("/api/drip/balance", { cache: "no-store" });
@@ -1287,13 +1288,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               {dailyClaimed?"✅ Claimed Today":`🐜 Daily +${tunnelCfg.dailyClaim} ${tunnelCfg.currency}`}
             </button>
 
-            {/* Buy Points */}
-            <button onClick={()=>setShowBuyPoints(true)}
-              style={{padding:"8px 14px",borderRadius:20,border:"1px solid rgba(255,255,255,0.2)",cursor:"pointer",fontWeight:700,fontSize:13,background:"rgba(255,255,255,0.06)",color:"rgba(255,255,255,0.8)"}}>
-              Buy Points
-            </button>
-
-            {/* Discord connect/disconnect */}
+{/* Discord connect/disconnect */}
             {showDisconnect?(
               <button onClick={()=>{
                 const p = loadProfile();
