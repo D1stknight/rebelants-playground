@@ -35,6 +35,10 @@ const DEFAULTS = {
   tunnelCrumbCount: 95,
   tunnelWallBreaks: 5,
   tunnelSpiderSpeedMs: 160,
+  raidCost: 600,
+  raidCarrierSurvival: 0.20,
+  raidUltraCarriers: 4,
+  raidUltraRatio: 0.65,
 
   rewards: { none: 0, common: 50, rare: 100, ultra: 200 },
 
@@ -126,6 +130,10 @@ const rareMerchDecimal = Number.isFinite(rawRareMerch)
   tunnelCrumbCount: Number(src?.tunnelCrumbCount ?? DEFAULTS.tunnelCrumbCount),
   tunnelWallBreaks: Number(src?.tunnelWallBreaks ?? DEFAULTS.tunnelWallBreaks),
   tunnelSpiderSpeedMs: Number(src?.tunnelSpiderSpeedMs ?? DEFAULTS.tunnelSpiderSpeedMs),
+  raidCost:            Number(src?.raidCost            ?? DEFAULTS.raidCost),
+  raidCarrierSurvival: Number(src?.raidCarrierSurvival ?? DEFAULTS.raidCarrierSurvival),
+  raidUltraCarriers:   Number(src?.raidUltraCarriers   ?? DEFAULTS.raidUltraCarriers),
+  raidUltraRatio:      Number(src?.raidUltraRatio      ?? DEFAULTS.raidUltraRatio),
 
   rewards: {
     none: Number(src?.rewards?.none ?? DEFAULTS.rewards.none),

@@ -13,6 +13,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // store state in httpOnly cookie (CSRF protection)
   res.setHeader("Set-Cookie", [
     `ra_discord_state=${state}; Path=/; HttpOnly; SameSite=Lax; Max-Age=600`,
+    `ra_return_to=${encodeURIComponent(String(Array.isArray(req.headers.referer) ? req.headers.referer[0] : req.headers.referer || "/"))}; Path=/; HttpOnly; SameSite=Lax; Max-Age=600`,
   ]);
 
   const params = new URLSearchParams({

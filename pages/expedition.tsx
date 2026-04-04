@@ -1,32 +1,18 @@
-import React from "react";
-import Link from "next/link";
+// pages/expedition.tsx
+import type { NextPage } from "next";
+import Head from "next/head";
+import Raid from "../components/Raid";
 
-export default function ExpeditionPage() {
+const ExpeditionPage: NextPage = () => {
   return (
-    <main className="max-w-5xl mx-auto px-4 py-10">
-      <h1 className="text-3xl font-bold mb-3">Expedition</h1>
-      <p className="text-slate-300 mb-6">Coming soon.</p>
-
-      <div className="bg-slate-900/80 backdrop-blur-md border border-white/10 rounded-xl p-6">
-        <div className="text-slate-200 font-semibold mb-2">🚧 Game in development</div>
-        <p className="text-slate-300 mb-4">
-          Expedition missions are being assembled.
-        </p>
-
-        <div className="rounded-xl overflow-hidden border border-white/10 bg-black/20">
-          <img
-            src="/ui/coming-soon.png"
-            alt="Coming soon"
-            style={{ width: "100%", height: "auto", display: "block" }}
-          />
-        </div>
-
-        <div className="mt-6 flex gap-3">
-          <Link href="/shuffle" className="px-4 py-2 bg-blue-600 rounded-lg">
-            Back to Shuffle
-          </Link>
-        </div>
-      </div>
-    </main>
+    <>
+      <Head>
+        <title>The Raid — Rebel Ants Playground</title>
+        <meta name="description" content="Assemble 20 ants. Launch a brutal raid. Win loot or die trying." />
+      </Head>
+      <Raid />
+    </>
   );
-}
+};
+
+export default ExpeditionPage;

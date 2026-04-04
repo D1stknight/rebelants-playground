@@ -102,8 +102,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       totalCrystals: Number(statsRaw?.totalCrystals || 0),
     };
 
-    return res.status(200).json({
-      ok: true,
+    // Layout champions
+  const LNAMES: string[] = ["Split Path","Narrow Spine","Broken Cross","Double Fork","Ring Cut","Maze Teeth","Cracked Chamber","Death Lanes","Twin Corridors","Spiral Trap","Pincer","Catacomb","River","Fortress","Zipper","Labyrinth","Cross Fire","The Trap","Checkers","Spine","Corridor Wars","Diamond","Snake Pit","Pillars","Archipelago","Cascade","Honeycomb","Staircase","Vortex","Final Boss"];
+  const layoutChampions: {layoutIndex:number;layoutName:string;playerId:string;playerName:string;score:number}[] = [];
+  try {
+    for (let idx = 0; idx < 30; idx++) {
+      const top1 = await redis.zrange(`tunnel:layout:${idx}:scores`, 0, 0, { rev: true, withScores: true });
+      if (Array.isArray(top1) && top1.length >= 2) {
+        const parts = String(top1[0]).split('|');
+        layoutChampions.push({ layoutIndex: idx, layoutName: LNAMES[idx]||'Layout '+(idx+1), playerId: parts[0]||'', playerName: parts[1]||parts[0]||'', score: Number(top1[1]) });
+      } else {
+        layoutChampions.push({ layoutIndex: idx, layoutName: LNAMES[idx]||'Layout '+(idx+1), playerId: '', playerName: '', score: 0 });
+      }
+    }
+  } catch {}
+
+  // Layouts explored
+  let layoutsExplored = 0;
+  if (playerId) {
+    try {
+      const explored = await redis.smembers(`tunnel:player:${playerId}:explored`);
+      layoutsExplored = Array.isArray(explored) ? explored.length : 0;
+    } catch {}
+  }
+
+  return res.status(200).json({
+      layoutChampions,
+    layoutsExplored,
+    ok: true,
       topScore,
       fastestClear,
       personalStats,
