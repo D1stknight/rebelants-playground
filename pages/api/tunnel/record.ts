@@ -125,13 +125,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ ok: false, error: "Server error" });
   }
 }
-  // Layout champion tracking
-  if (layoutIndex !== null && score > 0) {
+    // Layout champion tracking
+    if (layoutIndex !== null && score > 0) {
     const lMember = playerId + "|" + playerName + "|" + layoutName;
     await redis.zadd("tunnel:layout:" + layoutIndex + ":scores", { score: Number(score), member: lMember }).catch(() => {});
-  }
-  // Track layouts explored
-  if (layoutIndex !== null) {
+    }
+    // Track layouts explored
+    if (layoutIndex !== null) {
     await redis.sadd("tunnel:player:" + playerId + ":explored", String(layoutIndex)).catch(() => {});
-  }
+    }
+
 
