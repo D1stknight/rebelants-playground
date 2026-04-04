@@ -1350,7 +1350,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
         : runMessageStyle.background,
       color: didWinRun ? "#fde68a" : "white",
       fontWeight: didWinRun ? 800 : 500,
-    }}}  >
+    }}>
           
     {runMessage}
   </div>
