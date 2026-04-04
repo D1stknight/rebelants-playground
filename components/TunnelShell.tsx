@@ -1092,7 +1092,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
         if (r.ok && j?.ok) { setDailyClaimed(!!j.claimed); if (j.msUntilNextClaim) setNextClaimTs(Date.now() + Number(j.msUntilNextClaim)); }
       } catch {}
     })();
-  }, [effectivePlayerId, dailyClaimed]);
+  }, [effectivePlayerId]);
 
   React.useEffect(() => {
     if (!nextClaimTs) return;
@@ -1280,15 +1280,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           {/* ── Economy buttons — exact Raid.tsx pattern ─────────── */}
           <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:12,marginTop:8,alignItems:"center"}}>
 
-            {/* Claim Daily */}
-            <button onClick={claimDailyNow} disabled={dailyClaimed}
-              style={{padding:"8px 14px",borderRadius:20,border:"none",cursor:dailyClaimed?"default":"pointer",fontWeight:700,fontSize:13,
-                background:dailyClaimed?"rgba(255,255,255,0.08)":themeMap[boardTheme].accent,
-                color:dailyClaimed?"rgba(255,255,255,0.4)":"#000",transition:"all 0.2s"}}>
-              {dailyClaimed?"✅ Claimed Today":`🐜 Daily +${tunnelCfg.dailyClaim} ${tunnelCfg.currency}`}
-            </button>
-
-{/* Discord connect/disconnect */}
+            {/* Discord connect/disconnect */}
             {showDisconnect?(
               <button onClick={()=>{
                 const p = loadProfile();
