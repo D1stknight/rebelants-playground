@@ -158,8 +158,8 @@ function calcPrize(slots: AntSlot[], cfg: any): { rarity: Rarity; prize: Prize }
 
 // ── Role Picker ───────────────────────────────────────────────────────────────
 
-function RolePicker({ squad, onChange, disabled }: {
-  squad: AntRole[]; onChange: (n: AntRole[]) => void; disabled: boolean;
+function RolePicker({ squad, onChange, disabled, carrierPct }: {
+  squad: AntRole[]; onChange: (n: AntRole[]) => void; disabled: boolean; carrierPct: number;
 }) {
   const roles = Object.keys(ROLE_META) as AntRole[];
 
@@ -187,7 +187,7 @@ function RolePicker({ squad, onChange, disabled }: {
               }}>
               <div style={{ fontSize: 22, marginBottom: 2 }}>{m.emoji}</div>
               <div style={{ color: m.color, fontSize: 10, fontWeight: 900 }}>{m.label}</div>
-              <div style={{ opacity: 0.55, fontSize: 9, marginTop: 1 }}>survive: {role === "carrier" ? Math.round(Number(cfg?.raidCarrierSurvival ?? 0.20) * (Number(cfg?.raidCarrierSurvival ?? 0.20) <= 1 ? 100 : 1)) + "%" : m.survivalDisplay}</div>
+              <div style={{ opacity: 0.55, fontSize: 9, marginTop: 1 }}>survive: {role === "carrier" ? carrierPct + "%" : m.survivalDisplay}</div>
               <div style={{ color: m.color, fontSize: 9, marginTop: 1, fontWeight: 900 }}>{ROLE_COST[role]} REBEL</div>
               <div style={{ marginTop: 4, fontSize: 13, fontWeight: 900, color: count > 0 ? m.color : "rgba(255,255,255,.3)" }}>×{count}</div>
             </button>
@@ -944,7 +944,7 @@ export default function Raid() {
           ⚠️ BRUTAL DIFFICULTY — Carriers only have {Math.round(Number(cfg?.raidCarrierSurvival ?? 20) * (Number(cfg?.raidCarrierSurvival ?? 20) <= 1 ? 100 : 1))}% survival. Place 🛡️ Guards next to them to boost their odds.
         </div>
 
-        <RolePicker squad={squad} onChange={setSquad} disabled={isBattling} />
+        <RolePicker squad={squad} onChange={setSquad} disabled={isBattling} carrierPct={Math.round(Number(cfg?.raidCarrierSurvival ?? 0.20) * (Number(cfg?.raidCarrierSurvival ?? 0.20) <= 1 ? 100 : 1))} />
 
         {phase==="launching" && <LaunchAnimation />}
         {(phase==="battling"||phase==="revealed") && slots.length>0 && (
