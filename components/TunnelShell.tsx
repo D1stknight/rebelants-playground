@@ -298,7 +298,7 @@ const LAYOUT_NAMES = [
 
 function baseWall(row: number, col: number, layoutIndex: number) {
   if (isOuterBorder(row, col)) return true;
-  const layout = TUNNEL_LAYOUTS[layoutIndex] || TUNNEL_LAYOUTS[0];
+  const layout = (TUNNEL_LAYOUTS[layoutIndex] || TUNNEL_LAYOUTS[0]) as string[];
   return layout.includes(`${row}:${col}`);
 }
 
