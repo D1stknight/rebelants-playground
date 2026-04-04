@@ -734,8 +734,8 @@ export default function Raid() {
       try {
         const r = await fetch(`/api/points/claim?playerId=${encodeURIComponent(effectivePlayerId)}`, { cache: 'no-store' });
         const j = await r.json().catch(() => null);
-        if (r.ok && j?.ok && j?.nextClaimTs) {
-          setNextClaimTs(Number(j.nextClaimTs));
+        if (r.ok && j?.ok && j?.msUntilNextClaim) {
+          setNextClaimTs(Date.now() + Number(j.msUntilNextClaim));
         }
       } catch {}
     })();
