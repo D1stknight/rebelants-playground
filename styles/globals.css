@@ -9,8 +9,16 @@ body { @apply bg-slate-950 text-slate-100; }
 .btn { @apply px-4 py-2 rounded-lg border border-slate-700 hover:bg-slate-800 active:scale-[.98] transition; }
 .title { @apply text-3xl font-bold tracking-tight; }
 .subtitle { @apply text-slate-400; }
-.tab { @apply inline-flex items-center gap-2 rounded-full border border-slate-700 px-3 py-1 text-sm; }
-.tab-active { @apply bg-slate-800; }
+.tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.tab {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 14px; border-radius: 20px; font-size: 13px; font-weight: 600;
+  border: 1px solid rgba(255,255,255,.13); color: rgba(255,255,255,.72);
+  background: rgba(255,255,255,.06); text-decoration: none;
+  transition: background .15s, transform .1s, border-color .15s;
+}
+.tab:hover { transform: translateY(-1px); background: rgba(255,255,255,.11); }
+.tab-active { background: rgba(248,113,113,.14); border-color: rgba(248,113,113,.32); color: #f87171; }
 
 /* ---------- Tiny helpers ---------- */
 @keyframes wobble {
