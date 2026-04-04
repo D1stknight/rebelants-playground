@@ -1,10 +1,4 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
-              <span style={{background:themeMap[boardTheme].accent+"22",border:"1px solid "+themeMap[boardTheme].accent+"66",color:themeMap[boardTheme].accent,borderRadius:12,padding:"2px 10px",fontSize:11,fontWeight:700}}>
-                {DIFFICULTY[boardTheme].emoji} {DIFFICULTY[boardTheme].label}
-              </span>
-              <span style={{fontSize:11,opacity:0.6,fontStyle:"italic"}}>{DIFFICULTY[boardTheme].desc}</span>
-            </div>
 import Link from "next/link";
 import { usePoints } from "../lib/usePoints";
 import { loadProfile, getEffectivePlayerId, saveProfile } from "../lib/profile";
@@ -1279,6 +1273,12 @@ const p = loadProfile();
               <div style={boardHeaderStyle}>
                 <div>
                   <div style={{ fontSize: 20, fontWeight: 900 }}>{theme.name}</div>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+              <span style={{background:themeMap[boardTheme].accent+"22",border:"1px solid "+themeMap[boardTheme].accent+"66",color:themeMap[boardTheme].accent,borderRadius:12,padding:"2px 10px",fontSize:11,fontWeight:700}}>
+                {DIFFICULTY[boardTheme].emoji} {DIFFICULTY[boardTheme].label}
+              </span>
+              <span style={{fontSize:11,opacity:0.6,fontStyle:"italic"}}>{DIFFICULTY[boardTheme].desc}</span>
+            </div>
                   <div style={{ fontSize: 13, opacity: 0.82 }}>
                                        Desktop: arrow keys move, Space breaks. Mobile: swipe to move, tap Break to smash walls.
                   </div>
