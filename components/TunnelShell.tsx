@@ -1104,10 +1104,15 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
       if (r.ok && j?.ok) { setDailyClaimed(true); if (j.msUntilNextClaim) setNextClaimTs(Date.now() + Number(j.msUntilNextClaim)); }
     } catch {}
   }
-const p = loadProfile();
+                    onChange={(e) => {
+                      const v = (e.target.value.slice(0, 18) || "guest").trim() || "guest";
+                      setPlayerName(v);
+
+                      const p = loadProfile();
                       const id = (p?.id || "guest").trim() || "guest";
                       saveProfile({ name: v, id });
                     }}
+                    style={inputStyle}
                     style={inputStyle}
 
   return (
