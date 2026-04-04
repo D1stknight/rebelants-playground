@@ -1250,8 +1250,8 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
   return (
     <>
           {countdown !== null && (
-            <div style={{position:"fixed",inset:0,zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.55)",pointerEvents:"none", backgroundImage:"url('/bg/tunnel-bg.png')", backgroundSize:"cover", backgroundPosition:"center top", backgroundRepeat:"no-repeat", position:"relative" as const, overflow:"hidden"}}>
-        <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom, rgba(9,12,22,0.2) 0%, rgba(9,12,22,0.6) 100%)",zIndex:0,pointerEvents:"none"}}/>
+            <div style={{position:"fixed",inset:0,zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.55)",pointerEvents:"none"}}>
+        <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom, rgba(9,12,22,0.15) 0%, rgba(9,12,22,0.5) 70%, rgba(9,12,22,0.88) 100%)",zIndex:0,pointerEvents:"none"}}/>
               <div style={{fontSize:140,fontWeight:900,color:"#fff",textShadow:"0 0 60px rgba(96,165,250,0.9)",lineHeight:1,userSelect:"none"}}>{countdown}</div>
             </div>
           )}
@@ -1277,7 +1277,8 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           padding: isPlaying && isMobileView ? "10px 8px" : "20px 16px",
         }}
       >
-        <header style={{ marginBottom: 18 }}>
+        <header style={{ marginBottom: 18 , backgroundImage:"url('/bg/tunnel-bg.png')", backgroundSize:"cover", backgroundPosition:"center top", backgroundRepeat:"no-repeat", position:"relative" as const, overflow:"hidden"}}>
+        <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom, rgba(9,12,22,0.2) 0%, rgba(9,12,22,0.65) 100%)",zIndex:0,pointerEvents:"none"}}/>
           <div style={{ fontSize: 28, fontWeight: 900, marginBottom: 8 }}>
             <Link href="/" style={{ textDecoration: "none", color: "inherit" }}>
               Rebel Ants Playground
