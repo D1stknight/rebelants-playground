@@ -1180,26 +1180,29 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               style={{padding:"8px 18px",borderRadius:20,border:"none",cursor:dailyClaimed?"default":"pointer",fontWeight:700,fontSize:13,
                 background:dailyClaimed?"rgba(255,255,255,0.08)":themeMap[boardTheme].accent,
                 color:dailyClaimed?"rgba(255,255,255,0.4)":"#000",transition:"all 0.2s"}}>
-              {dailyClaimed?(countdownStr?`⏱ ${countdownStr}`:"✅ Claimed Today"):`🐜 Daily +${tunnelCfg.dailyClaim} ${tunnelCfg.currency}`}
+              {dailyClaimed?"✅ Claimed Today":`🐜 Daily +${tunnelCfg.dailyClaim} ${tunnelCfg.currency}`}
             </button>
             {showDisconnect?(
-              <button onClick={()=>{window.location.href="/api/auth/discord/logout?returnTo=/tunnel";}}
+              <button onClick={()=>{window.location.href="/api/auth/discord/logout";}}
                 style={{padding:"8px 18px",borderRadius:20,border:"1px solid rgba(255,255,255,0.2)",cursor:"pointer",fontWeight:700,fontSize:13,background:"rgba(255,255,255,0.06)",color:"rgba(255,255,255,0.7)"}}>
                 Disconnect Discord
               </button>
             ):(
-              <button onClick={()=>{window.location.href="/api/auth/discord/login?returnTo=/tunnel";}}
+              <button onClick={()=>{window.location.href="/api/auth/discord/login";}}
                 style={{padding:"8px 18px",borderRadius:20,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,background:"#5865f2",color:"#fff"}}>
                 🔗 Connect Discord
               </button>
             )}
             <button
               onClick={async()=>{
+                const amt = window.prompt("How many DRIP points to migrate?");
+                if (!amt || isNaN(Number(amt)) || Number(amt) <= 0) return;
                 try {
-                  const r = await fetch("/api/drip/migrate", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({playerId:effectivePlayerId})});
+                  const idem = Date.now().toString(36);
+                  const r = await fetch("/api/drip/migrate", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({amount:Number(amt),playerId:effectivePlayerId,idempotencyKey:idem})});
                   const j = await r.json().catch(()=>null);
-                  if (r.ok) { await refresh(); setRunMessage(j?.message || "DRIP points migrated ✅"); }
-                  else setRunMessage(j?.error || "Migration failed.");
+                  if (r.ok && j?.ok) { await refresh(); setRunMessage(j?.message || `Migrated ${amt} DRIP points ✅`); }
+                  else setRunMessage(j?.error || "Migration failed. Make sure DRIP is linked in Discord.");
                 } catch(e:any) { setRunMessage(e?.message || "Migration failed."); }
               }}
               style={{padding:"8px 18px",borderRadius:20,border:"1px solid rgba(255,255,255,0.15)",cursor:"pointer",fontWeight:700,fontSize:13,background:"rgba(255,255,255,0.06)",color:"rgba(255,255,255,0.5)"}}>
@@ -1281,7 +1284,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                     <button
                         onClick={() => { void startRun(); }}
                         disabled={isPlaying}
-                        style={{...startRunButtonStyle, opacity: isPlaying ? 0.4 : 1, cursor: isPlaying ? 'default' : 'pointer'}}
+                        style={{...startRunButtonStyle, opacity: isPlaying ? 0.4 : 1, cursor: isPlaying ? 'default' : 'pointer', fontSize: isPlaying ? 13 : 15, padding: isPlaying ? '10px 14px' : '12px 20px'}}
                       >
                         {isPlaying ? "Running..." : "Start Run"}
                       </button>
@@ -1337,7 +1340,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                 </div>
               </div>
 
-              <div style={{ padding: 18, background: "transparent" }}>
+              <div style={{ padding: "12px 18px 18px" }}>
                {runMessage ? (
   <div
     style={{
@@ -2008,8 +2011,7 @@ const gameBoardWrapStyle: React.CSSProperties = {
 const gameBoardStyle: React.CSSProperties = {
   borderRadius: 18,
   border: "1px solid rgba(255,255,255,0.12)",
-  background:
-    "transparent",
+  background: "rgba(10,14,26,0.95)",
   overflow: "hidden",
 };
 
@@ -2018,7 +2020,7 @@ const boardHeaderStyle: React.CSSProperties = {
   justifyContent: "space-between",
   alignItems: "flex-start",
   gap: 12,
-  padding: 16,
+  padding: "12px 14px",
   borderBottom: "1px solid rgba(255,255,255,0.08)",
 };
 
@@ -2087,10 +2089,10 @@ const boardPreviewStyle: React.CSSProperties = {
   position: "relative",
   overflow: "auto",
   borderRadius: 18,
-  padding: 20,
-  height: "78vh",
-  minHeight: 760,
-  maxHeight: 980,
+  padding: 14,
+  height: "60vh",
+  minHeight: 520,
+  maxHeight: 720,
   scrollBehavior: "smooth",
   overscrollBehavior: "contain",
 };
@@ -2163,21 +2165,21 @@ function previewGlowStyle(accent: string): React.CSSProperties {
 
 const previewInnerStyle: React.CSSProperties = {
   position: "relative",
-  minWidth: 1400,
-  minHeight: 1040,
+  minWidth: 1100,
+  minHeight: 820,
 };
 
 const previewGridStyle: React.CSSProperties = {
   position: "relative",
   display: "grid",
   gridTemplateColumns: `repeat(${GRID_COLS}, minmax(0, 1fr))`,
-  gap: 10,
+  gap: 6,
 };
 
 const tileStyle: React.CSSProperties = {
   aspectRatio: "1 / 1",
   position: "relative",
-  borderRadius: 12,
+  borderRadius: 8,
   display: "grid",
   placeItems: "center",
   overflow: "hidden",
@@ -2303,7 +2305,7 @@ const leaderboardBadgeRedStyle: React.CSSProperties = {
 };
 
 const leaderboardScrollStyle: React.CSSProperties = {
-  maxHeight: 310,
+  maxHeight: 220,
   overflowY: "auto",
   paddingRight: 4,
   display: "flex",
@@ -2393,8 +2395,8 @@ const personalStatsGridMobileStyle: React.CSSProperties = {
 
 function personalStatBoxStyle(accent: string): React.CSSProperties {
   return {
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 12,
+    padding: 12,
     background: "rgba(255,255,255,0.04)",
     border: `1px solid ${accent}33`,
     boxShadow: `0 0 18px ${accent}12`,
@@ -2408,7 +2410,7 @@ const personalStatLabelStyle: React.CSSProperties = {
 };
 
 const personalStatValueStyle: React.CSSProperties = {
-  fontSize: 24,
+  fontSize: 20,
   fontWeight: 900,
   lineHeight: 1.1,
 };
