@@ -1319,8 +1319,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
         : runMessageStyle.background,
       color: didWinRun ? "#fde68a" : "white",
       fontWeight: didWinRun ? 800 : 500,
-    ,backgroundImage:"url('https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1400&q=80')",backgroundSize:"cover",backgroundBlendMode:"overlay",backgroundPosition:"center"}}
-  >
+    }}  >
           {isPlaying && (
             <div style={{position:"sticky",top:0,zIndex:50,display:"flex",justifyContent:"center",alignItems:"center",gap:20,padding:"5px 16px",background:"rgba(0,0,0,0.80)",backdropFilter:"blur(8px)",borderBottom:"1px solid "+themeMap[boardTheme].accent+"44"}}>
               <span style={{color:timeLeft<=10?"#ff4444":themeMap[boardTheme].accent,fontWeight:900,fontSize:16}}>⏱ {timeLeft}s</span>
