@@ -389,6 +389,7 @@ export default function TunnelShell() {
   const [layoutIndex, setLayoutIndex] = useState(0);
   const [layoutMode, setLayoutMode] = useState<"random"|"pick">("random");
   const [selectedLayout, setSelectedLayout] = useState<number|null>(null);
+  const [layoutsExplored, setLayoutsExplored] = useState(0);
 const [isPlaying, setIsPlaying] = useState(false);
 const [timeLeft, setTimeLeft] = useState(DEFAULT_TUNNEL_CONFIG.tunnelRunSeconds);
 const [score, setScore] = useState(0);
@@ -415,7 +416,6 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
   const [fastestClearRows, setFastestClearRows] = useState<TunnelFastestRow[]>([]);
   const [personalStats, setPersonalStats] = useState<TunnelPersonalStats | null>(null);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
-  const [layoutsExplored, setLayoutsExplored] = useState(0);
   const [isMobileView, setIsMobileView] = useState(false);
   const [isLandscape, setIsLandscape] = useState(true);
 
@@ -1418,8 +1418,8 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               {dripStatus && <div style={{marginTop:8,fontSize:12,fontWeight:700,color:dripStatus.includes("✅")?"#22c55e":"#f87171"}}>{dripStatus}</div>}
             </div>
           )}
-              {/* ── Layout chooser ──────────────────── */}
-              <div style={{display:"flex",gap:8,marginBottom:8,marginTop:2,flexWrap:"wrap",alignItems:"center"}}>
+              {/* ── Layout mode toggles ─────────────────────────────── */}
+              <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:8,flexWrap:"wrap"}}>
                 <button onClick={()=>{setLayoutMode("random");setSelectedLayout(null);}}
                   style={{padding:"5px 14px",borderRadius:20,fontSize:12,fontWeight:700,cursor:"pointer",transition:"all 0.2s",
                     border:layoutMode==="random"?"2px solid rgba(96,165,250,0.8)":"2px solid rgba(255,255,255,0.15)",
@@ -1437,7 +1437,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               {layoutMode==="pick"&&(
                 <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:6,marginBottom:12,padding:10,borderRadius:14,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)"}}>
                   {TUNNEL_LAYOUTS.map((layout,idx)=>{
-                    const ws=new Set(layout);const active=selectedLayout===idx;
+                    const ws=new Set(layout as string[]);const active=selectedLayout===idx;
                     return(<button key={idx} onClick={()=>setSelectedLayout(idx)} title={LAYOUT_NAMES[idx]}
                       style={{padding:0,border:active?"2px solid rgba(250,204,21,0.9)":"2px solid rgba(255,255,255,0.08)",borderRadius:8,
                         background:active?"rgba(250,204,21,0.08)":"rgba(255,255,255,0.03)",cursor:"pointer",overflow:"hidden",transition:"all 0.15s",
@@ -1885,22 +1885,17 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
 
           <div style={tunnelLeaderboardWrapStyle}>
 
-            {/* ── Leaderboard header ──────────────────────────────── */}
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,flexWrap:"wrap",gap:8}}>
+            {/* ── Header ─────────────────────────────────────────── */}
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
               <div>
-                <div style={{fontSize:22,fontWeight:900,letterSpacing:0.5}}>🏆 Tunnel Leaderboards</div>
-                <div style={{fontSize:12,opacity:0.6,marginTop:2}}>Top scores, fastest clears, and personal stats across all 30 layouts</div>
+                <div style={{fontSize:20,fontWeight:900,letterSpacing:0.5}}>🏆 Tunnel Leaderboards</div>
+                <div style={{fontSize:12,opacity:0.55,marginTop:2}}>Top scores, fastest clears &amp; personal stats across all 30 layouts</div>
               </div>
-              <button onClick={()=>void loadTunnelLeaderboard()}
-                style={{padding:"7px 14px",borderRadius:20,border:"1px solid rgba(255,255,255,0.15)",background:"rgba(255,255,255,0.06)",cursor:"pointer",fontSize:12,fontWeight:700,color:"rgba(255,255,255,0.7)"}}>
-                ↻ Refresh
-              </button>
+              <button onClick={()=>void loadTunnelLeaderboard()} style={{padding:"6px 12px",borderRadius:20,border:"1px solid rgba(255,255,255,0.15)",background:"rgba(255,255,255,0.06)",cursor:"pointer",fontSize:12,fontWeight:700,color:"rgba(255,255,255,0.7)"}}>↻ Refresh</button>
             </div>
 
-            {/* ── Top 2 boards side by side ──────────────────────── */}
+            {/* ── Top 2 boards ───────────────────────────────────── */}
             <div style={{...tunnelLeaderboardGridStyle,...(isMobileView?tunnelLeaderboardGridMobileStyle:null)}}>
-
-              {/* Top Score */}
               <div style={leaderboardCardBlueStyle}>
                 <div style={leaderboardCardHeaderStyle}>
                   <div>
@@ -1910,21 +1905,16 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                   <div style={leaderboardBadgeBlueStyle}>TOP 5</div>
                 </div>
                 <div style={leaderboardScrollStyle}>
-                  {leaderboardLoading?<div style={leaderboardEmptyStyle}>Loading...</div>:
-                  topScoreRows.length===0?<div style={leaderboardEmptyStyle}>No scores yet. Be the first! 🐜</div>:
+                  {leaderboardLoading?<div style={leaderboardEmptyStyle}>Loading...</div>:topScoreRows.length===0?<div style={leaderboardEmptyStyle}>No scores yet — be the first! 🐜</div>:
                   topScoreRows.map(row=>(
-                    <div key={`score-${row.playerId}-${row.rank}`} style={leaderboardRowStyle(row.rank,"#60a5fa")}>
+                    <div key={`s-${row.rank}`} style={leaderboardRowStyle(row.rank,"#60a5fa")}>
                       <div style={leaderboardRankStyle(row.rank)}>{row.rank===1?"🥇":row.rank===2?"🥈":row.rank===3?"🥉":"#"+row.rank}</div>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={leaderboardNameStyle}>{row.playerName||row.playerId}</div>
-                      </div>
-                      <div style={{...leaderboardValueStyle,color:"#93c5fd"}}>{Number(row.score||0).toLocaleString()} pts</div>
+                      <div style={{flex:1,minWidth:0}}><div style={leaderboardNameStyle}>{row.playerName||row.playerId}</div></div>
+                      <div style={{...leaderboardValueStyle,color:"#93c5fd"}}>{Number(row.score||0).toLocaleString()}</div>
                     </div>
                   ))}
                 </div>
               </div>
-
-              {/* Fastest Clear */}
               <div style={leaderboardCardGoldStyle}>
                 <div style={leaderboardCardHeaderStyle}>
                   <div>
@@ -1934,14 +1924,11 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                   <div style={leaderboardBadgeGoldStyle}>TOP 5</div>
                 </div>
                 <div style={leaderboardScrollStyle}>
-                  {leaderboardLoading?<div style={leaderboardEmptyStyle}>Loading...</div>:
-                  fastestClearRows.length===0?<div style={leaderboardEmptyStyle}>No full clears yet. Collect all 💎 to set a record!</div>:
+                  {leaderboardLoading?<div style={leaderboardEmptyStyle}>Loading...</div>:fastestClearRows.length===0?<div style={leaderboardEmptyStyle}>Collect all 💎 to set a record!</div>:
                   fastestClearRows.map(row=>(
-                    <div key={`fast-${row.playerId}-${row.rank}`} style={leaderboardRowStyle(row.rank,"#facc15")}>
+                    <div key={`f-${row.rank}`} style={leaderboardRowStyle(row.rank,"#facc15")}>
                       <div style={leaderboardRankStyle(row.rank)}>{row.rank===1?"🥇":row.rank===2?"🥈":row.rank===3?"🥉":"#"+row.rank}</div>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={leaderboardNameStyle}>{row.playerName||row.playerId}</div>
-                      </div>
+                      <div style={{flex:1,minWidth:0}}><div style={leaderboardNameStyle}>{row.playerName||row.playerId}</div></div>
                       <div style={{...leaderboardValueStyle,color:"#fde68a"}}>{formatMs(row.clearTimeMs)}</div>
                     </div>
                   ))}
@@ -1949,7 +1936,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               </div>
             </div>
 
-            {/* ── Personal stats full-width card ─────────────────── */}
+            {/* ── Personal stats ─────────────────────────────────── */}
             <div style={{...leaderboardCardRedStyle,marginTop:14}}>
               <div style={leaderboardCardHeaderStyle}>
                 <div>
@@ -1958,7 +1945,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                 </div>
                 <div style={leaderboardBadgeRedStyle}>YOU</div>
               </div>
-              <div style={{...personalStatsGridStyle,...(isMobileView?personalStatsGridMobileStyle:null),gridTemplateColumns:isMobileView?"repeat(2,1fr)":"repeat(5,1fr)"}}>
+              <div style={{display:"grid",gridTemplateColumns:isMobileView?"repeat(2,1fr)":"repeat(5,1fr)",gap:12,marginBottom:14}}>
                 <div style={personalStatBoxStyle("#60a5fa")}>
                   <div style={personalStatLabelStyle}>🎯 Best Score</div>
                   <div style={personalStatValueStyle}>{Number(personalStats?.bestScore||0).toLocaleString()}</div>
@@ -1976,27 +1963,23 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                   <div style={personalStatValueStyle}>{Number(personalStats?.totalCrystals||0).toLocaleString()}</div>
                 </div>
                 <div style={personalStatBoxStyle("#a78bfa")}>
-                  <div style={personalStatLabelStyle}>🗺️ Layouts Explored</div>
-                  <div style={personalStatValueStyle}>{layoutsExplored}<span style={{fontSize:13,opacity:0.6,fontWeight:600}}>/30</span></div>
+                  <div style={personalStatLabelStyle}>🗺️ Layouts</div>
+                  <div style={personalStatValueStyle}>{layoutsExplored}<span style={{fontSize:12,opacity:0.5,fontWeight:600}}>/30</span></div>
                 </div>
               </div>
-              {/* Explorer progress bar */}
-              <div style={{marginTop:12,padding:"10px 12px",borderRadius:12,background:"rgba(167,139,250,0.08)",border:"1px solid rgba(167,139,250,0.2)"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+              <div style={{padding:"10px 12px",borderRadius:12,background:"rgba(167,139,250,0.08)",border:"1px solid rgba(167,139,250,0.2)"}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
                   <span style={{fontSize:12,fontWeight:700,color:"#a78bfa"}}>🗺️ Explorer Progress</span>
-                  <span style={{fontSize:12,opacity:0.7}}>{layoutsExplored} / 30 layouts cleared</span>
+                  <span style={{fontSize:12,opacity:0.6}}>{layoutsExplored} / 30 layouts cleared</span>
                 </div>
-                <div style={{height:8,borderRadius:99,background:"rgba(255,255,255,0.08)",overflow:"hidden"}}>
-                  <div style={{height:"100%",borderRadius:99,width:`${Math.min(100,(layoutsExplored/30)*100)}%`,
-                    background:"linear-gradient(90deg,#7c3aed,#a78bfa,#c4b5fd)",
-                    boxShadow:"0 0 10px rgba(167,139,250,0.6)",transition:"width 0.6s ease"}}/>
+                <div style={{height:7,borderRadius:99,background:"rgba(255,255,255,0.08)"}}>
+                  <div style={{height:"100%",borderRadius:99,width:`${Math.min(100,(layoutsExplored/30)*100)}%`,background:"linear-gradient(90deg,#7c3aed,#a78bfa)",boxShadow:"0 0 8px rgba(167,139,250,0.5)",transition:"width 0.6s ease"}}/>
                 </div>
                 {layoutsExplored===30&&<div style={{marginTop:6,fontSize:12,fontWeight:800,color:"#fde68a",textAlign:"center"}}>🏆 All 30 layouts conquered! Legend status. 🐜</div>}
               </div>
             </div>
 
           </div>
-
         {isPlaying && isMobileView && !isLandscape && (
           <div style={mobileRotatePromptWrapStyle}>
             <div style={mobileRotatePromptCardStyle}>
@@ -2767,8 +2750,3 @@ const mobileRotatePromptCardStyle: React.CSSProperties = {
   textAlign: "center",
   boxShadow: "0 16px 40px rgba(0,0,0,0.32)",
 };
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
