@@ -108,7 +108,7 @@ const layoutName = typeof body.layoutName === 'string' ? body.layoutName : null;
   // Track layout-specific leaderboards
   if (typeof layoutIndex === 'number' && score > 0) {
     const lKey = `tunnel:layout:${layoutIndex}:scores`;
-    await redis.zadd(lKey, { score: Number(score), member: `${playerId}|${playerName}` }).catch(() => {});
+    await redis.zadd(lKey, { score: Number(score), member: `${playerId}|${playerName}|${layoutName||""}` }).catch(() => {});
   }
   // Track layouts explored per player
   if (typeof layoutIndex === 'number') {
