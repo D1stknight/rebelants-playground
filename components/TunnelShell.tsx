@@ -368,6 +368,7 @@ export default function TunnelShell() {
     const [boardTheme, setBoardTheme] = useState<BoardTheme>("colony");
   const [layoutIndex, setLayoutIndex] = useState(0);
   const [layoutMode, setLayoutMode] = useState<"random"|"pick">("random");
+  const [countdown, setCountdown] = useState<number|null>(null);
   const [selectedLayout, setSelectedLayout] = useState<number|null>(null);
   const [layoutsExplored, setLayoutsExplored] = useState(0);
   const [layoutChampions, setLayoutChampions] = useState<Array<{layoutIndex:number;layoutName:string;playerId:string;playerName:string;score:number}>>([]);
@@ -852,6 +853,21 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
 
              await refresh();
       setupNewRun();
+      // 3-2-1 countdown
+      setCountdown(3);
+      await new Promise<void>(resolve => {
+        let count = 3;
+        const tick = setInterval(() => {
+          count--;
+          if (count <= 0) {
+            clearInterval(tick);
+            setCountdown(null);
+            resolve();
+          } else {
+            setCountdown(count);
+          }
+        }, 1000);
+      });
       setIsPlaying(true);
       setRunMessage("");
 
@@ -1253,6 +1269,13 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               <span style={{color:themeMap[boardTheme].crystal,fontWeight:700,fontSize:16}}>💎 {score}</span>
               <span style={{color:"#ff8c00",fontWeight:700,fontSize:16}}>💥 {wallBreaksLeft}</span>
               <span style={{color:"rgba(255,255,255,0.6)",fontWeight:700,fontSize:14}}>💎 {crystals.length} left</span>
+            </div>
+          )}
+          {countdown !== null && (
+            <div style={{position:"fixed",inset:0,zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",pointerEvents:"none",background:"rgba(0,0,0,0.45)"}}>
+              <div style={{fontSize:120,fontWeight:900,color:"white",textShadow:"0 0 40px rgba(255,255,255,0.6), 0 0 80px rgba(96,165,250,0.8)",animation:"countdownPop 0.9s ease-out forwards",lineHeight:1}}>
+                {countdown}
+              </div>
             </div>
           )}
             <main
@@ -2023,6 +2046,13 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
 
              .hitShake {
           animation: hitShake 0.18s linear;
+        }
+
+        @keyframes countdownPop {
+          0% { transform: scale(1.8); opacity: 0; }
+          20% { transform: scale(1.0); opacity: 1; }
+          80% { transform: scale(1.0); opacity: 1; }
+          100% { transform: scale(0.6); opacity: 0; }
         }
 
                              .mobileOnlyControls {
