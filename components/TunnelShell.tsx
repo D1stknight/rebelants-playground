@@ -1286,15 +1286,15 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           padding: isPlaying && isMobileView ? "10px 8px" : "20px 16px",
         }}
       >
-        <header style={{ marginBottom: 18 , backgroundImage:"url('/bg/tunnel-bg.png')", backgroundSize:"cover", backgroundPosition:"center top", backgroundRepeat:"no-repeat", position:"relative" as const, overflow:"hidden"}}>
-        <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom, rgba(9,12,22,0.2) 0%, rgba(9,12,22,0.65) 100%)",zIndex:0,pointerEvents:"none"}}/>
-          <div style={{ fontSize: 28, fontWeight: 900, marginBottom: 8 }}>
+        <header style={{ marginBottom: 28, backgroundImage:"url('/bg/tunnel-bg.png')", backgroundSize:"cover", backgroundPosition:"center top", backgroundRepeat:"no-repeat", position:"relative" as const, overflow:"hidden", padding:"16px 20px 20px"}}>
+        <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom, rgba(9,12,22,0.3) 0%, rgba(9,12,22,0.75) 100%)",zIndex:0,pointerEvents:"none"}}/>
+          <div style={{ fontSize: 28, fontWeight: 900, marginBottom: 12, position:"relative", zIndex:1 }}>
             <Link href="/" style={{ textDecoration: "none", color: "inherit" }}>
               Rebel Ants Playground
             </Link>
           </div>
 
-          <nav className="tabs" aria-label="Main">
+          <nav className="tabs" aria-label="Main" style={{ position:"relative", zIndex:1 }}>
             <Link href="/tunnel"     className="tab tab-active">🐜 Ant Tunnel</Link>
             <Link href="/hatch"      className="tab">🥚 Queen&apos;s Egg Hatch</Link>
             <Link href="/expedition" className="tab">⚔️ The Raid</Link>
