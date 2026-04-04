@@ -11,10 +11,10 @@ export default function ShufflePage() {
       <h1 className="title mb-3">Rebel Ants Playground</h1>
 
       <nav className="mb-6 flex items-center gap-2">
-        <Link href="/tunnel" className="tab">Ant Tunnel</Link>
-        <Link href="/hatch" className="tab">Queen&apos;s Egg Hatch</Link>
-        <Link href="/expedition" className="tab">Expedition</Link>
-        <Link href="/shuffle" className="tab tab-active">Shuffle</Link>
+        <Link href="/tunnel" className="tab">🐜 Ant Tunnel</Link>
+        <Link href="/hatch" className="tab">🥚 Queen&apos;s Egg Hatch</Link>
+        <Link href="/expedition" className="tab">⚔️ The Raid</Link>
+        <Link href="/shuffle" className="tab tab-active">🎴 Shuffle</Link>
       </nav>
 
       <section className="ant-card">
