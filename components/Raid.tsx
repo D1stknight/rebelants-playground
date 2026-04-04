@@ -61,7 +61,7 @@ const ROLE_META: Record<AntRole, {
 }> = {
   scout:   { emoji: "🔍", label: "Scout",   desc: "Reveals path, boosts squad behind it",  color: "#60a5fa", bgColor: "rgba(96,165,250,0.15)",  survivalDisplay: "62%" },
   soldier: { emoji: "⚔️",  label: "Soldier", desc: "Fights through enemy guards",           color: "#f87171", bgColor: "rgba(248,113,113,0.15)",  survivalDisplay: "48%" },
-  carrier: { emoji: "🎒", label: "Carrier", desc: "Brings loot — MUST survive for crates", color: "#fbbf24", bgColor: "rgba(251,191,36,0.15)",   survivalDisplay: "20%" },
+  carrier: { emoji: "🎒", label: "Carrier", desc: "Brings loot — MUST survive for crates", color: "#fbbf24", bgColor: "rgba(251,191,36,0.15)",   survivalDisplay: "cfg" },
   guard:   { emoji: "🛡️",  label: "Guard",   desc: "Protects adjacent Carriers (+25%)",     color: "#34d399", bgColor: "rgba(52,211,153,0.15)",   survivalDisplay: "58%" },
   bomber:  { emoji: "💥", label: "Bomber",  desc: "Dies but clears path for next 3 ants",  color: "#f472b6", bgColor: "rgba(244,114,182,0.15)",  survivalDisplay: "8%"  },
 };
@@ -187,7 +187,7 @@ function RolePicker({ squad, onChange, disabled }: {
               }}>
               <div style={{ fontSize: 22, marginBottom: 2 }}>{m.emoji}</div>
               <div style={{ color: m.color, fontSize: 10, fontWeight: 900 }}>{m.label}</div>
-              <div style={{ opacity: 0.55, fontSize: 9, marginTop: 1 }}>survive: {m.survivalDisplay}</div>
+              <div style={{ opacity: 0.55, fontSize: 9, marginTop: 1 }}>survive: {role === "carrier" ? Math.round(Number(cfg?.raidCarrierSurvival ?? 0.20) * (Number(cfg?.raidCarrierSurvival ?? 0.20) <= 1 ? 100 : 1)) + "%" : m.survivalDisplay}</div>
               <div style={{ color: m.color, fontSize: 9, marginTop: 1, fontWeight: 900 }}>{ROLE_COST[role]} REBEL</div>
               <div style={{ marginTop: 4, fontSize: 13, fontWeight: 900, color: count > 0 ? m.color : "rgba(255,255,255,.3)" }}>×{count}</div>
             </button>
@@ -941,7 +941,7 @@ export default function Raid() {
 
         {/* Difficulty warning */}
         <div style={{ marginTop:10, padding:"8px 14px", borderRadius:10, background:"rgba(248,113,113,.07)", border:"1px solid rgba(248,113,113,.2)", fontSize:11, color:"#f87171", fontWeight:700, textAlign:"center", letterSpacing:"0.04em" }}>
-          ⚠️ BRUTAL DIFFICULTY — Carriers only have 20% survival. Place 🛡️ Guards next to them to boost their odds.
+          ⚠️ BRUTAL DIFFICULTY — Carriers only have {Math.round(Number(cfg?.raidCarrierSurvival ?? 20) * (Number(cfg?.raidCarrierSurvival ?? 20) <= 1 ? 100 : 1))}% survival. Place 🛡️ Guards next to them to boost their odds.
         </div>
 
         <RolePicker squad={squad} onChange={setSquad} disabled={isBattling} />
