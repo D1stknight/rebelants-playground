@@ -2767,3 +2767,8 @@ const mobileRotatePromptCardStyle: React.CSSProperties = {
   textAlign: "center",
   boxShadow: "0 16px 40px rgba(0,0,0,0.32)",
 };
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
