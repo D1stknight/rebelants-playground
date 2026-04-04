@@ -40,8 +40,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const fullClear = !!body?.fullClear;
     const clearTimeMs = Number(body?.clearTimeMs || 0);
     const crystalsCollected = Math.max(0, Number(body?.crystalsCollected || 0));
-  const layoutIndex = typeof body.layoutIndex === "number" ? body.layoutIndex : null;
-  const layoutName = typeof body.layoutName === "string" ? body.layoutName : "";
+    const layoutIndex = typeof body.layoutIndex === "number" ? body.layoutIndex : null;
+    const layoutName = typeof body.layoutName === "string" ? String(body.layoutName) : "";
 
     if (!Number.isFinite(score)) {
       return res.status(400).json({ ok: false, error: "Invalid score" });
