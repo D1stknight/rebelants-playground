@@ -65,6 +65,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   ]);
 
   // go back to Shuffle
-  const returnTo = (typeof state === "object" && state?.returnTo) ? String(state.returnTo) : "/";
+  const returnTo = (state && typeof state === "object") ? String((state as any).returnTo || "/") : "/";
   res.redirect(appUrl ? `${appUrl}${returnTo}?discord=1` : `${returnTo}?discord=1`);
 }
