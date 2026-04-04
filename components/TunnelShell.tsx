@@ -854,18 +854,6 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
              await refresh();
       setupNewRun();
       setCountdown(3);
-      let _cd = 3;
-      const _cdTimer = window.setInterval(() => {
-        _cd -= 1;
-        if (_cd <= 0) {
-          window.clearInterval(_cdTimer);
-          setCountdown(null);
-          setIsPlaying(true);
-          setRunMessage("");
-        } else {
-          setCountdown(_cd);
-        }
-      }, 1000);
 
       if (typeof window !== "undefined" && window.innerWidth <= 900) {
         requestAnimationFrame(() => {
@@ -1263,6 +1251,21 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     return () => window.clearTimeout(id);
   }, [countdown]);
 
+
+  // Countdown effect — uses flushSync to guarantee each tick re-renders
+  React.useEffect(() => {
+    if (countdown === null || countdown <= 0) return;
+    const id = window.setTimeout(() => {
+      if (countdown === 1) {
+        setCountdown(null);
+        setIsPlaying(true);
+        setRunMessage("");
+      } else {
+        setCountdown(prev => prev !== null ? prev - 1 : null);
+      }
+    }, 1000);
+    return () => window.clearTimeout(id);
+  }, [countdown]);
 
   return (
     <>
