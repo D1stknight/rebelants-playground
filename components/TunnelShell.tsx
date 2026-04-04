@@ -49,9 +49,9 @@ function useAudio() {
   }, []);
 
   const sfx = React.useMemo(() => ({
-    crumb:   () => { if (!muted) play("/audio/collect-crumb.mp3",   0.8); },
+    crumb:   () => { if (!muted) play("/audio/collect-crumb.mp3",   1.0); },
     crystal: () => { if (!muted) play("/audio/collect-crystal.mp3", 0.85); },
-    sugar:   () => { if (!muted) play("/audio/collect-crumb.mp3",   0.8); },
+    sugar:   () => { if (!muted) play("/audio/collect-crumb.mp3",   1.0); },
     wall:    () => { if (!muted) play("/audio/wall-break.mp3",      0.75); },
     win:     () => { if (!muted) { stopAmbient(); play("/audio/tunnel-win.mp3", 0.9); } },
     lose:    () => { if (!muted) { stopAmbient(); play("/audio/tunnel-lose.mp3", 0.8); } },
