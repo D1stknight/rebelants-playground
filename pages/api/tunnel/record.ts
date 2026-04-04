@@ -42,6 +42,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const crystalsCollected = Math.max(0, Number(body?.crystalsCollected || 0));
   const layoutIndex = typeof body.layoutIndex === "number" ? body.layoutIndex : null;
   const layoutName = typeof body.layoutName === "string" ? body.layoutName : "";
+  const layoutIndex = typeof body.layoutIndex === "number" ? body.layoutIndex : null;
+  const layoutName = typeof body.layoutName === "string" ? String(body.layoutName) : "";
 
     if (!Number.isFinite(score)) {
       return res.status(400).json({ ok: false, error: "Invalid score" });
@@ -125,3 +127,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ ok: false, error: "Server error" });
   }
 }
+  // Layout champion tracking
+  if (layoutIndex !== null && score > 0) {
+    const lMember = playerId + "|" + playerName + "|" + layoutName;
+    await redis.zadd("tunnel:layout:" + layoutIndex + ":scores", { score: Number(score), member: lMember }).catch(() => {});
+  }
+  // Track layouts explored
+  if (layoutIndex !== null) {
+    await redis.sadd("tunnel:player:" + playerId + ":explored", String(layoutIndex)).catch(() => {});
+  }
+
