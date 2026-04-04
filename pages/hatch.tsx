@@ -1,32 +1,40 @@
 import React from "react";
 import Link from "next/link";
+import Head from "next/head";
 
 export default function HatchPage() {
   return (
-    <main className="max-w-5xl mx-auto px-4 py-10">
-      <h1 className="text-3xl font-bold mb-3">Queen's Egg Hatch</h1>
-      <p className="text-slate-300 mb-6">Coming soon.</p>
+    <>
+      <Head>
+        <title>Queen's Egg Hatch — Rebel Ants Playground</title>
+      </Head>
+      <div style={{ minHeight: "100vh", background: "#0a0d16", color: "white" }}>
+        <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 20px" }}>
+          <div style={{ fontSize: 24, fontWeight: 900, marginBottom: 12 }}>
+            <Link href="/" style={{ textDecoration: "none", color: "inherit" }}>Rebel Ants Playground</Link>
+          </div>
+          <nav className="tabs" aria-label="Main" style={{ marginBottom: 28 }}>
+            <Link href="/tunnel"     className="tab">🐜 Ant Tunnel</Link>
+            <Link href="/hatch"      className="tab tab-active">🥚 Queen&apos;s Egg Hatch</Link>
+            <Link href="/expedition" className="tab">⚔️ The Raid</Link>
+            <Link href="/shuffle"    className="tab">🃏 Shuffle</Link>
+          </nav>
 
-      <div className="bg-slate-900/80 backdrop-blur-md border border-white/10 rounded-xl p-6">
-        <div className="text-slate-200 font-semibold mb-2">🚧 Game in development</div>
-        <p className="text-slate-300 mb-4">
-          Hatch mechanics are being finalized. Stay tuned.
-        </p>
+          <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16, padding: 32 }}>
+            <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>Queen's Egg Hatch</div>
+            <p style={{ opacity: 0.7, marginBottom: 20 }}>Coming soon.</p>
 
-        <div className="rounded-xl overflow-hidden border border-white/10 bg-black/20">
-          <img
-            src="/ui/coming-soon.png"
-            alt="Coming soon"
-            style={{ width: "100%", height: "auto", display: "block" }}
-          />
-        </div>
+            <div style={{ fontWeight: 600, marginBottom: 8, opacity: 0.9 }}>🚧 Game in development</div>
+            <p style={{ opacity: 0.7, marginBottom: 20 }}>
+              Hatch mechanics are being finalized. Stay tuned.
+            </p>
 
-        <div className="mt-6 flex gap-3">
-          <Link href="/shuffle" className="px-4 py-2 bg-blue-600 rounded-lg">
-            Back to Shuffle
-          </Link>
+            <div style={{ borderRadius: 12, overflow: "hidden", border: "1px solid rgba(255,255,255,0.1)", background: "rgba(0,0,0,0.2)" }}>
+              <img src="/ui/coming-soon.png" alt="Coming soon" style={{ width: "100%", height: "auto", display: "block" }} />
+            </div>
+          </div>
         </div>
       </div>
-    </main>
+    </>
   );
 }

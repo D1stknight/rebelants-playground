@@ -1327,23 +1327,15 @@ return (
           <Link href="/">Rebel Ants Playground</Link>
         </div>
         <nav className="tabs" aria-label="Main">
-          <Link href="/tunnel" className="tab">
-            Ant Tunnel
-          </Link>
-          <Link href="/hatch" className="tab">
-            Queen&apos;s Egg Hatch
-          </Link>
-          <Link href="/expedition" className="tab">
-            Expedition
-          </Link>
-          <Link href="/shuffle" className="tab tab-active">
-            Shuffle
-          </Link>
+          <Link href="/tunnel"     className="tab">🐜 Ant Tunnel</Link>
+          <Link href="/hatch"      className="tab">🥚 Queen&apos;s Egg Hatch</Link>
+          <Link href="/expedition" className="tab">⚔️ The Raid</Link>
+          <Link href="/shuffle"    className="tab tab-active">🃏 Shuffle</Link>
         </nav>
       </header>
 
       {/* Game card */}
-      <div className="ant-card ra-shuffle2">
+      <div className="ant-card ra-shuffle2" style={{ maxWidth: 980, margin: "0 auto" }}>
         
         <div className="title">Queen&apos;s Egg Shuffle</div>
         <p className="subtitle">
@@ -1923,20 +1915,28 @@ return (
           display: inline-flex;
           align-items: center;
           gap: 6px;
-          padding: 6px 10px;
+          padding: 6px 16px;
           border-radius: 999px;
           font-size: 13px;
-          background: rgba(255, 255, 255, 0.08);
-          border: 1px solid rgba(255, 255, 255, 0.18);
+          font-weight: 700;
+          background: rgba(0, 0, 0, 0.45);
+          border: 1px solid rgba(255, 255, 255, 0.28);
+          color: rgba(255, 255, 255, 0.92);
+          text-decoration: none;
           backdrop-filter: blur(4px);
+          text-shadow: 0 1px 3px rgba(0,0,0,0.8);
           transition: transform 0.06s ease, background 0.2s ease;
         }
         .tab:hover {
           transform: translateY(-1px);
-          background: rgba(255, 255, 255, 0.12);
+          background: rgba(0, 0, 0, 0.65);
+          border-color: rgba(255, 255, 255, 0.45);
         }
         .tab-active {
-          background: rgba(255, 255, 255, 0.16);
+          background: rgba(248, 113, 113, 0.25);
+          border-color: rgba(248, 113, 113, 0.55);
+          color: #fca5a5;
+          text-shadow: 0 0 8px rgba(248, 113, 113, 0.4);
         }
 
        .scene-bg {
