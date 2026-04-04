@@ -1182,7 +1182,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               </button>
             )}
             <button
-              onClick={async()=>{try{const r=await fetch("/api/points/migrate-drip",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({playerId:effectivePlayerId})});if(r.ok)refreshBalance();}catch{}}}
+              onClick={async()=>{try{const r=await fetch("/api/points/migrate-drip",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({playerId:effectivePlayerId})});if(r.ok)refresh();}catch{}}}
               style={{padding:"8px 18px",borderRadius:20,border:"1px solid rgba(255,255,255,0.15)",cursor:"pointer",fontWeight:700,fontSize:13,background:"rgba(255,255,255,0.06)",color:"rgba(255,255,255,0.5)"}}>
               Migrate DRIP Points
             </button>
@@ -1200,26 +1200,11 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                     onChange={(e) => {
                       const v = (e.target.value.slice(0, 18) || "guest").trim() || "guest";
                       setPlayerName(v);
-
-  // ── Discord name + countdown ──────────────────────────────────────────────
-  React.useEffect(() => {
-    const p = loadProfile();
-    if ((p as any)?.discordName) setDiscordName((p as any).discordName);
-    setShowDisconnect(!!(p as any)?.discordUserId);
-  }, [effectivePlayerId]);
-
-
-                      const p = loadProfile();
-                      const id = (p?.id || "guest").trim() || "guest";
-onChange={(e) => {
-                      const v = (e.target.value.slice(0, 18) || "guest").trim() || "guest";
-                      setPlayerName(v);
-
                       const p = loadProfile();
                       const id = (p?.id || "guest").trim() || "guest";
                       saveProfile({ name: v, id });
-                    }}                    }}
-                    style={inputStyle}
+                    }}
+                                        style={inputStyle}
                   />
                 </label>
 
