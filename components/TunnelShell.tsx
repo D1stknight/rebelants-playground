@@ -1285,19 +1285,11 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
             </Link>
           </div>
 
-          <nav style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Link href="/tunnel" style={tabActiveStyle}>
-              Ant Tunnel
-            </Link>
-            <Link href="/hatch" style={tabStyle}>
-              Queen&apos;s Egg Hatch
-            </Link>
-            <Link href="/expedition" style={tabStyle}>
-              Expedition
-            </Link>
-            <Link href="/shuffle" style={tabStyle}>
-              Shuffle
-            </Link>
+          <nav className="tabs" aria-label="Main">
+            <Link href="/tunnel"     className="tab tab-active">🐜 Ant Tunnel</Link>
+            <Link href="/hatch"      className="tab">🥚 Queen&apos;s Egg Hatch</Link>
+            <Link href="/expedition" className="tab">⚔️ The Raid</Link>
+            <Link href="/shuffle"    className="tab">🃏 Shuffle</Link>
           </nav>
         </header>
 
