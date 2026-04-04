@@ -102,7 +102,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       totalCrystals: Number(statsRaw?.totalCrystals || 0),
     };
 
-    return res.status(200).json({
+    // Layout champions — #1 score per layout
+  const layoutChampions: {layoutIndex:number;layoutName:string;playerId:string;playerName:string;score:number}[] = [];
+  try {
+    const LN: string[] = ["Split Path","Narrow Spine","Broken Cross","Double Fork","Ring Cut","Maze Teeth","Cracked Chamber","Death Lanes","Twin Corridors","Spiral Trap","Pincer","Catacomb","River","Fortress","Zipper","Labyrinth","Cross Fire","The Trap","Checkers","Spine","Corridor Wars","Diamond","Snake Pit","Pillars","Archipelago","Cascade","Honeycomb","Staircase","Vortex","Final Boss"];
+    for (let idx = 0; idx < 30; idx++) {
+      const top = await redis.zrange(`tunnel:layout:${idx}:scores`, 0, 0, { rev: true, withScores: true });
+      if (Array.isArray(top) && top.length >= 2) {
+        const [pid, pname] = String(top[0]).split('|');
+        layoutChampions.push({ layoutIndex: idx, layoutName: LN[idx]||'Layout '+(idx+1), playerId: pid||'', playerName: pname||pid||'', score: Number(top[1]) });
+      } else {
+        layoutChampions.push({ layoutIndex: idx, layoutName: LN[idx]||'Layout '+(idx+1), playerId: '', playerName: '', score: 0 });
+      }
+    }
+  } catch {}
+
+  return res.status(200).json({
       ok: true,
       topScore,
       fastestClear,
