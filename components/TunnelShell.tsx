@@ -61,20 +61,7 @@ const DEFAULT_TUNNEL_CONFIG = {
 
 const START_CELL: Cell = { row: 2, col: 2 };
 
-const themeMap: Record<string,
-  {
-    name: string;
-    bg: string;
-    floor: string;
-    wall: string;
-    accent: string;
-    crumb: string;
-    sugar: string;
-    crystal: string;
-    antGlow: string;
-    spiderGlow: string;
-  }
-> = {
+const themeMap: Record<string, any> = {
   colony: {
     name: "Colony Tunnel",
     bg: "linear-gradient(180deg, rgba(16,24,39,0.14), rgba(0,0,0,0.24)), linear-gradient(135deg, #2d1f14, #1b130d)",
