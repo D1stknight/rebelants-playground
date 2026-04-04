@@ -853,19 +853,18 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
 
              await refresh();
       setupNewRun();
-      // 3-2-1 countdown
-      setCountdown(3);
+      // 3-2-1 countdown using chained setTimeout for reliable React re-renders
       await new Promise<void>(resolve => {
-        let count = 3;
-        const tick = setInterval(() => {
-          count--;
-          if (count <= 0) {
-            clearInterval(tick);
-            setCountdown(null);
-            resolve();
-          } else {
-            setCountdown(count);
-          }
+        setCountdown(3);
+        setTimeout(() => {
+          setCountdown(2);
+          setTimeout(() => {
+            setCountdown(1);
+            setTimeout(() => {
+              setCountdown(null);
+              resolve();
+            }, 1000);
+          }, 1000);
         }, 1000);
       });
       setIsPlaying(true);
