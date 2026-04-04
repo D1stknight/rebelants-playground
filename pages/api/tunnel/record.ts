@@ -102,6 +102,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
+
+  // Track layout-specific leaderboards
+  if (typeof layoutIndex === 'number' && score > 0) {
+    const lKey = `tunnel:layout:${layoutIndex}:scores`;
+    await redis.zadd(lKey, { score: Number(score), member: `${playerId}|${playerName}` }).catch(() => {});
+  }
+  // Track layouts explored per player
+  if (typeof layoutIndex === 'number') {
+    await redis.sadd(`tunnel:player:${playerId}:explored`, String(layoutIndex)).catch(() => {});
+  }
     return res.status(200).json({
       ok: true,
       playerId,
