@@ -1,37 +1,5 @@
 // components/Raid.tsx — THE RAID (Epic Edition v2)
 
-  // Load next claim timestamp when player ID or claim status changes
-  React.useEffect(() => {
-    if (!effectivePlayerId) return;
-    (async () => {
-      try {
-        const r = await fetch(`/api/points/claim?playerId=${encodeURIComponent(effectivePlayerId)}`, { cache: 'no-store' });
-        const j = await r.json().catch(() => null);
-        if (r.ok && j?.ok && j?.nextClaimTs) {
-          setNextClaimTs(Number(j.nextClaimTs));
-        }
-      } catch {}
-    })();
-  }, [effectivePlayerId, dailyClaimed]);
-
-  // Live countdown ticker
-  React.useEffect(() => {
-    if (!nextClaimTs) return;
-    const tick = () => {
-      const remaining = nextClaimTs - Date.now();
-      if (remaining <= 0) {
-        setCountdownStr('');
-        setDailyClaimed(false);
-        setNextClaimTs(null);
-      } else {
-        setCountdownStr(formatCountdown(remaining));
-      }
-    };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [nextClaimTs]);
-import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { pointsConfig as defaultPointsConfig } from "../lib/pointsConfig";
 import { usePoints } from "../lib/usePoints";
@@ -755,6 +723,40 @@ export default function Raid() {
     } catch(e:any){setClaimStatus(e?.message||"Error");}
     finally{setClaimBusy(false);}
   }
+
+  // ── Daily claim countdown ─────────────────────────────────────────────────
+  // Load nextClaimTs when player identity or claim status changes
+  React.useEffect(() => {
+    if (!effectivePlayerId) return;
+    (async () => {
+      try {
+        const r = await fetch(`/api/points/claim?playerId=${encodeURIComponent(effectivePlayerId)}`, { cache: 'no-store' });
+        const j = await r.json().catch(() => null);
+        if (r.ok && j?.ok && j?.nextClaimTs) {
+          setNextClaimTs(Number(j.nextClaimTs));
+        }
+      } catch {}
+    })();
+  }, [effectivePlayerId, dailyClaimed]);
+
+  // Live countdown ticker - updates every second
+  React.useEffect(() => {
+    if (!nextClaimTs) return;
+    const tick = () => {
+      const remaining = nextClaimTs - Date.now();
+      if (remaining <= 0) {
+        setCountdownStr('');
+        setDailyClaimed(false);
+        setNextClaimTs(null);
+      } else {
+        setCountdownStr(formatCountdown(remaining));
+      }
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [nextClaimTs]);
+
 
   // DRIP migrate (mirrors Shuffle)
   const [showDripMigrate, setShowDripMigrate] = useState(false);
