@@ -1418,38 +1418,23 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               {dripStatus && <div style={{marginTop:8,fontSize:12,fontWeight:700,color:dripStatus.includes("✅")?"#22c55e":"#f87171"}}>{dripStatus}</div>}
             </div>
           )}
-              {/* ── Layout mode toggles ─────────────────────────────── */}
+              {/* Layout chooser */}
               <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:8,flexWrap:"wrap"}}>
                 <button onClick={()=>{setLayoutMode("random");setSelectedLayout(null);}}
-                  style={{padding:"5px 14px",borderRadius:20,fontSize:12,fontWeight:700,cursor:"pointer",transition:"all 0.2s",
-                    border:layoutMode==="random"?"2px solid rgba(96,165,250,0.8)":"2px solid rgba(255,255,255,0.15)",
-                    background:layoutMode==="random"?"rgba(96,165,250,0.15)":"rgba(255,255,255,0.06)",
-                    color:layoutMode==="random"?"#93c5fd":"rgba(255,255,255,0.5)"}}>🎲 Random Layout
-                </button>
+                  style={{padding:"5px 14px",borderRadius:20,fontSize:12,fontWeight:700,cursor:"pointer",transition:"all 0.2s",border:layoutMode==="random"?"2px solid rgba(96,165,250,0.8)":"2px solid rgba(255,255,255,0.15)",background:layoutMode==="random"?"rgba(96,165,250,0.15)":"rgba(255,255,255,0.06)",color:layoutMode==="random"?"#93c5fd":"rgba(255,255,255,0.5)"}}>🎲 Random Layout</button>
                 <button onClick={()=>setLayoutMode("pick")}
-                  style={{padding:"5px 14px",borderRadius:20,fontSize:12,fontWeight:700,cursor:"pointer",transition:"all 0.2s",
-                    border:layoutMode==="pick"?"2px solid rgba(250,204,21,0.8)":"2px solid rgba(255,255,255,0.15)",
-                    background:layoutMode==="pick"?"rgba(250,204,21,0.12)":"rgba(255,255,255,0.06)",
-                    color:layoutMode==="pick"?"#fde68a":"rgba(255,255,255,0.5)"}}>🗺️ Choose Layout
-                </button>
+                  style={{padding:"5px 14px",borderRadius:20,fontSize:12,fontWeight:700,cursor:"pointer",transition:"all 0.2s",border:layoutMode==="pick"?"2px solid rgba(250,204,21,0.8)":"2px solid rgba(255,255,255,0.15)",background:layoutMode==="pick"?"rgba(250,204,21,0.12)":"rgba(255,255,255,0.06)",color:layoutMode==="pick"?"#fde68a":"rgba(255,255,255,0.5)"}}>🗺️ Choose Layout</button>
                 {layoutMode==="pick"&&selectedLayout!==null&&<span style={{fontSize:12,opacity:0.75}}>Playing: <b style={{color:"#fde68a"}}>#{selectedLayout+1} {LAYOUT_NAMES[selectedLayout]}</b></span>}
               </div>
               {layoutMode==="pick"&&(
                 <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:6,marginBottom:12,padding:10,borderRadius:14,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)"}}>
                   {TUNNEL_LAYOUTS.map((layout,idx)=>{
                     const ws=new Set(layout as string[]);const active=selectedLayout===idx;
-                    return(<button key={idx} onClick={()=>setSelectedLayout(idx)} title={LAYOUT_NAMES[idx]}
-                      style={{padding:0,border:active?"2px solid rgba(250,204,21,0.9)":"2px solid rgba(255,255,255,0.08)",borderRadius:8,
-                        background:active?"rgba(250,204,21,0.08)":"rgba(255,255,255,0.03)",cursor:"pointer",overflow:"hidden",transition:"all 0.15s",
-                        boxShadow:active?"0 0 10px rgba(250,204,21,0.4)":"none"}}>
+                    return(<button key={idx} onClick={()=>setSelectedLayout(idx)} title={LAYOUT_NAMES[idx]} style={{padding:0,border:active?"2px solid rgba(250,204,21,0.9)":"2px solid rgba(255,255,255,0.08)",borderRadius:8,background:active?"rgba(250,204,21,0.08)":"rgba(255,255,255,0.03)",cursor:"pointer",overflow:"hidden",transition:"all 0.15s",boxShadow:active?"0 0 10px rgba(250,204,21,0.4)":"none"}}>
                       <div style={{display:"grid",gridTemplateColumns:"repeat(22,1fr)",padding:2}}>
-                        {Array.from({length:14*22},(_,i)=>{const r=Math.floor(i/22),c=i%22;const w=r===0||r===13||c===0||c===21||ws.has(`${r}:${c}`);
-                          return <div key={i} style={{aspectRatio:"1",background:w?"rgba(120,80,40,0.9)":"rgba(255,255,255,0.07)"}}/>;
-                        })}
+                        {Array.from({length:14*22},(_,i)=>{const r=Math.floor(i/22),c=i%22;const w=r===0||r===13||c===0||c===21||ws.has(`${r}:${c}`);return <div key={i} style={{aspectRatio:"1",background:w?"rgba(120,80,40,0.9)":"rgba(255,255,255,0.07)"}}/>;}) }
                       </div>
-                      <div style={{fontSize:9,fontWeight:700,padding:"2px 3px 3px",textAlign:"center",color:active?"#fde68a":"rgba(255,255,255,0.45)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
-                        #{idx+1} {LAYOUT_NAMES[idx]}
-                      </div>
+                      <div style={{fontSize:9,fontWeight:700,padding:"2px 3px 3px",textAlign:"center",color:active?"#fde68a":"rgba(255,255,255,0.45)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>#{idx+1} {LAYOUT_NAMES[idx]}</div>
                     </button>);
                   })}
                 </div>
@@ -1884,8 +1869,6 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           </div>
 
           <div style={tunnelLeaderboardWrapStyle}>
-
-            {/* ── Header ─────────────────────────────────────────── */}
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
               <div>
                 <div style={{fontSize:20,fontWeight:900,letterSpacing:0.5}}>🏆 Tunnel Leaderboards</div>
@@ -1893,79 +1876,53 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               </div>
               <button onClick={()=>void loadTunnelLeaderboard()} style={{padding:"6px 12px",borderRadius:20,border:"1px solid rgba(255,255,255,0.15)",background:"rgba(255,255,255,0.06)",cursor:"pointer",fontSize:12,fontWeight:700,color:"rgba(255,255,255,0.7)"}}>↻ Refresh</button>
             </div>
-
-            {/* ── Top 2 boards ───────────────────────────────────── */}
             <div style={{...tunnelLeaderboardGridStyle,...(isMobileView?tunnelLeaderboardGridMobileStyle:null)}}>
               <div style={leaderboardCardBlueStyle}>
                 <div style={leaderboardCardHeaderStyle}>
-                  <div>
-                    <div style={{...leaderboardTitleStyle,color:"#60a5fa"}}>🏆 Top Score</div>
-                    <div style={leaderboardSubtitleStyle}>All-time highest single-run score</div>
-                  </div>
+                  <div><div style={{...leaderboardTitleStyle,color:"#60a5fa"}}>🏆 Top Score</div><div style={leaderboardSubtitleStyle}>All-time highest single-run score</div></div>
                   <div style={leaderboardBadgeBlueStyle}>TOP 5</div>
                 </div>
                 <div style={leaderboardScrollStyle}>
                   {leaderboardLoading?<div style={leaderboardEmptyStyle}>Loading...</div>:topScoreRows.length===0?<div style={leaderboardEmptyStyle}>No scores yet — be the first! 🐜</div>:
-                  topScoreRows.map(row=>(
-                    <div key={`s-${row.rank}`} style={leaderboardRowStyle(row.rank,"#60a5fa")}>
-                      <div style={leaderboardRankStyle(row.rank)}>{row.rank===1?"🥇":row.rank===2?"🥈":row.rank===3?"🥉":"#"+row.rank}</div>
-                      <div style={{flex:1,minWidth:0}}><div style={leaderboardNameStyle}>{row.playerName||row.playerId}</div></div>
-                      <div style={{...leaderboardValueStyle,color:"#93c5fd"}}>{Number(row.score||0).toLocaleString()}</div>
-                    </div>
-                  ))}
+                    topScoreRows.map(row=>(
+                      <div key={`s-${row.rank}`} style={leaderboardRowStyle(row.rank,"#60a5fa")}>
+                        <div style={leaderboardRankStyle(row.rank)}>{row.rank===1?"🥇":row.rank===2?"🥈":row.rank===3?"🥉":"#"+row.rank}</div>
+                        <div style={{flex:1,minWidth:0}}><div style={leaderboardNameStyle}>{row.playerName||row.playerId}</div></div>
+                        <div style={{...leaderboardValueStyle,color:"#93c5fd"}}>{Number(row.score||0).toLocaleString()}</div>
+                      </div>
+                    ))
+                  }
                 </div>
               </div>
               <div style={leaderboardCardGoldStyle}>
                 <div style={leaderboardCardHeaderStyle}>
-                  <div>
-                    <div style={{...leaderboardTitleStyle,color:"#facc15"}}>⚡ Fastest Clear</div>
-                    <div style={leaderboardSubtitleStyle}>Crystal sweep speedrun — full board only</div>
-                  </div>
+                  <div><div style={{...leaderboardTitleStyle,color:"#facc15"}}>⚡ Fastest Clear</div><div style={leaderboardSubtitleStyle}>Crystal sweep speedrun — full board only</div></div>
                   <div style={leaderboardBadgeGoldStyle}>TOP 5</div>
                 </div>
                 <div style={leaderboardScrollStyle}>
                   {leaderboardLoading?<div style={leaderboardEmptyStyle}>Loading...</div>:fastestClearRows.length===0?<div style={leaderboardEmptyStyle}>Collect all 💎 to set a record!</div>:
-                  fastestClearRows.map(row=>(
-                    <div key={`f-${row.rank}`} style={leaderboardRowStyle(row.rank,"#facc15")}>
-                      <div style={leaderboardRankStyle(row.rank)}>{row.rank===1?"🥇":row.rank===2?"🥈":row.rank===3?"🥉":"#"+row.rank}</div>
-                      <div style={{flex:1,minWidth:0}}><div style={leaderboardNameStyle}>{row.playerName||row.playerId}</div></div>
-                      <div style={{...leaderboardValueStyle,color:"#fde68a"}}>{formatMs(row.clearTimeMs)}</div>
-                    </div>
-                  ))}
+                    fastestClearRows.map(row=>(
+                      <div key={`f-${row.rank}`} style={leaderboardRowStyle(row.rank,"#facc15")}>
+                        <div style={leaderboardRankStyle(row.rank)}>{row.rank===1?"🥇":row.rank===2?"🥈":row.rank===3?"🥉":"#"+row.rank}</div>
+                        <div style={{flex:1,minWidth:0}}><div style={leaderboardNameStyle}>{row.playerName||row.playerId}</div></div>
+                        <div style={{...leaderboardValueStyle,color:"#fde68a"}}>{formatMs(row.clearTimeMs)}</div>
+                      </div>
+                    ))
+                  }
                 </div>
               </div>
             </div>
-
-            {/* ── Personal stats ─────────────────────────────────── */}
             <div style={{...leaderboardCardRedStyle,marginTop:14}}>
               <div style={leaderboardCardHeaderStyle}>
-                <div>
-                  <div style={{...leaderboardTitleStyle,color:"#f87171"}}>🐜 Your Stats</div>
-                  <div style={leaderboardSubtitleStyle}>Personal progress across all runs</div>
-                </div>
+                <div><div style={{...leaderboardTitleStyle,color:"#f87171"}}>🐜 Your Stats</div><div style={leaderboardSubtitleStyle}>Personal progress across all runs</div></div>
                 <div style={leaderboardBadgeRedStyle}>YOU</div>
               </div>
               <div style={{display:"grid",gridTemplateColumns:isMobileView?"repeat(2,1fr)":"repeat(5,1fr)",gap:12,marginBottom:14}}>
-                <div style={personalStatBoxStyle("#60a5fa")}>
-                  <div style={personalStatLabelStyle}>🎯 Best Score</div>
-                  <div style={personalStatValueStyle}>{Number(personalStats?.bestScore||0).toLocaleString()}</div>
-                </div>
-                <div style={personalStatBoxStyle("#facc15")}>
-                  <div style={personalStatLabelStyle}>⚡ Best Clear</div>
-                  <div style={personalStatValueStyle}>{personalStats?.bestClearTimeMs?formatMs(personalStats.bestClearTimeMs):"--"}</div>
-                </div>
-                <div style={personalStatBoxStyle("#22c55e")}>
-                  <div style={personalStatLabelStyle}>🏃 Total Runs</div>
-                  <div style={personalStatValueStyle}>{Number(personalStats?.totalRuns||0).toLocaleString()}</div>
-                </div>
-                <div style={personalStatBoxStyle("#f43f5e")}>
-                  <div style={personalStatLabelStyle}>💎 Crystals</div>
-                  <div style={personalStatValueStyle}>{Number(personalStats?.totalCrystals||0).toLocaleString()}</div>
-                </div>
-                <div style={personalStatBoxStyle("#a78bfa")}>
-                  <div style={personalStatLabelStyle}>🗺️ Layouts</div>
-                  <div style={personalStatValueStyle}>{layoutsExplored}<span style={{fontSize:12,opacity:0.5,fontWeight:600}}>/30</span></div>
-                </div>
+                <div style={personalStatBoxStyle("#60a5fa")}><div style={personalStatLabelStyle}>🎯 Best Score</div><div style={personalStatValueStyle}>{Number(personalStats?.bestScore||0).toLocaleString()}</div></div>
+                <div style={personalStatBoxStyle("#facc15")}><div style={personalStatLabelStyle}>⚡ Best Clear</div><div style={personalStatValueStyle}>{personalStats?.bestClearTimeMs?formatMs(personalStats.bestClearTimeMs):"--"}</div></div>
+                <div style={personalStatBoxStyle("#22c55e")}><div style={personalStatLabelStyle}>🏃 Total Runs</div><div style={personalStatValueStyle}>{Number(personalStats?.totalRuns||0).toLocaleString()}</div></div>
+                <div style={personalStatBoxStyle("#f43f5e")}><div style={personalStatLabelStyle}>💎 Crystals</div><div style={personalStatValueStyle}>{Number(personalStats?.totalCrystals||0).toLocaleString()}</div></div>
+                <div style={personalStatBoxStyle("#a78bfa")}><div style={personalStatLabelStyle}>🗺️ Layouts</div><div style={personalStatValueStyle}>{layoutsExplored}<span style={{fontSize:12,opacity:0.5,fontWeight:600}}>/30</span></div></div>
               </div>
               <div style={{padding:"10px 12px",borderRadius:12,background:"rgba(167,139,250,0.08)",border:"1px solid rgba(167,139,250,0.2)"}}>
                 <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
@@ -1978,7 +1935,6 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                 {layoutsExplored===30&&<div style={{marginTop:6,fontSize:12,fontWeight:800,color:"#fde68a",textAlign:"center"}}>🏆 All 30 layouts conquered! Legend status. 🐜</div>}
               </div>
             </div>
-
           </div>
         {isPlaying && isMobileView && !isLandscape && (
           <div style={mobileRotatePromptWrapStyle}>
