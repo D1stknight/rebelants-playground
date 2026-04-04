@@ -1104,6 +1104,20 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
   }, [nextClaimTs]);
 
 
+  // ── Reload profile after Discord OAuth ────────────────────────────────────
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("discord") === "1") {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("discord");
+      window.history.replaceState({}, "", url.toString());
+      // Force re-render so inline discord vars recompute
+      setRunMessage("");
+    }
+  }, []);
+
+
   // ── Discord identity (computed inline like Raid.tsx) ─────────────────────
   const _profile = loadProfile();
   const discordUserId: string | null = (_profile as any)?.discordUserId || null;
@@ -1112,8 +1126,39 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
   const identityDisplay: string = discordName || (_profile as any)?.name || "guest";
 
 
+  // ── Reload identity after Discord OAuth redirect ──────────────────────────
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("discord") === "1") {
+      // Force re-read of profile from localStorage
+      const newProfile = loadProfile();
+      const newEffectiveId = getEffectivePlayerId(newProfile);
+      // Clean URL
+      const url = new URL(window.location.href);
+      url.searchParams.delete("discord");
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, []);
+
+
   return (
     <>
+      {isPlaying && (
+            <div style={{
+              position:"fixed", top:0, left:0, right:0, zIndex:1000,
+              display:"flex", justifyContent:"center", alignItems:"center", gap:24,
+              padding:"8px 20px",
+              background:"rgba(0,0,0,0.90)", backdropFilter:"blur(12px)",
+              borderBottom:"2px solid "+themeMap[boardTheme].accent+"66",
+              boxShadow:"0 4px 20px rgba(0,0,0,0.5)",
+            }}>
+              <span style={{color:timeLeft<=10?"#ff4444":themeMap[boardTheme].accent,fontWeight:900,fontSize:18,letterSpacing:1}}>⏱ {timeLeft}s</span>
+              <span style={{color:themeMap[boardTheme].crystal,fontWeight:700,fontSize:16}}>💎 {score}</span>
+              <span style={{color:"#ff8c00",fontWeight:700,fontSize:16}}>💥 {wallBreaksLeft}</span>
+              <span style={{color:"rgba(255,255,255,0.6)",fontWeight:700,fontSize:14}}>💎 {crystals.length} left</span>
+            </div>
+          )}
             <main
         style={{
           maxWidth: 1600,
@@ -1186,27 +1231,12 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               {dailyClaimed?"✅ Claimed Today":`🐜 Daily +${tunnelCfg.dailyClaim} ${tunnelCfg.currency}`}
             </button>
             {showDisconnect?(
-              <button onClick={()=>{
-                try {
-                  const p = (window as any).__loadProfile?.() || JSON.parse(localStorage.getItem('ra_profile')||'{}');
-                  const fallback = (p.walletAddress ? "wallet:"+p.walletAddress : (p.id||"guest")).trim();
-                  localStorage.setItem('ra_profile', JSON.stringify({...p, discordUserId:undefined, discordName:undefined, primaryId:fallback, discordSkipLink:true}));
-                  window.dispatchEvent(new Event("ra:identity-changed"));
-                } catch(e){}
-                window.location.href="/api/auth/discord/logout";
-              }}
+              <button onClick={()=>{ window.location.href="/api/auth/discord/logout"; }}
                 style={{padding:"8px 18px",borderRadius:20,border:"1px solid rgba(255,255,255,0.2)",cursor:"pointer",fontWeight:700,fontSize:13,background:"rgba(255,255,255,0.06)",color:"rgba(255,255,255,0.7)"}}>
                 Disconnect Discord
               </button>
             ):(
-              <button onClick={()=>{
-                try {
-                  const p = JSON.parse(localStorage.getItem('ra_profile')||'{}');
-                  localStorage.setItem('ra_profile', JSON.stringify({...p, discordSkipLink:false}));
-                  window.dispatchEvent(new Event("ra:identity-changed"));
-                } catch(e){}
-                window.location.href="/api/auth/discord/login";
-              }}
+              <button onClick={()=>{ window.location.href="/api/auth/discord/login"; }}
                 style={{padding:"8px 18px",borderRadius:20,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,background:"#5865f2",color:"#fff"}}>
                 🔗 Connect Discord
               </button>
@@ -1350,21 +1380,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                   </div>
                 </div>
 
-{isPlaying && (
-            <div style={{
-              position:"fixed", top:0, left:0, right:0, zIndex:1000,
-              display:"flex", justifyContent:"center", alignItems:"center", gap:24,
-              padding:"8px 20px",
-              background:"rgba(0,0,0,0.90)", backdropFilter:"blur(12px)",
-              borderBottom:"2px solid "+themeMap[boardTheme].accent+"66",
-              boxShadow:"0 4px 20px rgba(0,0,0,0.5)",
-            }}>
-              <span style={{color:timeLeft<=10?"#ff4444":themeMap[boardTheme].accent,fontWeight:900,fontSize:18,letterSpacing:1}}>⏱ {timeLeft}s</span>
-              <span style={{color:themeMap[boardTheme].crystal,fontWeight:700,fontSize:16}}>💎 {score}</span>
-              <span style={{color:"#ff8c00",fontWeight:700,fontSize:16}}>💥 {wallBreaksLeft}</span>
-              <span style={{color:"rgba(255,255,255,0.6)",fontWeight:700,fontSize:14}}>💎 {crystals.length} left</span>
-            </div>
-          )}
+
                 <div style={boardBadgeStyle}>
                   Cost: {tunnelCfg.tunnelCost}
                 </div>
