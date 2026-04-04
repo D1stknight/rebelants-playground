@@ -924,7 +924,7 @@ export default function Raid() {
           <Link href="/tunnel"     className="tab">🐜 Ant Tunnel</Link>
           <Link href="/hatch"      className="tab">🥚 Queen&apos;s Egg Hatch</Link>
           <Link href="/expedition" className="tab tab-active">⚔️ The Raid</Link>
-          <Link href="/shuffle"    className="tab">🥚 Shuffle</Link>
+          <Link href="/shuffle"    className="tab">🃏 Shuffle</Link>
         </nav>
       </header>
 
