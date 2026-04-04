@@ -1,137 +1,68 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { redis } from "../../../lib/server/redis";
+import { Redis } from "@upstash/redis";
 
-const PLAYER_NAMES = "ra:player_names_v1";
-
-// Tunnel-only leaderboard keys
-const TUNNEL_LB_SCORE = "ra:tunnel:lb:score:alltime";
-const TUNNEL_LB_FASTEST_CLEAR = "ra:tunnel:lb:fastest_clear";
-
-// Tunnel-only personal stats
-function tunnelStatsKey(playerId: string) {
-  return `ra:tunnel:stats:${playerId}`;
-}
-
-function cleanPlayerId(v: any) {
-  return String(v || "guest").trim().slice(0, 64) || "guest";
-}
-
-function cleanPlayerName(v: any) {
-  return String(v || "guest").trim().slice(0, 32) || "guest";
-}
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL!,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+});
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  res.setHeader("Cache-Control", "no-store, max-age=0");
-  res.setHeader("Pragma", "no-cache");
-  res.setHeader("Expires", "0");
+  if (req.method !== "POST") {
+    return res.status(405).json({ ok: false, error: "Method not allowed" });
+  }
 
   try {
-    if (req.method !== "POST") {
-      res.setHeader("Allow", "POST");
-      return res.status(405).json({ ok: false, error: "Method not allowed" });
-    }
+    const body = req.body || {};
+    const playerId = String(body.playerId || "guest").trim().slice(0, 64) || "guest";
+    const playerName = String(body.playerName || "guest").trim().slice(0, 40) || "guest";
+    const score = Math.max(0, Number(body.score || 0));
+    const fullClear = !!body.fullClear;
+    const clearTimeMs = Math.max(0, Number(body.clearTimeMs || 0));
+    const crystalsCollected = Math.max(0, Number(body.crystalsCollected || 0));
+    const layoutIndex = typeof body.layoutIndex === "number" ? body.layoutIndex : null;
+    const layoutName = typeof body.layoutName === "string" ? body.layoutName : "";
 
-    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    // Member string includes layoutName for display in leaderboards
+    const member = `${playerId}|${playerName}|${layoutName}`;
 
-    const playerId = cleanPlayerId(body?.playerId);
-    const playerName = cleanPlayerName(body?.playerName);
-
-    const score = Math.max(0, Number(body?.score || 0));
-    const fullClear = !!body?.fullClear;
-    const clearTimeMs = Number(body?.clearTimeMs || 0);
-    const crystalsCollected = Math.max(0, Number(body?.crystalsCollected || 0));
-const layoutIndex = typeof body.layoutIndex === 'number' ? body.layoutIndex : null;
-const layoutName = typeof body.layoutName === 'string' ? body.layoutName : null;
-
-    if (!Number.isFinite(score)) {
-      return res.status(400).json({ ok: false, error: "Invalid score" });
-    }
-
-    if (!Number.isFinite(clearTimeMs)) {
-      return res.status(400).json({ ok: false, error: "Invalid clearTimeMs" });
-    }
-
-    if (!Number.isFinite(crystalsCollected)) {
-      return res.status(400).json({ ok: false, error: "Invalid crystalsCollected" });
-    }
-
-    // save latest display name
-    await redis.hset(PLAYER_NAMES, { [playerId]: playerName });
-
-    const statsKey = tunnelStatsKey(playerId);
-
-    // current personal stats
-    const current = await redis.hgetall<Record<string, string>>(statsKey);
-
-    const prevBestScore = Number(current?.bestScore || 0);
-    const prevBestClearTimeMs = Number(current?.bestClearTimeMs || 0);
-    const prevTotalRuns = Number(current?.totalRuns || 0);
-    const prevTotalCrystals = Number(current?.totalCrystals || 0);
-
-    const nextBestScore = Math.max(prevBestScore, score);
-
-    let nextBestClearTimeMs = prevBestClearTimeMs;
-    if (fullClear && clearTimeMs > 0) {
-      if (prevBestClearTimeMs <= 0 || clearTimeMs < prevBestClearTimeMs) {
-        nextBestClearTimeMs = clearTimeMs;
+    // Update personal stats
+    await redis.hset(`tunnel:player:${playerId}:stats`, { playerName, totalRuns: 0 });
+    await redis.hincrby(`tunnel:player:${playerId}:stats`, "totalRuns", 1);
+    await redis.hincrby(`tunnel:player:${playerId}:stats`, "totalCrystals", crystalsCollected);
+    if (score > 0) {
+      const prevBest = Number(await redis.hget(`tunnel:player:${playerId}:stats`, "bestScore") || 0);
+      if (score > prevBest) {
+        await redis.hset(`tunnel:player:${playerId}:stats`, { bestScore: score });
       }
     }
 
-    const nextTotalRuns = prevTotalRuns + 1;
-    const nextTotalCrystals = prevTotalCrystals + crystalsCollected;
-
-    await redis.hset(statsKey, {
-      playerId,
-      playerName,
-      bestScore: String(nextBestScore),
-      bestClearTimeMs: String(nextBestClearTimeMs),
-      totalRuns: String(nextTotalRuns),
-      totalCrystals: String(nextTotalCrystals),
-      updatedAt: String(Date.now()),
-    });
-
-    // all-time top score leaderboard
-    await redis.zadd(TUNNEL_LB_SCORE, {
-      score,
-      member: playerId,
-    });
-
-    // fastest clear leaderboard (lower time is better, so store negative ms and sort desc later)
-    if (fullClear && clearTimeMs > 0) {
-      await redis.zadd(TUNNEL_LB_FASTEST_CLEAR, {
-        score: -clearTimeMs,
-        member: playerId,
-      });
+    // Global top score leaderboard
+    if (score > 0) {
+      await redis.zadd("tunnel:top:score", { score, member });
     }
 
+    // Fastest clear leaderboard
+    if (fullClear && clearTimeMs > 0) {
+      // Lower time = better, so store as negative
+      const prevFastest = await redis.zscore("tunnel:top:clear", member);
+      if (prevFastest === null || clearTimeMs < -prevFastest) {
+        await redis.zadd("tunnel:top:clear", { score: -clearTimeMs, member });
+        await redis.hset(`tunnel:player:${playerId}:stats`, { bestClearTimeMs: clearTimeMs });
+      }
+    }
 
-  // Track layout-specific leaderboards
-  if (typeof layoutIndex === 'number' && score > 0) {
-    const lKey = `tunnel:layout:${layoutIndex}:scores`;
-    await redis.zadd(lKey, { score: Number(score), member: `${playerId}|${playerName}|${layoutName||""}` }).catch(() => {});
-  }
-  // Track layouts explored per player
-  if (typeof layoutIndex === 'number') {
-    await redis.sadd(`tunnel:player:${playerId}:explored`, String(layoutIndex)).catch(() => {});
-  }
-    return res.status(200).json({
-      ok: true,
-      playerId,
-      playerName,
-      saved: true,
-      score,
-      fullClear,
-      clearTimeMs,
-      crystalsCollected,
-      stats: {
-        bestScore: nextBestScore,
-        bestClearTimeMs: nextBestClearTimeMs,
-        totalRuns: nextTotalRuns,
-        totalCrystals: nextTotalCrystals,
-      },
-    });
+    // Layout-specific top score
+    if (layoutIndex !== null && score > 0) {
+      await redis.zadd(`tunnel:layout:${layoutIndex}:scores`, { score, member });
+    }
+
+    // Track layouts explored by this player
+    if (layoutIndex !== null) {
+      await redis.sadd(`tunnel:player:${playerId}:explored`, String(layoutIndex));
+    }
+
+    return res.status(200).json({ ok: true });
   } catch (e: any) {
-    console.error("tunnel record error:", e);
-    return res.status(500).json({ ok: false, error: "Server error" });
+    return res.status(500).json({ ok: false, error: e?.message || "Internal error" });
   }
 }
