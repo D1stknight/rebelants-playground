@@ -1327,18 +1327,10 @@ return (
           <Link href="/">Rebel Ants Playground</Link>
         </div>
         <nav className="tabs" aria-label="Main">
-          <Link href="/tunnel" className="tab">
-            Ant Tunnel
-          </Link>
-          <Link href="/hatch" className="tab">
-            Queen&apos;s Egg Hatch
-          </Link>
-          <Link href="/expedition" className="tab">
-            Expedition
-          </Link>
-          <Link href="/shuffle" className="tab tab-active">
-            Shuffle
-          </Link>
+          <Link href="/tunnel"     className="tab">🐜 Ant Tunnel</Link>
+          <Link href="/hatch"      className="tab">🥚 Queen&apos;s Egg Hatch</Link>
+          <Link href="/expedition" className="tab">⚔️ The Raid</Link>
+          <Link href="/shuffle"    className="tab tab-active">🃏 Shuffle</Link>
         </nav>
       </header>
 
