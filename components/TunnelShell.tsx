@@ -1240,19 +1240,6 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
   }, []);
 
 
-  // ── Countdown tick + game start ─────────────────────────────────────
-  React.useEffect(() => {
-    if (countdown === null) return;
-    if (countdown === 0) {
-      setCountdown(null);
-      setIsPlaying(true);
-      setRunMessage("");
-      return;
-    }
-    const id = window.setTimeout(() => setCountdown(c => c !== null ? c - 1 : null), 1000);
-    return () => window.clearTimeout(id);
-  }, [countdown]);
-
 
   return (
     <>
