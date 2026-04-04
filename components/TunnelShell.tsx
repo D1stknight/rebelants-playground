@@ -98,7 +98,6 @@ const themeMap: Record<string, any> = {
     antGlow: "0 0 26px rgba(244,63,94,0.28)",
     spiderGlow: "0 0 22px rgba(251,191,36,0.22)",
   },
-
   lava:   { name:"Lava Caves",   bg:"#1a0500",floor:"#2d0a00",wall:"#8b1a00",accent:"#ff4500",crumb:"#ff6b35",sugar:"#ff8c00",crystal:"#ffcc00",antGlow:"#ff4500",spiderGlow:"#ff0000",neon:false },
   ice:    { name:"Ice Caverns",  bg:"#000d1a",floor:"#001a33",wall:"#003366",accent:"#00ccff",crumb:"#80e5ff",sugar:"#ffffff",crystal:"#00ffff",antGlow:"#00ccff",spiderGlow:"#0080ff",neon:true  },
   golden: { name:"Golden Vault", bg:"#1a1000",floor:"#2d1f00",wall:"#8b6914",accent:"#ffd700",crumb:"#ffec8b",sugar:"#ffe066",crystal:"#ffa500",antGlow:"#ffd700",spiderGlow:"#ff8c00",neon:false },
@@ -107,9 +106,11 @@ const themeMap: Record<string, any> = {
   toxic:  { name:"Toxic Depths", bg:"#001a00",floor:"#002600",wall:"#004d00",accent:"#00ff41",crumb:"#66ff66",sugar:"#00ff99",crystal:"#ff00ff",antGlow:"#00ff41",spiderGlow:"#ff00ff",neon:true  },
   void:   { name:"Void Core",    bg:"#000000",floor:"#030303",wall:"#0a0a0a",accent:"#ffffff",crumb:"#cccccc",sugar:"#888888",crystal:"#ff0080",antGlow:"#ffffff",spiderGlow:"#ff0080",neon:true  },
 };
+
 function cellKey(cell: Cell) {
   return `${cell.row}:${cell.col}`;
 }
+
 function isOuterBorder(row: number, col: number) {
   return row === 0 || row === GRID_ROWS - 1 || col === 0 || col === GRID_COLS - 1;
 }
@@ -302,18 +303,18 @@ function formatMs(ms: number) {
   return `${totalSeconds.toFixed(2)}s`;
 }
 
-// ── Difficulty levels ─────────────────────────────────────────────────────────
-const DIFFICULTY: Record<string, {label:string;emoji:string;desc:string;spiderMult:number;wallMult:number;timeMult:number}> = {
-  colony:  {label:"Level 1",  emoji:"🐜", desc:"Classic colony. Learn the ropes.",         spiderMult:1.00,wallMult:1.00,timeMult:1.00},
-  neon:    {label:"Level 2",  emoji:"⚡", desc:"Electric. Spider moves faster.",            spiderMult:0.90,wallMult:0.95,timeMult:0.95},
-  mythic:  {label:"Level 3",  emoji:"🔮", desc:"Dark magic. Tighter paths.",                spiderMult:0.80,wallMult:0.90,timeMult:0.92},
-  lava:    {label:"Level 4",  emoji:"🌋", desc:"Volcanic. Heat slows your breaks.",         spiderMult:0.72,wallMult:0.85,timeMult:0.90},
-  ice:     {label:"Level 5",  emoji:"🧊", desc:"Frozen. Spider is relentless.",             spiderMult:0.65,wallMult:0.80,timeMult:0.87},
-  golden:  {label:"Level 6",  emoji:"🏆", desc:"Guarded vault. Charges dwindling.",         spiderMult:0.58,wallMult:0.72,timeMult:0.85},
-  shadow:  {label:"Level 7",  emoji:"👁️", desc:"You barely see the walls.",               spiderMult:0.50,wallMult:0.65,timeMult:0.82},
-  amber:   {label:"Level 8",  emoji:"🏺", desc:"Ancient stone. Walls resist breaking.",    spiderMult:0.43,wallMult:0.55,timeMult:0.80},
-  toxic:   {label:"Level 9",  emoji:"☢️", desc:"Poison mist. Near impossible odds.",       spiderMult:0.36,wallMult:0.45,timeMult:0.75},
-  void:    {label:"Level 10", emoji:"💀", desc:"Pure darkness. Maximum difficulty.",        spiderMult:0.28,wallMult:0.35,timeMult:0.70},
+// ── Difficulty levels ──────────────────────────────────────────────────────
+const DIFFICULTY: Record<string, {label:string;emoji:string;desc:string}> = {
+  colony:  {label:"Level 1",  emoji:"🐜", desc:"Classic colony. Learn the ropes."},
+  neon:    {label:"Level 2",  emoji:"⚡", desc:"Electric. Spider moves faster."},
+  mythic:  {label:"Level 3",  emoji:"🔮", desc:"Dark magic. Tighter paths."},
+  lava:    {label:"Level 4",  emoji:"🌋", desc:"Volcanic. Heat slows your breaks."},
+  ice:     {label:"Level 5",  emoji:"🧊", desc:"Frozen. Spider is relentless."},
+  golden:  {label:"Level 6",  emoji:"🏆", desc:"Guarded vault. Charges dwindling."},
+  shadow:  {label:"Level 7",  emoji:"👁️", desc:"You barely see the walls."},
+  amber:   {label:"Level 8",  emoji:"🏺", desc:"Ancient stone. Walls resist breaking."},
+  toxic:   {label:"Level 9",  emoji:"☢️", desc:"Poison mist. Near impossible odds."},
+  void:    {label:"Level 10", emoji:"💀", desc:"Pure darkness. Maximum difficulty."},
 };
 
 export default function TunnelShell() {
@@ -1062,24 +1063,29 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     window.addEventListener("keydown", onKeyDown, { passive: false });
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isPlaying, facing, playerPos, wallBreaksLeft, brokenWallSet, layoutIndex]);
-
-  // ── Daily claim countdown ─────────────────────────────────────────────────
   function formatCountdown(ms: number): string {
     if (ms <= 0) return "00:00:00";
     const s = Math.floor(ms / 1000);
     const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
     return [h, m, sec].map(n => String(n).padStart(2, "0")).join(":");
   }
+
+  async function claimDailyNow() {
+    if (dailyClaimed || !effectivePlayerId) return;
+    try {
+      const r = await fetch("/api/points/claim", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ playerId: effectivePlayerId }) });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) { setDailyClaimed(true); if (j.msUntilNextClaim) setNextClaimTs(Date.now() + Number(j.msUntilNextClaim)); }
+    } catch {}
+  }
+
   React.useEffect(() => {
     if (!effectivePlayerId) return;
     (async () => {
       try {
         const r = await fetch(`/api/points/claim?playerId=${encodeURIComponent(effectivePlayerId)}`, { cache: "no-store" });
         const j = await r.json().catch(() => null);
-        if (r.ok && j?.ok) {
-          setDailyClaimed(!!j.claimed);
-          if (j.msUntilNextClaim) setNextClaimTs(Date.now() + Number(j.msUntilNextClaim));
-        }
+        if (r.ok && j?.ok) { setDailyClaimed(!!j.claimed); if (j.msUntilNextClaim) setNextClaimTs(Date.now() + Number(j.msUntilNextClaim)); }
       } catch {}
     })();
   }, [effectivePlayerId, dailyClaimed]);
@@ -1095,25 +1101,6 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [nextClaimTs]);
-
-  async function claimDailyNow() {
-    if (dailyClaimed || !effectivePlayerId) return;
-    try {
-      const r = await fetch("/api/points/claim", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ playerId: effectivePlayerId }) });
-      const j = await r.json().catch(() => null);
-      if (r.ok && j?.ok) { setDailyClaimed(true); if (j.msUntilNextClaim) setNextClaimTs(Date.now() + Number(j.msUntilNextClaim)); }
-    } catch {}
-  }
-                    onChange={(e) => {
-                      const v = (e.target.value.slice(0, 18) || "guest").trim() || "guest";
-                      setPlayerName(v);
-
-                      const p = loadProfile();
-                      const id = (p?.id || "guest").trim() || "guest";
-                      saveProfile({ name: v, id });
-                    }}
-                    style={inputStyle}
-                    style={inputStyle}
 
   return (
     <>
@@ -1175,7 +1162,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                 onRefresh={refresh}
               />
 
-          {/* ── Economy buttons ─────────────────────────────── */}
+          {/* ── Economy buttons ──────────────────────────────── */}
           <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:12}}>
             <button onClick={claimDailyNow} disabled={dailyClaimed}
               style={{padding:"8px 18px",borderRadius:20,border:"none",cursor:dailyClaimed?"default":"pointer",fontWeight:700,fontSize:13,
@@ -1214,14 +1201,25 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                       const v = (e.target.value.slice(0, 18) || "guest").trim() || "guest";
                       setPlayerName(v);
 
-                      
-  // ── Discord name + disconnect detection ──────────────────────────────────
+  // ── Discord name + countdown ──────────────────────────────────────────────
   React.useEffect(() => {
     const p = loadProfile();
     if ((p as any)?.discordName) setDiscordName((p as any).discordName);
     setShowDisconnect(!!(p as any)?.discordUserId);
   }, [effectivePlayerId]);
 
+
+                      const p = loadProfile();
+                      const id = (p?.id || "guest").trim() || "guest";
+onChange={(e) => {
+                      const v = (e.target.value.slice(0, 18) || "guest").trim() || "guest";
+                      setPlayerName(v);
+
+                      const p = loadProfile();
+                      const id = (p?.id || "guest").trim() || "guest";
+                      saveProfile({ name: v, id });
+                    }}                    }}
+                    style={inputStyle}
                   />
                 </label>
 
@@ -1336,8 +1334,15 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
         : runMessageStyle.background,
       color: didWinRun ? "#fde68a" : "white",
       fontWeight: didWinRun ? 800 : 500,
-    , backgroundImage:"url('https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1400&q=80')",backgroundSize:"cover",backgroundBlendMode:"overlay",backgroundPosition:"center"}}
+    ,backgroundImage:"url('https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1400&q=80')",backgroundSize:"cover",backgroundBlendMode:"overlay",backgroundPosition:"center"}}
   >
+          {isPlaying && (
+            <div style={{position:"sticky",top:0,zIndex:50,display:"flex",justifyContent:"center",alignItems:"center",gap:20,padding:"5px 16px",background:"rgba(0,0,0,0.80)",backdropFilter:"blur(8px)",borderBottom:"1px solid "+themeMap[boardTheme].accent+"44"}}>
+              <span style={{color:timeLeft<=10?"#ff4444":themeMap[boardTheme].accent,fontWeight:900,fontSize:16}}>⏱ {timeLeft}s</span>
+              <span style={{color:themeMap[boardTheme].crystal,fontWeight:700,fontSize:14}}>💎 {score}</span>
+              <span style={{color:"#ff8c00",fontWeight:700,fontSize:14}}>💥 {wallBreaksLeft}</span>
+            </div>
+          )}
     {runMessage}
   </div>
 ) : null}
@@ -1356,14 +1361,6 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                     touchAction: isPlaying && isMobileView ? "none" : undefined,
                   }}
                 >
-          {/* ── Floating Timer HUD ────────────────────────── */}
-          {isPlaying && (
-            <div style={{position:"sticky",top:0,zIndex:50,display:"flex",justifyContent:"center",alignItems:"center",gap:20,padding:"5px 16px",background:"rgba(0,0,0,0.80)",backdropFilter:"blur(8px)",borderBottom:"1px solid "+themeMap[boardTheme].accent+"44"}}>
-              <span style={{color:timeLeft<=10?"#ff4444":themeMap[boardTheme].accent,fontWeight:900,fontSize:16,letterSpacing:1}}>⏱ {timeLeft}s</span>
-              <span style={{color:themeMap[boardTheme].crystal,fontWeight:700,fontSize:14}}>💎 {score}</span>
-              <span style={{color:"#ff8c00",fontWeight:700,fontSize:14}}>💥 {wallBreaksLeft}</span>
-            </div>
-          )}
                                    <div style={previewGlowStyle(theme.accent)} />
 
                   {isPlaying && isMobileView && !isLandscape && (
