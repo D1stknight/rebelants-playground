@@ -1,4 +1,36 @@
 // components/Raid.tsx — THE RAID (Epic Edition v2)
+
+  // Load next claim timestamp when player ID or claim status changes
+  React.useEffect(() => {
+    if (!effectivePlayerId) return;
+    (async () => {
+      try {
+        const r = await fetch(`/api/points/claim?playerId=${encodeURIComponent(effectivePlayerId)}`, { cache: 'no-store' });
+        const j = await r.json().catch(() => null);
+        if (r.ok && j?.ok && j?.nextClaimTs) {
+          setNextClaimTs(Number(j.nextClaimTs));
+        }
+      } catch {}
+    })();
+  }, [effectivePlayerId, dailyClaimed]);
+
+  // Live countdown ticker
+  React.useEffect(() => {
+    if (!nextClaimTs) return;
+    const tick = () => {
+      const remaining = nextClaimTs - Date.now();
+      if (remaining <= 0) {
+        setCountdownStr('');
+        setDailyClaimed(false);
+        setNextClaimTs(null);
+      } else {
+        setCountdownStr(formatCountdown(remaining));
+      }
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [nextClaimTs]);
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { pointsConfig as defaultPointsConfig } from "../lib/pointsConfig";
@@ -589,7 +621,7 @@ function RaidLeaderboardPanel({ lb }: { lb: RaidLeaderboards }) {
                     {e.rarity==="ultra"?"🏆":e.rarity==="rare"?"⚔️":e.rarity==="common"?"✅":"💀"}
                   </span>
                   <span style={{ flex: 1, marginLeft: 6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 11 }}>{shortId(e.playerId, e.playerName)}</span>
-                  <span style={{ color: "#34d399", fontSize: 10, marginLeft: 4, whiteSpace: "nowrap" }}>{e.survivors}/{SQUAD_SIZE}🐜</span>
+                  <span style={{ color: "#34d399", fontSize: 10, marginLeft: 4, whiteSpace: "nowrap" }}>{e.pointsAwarded > 0 ? `+${e.pointsAwarded} REBEL` : '💀 No loot'}/{SQUAD_SIZE}🐜</span>
                   <span style={{ opacity: 0.35, fontSize: 9, marginLeft: 6, whiteSpace: "nowrap" }}>{timeAgo(e.ts)}</span>
                 </div>
               ))
@@ -689,6 +721,18 @@ export default function Raid() {
 
   // Daily claim
   const [dailyClaimed, setDailyClaimed] = useState(false);
+  const [nextClaimTs, setNextClaimTs]   = useState<number | null>(null);
+  const [countdownStr, setCountdownStr] = useState<string>('');
+
+  // Format ms remaining into HH:MM:SS
+  function formatCountdown(ms: number): string {
+    if (ms <= 0) return '00:00:00';
+    const totalSec = Math.floor(ms / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    return [h, m, s].map(n => String(n).padStart(2, '0')).join(':');
+  }
   const [claimStatus, setClaimStatus]   = useState("");
   const [claimBusy, setClaimBusy]       = useState(false);
 
@@ -970,7 +1014,11 @@ export default function Raid() {
           </label>
 
           <button className="btn" type="button" onClick={claimDailyNow} disabled={claimBusy||dailyClaimed} style={{ padding:"8px 12px", fontSize:12 }}>
-            {dailyClaimed?"🐜 Claimed Today ✅":`🐜 Daily +${cfg?.dailyClaim} ${cfg?.currency}`}
+            {dailyClaimed
+              ? countdownStr
+                ? `⏱ Next claim in ${countdownStr}`
+                : "🐜 Claimed Today ✅"
+              : `🐜 Daily +${cfg?.dailyClaim} ${cfg?.currency}`}
           </button>
 
           {process.env.NODE_ENV!=="production" && (
