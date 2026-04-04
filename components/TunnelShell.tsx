@@ -1102,6 +1102,13 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     return () => clearInterval(id);
   }, [nextClaimTs]);
 
+  // ── Load discord connection state ────────────────────────────────────────
+  React.useEffect(() => {
+    const p = loadProfile();
+    if ((p as any)?.discordName) setDiscordName((p as any).discordName);
+    setShowDisconnect(!!(p as any)?.discordUserId);
+  }, [effectivePlayerId]);
+
   return (
     <>
             <main
@@ -1163,7 +1170,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               />
 
           {/* ── Economy buttons ──────────────────────────────── */}
-          <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:12}}>
+          <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:16,marginTop:4,alignItems:"center"}}>
             <button onClick={claimDailyNow} disabled={dailyClaimed}
               style={{padding:"8px 18px",borderRadius:20,border:"none",cursor:dailyClaimed?"default":"pointer",fontWeight:700,fontSize:13,
                 background:dailyClaimed?"rgba(255,255,255,0.08)":themeMap[boardTheme].accent,
@@ -1182,7 +1189,14 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               </button>
             )}
             <button
-              onClick={async()=>{try{const r=await fetch("/api/points/migrate-drip",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({playerId:effectivePlayerId})});if(r.ok)refresh();}catch{}}}
+              onClick={async()=>{
+                try {
+                  const r = await fetch("/api/points/migrate-drip", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({playerId:effectivePlayerId})});
+                  const j = await r.json().catch(()=>null);
+                  if (r.ok) { await refresh(); setRunMessage(j?.message || "DRIP points migrated ✅"); }
+                  else setRunMessage(j?.error || "Migration failed.");
+                } catch(e:any) { setRunMessage(e?.message || "Migration failed."); }
+              }}
               style={{padding:"8px 18px",borderRadius:20,border:"1px solid rgba(255,255,255,0.15)",cursor:"pointer",fontWeight:700,fontSize:13,background:"rgba(255,255,255,0.06)",color:"rgba(255,255,255,0.5)"}}>
               Migrate DRIP Points
             </button>
@@ -1216,7 +1230,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                   How to Play + Official Rules
                 </Link>
               </div>
-              <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
+              <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:14,marginTop:8}}>
             {(["colony","neon","mythic","lava","ice","golden","shadow","amber","toxic","void"] as BoardTheme[]).map(key => {
               const d = DIFFICULTY[key]; const th = themeMap[key]; const active = boardTheme === key;
               return (
@@ -1259,16 +1273,13 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                   </div>
 
                                   <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-                    {!isPlaying && (
-                      <button
-                        onClick={() => {
-                          void startRun();
-                        }}
-                        style={startRunButtonStyle}
+                    <button
+                        onClick={() => { void startRun(); }}
+                        disabled={isPlaying}
+                        style={{...startRunButtonStyle, opacity: isPlaying ? 0.4 : 1, cursor: isPlaying ? 'default' : 'pointer'}}
                       >
-                        Start Run
+                        {isPlaying ? "Running..." : "Start Run"}
                       </button>
-                    )}
 
                     <div style={statusPillStyle}>
                       ⏱ Time: <b>{timeLeft}s</b>
@@ -1301,6 +1312,13 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                   </div>
                 </div>
 
+{isPlaying && (
+            <div style={{position:"sticky",top:0,zIndex:50,display:"flex",justifyContent:"center",alignItems:"center",gap:20,padding:"5px 16px",background:"rgba(0,0,0,0.80)",backdropFilter:"blur(8px)",borderBottom:"1px solid "+themeMap[boardTheme].accent+"44"}}>
+              <span style={{color:timeLeft<=10?"#ff4444":themeMap[boardTheme].accent,fontWeight:900,fontSize:16}}>⏱ {timeLeft}s</span>
+              <span style={{color:themeMap[boardTheme].crystal,fontWeight:700,fontSize:14}}>💎 {score}</span>
+              <span style={{color:"#ff8c00",fontWeight:700,fontSize:14}}>💥 {wallBreaksLeft}</span>
+            </div>
+          )}
                 <div style={boardBadgeStyle}>
                   Cost: {tunnelCfg.tunnelCost}
                 </div>
@@ -1320,13 +1338,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
       color: didWinRun ? "#fde68a" : "white",
       fontWeight: didWinRun ? 800 : 500,
     }}  >
-          {isPlaying && (
-            <div style={{position:"sticky",top:0,zIndex:50,display:"flex",justifyContent:"center",alignItems:"center",gap:20,padding:"5px 16px",background:"rgba(0,0,0,0.80)",backdropFilter:"blur(8px)",borderBottom:"1px solid "+themeMap[boardTheme].accent+"44"}}>
-              <span style={{color:timeLeft<=10?"#ff4444":themeMap[boardTheme].accent,fontWeight:900,fontSize:16}}>⏱ {timeLeft}s</span>
-              <span style={{color:themeMap[boardTheme].crystal,fontWeight:700,fontSize:14}}>💎 {score}</span>
-              <span style={{color:"#ff8c00",fontWeight:700,fontSize:14}}>💥 {wallBreaksLeft}</span>
-            </div>
-          )}
+          
     {runMessage}
   </div>
 ) : null}
@@ -1984,7 +1996,7 @@ const gameBoardStyle: React.CSSProperties = {
   borderRadius: 18,
   border: "1px solid rgba(255,255,255,0.12)",
   background:
-    "radial-gradient(circle at top, rgba(96,165,250,0.09), rgba(15,23,42,0.95) 45%)",
+    "rgba(0,0,0,0)",
   overflow: "hidden",
 };
 
@@ -2207,17 +2219,23 @@ const leaderboardBaseCardStyle: React.CSSProperties = {
 
 const leaderboardCardBlueStyle: React.CSSProperties = {
   ...leaderboardBaseCardStyle,
-  boxShadow: "0 0 0 1px rgba(96,165,250,0.18), 0 0 24px rgba(96,165,250,0.14), 0 18px 40px rgba(0,0,0,0.32)",
+  background: "linear-gradient(135deg, rgba(96,165,250,0.12), rgba(9,12,22,0.95))",
+  boxShadow: "0 0 0 1px rgba(96,165,250,0.35), 0 0 32px rgba(96,165,250,0.22), 0 18px 40px rgba(0,0,0,0.45)",
+  borderColor: "rgba(96,165,250,0.3)",
 };
 
 const leaderboardCardGoldStyle: React.CSSProperties = {
   ...leaderboardBaseCardStyle,
-  boxShadow: "0 0 0 1px rgba(250,204,21,0.18), 0 0 24px rgba(250,204,21,0.12), 0 18px 40px rgba(0,0,0,0.32)",
+  background: "linear-gradient(135deg, rgba(250,204,21,0.10), rgba(9,12,22,0.95))",
+  boxShadow: "0 0 0 1px rgba(250,204,21,0.35), 0 0 32px rgba(250,204,21,0.20), 0 18px 40px rgba(0,0,0,0.45)",
+  borderColor: "rgba(250,204,21,0.3)",
 };
 
 const leaderboardCardRedStyle: React.CSSProperties = {
   ...leaderboardBaseCardStyle,
-  boxShadow: "0 0 0 1px rgba(244,63,94,0.18), 0 0 24px rgba(244,63,94,0.12), 0 18px 40px rgba(0,0,0,0.32)",
+  background: "linear-gradient(135deg, rgba(244,63,94,0.10), rgba(9,12,22,0.95))",
+  boxShadow: "0 0 0 1px rgba(244,63,94,0.35), 0 0 32px rgba(244,63,94,0.20), 0 18px 40px rgba(0,0,0,0.45)",
+  borderColor: "rgba(244,63,94,0.3)",
 };
 
 const leaderboardCardHeaderStyle: React.CSSProperties = {
@@ -2229,9 +2247,10 @@ const leaderboardCardHeaderStyle: React.CSSProperties = {
 };
 
 const leaderboardTitleStyle: React.CSSProperties = {
-  fontSize: 20,
+  fontSize: 22,
   fontWeight: 900,
-  letterSpacing: 0.2,
+  letterSpacing: 0.5,
+  textShadow: "0 0 20px currentColor",
 };
 
 const leaderboardSubtitleStyle: React.CSSProperties = {
