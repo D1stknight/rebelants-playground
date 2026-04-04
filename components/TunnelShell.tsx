@@ -327,6 +327,9 @@ export default function TunnelShell() {
   const [dailyClaimed,   setDailyClaimed]   = useState(false);
   const [nextClaimTs,    setNextClaimTs]    = useState<number|null>(null);
   const [countdownStr,   setCountdownStr]   = useState("");
+  const [dripAmount,     setDripAmount]     = useState(0);
+  const [dripPanelOpen,  setDripPanelOpen]  = useState(false);
+  const [dripBusy,       setDripBusy]       = useState(false);
   const [showBuyPoints, setShowBuyPoints] = useState(false);
   const [tunnelCfg, setTunnelCfg] = useState(DEFAULT_TUNNEL_CONFIG);
 
@@ -1183,31 +1186,58 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               {dailyClaimed?"✅ Claimed Today":`🐜 Daily +${tunnelCfg.dailyClaim} ${tunnelCfg.currency}`}
             </button>
             {showDisconnect?(
-              <button onClick={()=>{window.location.href="/api/auth/discord/logout";}}
+              <button onClick={()=>{
+                try {
+                  const p = (window as any).__loadProfile?.() || JSON.parse(localStorage.getItem('ra_profile')||'{}');
+                  const fallback = (p.walletAddress ? "wallet:"+p.walletAddress : (p.id||"guest")).trim();
+                  localStorage.setItem('ra_profile', JSON.stringify({...p, discordUserId:undefined, discordName:undefined, primaryId:fallback, discordSkipLink:true}));
+                  window.dispatchEvent(new Event("ra:identity-changed"));
+                } catch(e){}
+                window.location.href="/api/auth/discord/logout";
+              }}
                 style={{padding:"8px 18px",borderRadius:20,border:"1px solid rgba(255,255,255,0.2)",cursor:"pointer",fontWeight:700,fontSize:13,background:"rgba(255,255,255,0.06)",color:"rgba(255,255,255,0.7)"}}>
                 Disconnect Discord
               </button>
             ):(
-              <button onClick={()=>{window.location.href="/api/auth/discord/login";}}
+              <button onClick={()=>{
+                try {
+                  const p = JSON.parse(localStorage.getItem('ra_profile')||'{}');
+                  localStorage.setItem('ra_profile', JSON.stringify({...p, discordSkipLink:false}));
+                  window.dispatchEvent(new Event("ra:identity-changed"));
+                } catch(e){}
+                window.location.href="/api/auth/discord/login";
+              }}
                 style={{padding:"8px 18px",borderRadius:20,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,background:"#5865f2",color:"#fff"}}>
                 🔗 Connect Discord
               </button>
             )}
-            <button
-              onClick={async()=>{
-                const amt = window.prompt("How many DRIP points to migrate?");
-                if (!amt || isNaN(Number(amt)) || Number(amt) <= 0) return;
-                try {
-                  const idem = Date.now().toString(36);
-                  const r = await fetch("/api/drip/migrate", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({amount:Number(amt),playerId:effectivePlayerId,idempotencyKey:idem})});
-                  const j = await r.json().catch(()=>null);
-                  if (r.ok && j?.ok) { await refresh(); setRunMessage(j?.message || `Migrated ${amt} DRIP points ✅`); }
-                  else setRunMessage(j?.error || "Migration failed. Make sure DRIP is linked in Discord.");
-                } catch(e:any) { setRunMessage(e?.message || "Migration failed."); }
-              }}
-              style={{padding:"8px 18px",borderRadius:20,border:"1px solid rgba(255,255,255,0.15)",cursor:"pointer",fontWeight:700,fontSize:13,background:"rgba(255,255,255,0.06)",color:"rgba(255,255,255,0.5)"}}>
+            <button onClick={()=>setDripPanelOpen(v=>!v)}
+              style={{padding:"8px 18px",borderRadius:20,border:"1px solid rgba(255,255,255,0.15)",cursor:"pointer",fontWeight:700,fontSize:13,background:dripPanelOpen?"rgba(255,255,255,0.12)":"rgba(255,255,255,0.06)",color:"rgba(255,255,255,0.6)"}}>
               Migrate DRIP Points
             </button>
+            {dripPanelOpen && (
+              <div style={{width:"100%",marginTop:8,padding:"12px 14px",borderRadius:14,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.12)",display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                <span style={{fontSize:12,opacity:0.7}}>Amount:</span>
+                <input type="number" min={1} value={dripAmount||""} onChange={e=>setDripAmount(Number(e.target.value))}
+                  style={{width:90,padding:"6px 10px",borderRadius:10,border:"1px solid rgba(255,255,255,0.2)",background:"rgba(15,23,42,0.7)",color:"white",fontWeight:700}}
+                  placeholder="e.g. 100" />
+                <button disabled={dripBusy||!dripAmount} onClick={async()=>{
+                  if(!dripAmount||dripAmount<=0)return;
+                  setDripBusy(true);
+                  try{
+                    const idem=Date.now().toString(36);
+                    const r=await fetch("/api/drip/migrate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({amount:dripAmount,playerId:effectivePlayerId,idempotencyKey:idem})});
+                    const j=await r.json().catch(()=>null);
+                    if(r.ok&&j?.ok){await refresh();setRunMessage(j?.message||`Migrated ${dripAmount} DRIP points ✅`);setDripPanelOpen(false);setDripAmount(0);}
+                    else setRunMessage(j?.error||"Migration failed. Make sure DRIP is linked in Discord.");
+                  }catch(e:any){setRunMessage(e?.message||"Migration failed.");}
+                  finally{setDripBusy(false);}
+                }} style={{padding:"6px 14px",borderRadius:14,border:"none",cursor:dripBusy?"default":"pointer",fontWeight:700,fontSize:12,background:"#5865f2",color:"#fff",opacity:dripBusy?0.5:1}}>
+                  {dripBusy?"Migrating…":"Migrate Now"}
+                </button>
+                <span style={{fontSize:11,opacity:0.5}}>Deducts from DRIP Discord bot → credits here</span>
+              </div>
+            )}
           </div>
               <div
                 style={{
@@ -2022,6 +2052,11 @@ const boardHeaderStyle: React.CSSProperties = {
   gap: 12,
   padding: "12px 14px",
   borderBottom: "1px solid rgba(255,255,255,0.08)",
+  position: "sticky",
+  top: 0,
+  zIndex: 20,
+  background: "rgba(10,14,26,0.97)",
+  backdropFilter: "blur(8px)",
 };
 
 const boardBadgeStyle: React.CSSProperties = {
