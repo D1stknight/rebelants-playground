@@ -1118,6 +1118,41 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
   }, []);
 
 
+  // ── Sync Discord session to localStorage (matches Shuffle.tsx) ──────────────
+  const _didDiscordLinkRef = React.useRef(false);
+  React.useEffect(() => {
+    if (_didDiscordLinkRef.current) return;
+    _didDiscordLinkRef.current = true;
+    let cancelled = false;
+    (async () => {
+      try {
+        const gate = loadProfile();
+        if ((gate as any)?.discordSkipLink) return;
+        const sr = await fetch("/api/auth/discord/session", { cache: "no-store" });
+        const sj = await sr.json().catch(() => null);
+        if (!sr.ok || !sj?.ok || !sj?.discordUserId) return;
+        const prof = loadProfile();
+        const toId = `discord:${sj.discordUserId}`;
+        if (String((prof as any)?.primaryId || "") === toId) return;
+        const lr = await fetch("/api/identity/link-discord", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fromId: getEffectivePlayerId(prof) }),
+        });
+        const lj = await lr.json().catch(() => null);
+        if (!lr.ok || !lj?.ok) return;
+        saveProfile({
+          ...(prof as any),
+          discordUserId: sj.discordUserId,
+          discordName: sj.discordName,
+          primaryId: toId,
+          name: sj.discordName || (prof as any)?.name,
+          discordSkipLink: false,
+        } as any);
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   // ── Discord identity (computed inline like Raid.tsx) ─────────────────────
   const _profile = loadProfile();
   const discordUserId: string | null = (_profile as any)?.discordUserId || null;
