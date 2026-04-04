@@ -332,18 +332,18 @@ function formatMs(ms: number) {
   return `${totalSeconds.toFixed(2)}s`;
 }
 
-// Ã¢ÂÂÃ¢ÂÂ Difficulty levels Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+// ── Difficulty levels ──────────────────────────────────────────────────────
 const DIFFICULTY: Record<string, {label:string;emoji:string;desc:string}> = {
-  colony:  {label:"Level 1",  emoji:"Ã°ÂÂÂ", desc:"Classic colony. Learn the ropes."},
-  neon:    {label:"Level 2",  emoji:"Ã¢ÂÂ¡", desc:"Electric. Spider moves faster."},
-  mythic:  {label:"Level 3",  emoji:"Ã°ÂÂÂ®", desc:"Dark magic. Tighter paths."},
-  lava:    {label:"Level 4",  emoji:"Ã°ÂÂÂ", desc:"Volcanic. Heat slows your breaks."},
-  ice:     {label:"Level 5",  emoji:"Ã°ÂÂ§Â", desc:"Frozen. Spider is relentless."},
-  golden:  {label:"Level 6",  emoji:"Ã°ÂÂÂ", desc:"Guarded vault. Charges dwindling."},
-  shadow:  {label:"Level 7",  emoji:"Ã°ÂÂÂÃ¯Â¸Â", desc:"You barely see the walls."},
-  amber:   {label:"Level 8",  emoji:"Ã°ÂÂÂº", desc:"Ancient stone. Walls resist breaking."},
-  toxic:   {label:"Level 9",  emoji:"Ã¢ÂÂ¢Ã¯Â¸Â", desc:"Poison mist. Near impossible odds."},
-  void:    {label:"Level 10", emoji:"Ã°ÂÂÂ", desc:"Pure darkness. Maximum difficulty."},
+  colony:  {label:"Level 1",  emoji:"🐜", desc:"Classic colony. Learn the ropes."},
+  neon:    {label:"Level 2",  emoji:"⚡", desc:"Electric. Spider moves faster."},
+  mythic:  {label:"Level 3",  emoji:"🔮", desc:"Dark magic. Tighter paths."},
+  lava:    {label:"Level 4",  emoji:"🌋", desc:"Volcanic. Heat slows your breaks."},
+  ice:     {label:"Level 5",  emoji:"🧊", desc:"Frozen. Spider is relentless."},
+  golden:  {label:"Level 6",  emoji:"🏆", desc:"Guarded vault. Charges dwindling."},
+  shadow:  {label:"Level 7",  emoji:"👁️", desc:"You barely see the walls."},
+  amber:   {label:"Level 8",  emoji:"🏺", desc:"Ancient stone. Walls resist breaking."},
+  toxic:   {label:"Level 9",  emoji:"☢️", desc:"Poison mist. Near impossible odds."},
+  void:    {label:"Level 10", emoji:"💀", desc:"Pure darkness. Maximum difficulty."},
 };
 
 export default function TunnelShell() {
@@ -356,7 +356,6 @@ export default function TunnelShell() {
   const [dailyClaimed,   setDailyClaimed]   = useState(false);
   const [nextClaimTs,    setNextClaimTs]    = useState<number|null>(null);
   const [countdownStr,   setCountdownStr]   = useState("");
-  const [countdown, setCountdown] = useState<number|null>(null);
   const [dripAmount,     setDripAmount]     = useState(0);
   const [profileVersion, setProfileVersion] = useState(0);
   const [dripPanelOpen,  setDripPanelOpen]  = useState(false);
@@ -368,6 +367,7 @@ export default function TunnelShell() {
 
     const [boardTheme, setBoardTheme] = useState<BoardTheme>("colony");
   const [layoutIndex, setLayoutIndex] = useState(0);
+  const [countdown, setCountdown] = useState<number|null>(null);
   const [layoutMode, setLayoutMode] = useState<"random"|"pick">("random");
   const [selectedLayout, setSelectedLayout] = useState<number|null>(null);
   const [layoutsExplored, setLayoutsExplored] = useState(0);
@@ -629,7 +629,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
       setBrokenWalls((prev) => [...prev, key]);
       setWallBreaksLeft((n) => Math.max(0, n - 1));
       triggerWallBurst(target.row, target.col);
-      setRunMessage("Wall broken Ã¢ÂÂ");
+      setRunMessage("Wall broken ✅");
       return;
     }
 
@@ -918,7 +918,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           return;
         }
 
-                       setRunMessage(`Run complete. +${earnRes?.added ?? score} REBEL Points credited Ã¢ÂÂ`);
+                       setRunMessage(`Run complete. +${earnRes?.added ?? score} REBEL Points credited ✅`);
         await refresh();
         scrollBackToBoardHeader();
       } catch (e: any) {
@@ -957,7 +957,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
         return;
       }
 
-      setRunMessage(`Crystal sweep complete! Claiming ${score} REBEL Points... Ã°ÂÂÂ`);
+      setRunMessage(`Crystal sweep complete! Claiming ${score} REBEL Points... 👑`);
 
       try {
         const earnRes: any = await earn(score);
@@ -969,7 +969,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           return;
         }
 
-                       setRunMessage(`Crystal sweep complete! +${earnRes?.added ?? score} REBEL Points credited Ã°ÂÂÂ`);
+                       setRunMessage(`Crystal sweep complete! +${earnRes?.added ?? score} REBEL Points credited 👑`);
         await refresh();
         scrollBackToBoardHeader();
       } catch (e: any) {
@@ -1144,7 +1144,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
   }, [nextClaimTs]);
 
 
-  // Ã¢ÂÂÃ¢ÂÂ Reload profile after Discord OAuth Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+  // ── Reload profile after Discord OAuth ────────────────────────────────────
   React.useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
@@ -1158,7 +1158,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
   }, []);
 
 
-  // Ã¢ÂÂÃ¢ÂÂ Sync Discord session to localStorage (matches Shuffle.tsx) Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+  // ── Sync Discord session to localStorage (matches Shuffle.tsx) ──────────────
   const _didDiscordLinkRef = React.useRef(false);
   React.useEffect(() => {
     if (_didDiscordLinkRef.current) return;
@@ -1201,7 +1201,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     return () => { cancelled = true; };
   }, []);
 
-  // Ã¢ÂÂÃ¢ÂÂ Load DRIP balance when discord is connected Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+  // ── Load DRIP balance when discord is connected ──────────────────────────
   React.useEffect(() => {
     const p = loadProfile();
     if (!(p as any)?.discordUserId) return;
@@ -1214,7 +1214,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     })();
   }, [effectivePlayerId]);
 
-  // Ã¢ÂÂÃ¢ÂÂ Discord identity (computed inline like Raid.tsx) Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+  // ── Discord identity (computed inline like Raid.tsx) ─────────────────────
   const _profile = loadProfile();
   const discordUserId: string | null = (_profile as any)?.discordUserId || null;
   const discordName: string = (_profile as any)?.discordName || "";
@@ -1222,7 +1222,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
   const identityDisplay: string = discordName || (_profile as any)?.name || "guest";
 
 
-  // Ã¢ÂÂÃ¢ÂÂ Reload identity after Discord OAuth redirect Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+  // ── Reload identity after Discord OAuth redirect ──────────────────────────
   React.useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
@@ -1263,10 +1263,10 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               borderBottom:"2px solid "+themeMap[boardTheme].accent+"66",
               boxShadow:"0 4px 20px rgba(0,0,0,0.5)",
             }}>
-              <span style={{color:timeLeft<=10?"#ff4444":themeMap[boardTheme].accent,fontWeight:900,fontSize:18,letterSpacing:1}}>Ã¢ÂÂ± {timeLeft}s</span>
-              <span style={{color:themeMap[boardTheme].crystal,fontWeight:700,fontSize:16}}>Ã°ÂÂÂ {score}</span>
-              <span style={{color:"#ff8c00",fontWeight:700,fontSize:16}}>Ã°ÂÂÂ¥ {wallBreaksLeft}</span>
-              <span style={{color:"rgba(255,255,255,0.6)",fontWeight:700,fontSize:14}}>Ã°ÂÂÂ {crystals.length} left</span>
+              <span style={{color:timeLeft<=10?"#ff4444":themeMap[boardTheme].accent,fontWeight:900,fontSize:18,letterSpacing:1}}>⏱ {timeLeft}s</span>
+              <span style={{color:themeMap[boardTheme].crystal,fontWeight:700,fontSize:16}}>💎 {score}</span>
+              <span style={{color:"#ff8c00",fontWeight:700,fontSize:16}}>💥 {wallBreaksLeft}</span>
+              <span style={{color:"rgba(255,255,255,0.6)",fontWeight:700,fontSize:14}}>💎 {crystals.length} left</span>
             </div>
           )}
             <main
@@ -1328,7 +1328,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               />
 
 
-          {/* Ã¢ÂÂÃ¢ÂÂ Economy buttons Ã¢ÂÂ exact Raid.tsx pattern Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ */}
+          {/* ── Economy buttons — exact Raid.tsx pattern ─────────── */}
           <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:12,marginTop:8,alignItems:"center"}}>
 
             {/* Discord connect/disconnect */}
@@ -1349,18 +1349,18 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                 window.location.href="/api/auth/discord/login";
               }}
                 style={{padding:"8px 14px",borderRadius:20,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,background:"#5865f2",color:"#fff"}}>
-                Ã°ÂÂÂ Connect Discord
+                🔗 Connect Discord
               </button>
             )}
 
-            {/* Discord status Ã¢ÂÂ shown when connected */}
+            {/* Discord status — shown when connected */}
             {showDisconnect && (
               <div style={{fontSize:13,fontWeight:700,color:"#22c55e"}}>
-                Discord: Connected Ã¢ÂÂ
+                Discord: Connected ✅
               </div>
             )}
 
-            {/* Migrate DRIP Ã¢ÂÂ only when discord connected */}
+            {/* Migrate DRIP — only when discord connected */}
             {showDisconnect && (
               <button onClick={()=>setDripPanelOpen(v=>!v)}
                 style={{padding:"8px 14px",borderRadius:20,border:"1px solid rgba(255,255,255,0.2)",cursor:"pointer",fontWeight:700,fontSize:13,background:dripPanelOpen?"rgba(255,255,255,0.12)":"rgba(255,255,255,0.06)",color:"rgba(255,255,255,0.8)"}}>
@@ -1368,7 +1368,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               </button>
             )}
 
-            {/* DRIP balance Ã¢ÂÂ shown next to migrate button */}
+            {/* DRIP balance — shown next to migrate button */}
             {showDisconnect && dripBalance !== null && (
               <div style={{fontSize:13,opacity:0.8}}>
                 DRIP: <b>{dripBalance}</b>
@@ -1380,7 +1380,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           {/* Drip migrate panel */}
           {dripPanelOpen && showDisconnect && (
             <div style={{marginBottom:12,padding:"12px 14px",borderRadius:14,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.12)"}}>
-              <div style={{fontWeight:900,fontSize:14,marginBottom:8}}>Migrate DRIP Points Ã¢ÂÂ Game</div>
+              <div style={{fontWeight:900,fontSize:14,marginBottom:8}}>Migrate DRIP Points → Game</div>
               <div style={{fontSize:12,opacity:0.8,marginBottom:10}}>This will <b>deduct</b> points from DRIP (Discord) and <b>credit</b> the same amount into the game. No double-dipping.</div>
               {dripBalance !== null && <div style={{fontSize:13,marginBottom:8}}>DRIP Balance: <b>{dripBalance}</b></div>}
               <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
@@ -1398,20 +1398,20 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                     if(r.ok&&j?.ok){
                       await refresh();
                       setDripBalance(b=>b!==null?b-dripAmount:null);
-                      setDripStatus(`Ã¢ÂÂ Migrated ${dripAmount} points!`);
+                      setDripStatus(`✅ Migrated ${dripAmount} points!`);
                       setDripPanelOpen(false);setDripAmount(0);
                     } else setDripStatus(j?.error||"Migration failed.");
                   }catch(e:any){setDripStatus(e?.message||"Error.");}
                   finally{setDripBusy(false);}
                 }} style={{padding:"8px 16px",borderRadius:14,border:"none",cursor:dripBusy?"default":"pointer",fontWeight:700,fontSize:13,background:"#5865f2",color:"#fff",opacity:dripBusy?0.5:1}}>
-                  {dripBusy?"MigratingÃ¢ÂÂ¦":"Migrate Now"}
+                  {dripBusy?"Migrating…":"Migrate Now"}
                 </button>
                 <button onClick={()=>{setDripPanelOpen(false);setDripStatus("");}}
                   style={{padding:"8px 12px",borderRadius:12,border:"1px solid rgba(255,255,255,0.15)",cursor:"pointer",fontWeight:700,fontSize:12,background:"transparent",color:"rgba(255,255,255,0.5)"}}>
                   Close
                 </button>
               </div>
-              {dripStatus && <div style={{marginTop:8,fontSize:12,fontWeight:700,color:dripStatus.includes("Ã¢ÂÂ")?"#22c55e":"#f87171"}}>{dripStatus}</div>}
+              {dripStatus && <div style={{marginTop:8,fontSize:12,fontWeight:700,color:dripStatus.includes("✅")?"#22c55e":"#f87171"}}>{dripStatus}</div>}
             </div>
           )}
               {/* Layout chooser */}
@@ -1424,7 +1424,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                 <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:6,marginBottom:12,padding:10,borderRadius:14,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)"}}>
                   {TUNNEL_LAYOUTS.map((layout,idx)=>{
                     const ws=new Set(layout as string[]);const active=selectedLayout===idx;
-                    return(<button key={idx} onClick={()=>setSelectedLayout(idx)} title={LAYOUT_NAMES[idx]} style={{padding:0,border:active?"2px solid rgba(250,204,21,0.9)":"2px solid rgba(255,255,255,0.08)",borderRadius:8,background:active?"rgba(250,204,21,0.08)":"rgba(255,255,255,0.03)",cursor:"pointer",overflow:"hidden",transition:"all 0.15s",boxShadow:active?"0 0 10px rgba(250,204,21,0.4)":"none"}}>
+                    return(<button key={idx} onClick={()=>setSelectedLayout(idx)} title={LAYOUT_NAMES[idx]} style={{padding:0,border:active?"2px solid rgba(250,204,21,0.9)":"2px solid rgba(255,255,255,0.08)",borderRadius:8,background:active?"rgba(250,204,21,0.08)":"rgba(255,255,255,0.03)",cursor:"pointer",overflow:"hidden",transition:"all 0.15s"}}>
                       <div style={{display:"grid",gridTemplateColumns:"repeat(22,1fr)",padding:2}}>
                         {Array.from({length:14*22},(_,i)=>{const r=Math.floor(i/22),c=i%22;const w=r===0||r===13||c===0||c===21||ws.has(r+":"+c);return <div key={i} style={{aspectRatio:"1",background:w?"rgba(120,80,40,0.9)":"rgba(255,255,255,0.07)"}}/>;}) }
                       </div>
@@ -1487,10 +1487,10 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
 
           {isPlaying && isMobileView && (
             <div style={mobileRunTopBarStyle}>
-              <div style={mobileRunStatPillStyle}>Ã¢ÂÂ± {timeLeft}s</div>
-              <div style={mobileRunStatPillStyle}>Ã°ÂÂÂ¯ {score}</div>
-              <div style={mobileRunStatPillStyle}>Ã°ÂÂ§Â± {wallBreaksLeft}</div>
-              <div style={mobileRunStatPillStyle}>Ã°ÂÂÂ {crystals.length}</div>
+              <div style={mobileRunStatPillStyle}>⏱ {timeLeft}s</div>
+              <div style={mobileRunStatPillStyle}>🎯 {score}</div>
+              <div style={mobileRunStatPillStyle}>🧱 {wallBreaksLeft}</div>
+              <div style={mobileRunStatPillStyle}>💎 {crystals.length}</div>
             </div>
           )}
 
@@ -1519,15 +1519,15 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                       </button>
 
                     <div style={statusPillStyle}>
-                      Ã¢ÂÂ± Time: <b>{timeLeft}s</b>
+                      ⏱ Time: <b>{timeLeft}s</b>
                     </div>
 
                     <div style={statusPillStyle}>
-                      Ã°ÂÂÂ¯ Score: <b>{score}</b>
+                      🎯 Score: <b>{score}</b>
                     </div>
 
                     <div style={statusPillStyle}>
-                      Ã°ÂÂ§Â± Wall Break Charges: <b>{wallBreaksLeft}</b> / {tunnelCfg.tunnelWallBreaks}
+                      🧱 Wall Break Charges: <b>{wallBreaksLeft}</b> / {tunnelCfg.tunnelWallBreaks}
                     </div>
                   </div>
 
@@ -1541,10 +1541,10 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                       opacity: 0.85,
                     }}
                   >
-                    <span>Ã°ÂÂÂ Crumb = 1</span>
-                    <span>Ã°ÂÂÂ¬ Sugar = 5</span>
-                    <span>Ã°ÂÂÂ Crystal = 20</span>
-                    <span>Ã°ÂÂÂ·Ã¯Â¸Â Hit = -3 sec</span>
+                    <span>🍞 Crumb = 1</span>
+                    <span>🍬 Sugar = 5</span>
+                    <span>💎 Crystal = 20</span>
+                    <span>🕷️ Hit = -3 sec</span>
                     <span>Collect all crystals to win early</span>
                   </div>
                 </div>
@@ -1675,7 +1675,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
         : "drop-shadow(0 0 6px rgba(34,197,94,0.8))",
     }}
   >
-    Ã°ÂÂÂ
+    🍞
   </div>
 )}
 
@@ -1699,7 +1699,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
         : "drop-shadow(0 0 10px rgba(250,204,21,0.9))",
     }}
   >
-    Ã°ÂÂÂ¬
+    🍬
   </div>
 )}
 
@@ -1725,7 +1725,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
         `,
     }}
   >
-    Ã°ÂÂÂ
+    💎
   </div>
 )}
 
@@ -1864,102 +1864,63 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
 
           <div style={tunnelLeaderboardWrapStyle}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
-              <div>
-                <div style={{fontSize:20,fontWeight:900}}>🏆 Tunnel Leaderboards</div>
-                <div style={{fontSize:12,opacity:0.55,marginTop:2}}>Top scores, fastest clears &amp; champions across all 30 layouts</div>
-              </div>
+              <div><div style={{fontSize:20,fontWeight:900}}>🏆 Tunnel Leaderboards</div><div style={{fontSize:12,opacity:0.55,marginTop:2}}>Top scores, fastest clears &amp; champions across all 30 layouts</div></div>
               <button onClick={()=>void loadTunnelLeaderboard()} style={{padding:"6px 12px",borderRadius:20,border:"1px solid rgba(255,255,255,0.15)",background:"rgba(255,255,255,0.06)",cursor:"pointer",fontSize:12,fontWeight:700,color:"rgba(255,255,255,0.7)"}}>↻ Refresh</button>
             </div>
             <div style={{...tunnelLeaderboardGridStyle,...(isMobileView?tunnelLeaderboardGridMobileStyle:null)}}>
               <div style={leaderboardCardBlueStyle}>
                 <div style={leaderboardCardHeaderStyle}>
-                  <div>
-                    <div style={{...leaderboardTitleStyle,color:"#60a5fa"}}>🏆 Top Score</div>
-                    <div style={leaderboardSubtitleStyle}>Best single-run score across all layouts. Any layout counts.</div>
-                  </div>
+                  <div><div style={{...leaderboardTitleStyle,color:"#60a5fa"}}>🏆 Top Score</div><div style={leaderboardSubtitleStyle}>Best single-run score across all layouts. Any layout counts.</div></div>
                   <div style={leaderboardBadgeBlueStyle}>TOP 5</div>
                 </div>
                 <div style={leaderboardScrollStyle}>
                   {leaderboardLoading?(<div style={leaderboardEmptyStyle}>Loading...</div>):topScoreRows.length===0?(<div style={leaderboardEmptyStyle}>No scores yet!</div>):
-                    topScoreRows.map(row=>{
-                      const parts=String(row.playerId||'').split('|');
-                      return(
-                        <div key={"s"+row.rank} style={leaderboardRowStyle(row.rank,"#60a5fa")}>
-                          <div style={leaderboardRankStyle(row.rank)}>{row.rank===1?"🥇":row.rank===2?"🥈":row.rank===3?"🥉":"#"+row.rank}</div>
-                          <div style={{flex:1,minWidth:0}}>
-                            <div style={leaderboardNameStyle}>{row.playerName||row.playerId}</div>
-                            {parts[2]&&<div style={{fontSize:10,opacity:0.55,marginTop:1}}>on {parts[2]}</div>}
-                          </div>
-                          <div style={{...leaderboardValueStyle,color:"#93c5fd"}}>{Number(row.score||0).toLocaleString()}</div>
-                        </div>
-                      );
-                    })
+                    topScoreRows.map(row=>{const parts=String(row.playerId||'').split('|');return(
+                      <div key={"s"+row.rank} style={leaderboardRowStyle(row.rank,"#60a5fa")}>
+                        <div style={leaderboardRankStyle(row.rank)}>{row.rank===1?"🥇":row.rank===2?"🥈":row.rank===3?"🥉":"#"+row.rank}</div>
+                        <div style={{flex:1,minWidth:0}}><div style={leaderboardNameStyle}>{row.playerName||row.playerId}</div>{parts[2]&&<div style={{fontSize:10,opacity:0.55,marginTop:1}}>on {parts[2]}</div>}</div>
+                        <div style={{...leaderboardValueStyle,color:"#93c5fd"}}>{Number(row.score||0).toLocaleString()}</div>
+                      </div>);})
                   }
                 </div>
               </div>
               <div style={leaderboardCardGoldStyle}>
                 <div style={leaderboardCardHeaderStyle}>
-                  <div>
-                    <div style={{...leaderboardTitleStyle,color:"#facc15"}}>⚡ Fastest Clear</div>
-                    <div style={leaderboardSubtitleStyle}>Fastest time collecting all crystals. Layout shown Ã¢ÂÂ beat them on the same map!</div>
-                  </div>
+                  <div><div style={{...leaderboardTitleStyle,color:"#facc15"}}>⚡ Fastest Clear</div><div style={leaderboardSubtitleStyle}>Fastest time collecting all 💎. Layout shown — beat them on the same map!</div></div>
                   <div style={leaderboardBadgeGoldStyle}>TOP 5</div>
                 </div>
                 <div style={leaderboardScrollStyle}>
-                  {leaderboardLoading?(<div style={leaderboardEmptyStyle}>Loading...</div>):fastestClearRows.length===0?(<div style={leaderboardEmptyStyle}>Collect all crystals to set a record!</div>):
-                    fastestClearRows.map(row=>{
-                      const parts=String(row.playerId||'').split('|');
-                      return(
-                        <div key={"f"+row.rank} style={leaderboardRowStyle(row.rank,"#facc15")}>
-                          <div style={leaderboardRankStyle(row.rank)}>{row.rank===1?"🥇":row.rank===2?"🥈":row.rank===3?"🥉":"#"+row.rank}</div>
-                          <div style={{flex:1,minWidth:0}}>
-                            <div style={leaderboardNameStyle}>{row.playerName||row.playerId}</div>
-                            {parts[2]&&<div style={{fontSize:10,opacity:0.55,marginTop:1}}>on {parts[2]}</div>}
-                          </div>
-                          <div style={{...leaderboardValueStyle,color:"#fde68a"}}>{formatMs(row.clearTimeMs)}</div>
-                        </div>
-                      );
-                    })
+                  {leaderboardLoading?(<div style={leaderboardEmptyStyle}>Loading...</div>):fastestClearRows.length===0?(<div style={leaderboardEmptyStyle}>Collect all 💎 to set a record!</div>):
+                    fastestClearRows.map(row=>{const parts=String(row.playerId||'').split('|');return(
+                      <div key={"f"+row.rank} style={leaderboardRowStyle(row.rank,"#facc15")}>
+                        <div style={leaderboardRankStyle(row.rank)}>{row.rank===1?"🥇":row.rank===2?"🥈":row.rank===3?"🥉":"#"+row.rank}</div>
+                        <div style={{flex:1,minWidth:0}}><div style={leaderboardNameStyle}>{row.playerName||row.playerId}</div>{parts[2]&&<div style={{fontSize:10,opacity:0.55,marginTop:1}}>on {parts[2]}</div>}</div>
+                        <div style={{...leaderboardValueStyle,color:"#fde68a"}}>{formatMs(row.clearTimeMs)}</div>
+                      </div>);})
                   }
                 </div>
               </div>
             </div>
             <div style={{...leaderboardCardRedStyle,marginTop:14,border:"1px solid rgba(250,204,21,0.25)",background:"linear-gradient(135deg,rgba(250,204,21,0.07),rgba(9,12,22,0.95))"}}>
               <div style={leaderboardCardHeaderStyle}>
-                <div>
-                  <div style={{...leaderboardTitleStyle,color:"#fde68a"}}>🗺️ Layout Champions</div>
-                  <div style={leaderboardSubtitleStyle}>The #1 score holder on each of the 30 layouts. Claim a throne Ã¢ÂÂ or steal one.</div>
-                </div>
+                <div><div style={{...leaderboardTitleStyle,color:"#fde68a"}}>🗺️ Layout Champions</div><div style={leaderboardSubtitleStyle}>The #1 score holder on each of the 30 layouts. Claim a throne — or steal one.</div></div>
                 <div style={{...leaderboardBadgeGoldStyle,background:"rgba(250,204,21,0.18)"}}>30 MAPS</div>
               </div>
               <div style={{display:"grid",gridTemplateColumns:isMobileView?"1fr":"repeat(2,1fr)",gap:6,maxHeight:320,overflowY:"auto",paddingRight:4}}>
-                {layoutChampions.length===0?(
-                  <div style={{...leaderboardEmptyStyle,gridColumn:"1/-1"}}>No layout records yet Ã¢ÂÂ play any layout to claim it!</div>
-                ):layoutChampions.map((champ,idx)=>{
-                  const isMine=champ.playerId&&(champ.playerId===effectivePlayerId||champ.playerName===playerName);
-                  const unclaimed=!champ.playerId||champ.score===0;
-                  return(
-                    <div key={idx} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:10,
-                      background:isMine?"rgba(250,204,21,0.12)":unclaimed?"rgba(255,255,255,0.02)":"rgba(255,255,255,0.04)",
-                      border:isMine?"1px solid rgba(250,204,21,0.4)":unclaimed?"1px dashed rgba(255,255,255,0.08)":"1px solid rgba(255,255,255,0.06)"}}>
+                {layoutChampions.length===0?(<div style={{...leaderboardEmptyStyle,gridColumn:"1/-1"}}>No layout records yet!</div>):
+                  layoutChampions.map((champ,idx)=>{const isMine=champ.playerId&&(champ.playerId===effectivePlayerId||champ.playerName===playerName);const unclaimed=!champ.playerId||champ.score===0;return(
+                    <div key={idx} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:10,background:isMine?"rgba(250,204,21,0.12)":unclaimed?"rgba(255,255,255,0.02)":"rgba(255,255,255,0.04)",border:isMine?"1px solid rgba(250,204,21,0.4)":unclaimed?"1px dashed rgba(255,255,255,0.08)":"1px solid rgba(255,255,255,0.06)"}}>
                       <div style={{fontSize:10,fontWeight:800,color:"rgba(255,255,255,0.35)",minWidth:20,textAlign:"center"}}>#{idx+1}</div>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:11,fontWeight:700,color:isMine?"#fde68a":"rgba(255,255,255,0.8)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{champ.layoutName}</div>
-                        <div style={{fontSize:10,opacity:0.55,marginTop:1}}>{unclaimed?"🏆 Unclaimed":(isMine?"👑 You hold this!":champ.playerName||champ.playerId)}</div>
-                      </div>
+                      <div style={{flex:1,minWidth:0}}><div style={{fontSize:11,fontWeight:700,color:isMine?"#fde68a":"rgba(255,255,255,0.8)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{champ.layoutName}</div><div style={{fontSize:10,opacity:0.55,marginTop:1}}>{unclaimed?"🏆 Unclaimed":(isMine?"👑 You hold this!":champ.playerName||champ.playerId)}</div></div>
                       {!unclaimed&&<div style={{fontSize:11,fontWeight:900,color:"#fde68a"}}>{champ.score.toLocaleString()}</div>}
                       {unclaimed&&<div style={{fontSize:10,color:"rgba(250,204,21,0.5)"}}>Open</div>}
-                    </div>
-                  );
-                })}
+                    </div>);})
+                }
               </div>
             </div>
             <div style={{...leaderboardCardRedStyle,marginTop:14}}>
               <div style={leaderboardCardHeaderStyle}>
-                <div>
-                  <div style={{...leaderboardTitleStyle,color:"#f87171"}}>🐜 Your Stats</div>
-                  <div style={leaderboardSubtitleStyle}>Your personal progress. Only you can see this.</div>
-                </div>
+                <div><div style={{...leaderboardTitleStyle,color:"#f87171"}}>🐜 Your Stats</div><div style={leaderboardSubtitleStyle}>Your personal progress. Only you can see this.</div></div>
                 <div style={leaderboardBadgeRedStyle}>YOU</div>
               </div>
               <div style={{display:"grid",gridTemplateColumns:isMobileView?"repeat(2,1fr)":"repeat(5,1fr)",gap:12,marginBottom:14}}>
@@ -1970,15 +1931,10 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                 <div style={personalStatBoxStyle("#a78bfa")}><div style={personalStatLabelStyle}>🗺️ Layouts</div><div style={personalStatValueStyle}>{layoutsExplored}<span style={{fontSize:12,opacity:0.5}}>/30</span></div></div>
               </div>
               <div style={{padding:"10px 12px",borderRadius:12,background:"rgba(167,139,250,0.08)",border:"1px solid rgba(167,139,250,0.2)"}}>
-                <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
-                  <span style={{fontSize:12,fontWeight:700,color:"#a78bfa"}}>🗺️ Explorer Progress</span>
-                  <span style={{fontSize:12,opacity:0.6}}>{layoutsExplored} / 30 layouts played</span>
-                </div>
-                <div style={{height:7,borderRadius:99,background:"rgba(255,255,255,0.08)"}}>
-                  <div style={{height:"100%",borderRadius:99,width:(Math.min(100,(layoutsExplored/30)*100))+"%",background:"linear-gradient(90deg,#7c3aed,#a78bfa)",transition:"width 0.6s ease"}}/>
-                </div>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}><span style={{fontSize:12,fontWeight:700,color:"#a78bfa"}}>🗺️ Explorer Progress</span><span style={{fontSize:12,opacity:0.6}}>{layoutsExplored} / 30 layouts played</span></div>
+                <div style={{height:7,borderRadius:99,background:"rgba(255,255,255,0.08)"}}><div style={{height:"100%",borderRadius:99,width:(Math.min(100,(layoutsExplored/30)*100))+"%",background:"linear-gradient(90deg,#7c3aed,#a78bfa)",transition:"width 0.6s ease"}}/></div>
                 <div style={{fontSize:10,opacity:0.5,marginTop:4}}>Play any run on a layout to mark it explored</div>
-                {layoutsExplored===30&&(<div style={{marginTop:4,fontSize:12,fontWeight:800,color:"#fde68a",textAlign:"center"}}>All 30 layouts conquered! Legend status.</div>)}
+                {layoutsExplored===30&&<div style={{marginTop:4,fontSize:12,fontWeight:800,color:"#fde68a",textAlign:"center"}}>🏆 All 30 layouts conquered! Legend status. 🐜</div>}
               </div>
             </div>
           </div>
