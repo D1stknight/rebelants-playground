@@ -324,11 +324,9 @@ export default function TunnelShell() {
 
     const [playerName, setPlayerName] = useState(initialName);
   const [effectivePlayerId] = useState(initialEffectiveId);
-  const [discordName,    setDiscordName]    = useState<string>("");
   const [dailyClaimed,   setDailyClaimed]   = useState(false);
   const [nextClaimTs,    setNextClaimTs]    = useState<number|null>(null);
   const [countdownStr,   setCountdownStr]   = useState("");
-  const [showDisconnect, setShowDisconnect] = useState(false);
   const [showBuyPoints, setShowBuyPoints] = useState(false);
   const [tunnelCfg, setTunnelCfg] = useState(DEFAULT_TUNNEL_CONFIG);
 
@@ -1102,12 +1100,14 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     return () => clearInterval(id);
   }, [nextClaimTs]);
 
-  // ── Load discord connection state ────────────────────────────────────────
-  React.useEffect(() => {
-    const p = loadProfile();
-    if ((p as any)?.discordName) setDiscordName((p as any).discordName);
-    setShowDisconnect(!!(p as any)?.discordUserId);
-  }, [effectivePlayerId]);
+
+  // ── Discord identity (computed inline like Raid.tsx) ─────────────────────
+  const _profile = loadProfile();
+  const discordUserId: string | null = (_profile as any)?.discordUserId || null;
+  const discordName: string = (_profile as any)?.discordName || "";
+  const showDisconnect: boolean = !!discordUserId;
+  const identityDisplay: string = discordName || (_profile as any)?.name || "guest";
+
 
   return (
     <>
@@ -1157,7 +1157,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               </p>
 
               <SharedEconomyPanel
-                playerId={discordName || playerName}
+                playerId={identityDisplay}
                 balance={balance}
                 totalPlaysLeft={totalEarnRoom}
                 dailyPlaysLeft={remainingDaily}
@@ -1191,7 +1191,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
             <button
               onClick={async()=>{
                 try {
-                  const r = await fetch("/api/points/migrate-drip", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({playerId:effectivePlayerId})});
+                  const r = await fetch("/api/drip/migrate", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({playerId:effectivePlayerId})});
                   const j = await r.json().catch(()=>null);
                   if (r.ok) { await refresh(); setRunMessage(j?.message || "DRIP points migrated ✅"); }
                   else setRunMessage(j?.error || "Migration failed.");
@@ -1313,10 +1313,18 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                 </div>
 
 {isPlaying && (
-            <div style={{position:"sticky",top:0,zIndex:50,display:"flex",justifyContent:"center",alignItems:"center",gap:20,padding:"5px 16px",background:"rgba(0,0,0,0.80)",backdropFilter:"blur(8px)",borderBottom:"1px solid "+themeMap[boardTheme].accent+"44"}}>
-              <span style={{color:timeLeft<=10?"#ff4444":themeMap[boardTheme].accent,fontWeight:900,fontSize:16}}>⏱ {timeLeft}s</span>
-              <span style={{color:themeMap[boardTheme].crystal,fontWeight:700,fontSize:14}}>💎 {score}</span>
-              <span style={{color:"#ff8c00",fontWeight:700,fontSize:14}}>💥 {wallBreaksLeft}</span>
+            <div style={{
+              position:"fixed", top:0, left:0, right:0, zIndex:1000,
+              display:"flex", justifyContent:"center", alignItems:"center", gap:24,
+              padding:"8px 20px",
+              background:"rgba(0,0,0,0.90)", backdropFilter:"blur(12px)",
+              borderBottom:"2px solid "+themeMap[boardTheme].accent+"66",
+              boxShadow:"0 4px 20px rgba(0,0,0,0.5)",
+            }}>
+              <span style={{color:timeLeft<=10?"#ff4444":themeMap[boardTheme].accent,fontWeight:900,fontSize:18,letterSpacing:1}}>⏱ {timeLeft}s</span>
+              <span style={{color:themeMap[boardTheme].crystal,fontWeight:700,fontSize:16}}>💎 {score}</span>
+              <span style={{color:"#ff8c00",fontWeight:700,fontSize:16}}>💥 {wallBreaksLeft}</span>
+              <span style={{color:"rgba(255,255,255,0.6)",fontWeight:700,fontSize:14}}>💎 {crystals.length} left</span>
             </div>
           )}
                 <div style={boardBadgeStyle}>
@@ -1641,7 +1649,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               <div style={leaderboardCardBlueStyle}>
                 <div style={leaderboardCardHeaderStyle}>
                   <div>
-                    <div style={leaderboardTitleStyle}>Top Score</div>
+                    <div style={leaderboardTitleStyle}>🏆 Top Score</div>
                     <div style={leaderboardSubtitleStyle}>All-Time Tunnel Leaders</div>
                   </div>
                   <div style={leaderboardBadgeBlueStyle}>Top 5</div>
@@ -1658,7 +1666,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                         key={`score-${row.playerId}-${row.rank}`}
                         style={leaderboardRowStyle(row.rank, "#60a5fa")}
                       >
-                        <div style={leaderboardRankStyle(row.rank)}>#{row.rank}</div>
+                        <div style={leaderboardRankStyle(row.rank)}>{row.rank===1?"🥇":row.rank===2?"🥈":row.rank===3?"🥉":"#"+row.rank}</div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={leaderboardNameStyle}>{row.playerName || row.playerId}</div>
                         </div>
@@ -1672,8 +1680,8 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               <div style={leaderboardCardGoldStyle}>
                 <div style={leaderboardCardHeaderStyle}>
                   <div>
-                    <div style={leaderboardTitleStyle}>Fastest Clear</div>
-                    <div style={leaderboardSubtitleStyle}>Full Crystal Sweep Only</div>
+                    <div style={leaderboardTitleStyle}>⚡ Fastest Clear</div>
+                    <div style={leaderboardSubtitleStyle}>Full Crystal Sweep Only ✨</div>
                   </div>
                   <div style={leaderboardBadgeGoldStyle}>Top 5</div>
                 </div>
@@ -1704,8 +1712,8 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
             <div style={leaderboardCardRedStyle}>
               <div style={leaderboardCardHeaderStyle}>
                 <div>
-                  <div style={leaderboardTitleStyle}>Your Tunnel Stats</div>
-                  <div style={leaderboardSubtitleStyle}>Personal Progress</div>
+                  <div style={leaderboardTitleStyle}>🐜 Your Stats</div>
+                  <div style={leaderboardSubtitleStyle}>Personal Progress 📈</div>
                 </div>
                 <div style={leaderboardBadgeRedStyle}>You</div>
               </div>
@@ -1717,28 +1725,28 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                 }}
               >
                 <div style={personalStatBoxStyle("#60a5fa")}>
-                  <div style={personalStatLabelStyle}>Best Score</div>
+                  <div style={personalStatLabelStyle}>🎯 Best Score</div>
                   <div style={personalStatValueStyle}>
                     {Number(personalStats?.bestScore || 0).toLocaleString()}
                   </div>
                 </div>
 
                 <div style={personalStatBoxStyle("#facc15")}>
-                  <div style={personalStatLabelStyle}>Best Clear Time</div>
+                  <div style={personalStatLabelStyle}>⚡ Best Clear Time</div>
                   <div style={personalStatValueStyle}>
                     {personalStats?.bestClearTimeMs ? formatMs(personalStats.bestClearTimeMs) : "--"}
                   </div>
                 </div>
 
                 <div style={personalStatBoxStyle("#22c55e")}>
-                  <div style={personalStatLabelStyle}>Total Runs</div>
+                  <div style={personalStatLabelStyle}>🏃 Total Runs</div>
                   <div style={personalStatValueStyle}>
                     {Number(personalStats?.totalRuns || 0).toLocaleString()}
                   </div>
                 </div>
 
                 <div style={personalStatBoxStyle("#f43f5e")}>
-                  <div style={personalStatLabelStyle}>Total Crystals</div>
+                  <div style={personalStatLabelStyle}>💎 Total Crystals</div>
                   <div style={personalStatValueStyle}>
                     {Number(personalStats?.totalCrystals || 0).toLocaleString()}
                   </div>
@@ -1996,7 +2004,7 @@ const gameBoardStyle: React.CSSProperties = {
   borderRadius: 18,
   border: "1px solid rgba(255,255,255,0.12)",
   background:
-    "rgba(0,0,0,0)",
+    "transparent",
   overflow: "hidden",
 };
 
