@@ -1115,7 +1115,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
         style={{
           maxWidth: 1600,
           margin: "0 auto",
-          padding: isPlaying && isMobileView ? "10px 8px" : "32px 16px",
+          padding: isPlaying && isMobileView ? "10px 8px" : "20px 16px",
         }}
       >
         <header style={{ marginBottom: 18 }}>
@@ -1152,7 +1152,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               <div style={{ fontSize: 30, fontWeight: 900, marginBottom: 6 }}>
                 Ant Tunnel
               </div>
-              <p style={{ opacity: 0.88, marginBottom: 18 }}>
+              <p style={{ opacity: 0.88, marginBottom: 12, fontSize: 13 }}>
                 Samurai Rebel Ants. Underground tunnels. Crumbs, sugar, crystals, danger, and breakable walls.
               </p>
 
@@ -1168,6 +1168,11 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                 onOpenBuyPoints={() => setShowBuyPoints(true)}
                 onRefresh={refresh}
               />
+              {discordUserId && (
+                <div style={{fontSize:12, opacity:0.6, marginTop:4}}>
+                  ID: {identityDisplay}
+                </div>
+              )}
 
           {/* ── Economy buttons ──────────────────────────────── */}
           <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:16,marginTop:4,alignItems:"center"}}>
@@ -1178,12 +1183,12 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               {dailyClaimed?(countdownStr?`⏱ ${countdownStr}`:"✅ Claimed Today"):`🐜 Daily +${tunnelCfg.dailyClaim} ${tunnelCfg.currency}`}
             </button>
             {showDisconnect?(
-              <button onClick={()=>{window.location.href="/api/auth/discord/logout";}}
+              <button onClick={()=>{window.location.href="/api/auth/discord/logout?returnTo=/tunnel";}}
                 style={{padding:"8px 18px",borderRadius:20,border:"1px solid rgba(255,255,255,0.2)",cursor:"pointer",fontWeight:700,fontSize:13,background:"rgba(255,255,255,0.06)",color:"rgba(255,255,255,0.7)"}}>
                 Disconnect Discord
               </button>
             ):(
-              <button onClick={()=>{window.location.href="/api/auth/discord/login";}}
+              <button onClick={()=>{window.location.href="/api/auth/discord/login?returnTo=/tunnel";}}
                 style={{padding:"8px 18px",borderRadius:20,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,background:"#5865f2",color:"#fff"}}>
                 🔗 Connect Discord
               </button>
@@ -1332,7 +1337,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                 </div>
               </div>
 
-              <div style={{ padding: 18 }}>
+              <div style={{ padding: 18, background: "transparent" }}>
                {runMessage ? (
   <div
     style={{
@@ -1345,7 +1350,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
         : runMessageStyle.background,
       color: didWinRun ? "#fde68a" : "white",
       fontWeight: didWinRun ? 800 : 500,
-    }}  >
+    }}}  >
           
     {runMessage}
   </div>
