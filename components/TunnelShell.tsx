@@ -2,6 +2,63 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "re
 import Link from "next/link";
 import { usePoints } from "../lib/usePoints";
 import { loadProfile, getEffectivePlayerId, saveProfile } from "../lib/profile";
+
+// ── Audio system ──────────────────────────────────────────────────────────────
+function useAudio() {
+  const [muted, setMuted] = React.useState<boolean>(() => {
+    try { return localStorage.getItem("ra:tunnel:muted") === "1"; } catch { return false; }
+  });
+  const ambientRef = React.useRef<HTMLAudioElement | null>(null);
+
+  const play = React.useCallback((src: string, volume = 1) => {
+    if (typeof window === "undefined") return;
+    try {
+      const a = new Audio(src);
+      a.volume = volume;
+      void a.play().catch(() => {});
+    } catch {}
+  }, []);
+
+  const startAmbient = React.useCallback(() => {
+    if (typeof window === "undefined") return;
+    if (ambientRef.current) { ambientRef.current.pause(); ambientRef.current = null; }
+    try {
+      const a = new Audio("/audio/ambient-tunnel.mp3");
+      a.loop = true;
+      a.volume = muted ? 0 : 0.35;
+      void a.play().catch(() => {});
+      ambientRef.current = a;
+    } catch {}
+  }, [muted]);
+
+  const stopAmbient = React.useCallback(() => {
+    if (ambientRef.current) {
+      ambientRef.current.pause();
+      ambientRef.current.currentTime = 0;
+      ambientRef.current = null;
+    }
+  }, []);
+
+  const toggleMute = React.useCallback(() => {
+    setMuted(m => {
+      const next = !m;
+      try { localStorage.setItem("ra:tunnel:muted", next ? "1" : "0"); } catch {}
+      if (ambientRef.current) ambientRef.current.volume = next ? 0 : 0.35;
+      return next;
+    });
+  }, []);
+
+  const sfx = React.useMemo(() => ({
+    crumb:   () => { if (!muted) play("/audio/collect-crumb.mp3",   0.1); },
+    crystal: () => { if (!muted) play("/audio/collect-crystal.mp3", 1.0); },
+    sugar:   () => { if (!muted) play("/audio/collect-crumb.mp3",   0.1); },
+    wall:    () => { if (!muted) play("/audio/wall-break.mp3",      0.75); },
+    win:     () => { if (!muted) { stopAmbient(); play("/audio/tunnel-win.mp3", 0.9); } },
+    lose:    () => { if (!muted) { stopAmbient(); play("/audio/tunnel-lose.mp3", 0.8); } },
+  }), [muted, play, stopAmbient]);
+
+  return { muted, toggleMute, startAmbient, stopAmbient, sfx };
+}
 import BuyPointsModal from "./BuyPointsModal";
 import SharedEconomyPanel from "./SharedEconomyPanel";
 
@@ -372,6 +429,7 @@ export default function TunnelShell() {
   const [dripBalance,    setDripBalance]    = useState<number|null>(null);
   const [dripStatus,     setDripStatus]     = useState("");
   const [showBuyPoints, setShowBuyPoints] = useState(false);
+  const { muted, toggleMute, startAmbient, stopAmbient, sfx } = useAudio();
   const [tunnelCfg, setTunnelCfg] = useState(DEFAULT_TUNNEL_CONFIG);
 
     const [boardTheme, setBoardTheme] = useState<BoardTheme>("colony");
@@ -637,6 +695,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
 
       setBrokenWalls((prev) => [...prev, key]);
       setWallBreaksLeft((n) => Math.max(0, n - 1));
+      sfx.wall();
       triggerWallBurst(target.row, target.col);
       setRunMessage("Wall broken ✅");
       return;
@@ -677,6 +736,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
         if (found) {
           setScore((s) => s + 1);
           triggerPickupBurst(nextRow, nextCol, "crumb");
+          sfx.crumb();
         }
         return current.filter((c) => !(c.row === nextRow && c.col === nextCol));
       });
@@ -686,6 +746,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
         if (found) {
           setScore((s) => s + 5);
           triggerPickupBurst(nextRow, nextCol, "sugar");
+          sfx.sugar();
         }
         return current.filter((c) => !(c.row === nextRow && c.col === nextCol));
       });
@@ -695,6 +756,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
         if (found) {
           setScore((s) => s + 20);
           triggerPickupBurst(nextRow, nextCol, "crystal");
+          sfx.crystal();
         }
         return current.filter((c) => !(c.row === nextRow && c.col === nextCol));
       });
@@ -901,6 +963,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
 
         const finishRun = async () => {
       setIsPlaying(false);
+      sfx.lose();
 
             const crystalsCollected = Math.max(0, runCrystalTarget - crystals.length);
       await recordTunnelRun({
@@ -952,6 +1015,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
        const finishCrystalRun = async () => {
       setIsPlaying(false);
       setDidWinRun(true);
+      sfx.win();
 
             await recordTunnelRun({
         score,
@@ -1250,7 +1314,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
   React.useEffect(() => {
     if (countdown === null || countdown <= 0) return;
     const id = window.setTimeout(() => {
-      if (countdown === 1) { setCountdown(null); setIsPlaying(true); setRunMessage(""); }
+      if (countdown === 1) { setCountdown(null); setIsPlaying(true); setRunMessage(""); startAmbient(); }
       else { setCountdown(c => c !== null ? c - 1 : null); }
     }, 1000);
     return () => window.clearTimeout(id);
@@ -1288,10 +1352,13 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
       >
         <header style={{ marginBottom: 28, backgroundImage:"url('/bg/tunnel-bg.png')", backgroundSize:"cover", backgroundPosition:"center top", backgroundRepeat:"no-repeat", position:"relative" as const, overflow:"hidden", padding:"16px 20px 20px"}}>
         <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom, rgba(9,12,22,0.3) 0%, rgba(9,12,22,0.75) 100%)",zIndex:0,pointerEvents:"none"}}/>
-          <div style={{ fontSize: 28, fontWeight: 900, marginBottom: 12, position:"relative", zIndex:1 }}>
+          <div style={{ fontSize: 28, fontWeight: 900, marginBottom: 12, position:"relative", zIndex:1, display:"flex", alignItems:"center", gap:10 }}>
             <Link href="/" style={{ textDecoration: "none", color: "inherit" }}>
               Rebel Ants Playground
             </Link>
+            <button onClick={toggleMute} title={muted ? "Unmute" : "Mute"} style={{ background:"rgba(0,0,0,0.4)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:20, padding:"3px 10px", cursor:"pointer", fontSize:16, color:"rgba(255,255,255,0.8)", lineHeight:1 }}>
+              {muted ? "🔇" : "🔊"}
+            </button>
           </div>
 
           <nav className="tabs" aria-label="Main" style={{ position:"relative", zIndex:1 }}>
