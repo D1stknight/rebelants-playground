@@ -330,6 +330,8 @@ export default function TunnelShell() {
   const [dripAmount,     setDripAmount]     = useState(0);
   const [dripPanelOpen,  setDripPanelOpen]  = useState(false);
   const [dripBusy,       setDripBusy]       = useState(false);
+  const [dripBalance,    setDripBalance]    = useState<number|null>(null);
+  const [dripStatus,     setDripStatus]     = useState("");
   const [showBuyPoints, setShowBuyPoints] = useState(false);
   const [tunnelCfg, setTunnelCfg] = useState(DEFAULT_TUNNEL_CONFIG);
 
@@ -1153,6 +1155,19 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     return () => { cancelled = true; };
   }, []);
 
+  // ── Load DRIP balance when discord is connected ──────────────────────────
+  React.useEffect(() => {
+    const p = loadProfile();
+    if (!(p as any)?.discordUserId) return;
+    (async () => {
+      try {
+        const r = await fetch("/api/drip/balance", { cache: "no-store" });
+        const j = await r.json().catch(() => null);
+        if (r.ok && j?.ok) setDripBalance(Number(j.balance || 0));
+      } catch {}
+    })();
+  }, [effectivePlayerId]);
+
   // ── Discord identity (computed inline like Raid.tsx) ─────────────────────
   const _profile = loadProfile();
   const discordUserId: string | null = (_profile as any)?.discordUserId || null;
@@ -1257,14 +1272,24 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                 </div>
               )}
 
-          {/* ── Economy buttons ──────────────────────────────── */}
-          <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:16,marginTop:4,alignItems:"center"}}>
+          {/* ── Economy buttons — exact Raid.tsx pattern ─────────── */}
+          <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:12,marginTop:8,alignItems:"center"}}>
+
+            {/* Claim Daily */}
             <button onClick={claimDailyNow} disabled={dailyClaimed}
-              style={{padding:"8px 18px",borderRadius:20,border:"none",cursor:dailyClaimed?"default":"pointer",fontWeight:700,fontSize:13,
+              style={{padding:"8px 14px",borderRadius:20,border:"none",cursor:dailyClaimed?"default":"pointer",fontWeight:700,fontSize:13,
                 background:dailyClaimed?"rgba(255,255,255,0.08)":themeMap[boardTheme].accent,
                 color:dailyClaimed?"rgba(255,255,255,0.4)":"#000",transition:"all 0.2s"}}>
               {dailyClaimed?"✅ Claimed Today":`🐜 Daily +${tunnelCfg.dailyClaim} ${tunnelCfg.currency}`}
             </button>
+
+            {/* Buy Points */}
+            <button onClick={()=>setShowBuyPoints(true)}
+              style={{padding:"8px 14px",borderRadius:20,border:"1px solid rgba(255,255,255,0.2)",cursor:"pointer",fontWeight:700,fontSize:13,background:"rgba(255,255,255,0.06)",color:"rgba(255,255,255,0.8)"}}>
+              Buy Points
+            </button>
+
+            {/* Discord connect/disconnect */}
             {showDisconnect?(
               <button onClick={()=>{
                 const p = loadProfile();
@@ -1272,7 +1297,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                 saveProfile({ ...(p as any), discordUserId: undefined, discordName: undefined, primaryId: fallback, discordSkipLink: true } as any);
                 window.location.href="/api/auth/discord/logout";
               }}
-                style={{padding:"8px 18px",borderRadius:20,border:"1px solid rgba(255,255,255,0.2)",cursor:"pointer",fontWeight:700,fontSize:13,background:"rgba(255,255,255,0.06)",color:"rgba(255,255,255,0.7)"}}>
+                style={{padding:"8px 14px",borderRadius:20,border:"1px solid rgba(255,255,255,0.2)",cursor:"pointer",fontWeight:700,fontSize:13,background:"rgba(255,255,255,0.06)",color:"rgba(255,255,255,0.7)"}}>
                 Disconnect Discord
               </button>
             ):(
@@ -1281,38 +1306,72 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                 saveProfile({ ...(p as any), discordSkipLink: false } as any);
                 window.location.href="/api/auth/discord/login";
               }}
-                style={{padding:"8px 18px",borderRadius:20,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,background:"#5865f2",color:"#fff"}}>
+                style={{padding:"8px 14px",borderRadius:20,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,background:"#5865f2",color:"#fff"}}>
                 🔗 Connect Discord
               </button>
             )}
-            <button onClick={()=>{ if(!showDisconnect){setRunMessage("Connect Discord first to migrate DRIP points.");return;} setDripPanelOpen(v=>!v); }}
-              style={{padding:"8px 18px",borderRadius:20,border:"1px solid rgba(255,255,255,0.15)",cursor:"pointer",fontWeight:700,fontSize:13,background:dripPanelOpen?"rgba(255,255,255,0.12)":"rgba(255,255,255,0.06)",color:showDisconnect?"rgba(255,255,255,0.6)":"rgba(255,255,255,0.3)"}}>
-              Migrate DRIP Points
-            </button>
-            {dripPanelOpen && (
-              <div style={{width:"100%",marginTop:8,padding:"12px 14px",borderRadius:14,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.12)",display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-                <span style={{fontSize:12,opacity:0.7}}>Amount:</span>
+
+            {/* Discord status — shown when connected */}
+            {showDisconnect && (
+              <div style={{fontSize:13,fontWeight:700,color:"#22c55e",display:"flex",alignItems:"center",gap:4}}>
+                Discord: <span style={{maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{discordName}</span> ✅
+              </div>
+            )}
+
+            {/* Migrate DRIP — only when discord connected */}
+            {showDisconnect && (
+              <button onClick={()=>setDripPanelOpen(v=>!v)}
+                style={{padding:"8px 14px",borderRadius:20,border:"1px solid rgba(255,255,255,0.2)",cursor:"pointer",fontWeight:700,fontSize:13,background:dripPanelOpen?"rgba(255,255,255,0.12)":"rgba(255,255,255,0.06)",color:"rgba(255,255,255,0.8)"}}>
+                Migrate Points from DRIP in Discord
+              </button>
+            )}
+
+            {/* DRIP balance — shown next to migrate button */}
+            {showDisconnect && dripBalance !== null && (
+              <div style={{fontSize:13,opacity:0.8}}>
+                DRIP: <b>{dripBalance}</b>
+              </div>
+            )}
+
+          </div>
+
+          {/* Drip migrate panel */}
+          {dripPanelOpen && showDisconnect && (
+            <div style={{marginBottom:12,padding:"12px 14px",borderRadius:14,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.12)"}}>
+              <div style={{fontWeight:900,fontSize:14,marginBottom:8}}>Migrate DRIP Points → Game</div>
+              <div style={{fontSize:12,opacity:0.8,marginBottom:10}}>This will <b>deduct</b> points from DRIP (Discord) and <b>credit</b> the same amount into the game. No double-dipping.</div>
+              {dripBalance !== null && <div style={{fontSize:13,marginBottom:8}}>DRIP Balance: <b>{dripBalance}</b></div>}
+              <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                <label style={{fontSize:12,opacity:0.8}}>Amount to migrate:</label>
                 <input type="number" min={1} value={dripAmount||""} onChange={e=>setDripAmount(Number(e.target.value))}
-                  style={{width:90,padding:"6px 10px",borderRadius:10,border:"1px solid rgba(255,255,255,0.2)",background:"rgba(15,23,42,0.7)",color:"white",fontWeight:700}}
+                  style={{width:100,padding:"6px 10px",borderRadius:10,border:"1px solid rgba(255,255,255,0.2)",background:"rgba(15,23,42,0.7)",color:"white",fontWeight:700}}
                   placeholder="e.g. 100" />
                 <button disabled={dripBusy||!dripAmount} onClick={async()=>{
                   if(!dripAmount||dripAmount<=0)return;
-                  setDripBusy(true);
+                  setDripBusy(true);setDripStatus("");
                   try{
                     const idem=Date.now().toString(36);
                     const r=await fetch("/api/drip/migrate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({amount:dripAmount,playerId:effectivePlayerId,idempotencyKey:idem})});
                     const j=await r.json().catch(()=>null);
-                    if(r.ok&&j?.ok){await refresh();setRunMessage(j?.message||`Migrated ${dripAmount} DRIP points ✅`);setDripPanelOpen(false);setDripAmount(0);}
-                    else setRunMessage(j?.error||"Migration failed. Make sure DRIP is linked in Discord.");
-                  }catch(e:any){setRunMessage(e?.message||"Migration failed.");}
+                    if(r.ok&&j?.ok){
+                      await refresh();
+                      setDripBalance(b=>b!==null?b-dripAmount:null);
+                      setDripStatus(`✅ Migrated ${dripAmount} points!`);
+                      setDripPanelOpen(false);setDripAmount(0);
+                    } else setDripStatus(j?.error||"Migration failed.");
+                  }catch(e:any){setDripStatus(e?.message||"Error.");}
                   finally{setDripBusy(false);}
-                }} style={{padding:"6px 14px",borderRadius:14,border:"none",cursor:dripBusy?"default":"pointer",fontWeight:700,fontSize:12,background:"#5865f2",color:"#fff",opacity:dripBusy?0.5:1}}>
+                }} style={{padding:"8px 16px",borderRadius:14,border:"none",cursor:dripBusy?"default":"pointer",fontWeight:700,fontSize:13,background:"#5865f2",color:"#fff",opacity:dripBusy?0.5:1}}>
                   {dripBusy?"Migrating…":"Migrate Now"}
                 </button>
-                <span style={{fontSize:11,opacity:0.5}}>Deducts from DRIP Discord bot → credits here</span>
+                <button onClick={()=>{setDripPanelOpen(false);setDripStatus("");}}
+                  style={{padding:"8px 12px",borderRadius:12,border:"1px solid rgba(255,255,255,0.15)",cursor:"pointer",fontWeight:700,fontSize:12,background:"transparent",color:"rgba(255,255,255,0.5)"}}>
+                  Close
+                </button>
               </div>
-            )}
-          </div>
+              {dripStatus && <div style={{marginTop:8,fontSize:12,fontWeight:700,color:dripStatus.includes("✅")?"#22c55e":"#f87171"}}>{dripStatus}</div>}
+            </div>
+          )}
               <div
                 style={{
                   ...tunnelTopMetaRowStyle,
