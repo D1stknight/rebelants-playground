@@ -332,18 +332,18 @@ function formatMs(ms: number) {
   return `${totalSeconds.toFixed(2)}s`;
 }
 
-// ── Difficulty levels ──────────────────────────────────────────────────────
+// ââ Difficulty levels ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 const DIFFICULTY: Record<string, {label:string;emoji:string;desc:string}> = {
-  colony:  {label:"Level 1",  emoji:"🐜", desc:"Classic colony. Learn the ropes."},
-  neon:    {label:"Level 2",  emoji:"⚡", desc:"Electric. Spider moves faster."},
-  mythic:  {label:"Level 3",  emoji:"🔮", desc:"Dark magic. Tighter paths."},
-  lava:    {label:"Level 4",  emoji:"🌋", desc:"Volcanic. Heat slows your breaks."},
-  ice:     {label:"Level 5",  emoji:"🧊", desc:"Frozen. Spider is relentless."},
-  golden:  {label:"Level 6",  emoji:"🏆", desc:"Guarded vault. Charges dwindling."},
-  shadow:  {label:"Level 7",  emoji:"👁️", desc:"You barely see the walls."},
-  amber:   {label:"Level 8",  emoji:"🏺", desc:"Ancient stone. Walls resist breaking."},
-  toxic:   {label:"Level 9",  emoji:"☢️", desc:"Poison mist. Near impossible odds."},
-  void:    {label:"Level 10", emoji:"💀", desc:"Pure darkness. Maximum difficulty."},
+  colony:  {label:"Level 1",  emoji:"ð", desc:"Classic colony. Learn the ropes."},
+  neon:    {label:"Level 2",  emoji:"â¡", desc:"Electric. Spider moves faster."},
+  mythic:  {label:"Level 3",  emoji:"ð®", desc:"Dark magic. Tighter paths."},
+  lava:    {label:"Level 4",  emoji:"ð", desc:"Volcanic. Heat slows your breaks."},
+  ice:     {label:"Level 5",  emoji:"ð§", desc:"Frozen. Spider is relentless."},
+  golden:  {label:"Level 6",  emoji:"ð", desc:"Guarded vault. Charges dwindling."},
+  shadow:  {label:"Level 7",  emoji:"ðï¸", desc:"You barely see the walls."},
+  amber:   {label:"Level 8",  emoji:"ðº", desc:"Ancient stone. Walls resist breaking."},
+  toxic:   {label:"Level 9",  emoji:"â¢ï¸", desc:"Poison mist. Near impossible odds."},
+  void:    {label:"Level 10", emoji:"ð", desc:"Pure darkness. Maximum difficulty."},
 };
 
 export default function TunnelShell() {
@@ -356,6 +356,7 @@ export default function TunnelShell() {
   const [dailyClaimed,   setDailyClaimed]   = useState(false);
   const [nextClaimTs,    setNextClaimTs]    = useState<number|null>(null);
   const [countdownStr,   setCountdownStr]   = useState("");
+  const [countdown, setCountdown] = useState<number|null>(null);
   const [dripAmount,     setDripAmount]     = useState(0);
   const [profileVersion, setProfileVersion] = useState(0);
   const [dripPanelOpen,  setDripPanelOpen]  = useState(false);
@@ -628,7 +629,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
       setBrokenWalls((prev) => [...prev, key]);
       setWallBreaksLeft((n) => Math.max(0, n - 1));
       triggerWallBurst(target.row, target.col);
-      setRunMessage("Wall broken ✅");
+      setRunMessage("Wall broken â");
       return;
     }
 
@@ -917,7 +918,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           return;
         }
 
-                       setRunMessage(`Run complete. +${earnRes?.added ?? score} REBEL Points credited ✅`);
+                       setRunMessage(`Run complete. +${earnRes?.added ?? score} REBEL Points credited â`);
         await refresh();
         scrollBackToBoardHeader();
       } catch (e: any) {
@@ -956,7 +957,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
         return;
       }
 
-      setRunMessage(`Crystal sweep complete! Claiming ${score} REBEL Points... 👑`);
+      setRunMessage(`Crystal sweep complete! Claiming ${score} REBEL Points... ð`);
 
       try {
         const earnRes: any = await earn(score);
@@ -968,7 +969,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           return;
         }
 
-                       setRunMessage(`Crystal sweep complete! +${earnRes?.added ?? score} REBEL Points credited 👑`);
+                       setRunMessage(`Crystal sweep complete! +${earnRes?.added ?? score} REBEL Points credited ð`);
         await refresh();
         scrollBackToBoardHeader();
       } catch (e: any) {
@@ -1143,7 +1144,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
   }, [nextClaimTs]);
 
 
-  // ── Reload profile after Discord OAuth ────────────────────────────────────
+  // ââ Reload profile after Discord OAuth ââââââââââââââââââââââââââââââââââââ
   React.useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
@@ -1157,7 +1158,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
   }, []);
 
 
-  // ── Sync Discord session to localStorage (matches Shuffle.tsx) ──────────────
+  // ââ Sync Discord session to localStorage (matches Shuffle.tsx) ââââââââââââââ
   const _didDiscordLinkRef = React.useRef(false);
   React.useEffect(() => {
     if (_didDiscordLinkRef.current) return;
@@ -1200,7 +1201,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     return () => { cancelled = true; };
   }, []);
 
-  // ── Load DRIP balance when discord is connected ──────────────────────────
+  // ââ Load DRIP balance when discord is connected ââââââââââââââââââââââââââ
   React.useEffect(() => {
     const p = loadProfile();
     if (!(p as any)?.discordUserId) return;
@@ -1213,7 +1214,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     })();
   }, [effectivePlayerId]);
 
-  // ── Discord identity (computed inline like Raid.tsx) ─────────────────────
+  // ââ Discord identity (computed inline like Raid.tsx) âââââââââââââââââââââ
   const _profile = loadProfile();
   const discordUserId: string | null = (_profile as any)?.discordUserId || null;
   const discordName: string = (_profile as any)?.discordName || "";
@@ -1221,7 +1222,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
   const identityDisplay: string = discordName || (_profile as any)?.name || "guest";
 
 
-  // ── Reload identity after Discord OAuth redirect ──────────────────────────
+  // ââ Reload identity after Discord OAuth redirect ââââââââââââââââââââââââââ
   React.useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
@@ -1262,10 +1263,10 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               borderBottom:"2px solid "+themeMap[boardTheme].accent+"66",
               boxShadow:"0 4px 20px rgba(0,0,0,0.5)",
             }}>
-              <span style={{color:timeLeft<=10?"#ff4444":themeMap[boardTheme].accent,fontWeight:900,fontSize:18,letterSpacing:1}}>⏱ {timeLeft}s</span>
-              <span style={{color:themeMap[boardTheme].crystal,fontWeight:700,fontSize:16}}>💎 {score}</span>
-              <span style={{color:"#ff8c00",fontWeight:700,fontSize:16}}>💥 {wallBreaksLeft}</span>
-              <span style={{color:"rgba(255,255,255,0.6)",fontWeight:700,fontSize:14}}>💎 {crystals.length} left</span>
+              <span style={{color:timeLeft<=10?"#ff4444":themeMap[boardTheme].accent,fontWeight:900,fontSize:18,letterSpacing:1}}>â± {timeLeft}s</span>
+              <span style={{color:themeMap[boardTheme].crystal,fontWeight:700,fontSize:16}}>ð {score}</span>
+              <span style={{color:"#ff8c00",fontWeight:700,fontSize:16}}>ð¥ {wallBreaksLeft}</span>
+              <span style={{color:"rgba(255,255,255,0.6)",fontWeight:700,fontSize:14}}>ð {crystals.length} left</span>
             </div>
           )}
             <main
@@ -1327,7 +1328,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               />
 
 
-          {/* ── Economy buttons — exact Raid.tsx pattern ─────────── */}
+          {/* ââ Economy buttons â exact Raid.tsx pattern âââââââââââ */}
           <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:12,marginTop:8,alignItems:"center"}}>
 
             {/* Discord connect/disconnect */}
@@ -1348,18 +1349,18 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                 window.location.href="/api/auth/discord/login";
               }}
                 style={{padding:"8px 14px",borderRadius:20,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,background:"#5865f2",color:"#fff"}}>
-                🔗 Connect Discord
+                ð Connect Discord
               </button>
             )}
 
-            {/* Discord status — shown when connected */}
+            {/* Discord status â shown when connected */}
             {showDisconnect && (
               <div style={{fontSize:13,fontWeight:700,color:"#22c55e"}}>
-                Discord: Connected ✅
+                Discord: Connected â
               </div>
             )}
 
-            {/* Migrate DRIP — only when discord connected */}
+            {/* Migrate DRIP â only when discord connected */}
             {showDisconnect && (
               <button onClick={()=>setDripPanelOpen(v=>!v)}
                 style={{padding:"8px 14px",borderRadius:20,border:"1px solid rgba(255,255,255,0.2)",cursor:"pointer",fontWeight:700,fontSize:13,background:dripPanelOpen?"rgba(255,255,255,0.12)":"rgba(255,255,255,0.06)",color:"rgba(255,255,255,0.8)"}}>
@@ -1367,7 +1368,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               </button>
             )}
 
-            {/* DRIP balance — shown next to migrate button */}
+            {/* DRIP balance â shown next to migrate button */}
             {showDisconnect && dripBalance !== null && (
               <div style={{fontSize:13,opacity:0.8}}>
                 DRIP: <b>{dripBalance}</b>
@@ -1379,7 +1380,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           {/* Drip migrate panel */}
           {dripPanelOpen && showDisconnect && (
             <div style={{marginBottom:12,padding:"12px 14px",borderRadius:14,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.12)"}}>
-              <div style={{fontWeight:900,fontSize:14,marginBottom:8}}>Migrate DRIP Points → Game</div>
+              <div style={{fontWeight:900,fontSize:14,marginBottom:8}}>Migrate DRIP Points â Game</div>
               <div style={{fontSize:12,opacity:0.8,marginBottom:10}}>This will <b>deduct</b> points from DRIP (Discord) and <b>credit</b> the same amount into the game. No double-dipping.</div>
               {dripBalance !== null && <div style={{fontSize:13,marginBottom:8}}>DRIP Balance: <b>{dripBalance}</b></div>}
               <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
@@ -1397,20 +1398,20 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                     if(r.ok&&j?.ok){
                       await refresh();
                       setDripBalance(b=>b!==null?b-dripAmount:null);
-                      setDripStatus(`✅ Migrated ${dripAmount} points!`);
+                      setDripStatus(`â Migrated ${dripAmount} points!`);
                       setDripPanelOpen(false);setDripAmount(0);
                     } else setDripStatus(j?.error||"Migration failed.");
                   }catch(e:any){setDripStatus(e?.message||"Error.");}
                   finally{setDripBusy(false);}
                 }} style={{padding:"8px 16px",borderRadius:14,border:"none",cursor:dripBusy?"default":"pointer",fontWeight:700,fontSize:13,background:"#5865f2",color:"#fff",opacity:dripBusy?0.5:1}}>
-                  {dripBusy?"Migrating…":"Migrate Now"}
+                  {dripBusy?"Migratingâ¦":"Migrate Now"}
                 </button>
                 <button onClick={()=>{setDripPanelOpen(false);setDripStatus("");}}
                   style={{padding:"8px 12px",borderRadius:12,border:"1px solid rgba(255,255,255,0.15)",cursor:"pointer",fontWeight:700,fontSize:12,background:"transparent",color:"rgba(255,255,255,0.5)"}}>
                   Close
                 </button>
               </div>
-              {dripStatus && <div style={{marginTop:8,fontSize:12,fontWeight:700,color:dripStatus.includes("✅")?"#22c55e":"#f87171"}}>{dripStatus}</div>}
+              {dripStatus && <div style={{marginTop:8,fontSize:12,fontWeight:700,color:dripStatus.includes("â")?"#22c55e":"#f87171"}}>{dripStatus}</div>}
             </div>
           )}
               {/* Layout chooser */}
@@ -1486,10 +1487,10 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
 
           {isPlaying && isMobileView && (
             <div style={mobileRunTopBarStyle}>
-              <div style={mobileRunStatPillStyle}>⏱ {timeLeft}s</div>
-              <div style={mobileRunStatPillStyle}>🎯 {score}</div>
-              <div style={mobileRunStatPillStyle}>🧱 {wallBreaksLeft}</div>
-              <div style={mobileRunStatPillStyle}>💎 {crystals.length}</div>
+              <div style={mobileRunStatPillStyle}>â± {timeLeft}s</div>
+              <div style={mobileRunStatPillStyle}>ð¯ {score}</div>
+              <div style={mobileRunStatPillStyle}>ð§± {wallBreaksLeft}</div>
+              <div style={mobileRunStatPillStyle}>ð {crystals.length}</div>
             </div>
           )}
 
@@ -1518,15 +1519,15 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                       </button>
 
                     <div style={statusPillStyle}>
-                      ⏱ Time: <b>{timeLeft}s</b>
+                      â± Time: <b>{timeLeft}s</b>
                     </div>
 
                     <div style={statusPillStyle}>
-                      🎯 Score: <b>{score}</b>
+                      ð¯ Score: <b>{score}</b>
                     </div>
 
                     <div style={statusPillStyle}>
-                      🧱 Wall Break Charges: <b>{wallBreaksLeft}</b> / {tunnelCfg.tunnelWallBreaks}
+                      ð§± Wall Break Charges: <b>{wallBreaksLeft}</b> / {tunnelCfg.tunnelWallBreaks}
                     </div>
                   </div>
 
@@ -1540,10 +1541,10 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                       opacity: 0.85,
                     }}
                   >
-                    <span>🍞 Crumb = 1</span>
-                    <span>🍬 Sugar = 5</span>
-                    <span>💎 Crystal = 20</span>
-                    <span>🕷️ Hit = -3 sec</span>
+                    <span>ð Crumb = 1</span>
+                    <span>ð¬ Sugar = 5</span>
+                    <span>ð Crystal = 20</span>
+                    <span>ð·ï¸ Hit = -3 sec</span>
                     <span>Collect all crystals to win early</span>
                   </div>
                 </div>
@@ -1674,7 +1675,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
         : "drop-shadow(0 0 6px rgba(34,197,94,0.8))",
     }}
   >
-    🍞
+    ð
   </div>
 )}
 
@@ -1698,7 +1699,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
         : "drop-shadow(0 0 10px rgba(250,204,21,0.9))",
     }}
   >
-    🍬
+    ð¬
   </div>
 )}
 
@@ -1724,7 +1725,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
         `,
     }}
   >
-    💎
+    ð
   </div>
 )}
 
@@ -1900,7 +1901,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                 <div style={leaderboardCardHeaderStyle}>
                   <div>
                     <div style={{...leaderboardTitleStyle,color:"#facc15"}}>&#x26A1; Fastest Clear</div>
-                    <div style={leaderboardSubtitleStyle}>Fastest time collecting all crystals. Layout shown — beat them on the same map!</div>
+                    <div style={leaderboardSubtitleStyle}>Fastest time collecting all crystals. Layout shown â beat them on the same map!</div>
                   </div>
                   <div style={leaderboardBadgeGoldStyle}>TOP 5</div>
                 </div>
@@ -1927,13 +1928,13 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               <div style={leaderboardCardHeaderStyle}>
                 <div>
                   <div style={{...leaderboardTitleStyle,color:"#fde68a"}}>&#x1F5FA;&#xFE0F; Layout Champions</div>
-                  <div style={leaderboardSubtitleStyle}>The #1 score holder on each of the 30 layouts. Claim a throne — or steal one.</div>
+                  <div style={leaderboardSubtitleStyle}>The #1 score holder on each of the 30 layouts. Claim a throne â or steal one.</div>
                 </div>
                 <div style={{...leaderboardBadgeGoldStyle,background:"rgba(250,204,21,0.18)"}}>30 MAPS</div>
               </div>
               <div style={{display:"grid",gridTemplateColumns:isMobileView?"1fr":"repeat(2,1fr)",gap:6,maxHeight:320,overflowY:"auto",paddingRight:4}}>
                 {layoutChampions.length===0?(
-                  <div style={{...leaderboardEmptyStyle,gridColumn:"1/-1"}}>No layout records yet — play any layout to claim it!</div>
+                  <div style={{...leaderboardEmptyStyle,gridColumn:"1/-1"}}>No layout records yet â play any layout to claim it!</div>
                 ):layoutChampions.map((champ,idx)=>{
                   const isMine=champ.playerId&&(champ.playerId===effectivePlayerId||champ.playerName===playerName);
                   const unclaimed=!champ.playerId||champ.score===0;
