@@ -1940,6 +1940,10 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           <div style={mobileRotatePromptWrapStyle}>
             <div style={mobileRotatePromptCardStyle}>
               Rotate your phone to landscape for a better game experience
+          </div>
+          </div>
+          </div>
+          </div>
             </div>
           </div>
         )}
