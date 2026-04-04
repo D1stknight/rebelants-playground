@@ -853,7 +853,6 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
 
              await refresh();
       setupNewRun();
-      setCountdown(3);
 
       if (typeof window !== "undefined" && window.innerWidth <= 900) {
         requestAnimationFrame(() => {
