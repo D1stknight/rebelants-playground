@@ -61,8 +61,7 @@ const DEFAULT_TUNNEL_CONFIG = {
 
 const START_CELL: Cell = { row: 2, col: 2 };
 
-const themeMap: Record<
-  BoardTheme,
+const themeMap: Record<string,
   {
     name: string;
     bg: string;
@@ -318,7 +317,7 @@ function formatMs(ms: number) {
 }
 
 // ── Difficulty levels ─────────────────────────────────────────────────────────
-const DIFFICULTY: Record<BoardTheme, {label:string;emoji:string;desc:string;spiderMult:number;wallMult:number;timeMult:number}> = {
+const DIFFICULTY: Record<string, {label:string;emoji:string;desc:string;spiderMult:number;wallMult:number;timeMult:number}> = {
   colony:  {label:"Level 1",  emoji:"🐜", desc:"Classic colony. Learn the ropes.",         spiderMult:1.00,wallMult:1.00,timeMult:1.00},
   neon:    {label:"Level 2",  emoji:"⚡", desc:"Electric. Spider moves faster.",            spiderMult:0.90,wallMult:0.95,timeMult:0.95},
   mythic:  {label:"Level 3",  emoji:"🔮", desc:"Dark magic. Tighter paths.",                spiderMult:0.80,wallMult:0.90,timeMult:0.92},
