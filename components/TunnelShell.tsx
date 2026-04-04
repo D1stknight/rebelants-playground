@@ -1231,18 +1231,27 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               {dailyClaimed?"✅ Claimed Today":`🐜 Daily +${tunnelCfg.dailyClaim} ${tunnelCfg.currency}`}
             </button>
             {showDisconnect?(
-              <button onClick={()=>{ window.location.href="/api/auth/discord/logout"; }}
+              <button onClick={()=>{
+                const p = loadProfile();
+                const fallback = (p as any)?.walletAddress ? `wallet:${(p as any).walletAddress}` : (p?.id || "guest");
+                saveProfile({ ...(p as any), discordUserId: undefined, discordName: undefined, primaryId: fallback, discordSkipLink: true } as any);
+                window.location.href="/api/auth/discord/logout";
+              }}
                 style={{padding:"8px 18px",borderRadius:20,border:"1px solid rgba(255,255,255,0.2)",cursor:"pointer",fontWeight:700,fontSize:13,background:"rgba(255,255,255,0.06)",color:"rgba(255,255,255,0.7)"}}>
                 Disconnect Discord
               </button>
             ):(
-              <button onClick={()=>{ window.location.href="/api/auth/discord/login"; }}
+              <button onClick={()=>{
+                const p = loadProfile();
+                saveProfile({ ...(p as any), discordSkipLink: false } as any);
+                window.location.href="/api/auth/discord/login";
+              }}
                 style={{padding:"8px 18px",borderRadius:20,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,background:"#5865f2",color:"#fff"}}>
                 🔗 Connect Discord
               </button>
             )}
-            <button onClick={()=>setDripPanelOpen(v=>!v)}
-              style={{padding:"8px 18px",borderRadius:20,border:"1px solid rgba(255,255,255,0.15)",cursor:"pointer",fontWeight:700,fontSize:13,background:dripPanelOpen?"rgba(255,255,255,0.12)":"rgba(255,255,255,0.06)",color:"rgba(255,255,255,0.6)"}}>
+            <button onClick={()=>{ if(!showDisconnect){setRunMessage("Connect Discord first to migrate DRIP points.");return;} setDripPanelOpen(v=>!v); }}
+              style={{padding:"8px 18px",borderRadius:20,border:"1px solid rgba(255,255,255,0.15)",cursor:"pointer",fontWeight:700,fontSize:13,background:dripPanelOpen?"rgba(255,255,255,0.12)":"rgba(255,255,255,0.06)",color:showDisconnect?"rgba(255,255,255,0.6)":"rgba(255,255,255,0.3)"}}>
               Migrate DRIP Points
             </button>
             {dripPanelOpen && (
