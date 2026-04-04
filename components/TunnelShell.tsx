@@ -1250,7 +1250,8 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
   return (
     <>
           {countdown !== null && (
-            <div style={{position:"fixed",inset:0,zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.55)",pointerEvents:"none"}}>
+            <div style={{position:"fixed",inset:0,zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.55)",pointerEvents:"none", backgroundImage:"url('/bg/tunnel-bg.png')", backgroundSize:"cover", backgroundPosition:"center top", backgroundRepeat:"no-repeat", position:"relative" as const, overflow:"hidden"}}>
+        <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom, rgba(9,12,22,0.15) 0%, rgba(9,12,22,0.5) 70%, rgba(9,12,22,0.88) 100%)",zIndex:0,pointerEvents:"none"}}/>
               <div style={{fontSize:140,fontWeight:900,color:"#fff",textShadow:"0 0 60px rgba(96,165,250,0.9)",lineHeight:1,userSelect:"none"}}>{countdown}</div>
             </div>
           )}
@@ -1305,7 +1306,6 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
             ...(isPlaying && isMobileView ? mobileRunCardStyle : null),
           }}
         >
-            <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom, rgba(9,12,22,0.35) 0%, rgba(9,12,22,0.65) 55%, rgba(9,12,22,0.92) 85%, rgba(9,12,22,0.98) 100%)",borderRadius:"inherit",zIndex:0,pointerEvents:"none"}}/>
           {!(isPlaying && isMobileView) && (
             <>
               <div style={{ fontSize: 30, fontWeight: 900, marginBottom: 6 }}>
@@ -2102,11 +2102,6 @@ const cardStyle: React.CSSProperties = {
   padding: 20,
   color: "white",
 
-  backgroundImage: "url('/bg/tunnel-bg.png')",
-  backgroundSize: "cover",
-  backgroundPosition: "center top",
-  backgroundRepeat: "no-repeat",
-  position: "relative" as const,
 };
 
 const tabStyle: React.CSSProperties = {
