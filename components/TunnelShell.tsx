@@ -115,7 +115,7 @@ function isOuterBorder(row: number, col: number) {
   return row === 0 || row === GRID_ROWS - 1 || col === 0 || col === GRID_COLS - 1;
 }
 
-const TUNNEL_LAYOUTS: string[][] = [
+const TUNNEL_LAYOUTS = [
   // 1) Split Path
   [
     "2:5","2:6","2:7","2:8","2:14","2:15","2:16",
