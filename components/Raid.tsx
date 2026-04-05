@@ -293,8 +293,9 @@ function RolePicker({ squad, onChange, disabled, carrierPct }: {
           ✕ Clear
         </button>
         {lastSquad && lastSquad.length === SQUAD_SIZE && (
-          <button disabled={busy||phase!=="idle"} onClick={() => setSquad([...lastSquad!])}
-            style={{ fontSize:11, padding:"6px 12px", borderRadius:8, border:"1px solid rgba(251,191,36,.4)", background:"rgba(251,191,36,.1)", color:"#fbbf24", cursor:(busy||phase!=="idle")?"not-allowed":"pointer", opacity:(busy||phase!=="idle")?0.5:1, fontWeight:700 }}>
+          <button disabled={disabled} onClick={() => onChange([...lastSquad])}
+            style={{ fontSize:11, padding:"6px 12px", borderRadius:8, border:"1px solid rgba(251,191,36,.4)", background:"rgba(251,191,36,.1)", color:"#fbbf24", cursor:disabled?"not-allowed":"pointer", opacity:disabled?0.5:1, fontWeight:700 }}
+            title="Reuse your last squad — survival odds are slightly lower for repeat squads">
             🔁 Last Squad <span style={{fontSize:9,opacity:0.65}}>(−10% survival)</span>
           </button>
         )}
