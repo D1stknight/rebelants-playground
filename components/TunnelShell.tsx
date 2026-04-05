@@ -1130,6 +1130,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     setRunMessage("Spider hit! -3 seconds");
     setHitFlash(true);
     setHitShake(true);
+    sfx.spiderHit();
 
     window.setTimeout(() => {
       setHitFlash(false);
