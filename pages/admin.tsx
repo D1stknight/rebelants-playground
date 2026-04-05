@@ -21,6 +21,9 @@ type PointsConfigShape = {
   // ✅ Faction Wars settings
   factionWarsCost: number;
   factionWarsAIDifficulty: number;
+  factionWarsPlunderBonus: number;
+  factionWarsHealCost: number;
+  factionWarsHealAmt: number;
 
   // ✅ Raid settings
   raidCost: number;
@@ -152,6 +155,9 @@ const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
   raidCost: (defaultConfig as any).raidCost ?? 600,
     factionWarsCost: (defaultConfig as any).factionWarsCost ?? 150,
     factionWarsAIDifficulty: (defaultConfig as any).factionWarsAIDifficulty ?? 0.65,
+    factionWarsPlunderBonus: (defaultConfig as any).factionWarsPlunderBonus ?? 50,
+    factionWarsHealCost: (defaultConfig as any).factionWarsHealCost ?? 25,
+    factionWarsHealAmt: (defaultConfig as any).factionWarsHealAmt ?? 30,
   raidCarrierSurvival: (defaultConfig as any).raidCarrierSurvival ?? 0.20,
   raidUltraCarriers: (defaultConfig as any).raidUltraCarriers ?? 4,
   raidUltraRatio: (defaultConfig as any).raidUltraRatio ?? 0.65,
@@ -1200,6 +1206,18 @@ String(c.status).toUpperCase()==="PENDING"
                   <label style={{ fontSize: 12, opacity: 0.9 }}>AI Difficulty (0.0 easy → 1.0 brutal)
                     <input value={cfg.factionWarsAIDifficulty} onChange={e => setCfg(c => ({ ...c, factionWarsAIDifficulty: Math.min(1, Math.max(0, safeNum(e.target.value, c.factionWarsAIDifficulty))) }))}
                       type="number" min="0" max="1" step="0.05" style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} />
+                  </label>
+                  <label style={{ fontSize: 12, opacity: 0.9 }}>Plunder Bonus (REBEL earned on win)
+                    <input value={cfg.factionWarsPlunderBonus} onChange={e => setCfg(c => ({ ...c, factionWarsPlunderBonus: safeNum(e.target.value, c.factionWarsPlunderBonus) }))}
+                      type="number" min="0" style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} />
+                  </label>
+                  <label style={{ fontSize: 12, opacity: 0.9 }}>Heal Potion Cost (REBEL)
+                    <input value={cfg.factionWarsHealCost} onChange={e => setCfg(c => ({ ...c, factionWarsHealCost: safeNum(e.target.value, c.factionWarsHealCost) }))}
+                      type="number" min="0" style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} />
+                  </label>
+                  <label style={{ fontSize: 12, opacity: 0.9 }}>Heal Potion Amount (HP restored)
+                    <input value={cfg.factionWarsHealAmt} onChange={e => setCfg(c => ({ ...c, factionWarsHealAmt: safeNum(e.target.value, c.factionWarsHealAmt) }))}
+                      type="number" min="1" max="100" style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} />
                   </label>
                 </div>
               </div>

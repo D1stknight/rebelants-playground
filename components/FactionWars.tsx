@@ -81,7 +81,7 @@ const FACTIONS: Record<FactionId, Faction> = {
     moves:[{id:"precision_slash",label:"Precision Slash",emoji:"🌊",desc:"Bypass enemy defense",power:8,type:"attack"},{id:"blade_harmony",label:"Blade Harmony",emoji:"🌀",desc:"Chain to next warrior +3",power:7,type:"magic"},{id:"meditation",label:"Meditative Focus",emoji:"🧘",desc:"Build +2 power per territory",power:5,type:"defend"},{id:"blade_storm",oneTime:true,label:"Blade Storm",emoji:"💨",desc:"Flurry — 4 rapid hits average power 6",power:9,type:"attack"},{id:"perfect_form",label:"Perfect Form",emoji:"✨",desc:"Flawless stance — +2 power if no damage taken",power:7,type:"defend"}],
     weakTo:["wokou","warrior"], strongVs:["buke","samurai"] },
   wokou: { id:"wokou", name:"Wokou", emoji:"🌊", color:"#475569", bgColor:"rgba(71,85,105,0.12)", borderColor:"rgba(71,85,105,0.4)", role:"Sea raiders", passive:"Sea Raider", passiveDesc:"Win a territory: random chance to earn extra bonus REBEL", weapon:"Cutlass",
-    moves:[{id:"cutlass_raid",label:"Cutlass Raid",emoji:"🏴‍☠️",desc:"Steal enemy bonus on win",power:7,type:"trick"},{id:"sea_storm",label:"Sea Storm",emoji:"🌊",desc:"Chaotic random power 4-10",power:7,type:"magic"},{id:"ghost_tide",label:"Ghost Tide",emoji:"👻",desc:"Disappear — enemy nullified",power:6,type:"trick"},{id:"ambush",oneTime:true,label:"Ambush",emoji:"🗺️",desc:"Surprise attack — +3 if enemy chose attack",power:8,type:"trick"},{id:"plunder",label:"Plunder",emoji:"💰",desc:"Loot bonus — extra REBEL if this territory won",power:6,type:"magic"}],
+    moves:[{id:"cutlass_raid",label:"Cutlass Raid",emoji:"🏴‍☠️",desc:"Steal enemy bonus on win",power:7,type:"trick"},{id:"sea_storm",label:"Sea Storm",emoji:"🌊",desc:"Chaotic random power 4-10",power:7,type:"magic"},{id:"ghost_tide",label:"Ghost Tide",emoji:"👻",desc:"Disappear — enemy nullified",power:6,type:"trick"},{id:"ambush",oneTime:true,label:"Ambush",emoji:"🗺️",desc:"Surprise attack — +3 if enemy chose attack",power:8,type:"trick"},{id:"plunder",label:"Plunder",emoji:"💰",desc:"Loot bonus — win this territory to earn extra REBEL (see reward)",power:6,type:"magic"}],
     weakTo:["ashigaru","buke"], strongVs:["kenshi","shogun"] },
   sohei: { id:"sohei", name:"Sohei", emoji:"🟠", color:"#c2410c", bgColor:"rgba(194,65,12,0.12)", borderColor:"rgba(194,65,12,0.4)", role:"Monk warriors", passive:"Monk Ward", passiveDesc:"Lose a territory with HP above 0: counts as a narrow escape", weapon:"War Staff",
     moves:[{id:"staff_sweep",label:"Staff Sweep",emoji:"🌅",desc:"Area attack all positions",power:7,type:"attack"},{id:"monks_ward",label:"Monk's Ward",emoji:"☯️",desc:"Nullify one enemy hit",power:8,type:"defend"},{id:"enlightened",label:"Enlightened Strike",emoji:"🔥",desc:"Spiritual damage bypasses armor",power:9,type:"magic"},{id:"sacred_flame",oneTime:true,label:"Sacred Flame",emoji:"🕯️",desc:"Holy fire — power 10 against magic users",power:8,type:"magic"},{id:"iron_meditation",label:"Iron Meditation",emoji:"🧘",desc:"Center self — +3 power and heal passive",power:6,type:"defend"}],
@@ -208,7 +208,7 @@ function FactionCard({ faction, selected, onSelect, disabled }: { faction: Facti
           />
           <div style={{ padding: "4px 4px 6px", textAlign: "center" }}>
             <div style={{ fontSize: 9, fontWeight: 900, color: faction.color, letterSpacing: "0.06em" }}>{faction.name.toUpperCase()}</div>
-            <div style={{ fontSize: 8, opacity: 0.5, marginTop: 1 }}>{faction.weapon}</div>
+            {(() => { const best = faction.moves.reduce((a,b)=>a.power>b.power?a:b); return <div style={{ fontSize:9, fontWeight:900, color:faction.color, marginTop:1 }}>{best.emoji} PWR {best.power}</div>; })()}
           </div>
         </div>
         {/* Back: character */}
@@ -561,7 +561,8 @@ export default function FactionWars() {
   const [cfgState, setCfgState] = useState<any>(defaultPointsConfig);
   useEffect(() => { fetch("/api/config",{cache:"no-store"}).then(r=>r.json()).then(j=>{if(j?.pointsConfig)setCfgState((c:any)=>({...c,...j.pointsConfig}));}).catch(()=>{}); }, []);
   const cfg        = cfgState as any;
-  const fwCost     = Number(cfg?.factionWarsCost        ?? 150);
+  const fwCost        = Number(cfg?.factionWarsCost           ?? 150);
+  const fwPlunderBonus = Number(cfg?.factionWarsPlunderBonus  ?? 50);
   const difficulty = Number(cfg?.factionWarsAIDifficulty ?? 0.65);
   const currency   = String(cfg?.currency || "REBEL");
 
@@ -593,6 +594,7 @@ export default function FactionWars() {
   const dmgFloatId = useRef(0);
   const [usedMoves, setUsedMoves] = useState<Record<string,number>>({});
   const [sacrificeBonus, setSacrificeBonus] = useState(0);
+  const [healBusy, setHealBusy] = useState(false);
   const [oneTimeUsed, setOneTimeUsed] = useState<string[]>([]);
   const [showHowToPlay, setShowHowToPlay] = useState(true);
   const { muted, toggleMute, startMusic, stopMusic, sfx } = useFWAudio();
@@ -613,10 +615,12 @@ export default function FactionWars() {
   const startCampaign = async () => {
     if (team.length < TEAM_SIZE || busy) return;
     if (Number(totalEarnRoom||0) < fwCost) { setRunMessage("No plays left today."); return; }
-    if (balance < fwCost) { setRunMessage(`Not enough ${currency} to start Faction Wars.`); return; }
+    const actualCostCheck = team.includes("ashigaru") ? Math.max(0, fwCost - 25) : fwCost;
+    if (balance < actualCostCheck) { setRunMessage(`Not enough ${currency} to start Faction Wars.`); return; }
     setBusy(true); setRunMessage("Assembling your forces...");
     try {
-      const spendRes: any = await spend(fwCost, "faction-wars");
+      const actualCost = team.includes("ashigaru") ? Math.max(0, fwCost - 25) : fwCost;
+    const spendRes: any = await spend(actualCost, "faction-wars");
       if (!spendRes?.ok) { setRunMessage(spendRes?.error||"Could not start campaign."); setBusy(false); return; }
     } catch (e: any) { setRunMessage(e?.message||"Could not start."); setBusy(false); return; }
     const defs: FactionId[] = [];
@@ -653,6 +657,8 @@ export default function FactionWars() {
     const degradedMove: Move = { ...selectedMove, power: Math.max(1, selectedMove.power - timesUsed) };
     setUsedMoves(prev => ({ ...prev, [selectedMove.id]: (prev[selectedMove.id]||0)+1 }));
     if (selectedMove.oneTime) setOneTimeUsed(prev => [...prev, selectedMove.id]);
+    // Track plunder use for this territory
+    if (selectedMove.id === "plunder") { window._fw_plunder_pending = true; }
     if (selectedMove.id === "noble_sacrifice") {
       setSacrificeBonus(12);
       setPlayerHp(0);
@@ -701,6 +707,13 @@ export default function FactionWars() {
       await new Promise(r=>setTimeout(r,500));
       setBattleAnim("idle");
       const playerWon = newEnemyHp <= 0;
+      // Plunder bonus on win
+      if (playerWon && window._fw_plunder_pending) {
+        const plunderAmt = Number(cfg?.factionWarsPlunderBonus ?? 50);
+        try { await earn(plunderAmt); await refresh(); } catch {}
+        window._fw_plunder_pending = false;
+        setDmgFloats(prev => [...prev, {id:++dmgFloatId.current, side:"enemy" as const, dmg:-plunderAmt}]);
+      }
       const result: TerritoryResult = {
         territory: currentTerritory, defender, playerFaction,
         rounds: newRounds, playerHpFinal: newPlayerHp, enemyHpFinal: newEnemyHp, won: playerWon,
@@ -824,7 +837,7 @@ export default function FactionWars() {
               <div style={{ marginTop:16, display:"flex", gap:10, flexWrap:"wrap", alignItems:"center" }}>
                 <button onClick={startCampaign} disabled={team.length<TEAM_SIZE||busy||balance<fwCost}
                   style={{ minWidth:240, height:48, fontSize:14, fontWeight:900, display:"inline-flex", alignItems:"center", justifyContent:"center", borderRadius:12, border:"1px solid rgba(251,191,36,0.35)", cursor:team.length<TEAM_SIZE||busy||balance<fwCost?"not-allowed":"pointer", background:team.length<TEAM_SIZE?"rgba(15,23,42,.7)":"linear-gradient(135deg,rgba(251,191,36,.18),rgba(192,132,252,.18))", color:"#fbbf24" }}>
-                  {team.length<TEAM_SIZE?`⚔️ Select ${TEAM_SIZE-team.length} more warriors`:busy?"Assembling...":`⚔️ Launch Campaign (-${fwCost} ${currency})`}
+                  {team.length<TEAM_SIZE?`⚔️ Select ${TEAM_SIZE-team.length} more warriors`:busy?"Assembling...":`⚔️ Launch Campaign (-${team.includes("ashigaru") ? Math.max(0, fwCost-25) : fwCost} ${currency})`}
                 </button>
                 <button onClick={()=>setShowBuyPoints(true)} style={{ padding:"10px 14px", fontSize:12, borderRadius:10, border:"1px solid rgba(255,255,255,0.15)", background:"rgba(255,255,255,0.07)", color:"white", cursor:"pointer", fontWeight:700 }}>💳 Buy Points</button>
                 {isDiscordConnected
@@ -1122,6 +1135,29 @@ export default function FactionWars() {
                   )}
                 </div>
 
+                {/* Healing Potion button */}
+                {(() => {
+                  const healCost = Number(cfg?.factionWarsHealCost ?? 25);
+                  const healAmt  = Number(cfg?.factionWarsHealAmt  ?? 30);
+                  return (
+                    <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:8 }}>
+                      <button
+                        onClick={async()=>{
+                          if (healBusy||busy||playerHp>=MAX_HP) return;
+                          if (balance < healCost) { return; }
+                          setHealBusy(true);
+                          try { await spend(healCost,"faction-wars"); const newHp=Math.min(MAX_HP,playerHp+healAmt); setPlayerHp(newHp); await refresh(); } catch {}
+                          setHealBusy(false);
+                        }}
+                        disabled={healBusy||busy||playerHp>=MAX_HP||balance<Number(cfg?.factionWarsHealCost??25)}
+                        title={`Spend ${healCost} REBEL to restore ${healAmt} HP`}
+                        style={{ display:"flex", alignItems:"center", gap:6, padding:"6px 14px", borderRadius:20, border:"1px solid rgba(52,211,153,0.3)", background:"rgba(52,211,153,0.1)", color:"#34d399", fontSize:11, fontWeight:800, cursor:healBusy||busy||playerHp>=MAX_HP||balance<Number(cfg?.factionWarsHealCost??25)?"not-allowed":"pointer", opacity:healBusy||busy||playerHp>=MAX_HP||balance<Number(cfg?.factionWarsHealCost??25)?0.4:1 }}>
+                        🧪 Heal +{healAmt} HP <span style={{opacity:0.6,fontSize:10}}>(-{Number(cfg?.factionWarsHealCost??25)} {currency})</span>
+                      </button>
+                    </div>
+                  );
+                })()}
+
                 {/* Move selector */}
                 <div style={{ borderTop:"1px solid rgba(255,255,255,0.08)", paddingTop:16 }}>
                   <div style={{ fontSize:12, fontWeight:800, marginBottom:10, opacity:0.7, letterSpacing:"0.04em" }}>
@@ -1154,7 +1190,9 @@ export default function FactionWars() {
                               {m.oneTime && !isExhausted && <span style={{ fontSize:9, background:"rgba(251,191,36,0.2)", color:"#fbbf24", borderRadius:4, padding:"1px 6px", fontWeight:900, border:"1px solid rgba(251,191,36,0.3)" }}>1× ONLY</span>}
                               {isExhausted && <span style={{ fontSize:9, background:"rgba(255,255,255,0.1)", color:"#666", borderRadius:4, padding:"1px 6px", fontWeight:900 }}>USED</span>}
                             </div>
-                            <div style={{ fontSize:11, opacity:0.6 }}>{m.desc}</div>
+                            <div style={{ fontSize:11, opacity:0.6 }}>
+                              {m.id === "plunder" ? `Win this territory → earn +${fwPlunderBonus} bonus REBEL` : m.desc}
+                            </div>
                           </div>
                           {/* Power meter */}
                           <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:3, flexShrink:0, minWidth:44 }}>
