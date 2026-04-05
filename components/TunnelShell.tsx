@@ -524,8 +524,8 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
 
       if (!r.ok || !j?.ok) return;
 
-      setTopScoreRows(Array.isArray(j.topScore) ? j.topScore : []);
-      setFastestClearRows(Array.isArray(j.fastestClear) ? j.fastestClear : []);
+      // topScore global panel removed
+      // fastestClear global panel removed
       setPersonalStats(j.personalStats || null);
       setLayoutsExplored(Number(j.layoutsExplored || 0));
       setLayoutChampions(Array.isArray(j.layoutChampions) ? j.layoutChampions : []);
@@ -1939,61 +1939,56 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
 
           <div style={tunnelLeaderboardWrapStyle}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
-              <div><div style={{fontSize:20,fontWeight:900}}>🏆 Tunnel Leaderboards</div><div style={{fontSize:12,opacity:0.55,marginTop:2}}>Top scores, fastest clears &amp; champions across all 30 layouts</div></div>
+              <div><div style={{fontSize:20,fontWeight:900}}>🏆 Tunnel Leaderboards</div><div style={{fontSize:12,opacity:0.55,marginTop:2}}>Top 3 scores &amp; fastest clears per layout — 31 maps total</div></div>
               <button onClick={()=>void loadTunnelLeaderboard()} style={{padding:"6px 12px",borderRadius:20,border:"1px solid rgba(255,255,255,0.15)",background:"rgba(255,255,255,0.06)",cursor:"pointer",fontSize:12,fontWeight:700,color:"rgba(255,255,255,0.7)"}}>↻ Refresh</button>
             </div>
-            <div style={{...tunnelLeaderboardGridStyle,...(isMobileView?tunnelLeaderboardGridMobileStyle:null)}}>
-              <div style={leaderboardCardBlueStyle}>
-                <div style={leaderboardCardHeaderStyle}>
-                  <div><div style={{...leaderboardTitleStyle,color:"#60a5fa"}}>🏆 Top Score</div><div style={leaderboardSubtitleStyle}>Best single-run score across all layouts. Any layout counts.</div></div>
-                  <div style={leaderboardBadgeBlueStyle}>TOP 5</div>
-                </div>
-                <div style={leaderboardScrollStyle}>
-                  {leaderboardLoading?(<div style={leaderboardEmptyStyle}>Loading...</div>):topScoreRows.length===0?(<div style={leaderboardEmptyStyle}>No scores yet!</div>):
-                    topScoreRows.map(row=>{const parts=String(row.playerId||'').split('|');return(
-                      <div key={"s"+row.rank} style={leaderboardRowStyle(row.rank,"#60a5fa")}>
-                        <div style={leaderboardRankStyle(row.rank)}>{row.rank===1?"🥇":row.rank===2?"🥈":row.rank===3?"🥉":"#"+row.rank}</div>
-                        <div style={{flex:1,minWidth:0}}><div style={leaderboardNameStyle}>{row.playerName||row.playerId}</div>{parts[2]&&<div style={{fontSize:10,opacity:0.55,marginTop:1}}>on {parts[2]}</div>}</div>
-                        <div style={{...leaderboardValueStyle,color:"#93c5fd"}}>{Number(row.score||0).toLocaleString()}</div>
-                      </div>);})
-                  }
-                </div>
-              </div>
-              <div style={leaderboardCardGoldStyle}>
-                <div style={leaderboardCardHeaderStyle}>
-                  <div><div style={{...leaderboardTitleStyle,color:"#facc15"}}>⚡ Fastest Clear</div><div style={leaderboardSubtitleStyle}>Fastest time collecting all 💎. Layout shown — beat them on the same map!</div></div>
-                  <div style={leaderboardBadgeGoldStyle}>TOP 5</div>
-                </div>
-                <div style={leaderboardScrollStyle}>
-                  {leaderboardLoading?(<div style={leaderboardEmptyStyle}>Loading...</div>):fastestClearRows.length===0?(<div style={leaderboardEmptyStyle}>Collect all 💎 to set a record!</div>):
-                    fastestClearRows.map(row=>{const parts=String(row.playerId||'').split('|');return(
-                      <div key={"f"+row.rank} style={leaderboardRowStyle(row.rank,"#facc15")}>
-                        <div style={leaderboardRankStyle(row.rank)}>{row.rank===1?"🥇":row.rank===2?"🥈":row.rank===3?"🥉":"#"+row.rank}</div>
-                        <div style={{flex:1,minWidth:0}}><div style={leaderboardNameStyle}>{row.playerName||row.playerId}</div>{parts[2]&&<div style={{fontSize:10,opacity:0.55,marginTop:1}}>on {parts[2]}</div>}</div>
-                        <div style={{...leaderboardValueStyle,color:"#fde68a"}}>{formatMs(row.clearTimeMs)}</div>
-                      </div>);})
-                  }
-                </div>
-              </div>
+            <div style={{marginTop:14}}>
+      <div style={{fontSize:13,fontWeight:800,opacity:0.6,marginBottom:10,letterSpacing:"0.06em"}}>🗺️ LAYOUT LEADERBOARDS — 31 MAPS</div>
+      <div style={{display:"grid",gridTemplateColumns:isMobileView?"1fr":"repeat(2,1fr)",gap:10}}>
+        {layoutChampions.map((lc,idx)=>{
+          const hasScores=lc.topScores&&lc.topScores.length>0;
+          const hasClears=lc.fastestClears&&lc.fastestClears.length>0;
+          const layoutLabel=lc.layoutName||(lc.layoutIndex===30?"#31":"Layout "+(lc.layoutIndex+1));
+          return(
+          <div key={idx} style={{borderRadius:12,border:"1px solid rgba(255,255,255,0.08)",background:"rgba(0,0,0,0.35)",overflow:"hidden"}}>
+            <div style={{padding:"8px 12px",background:"rgba(255,255,255,0.04)",borderBottom:"1px solid rgba(255,255,255,0.07)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontSize:12,fontWeight:900,color:"#fde68a"}}>#{lc.layoutIndex+1} {layoutLabel}</span>
+              <span style={{fontSize:10,opacity:0.4}}>Top 3</span>
             </div>
-            <div style={{...leaderboardCardRedStyle,marginTop:14,border:"1px solid rgba(250,204,21,0.25)",background:"linear-gradient(135deg,rgba(250,204,21,0.07),rgba(9,12,22,0.95))"}}>
-              <div style={leaderboardCardHeaderStyle}>
-                <div><div style={{...leaderboardTitleStyle,color:"#fde68a"}}>🗺️ Layout Champions</div><div style={leaderboardSubtitleStyle}>The #1 score holder on each of the 30 layouts. Claim a throne — or steal one.</div></div>
-                <div style={{...leaderboardBadgeGoldStyle,background:"rgba(250,204,21,0.18)"}}>30 MAPS</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:0}}>
+              <div style={{padding:"8px 10px",borderRight:"1px solid rgba(255,255,255,0.05)"}}>
+                <div style={{fontSize:10,fontWeight:800,color:"#60a5fa",marginBottom:6,letterSpacing:"0.05em"}}>🏆 SCORES</div>
+                {!hasScores
+                  ?<div style={{fontSize:10,opacity:0.35,fontStyle:"italic"}}>Open</div>
+                  :lc.topScores.slice(0,3).map((e:any,i:number)=>(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:4,marginBottom:3}}>
+                      <span style={{fontSize:10,minWidth:16}}>{i===0?"🥇":i===1?"🥈":"🥉"}</span>
+                      <span style={{fontSize:10,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",opacity:0.8}}>{e.playerName||e.playerId||"guest"}</span>
+                      <span style={{fontSize:10,fontWeight:800,color:"#93c5fd"}}>{Number(e.score).toLocaleString()}</span>
+                    </div>
+                  ))
+                }
               </div>
-              <div style={{display:"grid",gridTemplateColumns:isMobileView?"1fr":"repeat(2,1fr)",gap:6,maxHeight:320,overflowY:"auto",paddingRight:4}}>
-                {layoutChampions.length===0?(<div style={{...leaderboardEmptyStyle,gridColumn:"1/-1"}}>No layout records yet!</div>):
-                  layoutChampions.map((champ,idx)=>{const isMine=champ.playerId&&(champ.playerId===effectivePlayerId||champ.playerName===playerName);const unclaimed=!champ.playerId||champ.score===0;return(
-                    <div key={idx} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:10,background:isMine?"rgba(250,204,21,0.12)":unclaimed?"rgba(255,255,255,0.02)":"rgba(255,255,255,0.04)",border:isMine?"1px solid rgba(250,204,21,0.4)":unclaimed?"1px dashed rgba(255,255,255,0.08)":"1px solid rgba(255,255,255,0.06)"}}>
-                      <div style={{fontSize:10,fontWeight:800,color:"rgba(255,255,255,0.35)",minWidth:20,textAlign:"center"}}>#{idx+1}</div>
-                      <div style={{flex:1,minWidth:0}}><div style={{fontSize:11,fontWeight:700,color:isMine?"#fde68a":"rgba(255,255,255,0.8)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{champ.layoutName}</div><div style={{fontSize:10,opacity:0.55,marginTop:1}}>{unclaimed?"🏆 Unclaimed":(isMine?"👑 You hold this!":champ.playerName||champ.playerId)}</div></div>
-                      {!unclaimed&&<div style={{fontSize:11,fontWeight:900,color:"#fde68a"}}>{champ.score.toLocaleString()}</div>}
-                      {unclaimed&&<div style={{fontSize:10,color:"rgba(250,204,21,0.5)"}}>Open</div>}
-                    </div>);})
+              <div style={{padding:"8px 10px"}}>
+                <div style={{fontSize:10,fontWeight:800,color:"#fbbf24",marginBottom:6,letterSpacing:"0.05em"}}>⚡ FASTEST</div>
+                {!hasClears
+                  ?<div style={{fontSize:10,opacity:0.35,fontStyle:"italic"}}>Open</div>
+                  :lc.fastestClears.slice(0,3).map((e:any,i:number)=>(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:4,marginBottom:3}}>
+                      <span style={{fontSize:10,minWidth:16}}>{i===0?"🥇":i===1?"🥈":"🥉"}</span>
+                      <span style={{fontSize:10,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",opacity:0.8}}>{e.playerName||e.playerId||"guest"}</span>
+                      <span style={{fontSize:10,fontWeight:800,color:"#fde68a"}}>{formatMs(e.clearTimeMs)}</span>
+                    </div>
+                  ))
                 }
               </div>
             </div>
-            <div style={{...leaderboardCardRedStyle,marginTop:14}}>
+          </div>
+          );
+        })}
+      </div>
+    </div>
+    <div style={{...leaderboardCardRedStyle,marginTop:14}}>
               <div style={leaderboardCardHeaderStyle}>
                 <div><div style={{...leaderboardTitleStyle,color:"#f87171"}}>🐜 Your Stats</div><div style={leaderboardSubtitleStyle}>Your personal progress. Only you can see this.</div></div>
                 <div style={leaderboardBadgeRedStyle}>YOU</div>
