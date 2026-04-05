@@ -595,7 +595,7 @@ export default function FactionWars() {
     try {
       const r=await fetch("/api/drip/balance",{cache:"no-store"}); const j=await r.json().catch(()=>null);
       if (!r.ok||!j?.ok){setDripStatus(j?.error||"Could not load DRIP balance.");setShowDripMigrate(true);return;}
-      setDripBalance(Number(j.balance||0)); setDripAmount(0); setShowDripMigrate(true);
+      setDripBalance(Number(j.balance||0)); setDripAmount(""); setShowDripMigrate(true);
     } catch(e:any){setDripStatus(e?.message||"DRIP error");setShowDripMigrate(true);}
     finally{setDripBusy(false);}
   }
@@ -1022,7 +1022,7 @@ export default function FactionWars() {
           <div style={{ background:"#0f172a", border:"1px solid rgba(255,255,255,0.15)", borderRadius:16, padding:24, maxWidth:380, width:"90%", position:"relative" }} onClick={e=>e.stopPropagation()}>
             <div style={{ fontWeight:900, fontSize:16, marginBottom:12 }}>⚔️ Migrate DRIP Points</div>
             {dripBalance !== null && <div style={{ fontSize:13, opacity:0.8, marginBottom:10 }}>DRIP Balance: <b>{dripBalance}</b></div>}
-            <input type="number" value={dripAmount} onChange={e=>setDripAmount(Number(e.target.value))} min={0} max={dripBalance||0} placeholder="Amount to migrate" style={{ width:"100%", padding:"10px 12px", borderRadius:10, border:"1px solid rgba(255,255,255,0.2)", background:"rgba(0,0,0,0.3)", color:"white", marginBottom:10, fontSize:14 }} />
+            <input type="number" value={dripAmount} onChange={e=>setDripAmount(e.target.value)} min={0} max={dripBalance||0} placeholder="Amount to migrate" style={{ width:"100%", padding:"10px 12px", borderRadius:10, border:"1px solid rgba(255,255,255,0.2)", background:"rgba(0,0,0,0.3)", color:"white", marginBottom:10, fontSize:14 }} />
             {dripStatus && <div style={{ fontSize:12, color:dripStatus.startsWith("✅")?"#34d399":"#f87171", marginBottom:10 }}>{dripStatus}</div>}
             <div style={{ display:"flex", gap:10 }}>
               <button onClick={migrateDripNow} disabled={dripBusy} style={{ flex:1, padding:"10px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#fbbf24,#f59e0b)", color:"#000", fontWeight:900, cursor:"pointer" }}>Migrate</button>
