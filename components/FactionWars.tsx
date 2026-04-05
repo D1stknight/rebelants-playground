@@ -538,6 +538,7 @@ export default function FactionWars() {
   const [prizeMerchShipping, setPrizeMerchShipping] = useState(false);
   const [lb, setLb]                     = useState<FWLeaderboards>({ warlords:[], factions:[], streaks:[], rich:[], perfect:[] });
   const [battleAnim, setBattleAnim]     = useState<"idle"|"clash"|"win"|"lose">("idle");
+  const [showHowToPlay, setShowHowToPlay] = useState(true);
   const { muted, toggleMute, startMusic, stopMusic, sfx } = useFWAudio();
 
   const loadLB = useCallback(async () => {
@@ -806,6 +807,43 @@ export default function FactionWars() {
               </div>
             </div>
 
+            {/* HOW TO PLAY — collapsible */}
+            <div style={{ marginBottom:12 }}>
+              <button onClick={()=>setShowHowToPlay(h=>!h)} style={{ display:"flex", alignItems:"center", gap:8, background:"rgba(251,191,36,0.08)", border:"1px solid rgba(251,191,36,0.2)", borderRadius:10, padding:"8px 14px", cursor:"pointer", width:"100%", color:"white" }}>
+                <span style={{ fontSize:14 }}>📖</span>
+                <span style={{ fontWeight:800, fontSize:12, color:"#fbbf24", flex:1, textAlign:"left" }}>How to Play</span>
+                <span style={{ fontSize:11, opacity:0.5 }}>{showHowToPlay ? "▲ hide" : "▼ show"}</span>
+              </button>
+              {showHowToPlay && (
+                <div style={{ background:"rgba(0,0,0,0.5)", border:"1px solid rgba(251,191,36,0.15)", borderRadius:"0 0 10px 10px", padding:"12px 16px", fontSize:12 }}>
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
+                    <div style={{ background:"rgba(255,255,255,0.04)", borderRadius:8, padding:"8px 10px" }}>
+                      <div style={{ fontWeight:900, color:"#fbbf24", marginBottom:4 }}>⚔️ Goal</div>
+                      <div style={{ opacity:0.75, lineHeight:1.5 }}>Win as many of the 5 territories as possible. Each territory is one fight between your warrior and the defender. Win 3+ to earn rewards. Win all 5 for the Ultra crate.</div>
+                    </div>
+                    <div style={{ background:"rgba(255,255,255,0.04)", borderRadius:8, padding:"8px 10px" }}>
+                      <div style={{ fontWeight:900, color:"#60a5fa", marginBottom:4 }}>🎯 Moves</div>
+                      <div style={{ opacity:0.75, lineHeight:1.5 }}>Pick one of your warrior's 5 moves. Each move has a <b>Power value</b> (1–11). Higher power = better chance to win that territory. The enemy AI picks its best counter automatically.</div>
+                    </div>
+                    <div style={{ background:"rgba(255,255,255,0.04)", borderRadius:8, padding:"8px 10px" }}>
+                      <div style={{ fontWeight:900, color:"#34d399", marginBottom:4 }}>📊 Power Bars</div>
+                      <div style={{ opacity:0.75, lineHeight:1.5 }}><b>Your bar</b> = how many warriors you have left on your team (5 total — one fights each territory). <b>Enemy bar</b> = how many territories they still hold. Both go down as you advance.</div>
+                    </div>
+                    <div style={{ background:"rgba(255,255,255,0.04)", borderRadius:8, padding:"8px 10px" }}>
+                      <div style={{ fontWeight:900, color:"#c084fc", marginBottom:4 }}>⚡ Passives</div>
+                      <div style={{ opacity:0.75, lineHeight:1.5 }}>Each faction has a passive bonus — like Ronin getting stronger after a loss, or Samurai hitting harder on Territory 1. Combine factions to stack advantages.</div>
+                    </div>
+                  </div>
+                  <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+                    <div style={{ fontSize:11, background:"rgba(248,113,113,0.12)", border:"1px solid rgba(248,113,113,0.2)", borderRadius:6, padding:"3px 8px", color:"#f87171" }}>🔴 ATTACK — raw damage</div>
+                    <div style={{ fontSize:11, background:"rgba(52,211,153,0.12)", border:"1px solid rgba(52,211,153,0.2)", borderRadius:6, padding:"3px 8px", color:"#34d399" }}>🟢 DEFEND — blocks counters</div>
+                    <div style={{ fontSize:11, background:"rgba(192,132,252,0.12)", border:"1px solid rgba(192,132,252,0.2)", borderRadius:6, padding:"3px 8px", color:"#c084fc" }}>🟣 MAGIC — special effects</div>
+                    <div style={{ fontSize:11, background:"rgba(251,191,36,0.12)", border:"1px solid rgba(251,191,36,0.2)", borderRadius:6, padding:"3px 8px", color:"#fbbf24" }}>🟡 TRICK — dodge or steal</div>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* MAIN BATTLE ARENA */}
             <div style={{ position:"relative", borderRadius:18, overflow:"hidden", marginBottom:16, border:"1px solid rgba(255,255,255,0.1)" }}>
 
@@ -840,13 +878,13 @@ export default function FactionWars() {
                       <div style={{ fontWeight:900, fontSize:15, color:currentPlayerFD.color, letterSpacing:"0.04em" }}>{currentPlayerFD.name.toUpperCase()}</div>
                       <div style={{ fontSize:10, opacity:0.5, marginTop:1 }}>Warrior {currentFactionIdx+1} of {TEAM_SIZE}</div>
                     </div>
-                    {/* Player power bar — warriors remaining */}
+                    {/* Player power bar — warriors remaining (NOT health points) */}
                     <div style={{ width:"100%", height:5, borderRadius:3, background:"rgba(255,255,255,0.08)", overflow:"hidden" }}>
                       <div style={{ height:"100%", borderRadius:3, background:`linear-gradient(90deg, ${currentPlayerFD.color}, ${currentPlayerFD.color}88)`, width:`${Math.round(((TEAM_SIZE - currentFactionIdx) / TEAM_SIZE) * 100)}%`, transition:"width 0.6s ease" }} />
                     </div>
-                    <div style={{ fontSize:9, opacity:0.45, display:"flex", gap:8 }}>
-                      <span>{TEAM_SIZE - currentFactionIdx} of {TEAM_SIZE} warriors left</span>
-                      {territoriesWon > 0 && <span style={{color:currentPlayerFD.color}}>✅ {territoriesWon} won</span>}
+                    <div style={{ fontSize:9, opacity:0.55, display:"flex", gap:8, fontWeight:600 }}>
+                      <span>👥 {TEAM_SIZE - currentFactionIdx}/{TEAM_SIZE} warriors left</span>
+                      {territoriesWon > 0 && <span style={{color:"#34d399"}}>✅ {territoriesWon} won</span>}
                     </div>
                   </div>
 
@@ -882,9 +920,9 @@ export default function FactionWars() {
                     <div style={{ width:"100%", height:5, borderRadius:3, background:"rgba(255,255,255,0.08)", overflow:"hidden" }}>
                       <div style={{ height:"100%", borderRadius:3, background:`linear-gradient(90deg, ${currentDefenderFD.color}, ${currentDefenderFD.color}88)`, width:`${Math.round(((TERRITORY_COUNT - currentTerritory) / TERRITORY_COUNT) * 100)}%`, transition:"width 0.6s ease" }} />
                     </div>
-                    <div style={{ fontSize:9, opacity:0.45, display:"flex", gap:8 }}>
-                      <span>{TERRITORY_COUNT - currentTerritory} territories left to defend</span>
-                      {results.filter(r=>!r.won).length > 0 && <span style={{color:"#34d399"}}>💀 {results.filter(r=>!r.won).length} lost</span>}
+                    <div style={{ fontSize:9, opacity:0.55, display:"flex", gap:8, fontWeight:600 }}>
+                      <span>🏰 {TERRITORY_COUNT - currentTerritory}/{TERRITORY_COUNT} defending</span>
+                      {results.filter(r=>!r.won).length > 0 && <span style={{color:"#f87171"}}>💀 {results.filter(r=>!r.won).length} lost</span>}
                     </div>
                   </div>
                 </div>
