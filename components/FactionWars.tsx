@@ -60,37 +60,40 @@ type FWLeaderboards = { warlords: {playerId:string;playerName?:string;score:numb
 
 const FACTIONS: Record<FactionId, Faction> = {
   samurai: { id:"samurai", name:"Samurai", emoji:"🔴", color:"#dc2626", bgColor:"rgba(220,38,38,0.12)", borderColor:"rgba(220,38,38,0.4)", role:"Core soldiers", passive:"First Strike", passiveDesc:"1st territory: +2 bonus damage dealt per round", weapon:"Katana",
-    moves:[{id:"katana_strike",label:"Katana Strike",emoji:"⚔️",desc:"Precise high-damage slash",power:8,type:"attack"},{id:"honor_guard",label:"Honor Guard",emoji:"🛡️",desc:"Nullifies enemy tricks",power:6,type:"defend"},{id:"battle_cry",label:"Battle Cry",emoji:"📯",desc:"Boosts team power this territory",power:5,type:"magic"},{id:"counter_strike",label:"Counter Strike",emoji:"🔄",desc:"Counter — deal back 150% of enemy power",power:7,type:"trick"},{id:"iron_code",label:"Iron Code",emoji:"📜",desc:"Honor buff — +3 power for next 2 territories",power:4,type:"magic"}],
+    moves:[{id:"katana_strike",label:"Katana Strike",emoji:"⚔️",desc:"Strong reliable slash — full power damage",power:8,type:"attack"},{id:"honor_guard",label:"Honor Guard",emoji:"🛡️",desc:"Block stance — reduces incoming damage by 40%",power:6,type:"defend"},{id:"battle_cry",label:"Battle Cry",emoji:"📯",desc:"War cry — grants +4 damage for next 5 rounds",power:5,type:"magic"},{id:"counter_strike",label:"Counter Strike",emoji:"🔄",desc:"Counter — deal extra damage equal to enemy power",power:7,type:"trick"},{id:"iron_code",label:"Iron Code",emoji:"📜",desc:"+3 bonus damage for next 8 rounds (persists)",power:4,type:"magic"}],
     weakTo:["ronin","yamabushi"], strongVs:["ashigaru","buke"] },
   ronin: { id:"ronin", name:"Ronin", emoji:"⚫", color:"#9f1239", bgColor:"rgba(159,18,57,0.12)", borderColor:"rgba(159,18,57,0.45)", role:"Elite assassins", passive:"Comeback", passiveDesc:"After losing a territory: next warrior deals +15 bonus damage per round", weapon:"Twin Daggers",
-    moves:[{id:"twin_daggers",label:"Twin Daggers",emoji:"🗡️",desc:"Double hit lower power",power:7,type:"attack"},{id:"shadow_step",label:"Shadow Step",emoji:"👤",desc:"Dodge — enemy misses",power:6,type:"trick"},{id:"last_stand",oneTime:true,label:"Last Stand",emoji:"💀",desc:"Massive spike if losing",power:9,type:"magic"},{id:"phantom_blade",oneTime:true,label:"Phantom Blade",emoji:"🌑",desc:"Invisible strike — bypasses all defenses",power:8,type:"trick"},{id:"death_mark",label:"Death Mark",emoji:"☠️",desc:"Mark enemy — next 2 attacks gain +2 power",power:5,type:"magic"}],
+    moves:[{id:"twin_daggers",label:"Twin Daggers",emoji:"🗡️",desc:"Double hit lower power",power:7,type:"attack"},{id:"shadow_step",label:"Shadow Step",emoji:"👤",desc:"Dodge — enemy misses",power:6,type:"trick"},{id:"last_stand",oneTime:true,label:"Last Stand",emoji:"💀",desc:"Massive +15 bonus damage when your HP is below 40",power:9,type:"magic"},{id:"phantom_blade",oneTime:true,label:"Phantom Blade",emoji:"🌑",desc:"Strike through defenses — enemy block reduced 70%",power:8,type:"trick"},{id:"death_mark",label:"Death Mark",emoji:"☠️",desc:"+2 bonus damage for next 4 rounds",power:5,type:"magic"}],
     weakTo:["shogun","bushi"], strongVs:["samurai","warrior"] },
   warrior: { id:"warrior", name:"Warrior", emoji:"🟤", color:"#b45309", bgColor:"rgba(180,83,9,0.12)", borderColor:"rgba(180,83,9,0.4)", role:"Battle veterans", passive:"Relentless", passiveDesc:"Cracked Circle & Berserker Rage deal +20 extra damage per use", weapon:"Greatsword",
-    moves:[{id:"greatsword",label:"Greatsword Slam",emoji:"🔨",desc:"Highest raw damage",power:10,type:"attack"},{id:"iron_will",label:"Iron Will",emoji:"⛰️",desc:"Absorb enemy hit completely",power:7,type:"defend"},{id:"cracked_circle",label:"Cracked Circle",emoji:"💢",desc:"Sacrifice defense for +4 power",power:8,type:"magic"},{id:"berserker_rage",oneTime:true,label:"Berserker Rage",emoji:"🔥",desc:"Go berserk — power 11 but lose all defense",power:11,type:"attack"},{id:"war_stomp",label:"War Stomp",emoji:"👊",desc:"Stagger enemy — reduce their power by 3",power:6,type:"trick"}],
+    moves:[{id:"greatsword",label:"Greatsword Slam",emoji:"🔨",desc:"Highest raw damage",power:10,type:"attack"},{id:"iron_will",label:"Iron Will",emoji:"⛰️",desc:"Absorb enemy hit completely",power:7,type:"defend"},{id:"cracked_circle",label:"Cracked Circle",emoji:"💢",desc:"Sacrifice defense for +4 power",power:8,type:"magic"},{id:"berserker_rage",oneTime:true,label:"Berserker Rage",emoji:"🔥",desc:"Go berserk — max damage but all defend moves locked this territory",power:11,type:"attack"},{id:"blood_price",oneTime:true,label:"Blood Price",emoji:"🩸",desc:"Sacrifice 20 HP to deal double power damage this round",power:10,type:"attack"},
+      {id:"war_stomp",label:"War Stomp",emoji:"👊",desc:"Stagger hit — reduces enemy damage by 3 this round",power:6,type:"trick"}],
     weakTo:["kenshi","sohei"], strongVs:["ronin","ashigaru"] },
   ashigaru: { id:"ashigaru", name:"Ashigaru", emoji:"🟢", color:"#166534", bgColor:"rgba(22,101,52,0.12)", borderColor:"rgba(22,101,52,0.4)", role:"Infantry force", passive:"Humble Roots", passiveDesc:"Campaign costs 25 REBEL less (125 total instead of 150)", weapon:"Spear",
-    moves:[{id:"spear_thrust",label:"Spear Thrust",emoji:"🌿",desc:"Reliable steady damage",power:6,type:"attack"},{id:"shield_wall",label:"Shield Wall",emoji:"🛡️",desc:"Blocks 60% of damage",power:7,type:"defend"},{id:"rally",label:"Rally",emoji:"📣",desc:"Recover lost territory slot",power:5,type:"magic"},{id:"phalanx",label:"Phalanx",emoji:"🔰",desc:"Lock shields — guaranteed defend result",power:8,type:"defend"},{id:"endure",label:"Endure",emoji:"💪",desc:"Suffer but survive — can't lose this territory",power:5,type:"defend"}],
+    moves:[{id:"spear_thrust",label:"Spear Thrust",emoji:"🌿",desc:"Reliable steady damage",power:6,type:"attack"},{id:"shield_wall",label:"Shield Wall",emoji:"🛡️",desc:"Blocks 60% of damage",power:7,type:"defend"},{id:"rally",label:"Rally",emoji:"📣",desc:"Rally — reduces incoming damage to 0 this round and fully blocks",power:5,type:"magic"},{id:"phalanx",label:"Phalanx",emoji:"🔰",desc:"Shield lock — 40% block with no damage penalty",power:8,type:"defend"},{id:"endure",label:"Endure",emoji:"💪",desc:"Endure — take 0 damage this round (can never finish a territory alone)",power:5,type:"defend"}],
     weakTo:["warrior","ronin"], strongVs:["wokou","sohei"] },
   shogun: { id:"shogun", name:"Shogun", emoji:"🟡", color:"#854d0e", bgColor:"rgba(133,77,14,0.12)", borderColor:"rgba(133,77,14,0.45)", role:"Commander", passive:"Divine Authority", passiveDesc:"Ultra victory: REBEL reward boosted by 15%", weapon:"War Staff",
-    moves:[{id:"command_strike",label:"Command Strike",emoji:"👑",desc:"Multiplies next warrior damage",power:9,type:"magic"},{id:"strategic_ret",label:"Strategic Retreat",emoji:"🏳️",desc:"Preserve and guarantee min reward",power:5,type:"defend"},{id:"divine_auth",label:"Divine Authority",emoji:"⚡",desc:"Force minimum Common reward",power:7,type:"magic"},{id:"imperial_decree",oneTime:true,label:"Imperial Decree",emoji:"📋",desc:"Issue decree — skip enemy strongest move",power:8,type:"trick"},{id:"warlords_fury",label:"Warlord's Fury",emoji:"⚡",desc:"Full power strike — scales with territories won",power:7,type:"attack"}],
+    moves:[{id:"command_strike",label:"Command Strike",emoji:"👑",desc:"Command — next round gains permanent +8 flat damage bonus",power:9,type:"magic"},{id:"strategic_ret",label:"Strategic Retreat",emoji:"🏳️",desc:"Retreat — your team gets Common reward even if campaign fails",power:5,type:"defend"},{id:"divine_auth",label:"Divine Authority",emoji:"⚡",desc:"Authority — guarantees minimum Common reward this campaign",power:7,type:"magic"},{id:"imperial_decree",oneTime:true,label:"Imperial Decree",emoji:"📋",desc:"Decree — forces enemy to use their weakest move this round",power:8,type:"trick"},{id:"final_command",oneTime:true,label:"Final Command",emoji:"📣",desc:"Epic decree — forces enemy to 1 power AND you get +6 damage",power:9,type:"magic"},
+      {id:"warlords_fury",label:"Warlord's Fury",emoji:"⚡",desc:"Fury — base power +4 per territory already won",power:7,type:"attack"}],
     weakTo:["yamabushi","wokou"], strongVs:["ronin","bushi"] },
   buke: { id:"buke", name:"Buke", emoji:"🪖", color:"#4d7c0f", bgColor:"rgba(77,124,15,0.12)", borderColor:"rgba(77,124,15,0.4)", role:"Noble defenders", passive:"Noble Guard", passiveDesc:"Mostly used defend moves? A campaign loss flips to Common win", weapon:"Trident",
-    moves:[{id:"trident_stab",label:"Trident Stab",emoji:"🔱",desc:"Multi-hit 3 small strikes",power:7,type:"attack"},{id:"noble_defense",label:"Noble Defense",emoji:"🏰",desc:"Guarantee no wipe",power:8,type:"defend"},{id:"honor_bond",label:"Honor Bond",emoji:"🤝",desc:"Link warriors +3 combo power",power:6,type:"magic"},{id:"bastion",label:"Bastion",emoji:"🏯",desc:"Fortress stance — +4 defense power",power:9,type:"defend"},{id:"noble_sacrifice",oneTime:true,label:"Noble Sacrifice",emoji:"💎",desc:"SACRIFICE: warrior dies instantly. Next warrior gets +12 permanent damage boost",power:4,type:"magic"}],
+    moves:[{id:"trident_stab",label:"Trident Stab",emoji:"🔱",desc:"Triple strike — reliable attack damage",power:7,type:"attack"},{id:"noble_defense",label:"Noble Defense",emoji:"🏰",desc:"Noble stance — 40% block with honorable defense",power:8,type:"defend"},{id:"honor_bond",label:"Honor Bond",emoji:"🤝",desc:"+3 permanent damage bonus for rest of campaign",power:6,type:"magic"},{id:"bastion",label:"Bastion",emoji:"🏯",desc:"Fortress — 40% block + +5 bonus damage dealt",power:9,type:"defend"},{id:"noble_sacrifice",oneTime:true,label:"Noble Sacrifice",emoji:"💎",desc:"SACRIFICE: warrior dies instantly. Next warrior gets +12 permanent damage boost",power:4,type:"magic"}],
     weakTo:["samurai","kenshi"], strongVs:["yamabushi","wokou"] },
   kenshi: { id:"kenshi", name:"Kenshi", emoji:"🩵", color:"#0f766e", bgColor:"rgba(15,118,110,0.12)", borderColor:"rgba(15,118,110,0.4)", role:"Sword masters", passive:"Blade Harmony", passiveDesc:"Win 3 territories in a row: all moves deal +12 extra damage", weapon:"Katana",
-    moves:[{id:"precision_slash",label:"Precision Slash",emoji:"🌊",desc:"Bypass enemy defense",power:8,type:"attack"},{id:"blade_harmony",label:"Blade Harmony",emoji:"🌀",desc:"Chain to next warrior +3",power:7,type:"magic"},{id:"meditation",label:"Meditative Focus",emoji:"🧘",desc:"Build +2 power per territory",power:5,type:"defend"},{id:"blade_storm",oneTime:true,label:"Blade Storm",emoji:"💨",desc:"Flurry — 4 rapid hits average power 6",power:9,type:"attack"},{id:"perfect_form",label:"Perfect Form",emoji:"✨",desc:"Flawless stance — +2 power if no damage taken",power:7,type:"defend"}],
+    moves:[{id:"precision_slash",label:"Precision Slash",emoji:"🌊",desc:"Precision cut — reduces enemy block effectiveness by 70%",power:8,type:"attack"},{id:"blade_harmony",label:"Blade Harmony",emoji:"🌀",desc:"+3 permanent damage bonus for rest of campaign",power:7,type:"magic"},{id:"meditation",label:"Meditative Focus",emoji:"🧘",desc:"Focus — stacks +2 damage per territory you use this move",power:5,type:"defend"},{id:"blade_storm",oneTime:true,label:"Blade Storm",emoji:"💨",desc:"Blade storm — rapid strikes with +7 bonus damage",power:9,type:"attack"},{id:"mirror_slash",label:"Mirror Slash",emoji:"🪞",desc:"Reflect — deals damage equal to what you just took last round",power:7,type:"trick"},
+      {id:"perfect_form",label:"Perfect Form",emoji:"✨",desc:"+3 bonus if you took 0 damage last round",power:7,type:"defend"}],
     weakTo:["wokou","warrior"], strongVs:["buke","samurai"] },
   wokou: { id:"wokou", name:"Wokou", emoji:"🌊", color:"#475569", bgColor:"rgba(71,85,105,0.12)", borderColor:"rgba(71,85,105,0.4)", role:"Sea raiders", passive:"Sea Raider", passiveDesc:"Win a territory: random chance to earn extra bonus REBEL", weapon:"Cutlass",
-    moves:[{id:"cutlass_raid",label:"Cutlass Raid",emoji:"🏴‍☠️",desc:"Steal enemy bonus on win",power:7,type:"trick"},{id:"sea_storm",label:"Sea Storm",emoji:"🌊",desc:"Chaotic random power 4-10",power:7,type:"magic"},{id:"ghost_tide",label:"Ghost Tide",emoji:"👻",desc:"Disappear — enemy nullified",power:6,type:"trick"},{id:"ambush",oneTime:true,label:"Ambush",emoji:"🗺️",desc:"Surprise attack — +3 if enemy chose attack",power:8,type:"trick"},{id:"plunder",label:"Plunder",emoji:"💰",desc:"Loot bonus — win this territory to earn extra REBEL (see reward)",power:6,type:"magic"}],
+    moves:[{id:"cutlass_raid",label:"Cutlass Raid",emoji:"🏴‍☠️",desc:"40% chance to earn +10 bonus REBEL when you win this territory",power:7,type:"trick"},{id:"sea_storm",label:"Sea Storm",emoji:"🌊",desc:"Chaos strike — random power 4-10 this round",power:7,type:"magic"},{id:"ghost_tide",label:"Ghost Tide",emoji:"👻",desc:"Disappear — enemy nullified",power:6,type:"trick"},{id:"ambush",oneTime:true,label:"Ambush",emoji:"🗺️",desc:"Ambush — deals +4 bonus damage if enemy also attacked",power:8,type:"trick"},{id:"plunder",label:"Plunder",emoji:"💰",desc:"Loot bonus — win this territory to earn extra REBEL (see reward)",power:6,type:"magic"}],
     weakTo:["ashigaru","buke"], strongVs:["kenshi","shogun"] },
   sohei: { id:"sohei", name:"Sohei", emoji:"🟠", color:"#c2410c", bgColor:"rgba(194,65,12,0.12)", borderColor:"rgba(194,65,12,0.4)", role:"Monk warriors", passive:"Monk Ward", passiveDesc:"Lose a territory with HP above 0: counts as a narrow escape", weapon:"War Staff",
-    moves:[{id:"staff_sweep",label:"Staff Sweep",emoji:"🌅",desc:"Area attack all positions",power:7,type:"attack"},{id:"monks_ward",label:"Monk's Ward",emoji:"☯️",desc:"Nullify one enemy hit",power:8,type:"defend"},{id:"enlightened",label:"Enlightened Strike",emoji:"🔥",desc:"Spiritual damage bypasses armor",power:9,type:"magic"},{id:"sacred_flame",oneTime:true,label:"Sacred Flame",emoji:"🕯️",desc:"Holy fire — power 10 against magic users",power:8,type:"magic"},{id:"iron_meditation",label:"Iron Meditation",emoji:"🧘",desc:"Center self — +3 power and heal passive",power:6,type:"defend"}],
+    moves:[{id:"staff_sweep",label:"Staff Sweep",emoji:"🌅",desc:"Sweep — strong reliable attack damage",power:7,type:"attack"},{id:"monks_ward",label:"Monk's Ward",emoji:"☯️",desc:"Ward — blocks 55% of enemy damage this round",power:8,type:"defend"},{id:"enlightened",label:"Enlightened Strike",emoji:"🔥",desc:"Spiritual damage bypasses armor",power:9,type:"magic"},{id:"sacred_flame",oneTime:true,label:"Sacred Flame",emoji:"🕯️",desc:"Sacred fire — +7 spiritual damage bonus",power:8,type:"magic"},{id:"iron_meditation",label:"Iron Meditation",emoji:"🧘",desc:"Meditate — heals +15 HP and gives +3 damage bonus for 4 rounds",power:6,type:"defend"}],
     weakTo:["ashigaru","kenshi"], strongVs:["warrior","yamabushi"] },
   yamabushi: { id:"yamabushi", name:"Yamabushi", emoji:"🔵", color:"#164e63", bgColor:"rgba(22,78,99,0.12)", borderColor:"rgba(22,78,99,0.4)", role:"Mountain mystics", passive:"Spirit Vision", passiveDesc:"One random territory this campaign: hidden +5 damage bonus", weapon:"Mystic Staff",
-    moves:[{id:"mystic_flame",label:"Mystic Flame",emoji:"🔮",desc:"Random elemental power 5-9",power:7,type:"magic"},{id:"spirit_vision",label:"Spirit Vision",emoji:"👁️",desc:"Reveal weakness +3 next",power:6,type:"trick"},{id:"mountain_seal",oneTime:true,label:"Mountain Seal",emoji:"🗻",desc:"Seal enemy strongest counter",power:8,type:"magic"},{id:"void_seal",oneTime:true,label:"Void Seal",emoji:"🌀",desc:"Erase enemy move — they get power 1",power:9,type:"magic"},{id:"mountain_echo",label:"Mountain Echo",emoji:"📣",desc:"Echo last move — replay previous territory's power",power:6,type:"trick"}],
+    moves:[{id:"mystic_flame",label:"Mystic Flame",emoji:"🔮",desc:"Random elemental power 4-10 via chaos magic",power:7,type:"magic"},{id:"spirit_vision",label:"Spirit Vision",emoji:"👁️",desc:"Vision — +3 damage bonus activates each round you use this",power:6,type:"trick"},{id:"mountain_seal",oneTime:true,label:"Mountain Seal",emoji:"🗻",desc:"Seal — +3 damage bonus after using (mountain power)",power:8,type:"magic"},{id:"void_seal",oneTime:true,label:"Void Seal",emoji:"🌀",desc:"Erase enemy move — they get power 1",power:9,type:"magic"},{id:"mountain_echo",label:"Mountain Echo",emoji:"📣",desc:"Echo — replays 70% of last round's damage as extra bonus",power:6,type:"trick"}],
     weakTo:["sohei","samurai"], strongVs:["shogun","buke"] },
   bushi: { id:"bushi", name:"Bushi", emoji:"🔷", color:"#1e3a5f", bgColor:"rgba(30,58,95,0.12)", borderColor:"rgba(30,58,95,0.45)", role:"Tactical officers", passive:"Tactical Mind", passiveDesc:"Each round: see enemy faction weaknesses before choosing", weapon:"Tactical Blade",
-    moves:[{id:"tactical_blade",label:"Tactical Blade",emoji:"🗡️",desc:"See result before confirming",power:7,type:"attack"},{id:"officers_order",label:"Officer's Order",emoji:"📋",desc:"Reorder attack +2 highest",power:6,type:"magic"},{id:"strategic_mind",oneTime:true,label:"Strategic Mind",emoji:"🧠",desc:"Pick enemy territory order",power:8,type:"trick"},{id:"field_intel",label:"Field Intel",emoji:"🔭",desc:"Scout ahead — reveal enemy move before choosing",power:7,type:"trick"},{id:"tactical_strike",label:"Tactical Strike",emoji:"🎯",desc:"Calculated blow — power equals territories won",power:7,type:"attack"}],
+    moves:[{id:"tactical_blade",label:"Tactical Blade",emoji:"🗡️",desc:"Blade strike — +2 bonus damage for attack moves",power:7,type:"attack"},{id:"officers_order",label:"Officer's Order",emoji:"📋",desc:"+3 bonus damage for all attack moves this territory",power:6,type:"magic"},{id:"strategic_mind",oneTime:true,label:"Strategic Mind",emoji:"🧠",desc:"Tactical read — +2 damage per territory already won",power:8,type:"trick"},{id:"field_intel",label:"Field Intel",emoji:"🔭",desc:"Intel — +3 bonus if your move counters the enemy type",power:7,type:"trick"},{id:"tactical_strike",label:"Tactical Strike",emoji:"🎯",desc:"Calculated blow — power equals territories won",power:7,type:"attack"}],
     weakTo:["samurai","sohei"], strongVs:["ronin","wokou"] },
 };
 
@@ -130,10 +133,11 @@ function calcDamage(move: Move, atk: FactionId, def: FactionId, bonus: number, t
 }
 
 function calcBlock(move: Move): number {
-  if (["shadow_step","ghost_tide"].includes(move.id)) return 0.45;
+  if (["shadow_step","ghost_tide","vanishing_cut"].includes(move.id)) return 0.40;
   if (["monks_ward"].includes(move.id)) return 0.55;
   if (["noble_defense","honor_guard","phalanx","bastion"].includes(move.id)) return 0.40;
   if (["shield_wall","iron_will","endure"].includes(move.id)) return 0.35;
+  if (move.id === "bushido_stand") return 0.30;
   if (move.type === "defend") return 0.25;
   return 0;
 }
@@ -596,6 +600,13 @@ export default function FactionWars() {
   const [usedMoves, setUsedMoves] = useState<Record<string,number>>({});
   const [sacrificeBonus, setSacrificeBonus] = useState(0);
   const [berserkerActive, setBerserkerActive] = useState(false);
+  // Campaign-level buffs (persist across territories)
+  const [powerBuffRounds, setPowerBuffRounds] = useState(0);   // rounds remaining for iron_code/death_mark style buffs
+  const [powerBuffAmt, setPowerBuffAmt]       = useState(0);   // extra damage while buff active
+  const [comboBonus, setComboBonus]           = useState(0);   // honor_bond/blade_harmony bonus
+  const [meditationStacks, setMeditationStacks] = useState(0); // meditative_focus stacks
+  const [lastStandUsed, setLastStandUsed]     = useState(false);
+  const [commandActive, setCommandActive]     = useState(false); // command_strike: next warrior +50% damage
   const [healBusy, setHealBusy]   = useState(false);
   const [healUsed, setHealUsed]     = useState(0);
   const [oneTimeUsed, setOneTimeUsed] = useState<string[]>([]);
@@ -642,6 +653,8 @@ export default function FactionWars() {
     setPlayerHp(MAX_HP); setEnemyHp(MAX_HP);
     setCurrentRound(0); setRoundLog([]); setDmgFloats([]); setCurrentTerritoryRounds([]);
     setUsedMoves({}); setBerserkerActive(false);
+    // Apply meditation stacks to starting power buff
+    if (meditationStacks > 0) { setPowerBuffAmt(meditationStacks * 2); setPowerBuffRounds(99); }
   };
 
   const fightTerritory = async () => {
@@ -650,20 +663,42 @@ export default function FactionWars() {
     const defender = defenders[currentTerritory];
     const tWon = results.filter(r=>r.won).length;
     const tLost = results.filter(r=>!r.won).length;
-    const bonus = calcPassiveBonus(playerFaction, tWon, currentTerritory === 0) + sacrificeBonus;
-    if (sacrificeBonus > 0) setSacrificeBonus(0); // consume after one use
+    const bonus = calcPassiveBonus(playerFaction, tWon, currentTerritory === 0) + sacrificeBonus
+      + (powerBuffRounds > 0 ? powerBuffAmt : 0)
+      + comboBonus
+      + (commandActive ? 8 : 0); // command_strike: +8 flat bonus
+    if (sacrificeBonus > 0) setSacrificeBonus(0);
+    if (powerBuffRounds > 0) setPowerBuffRounds(n => n - 1);
+    if (commandActive) setCommandActive(false); // consumed after one use
     setBusy(true); setBattleAnim("clash"); sfx.clash();
     await new Promise(r=>setTimeout(r,450));
 
-    const imperialDecreeFlag = selectedMove.id === "imperial_decree";
+    const imperialDecreeFlag = selectedMove.id === "imperial_decree" || selectedMove.id === "final_command";
     const enemyMove = imperialDecreeFlag
-      ? FACTIONS[defender].moves.reduce((a,b)=>a.power<b.power?a:b)  // forced weakest
+      ? FACTIONS[defender].moves.reduce((a,b)=>a.power<b.power?a:b)
       : pickEnemyMove(defender, selectedMove, difficulty, enemyHp, playerHp);
     const timesUsed = usedMoves[selectedMove.id] || 0;
     const degradedMove: Move = { ...selectedMove, power: Math.max(1, selectedMove.power - timesUsed) };
     setUsedMoves(prev => ({ ...prev, [selectedMove.id]: (prev[selectedMove.id]||0)+1 }));
     if (selectedMove.oneTime) setOneTimeUsed(prev => [...prev, selectedMove.id]);
-    if (selectedMove.id === "berserker_rage") setBerserkerActive(true);
+    // ── Special move effects ──────────────────────────────────────
+    if (selectedMove.id === "berserker_rage")  setBerserkerActive(true);
+    if (selectedMove.id === "iron_code")        { setPowerBuffAmt(3); setPowerBuffRounds(8); } // +3 dmg for 8 rounds (~2 territories)
+    if (selectedMove.id === "death_mark")       { setPowerBuffAmt(2); setPowerBuffRounds(4); } // +2 dmg next 4 rounds
+    if (selectedMove.id === "blade_harmony")    setComboBonus(prev => prev + 3); // permanent campaign +3
+    if (selectedMove.id === "honor_bond")       setComboBonus(prev => prev + 3); // permanent campaign +3
+    if (selectedMove.id === "command_strike")   setCommandActive(true); // next round gets +8 bonus
+    if (selectedMove.id === "meditation")       setMeditationStacks(prev => prev + 1); // stacks per territory
+    if (selectedMove.id === "iron_meditation")  { setPlayerHp(hp => Math.min(MAX_HP, hp + 15)); setPowerBuffAmt(3); setPowerBuffRounds(4); } // real +15 HP heal + buff
+    if (selectedMove.id === "battle_cry")       { setPowerBuffAmt(4); setPowerBuffRounds(5); } // +4 dmg next 5 rounds
+    if (selectedMove.id === "spirit_vision")    setPowerBuffAmt(prev => Math.max(prev, 3)); // reveal = +3 power buff rounds
+    if (selectedMove.id === "divine_auth")   plunderPendingRef.current = true; // reuse flag to signal min-rarity guarantee
+    // strategic_ret handled below
+    if (selectedMove.id === "cutlass_raid")     { if (Math.random() < 0.4) { const bonus2 = 10; earn(bonus2).catch(()=>{}); } }
+    if (selectedMove.id === "mountain_seal")    setPowerBuffAmt(prev => prev + 3); // seal = your next moves hit harder
+    if (selectedMove.id === "bushido_stand")     { /* handled via block + bonus in calcDamage */ }
+    if (selectedMove.id === "blood_price")       { setPlayerHp(hp => Math.max(1, hp - 20)); } // costs 20 HP
+
     // Track plunder use for this territory
     if (selectedMove.id === "plunder") { plunderPendingRef.current = true; }
     if (selectedMove.id === "noble_sacrifice") {
@@ -675,10 +710,48 @@ export default function FactionWars() {
       setResults(prev=>[...prev,sacRes]); setSelectedMove(null); setBusy(false); setPhase("territory_result");
       return;
     }
-    const playerDmg = calcDamage(degradedMove, playerFaction, defender, bonus, tWon, tLost, difficulty, true);
+    // ── Conditional round effects ────────────────────────────────
+    // war_stomp: reduce enemy damage this round by 3
+    const warStompPenalty = selectedMove.id === "war_stomp" ? 3 : 0;
+    // ambush: +4 bonus if enemy chose attack
+    const ambushBonus = (selectedMove.id === "ambush" && enemyMove.type === "attack") ? 4 : 0;
+    // counter_strike: deal back enemy's power as extra damage
+    const counterBonus = selectedMove.id === "counter_strike" ? Math.round(enemyMove.power * 1.2) : 0;
+    // precision_slash: ignore 50% of enemy block
+    const precisionFlag = selectedMove.id === "precision_slash";
+    // perfect_form: +3 bonus if enemy dealt 0 damage last round
+    const lastRound = currentTerritoryRounds[currentTerritoryRounds.length - 1];
+    const perfectBonus = (selectedMove.id === "perfect_form" && lastRound && lastRound.enemyDmg === 0) ? 3 : 0;
+    // sea_storm: random power 4-10
+    const seaStormFlag = selectedMove.id === "sea_storm";
+    // last_stand: huge spike only when player HP < 40
+    const lastStandActive = selectedMove.id === "last_stand" && playerHp < 40;
+    // endure: can't lose this territory (forced win if this move is chosen)
+    const endureFlag = selectedMove.id === "endure";
+    // mountain_echo: replay last round's player damage
+    const echoBonus = (selectedMove.id === "mountain_echo" && lastRound) ? Math.round(lastRound.playerDmg * 0.7) : 0;
+    const mirrorBonus = (selectedMove.id === "mirror_slash" && lastRound) ? lastRound.enemyDmg : 0;
+    const finalCmdBonus = selectedMove.id === "final_command" ? 6 : 0;
+    // officers_order: +3 to all attack moves this territory
+    const officersBonus = selectedMove.id === "officers_order" ? 3 : 0;
+    // tactical_blade: +2 power for attack moves
+    const tacticalBonus = selectedMove.id === "tactical_blade" && degradedMove.type === "attack" ? 2 : 0;
+    // field_intel: +3 if you counter the enemy's type
+    const cm2: Record<string,string[]> = { attack:["defend","trick"], defend:["magic","attack"], magic:["trick","defend"], trick:["attack","magic"] };
+    const fieldBonus = (selectedMove.id === "field_intel" && (cm2[enemyMove.type]||[]).includes(selectedMove.type)) ? 3 : 0;
+    // strategic_mind: +2 per territory already won
+    const stratBonus = selectedMove.id === "strategic_mind" ? tWon * 2 : 0;
+
+    const totalBonus = bonus + ambushBonus + counterBonus + perfectBonus + echoBonus + mirrorBonus + finalCmdBonus + officersBonus + tacticalBonus + fieldBonus + stratBonus + (lastStandActive ? 15 : 0);
+
+    let seaStormPower = seaStormFlag ? (Math.floor(Math.random()*7)+4) : degradedMove.power;
+    const moveForDmg: Move = seaStormFlag ? {...degradedMove, power: seaStormPower} : degradedMove;
+
+    const playerDmg = calcDamage(moveForDmg, playerFaction, defender, totalBonus, tWon, tLost, difficulty, true);
     const rawEnemyDmg = calcDamage(enemyMove, defender, playerFaction, 0, 0, 0, difficulty, false);
-    const block = calcBlock(selectedMove);
-    const enemyDmg = Math.round(rawEnemyDmg * (1 - block));
+    const rawEnemyReduced = Math.max(0, rawEnemyDmg - warStompPenalty);
+    const block = precisionFlag ? calcBlock(selectedMove) * 0.3 : calcBlock(selectedMove);
+    const enemyDmg = endureFlag ? 0 : Math.round(rawEnemyReduced * (1 - block));
 
     const newPlayerHp = Math.max(0, playerHp - enemyDmg);
     const newEnemyHp  = Math.max(0, enemyHp  - playerDmg);
@@ -702,7 +775,8 @@ export default function FactionWars() {
     setCurrentRound(n => n+1);
     setRoundLog(prev => [{playerMove:selectedMove.label, enemyMove:enemyMove.label, playerDmg, enemyDmg}, ...prev.slice(0,5)]);
 
-    const over = newPlayerHp <= 0 || newEnemyHp <= 0;
+    // endure: can't lose this territory — but also can't win by using it alone
+    const over = endureFlag ? false : (newPlayerHp <= 0 || newEnemyHp <= 0);
     setBattleAnim(newEnemyHp <= 0 ? "win" : newPlayerHp <= 0 ? "lose" : "idle");
     await new Promise(r=>setTimeout(r, over ? 700 : 250));
     if (!over) { setBattleAnim("idle"); }
@@ -1053,6 +1127,16 @@ export default function FactionWars() {
                       color:enemyHp>50?"#34d399":enemyHp>25?"#fbbf24":"#f87171" }}>{enemyHp}<span style={{fontSize:9,opacity:0.5}}>/100</span></div>
                   </div>
                 </div>
+
+                {/* Active buff indicators */}
+                {(powerBuffRounds > 0 || comboBonus > 0 || commandActive || meditationStacks > 0) && (
+                  <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:8, justifyContent:"center" }}>
+                    {powerBuffRounds > 0 && <div style={{ fontSize:10, fontWeight:800, background:"rgba(52,211,153,0.15)", border:"1px solid rgba(52,211,153,0.3)", color:"#34d399", borderRadius:20, padding:"2px 8px" }}>⚡ +{powerBuffAmt} dmg ({powerBuffRounds})</div>}
+                    {comboBonus > 0 && <div style={{ fontSize:10, fontWeight:800, background:"rgba(192,132,252,0.15)", border:"1px solid rgba(192,132,252,0.3)", color:"#c084fc", borderRadius:20, padding:"2px 8px" }}>🔗 Combo +{comboBonus}</div>}
+                    {commandActive && <div style={{ fontSize:10, fontWeight:800, background:"rgba(251,191,36,0.15)", border:"1px solid rgba(251,191,36,0.3)", color:"#fbbf24", borderRadius:20, padding:"2px 8px" }}>👑 Command +8 READY</div>}
+                    {meditationStacks > 0 && <div style={{ fontSize:10, fontWeight:800, background:"rgba(99,102,241,0.15)", border:"1px solid rgba(99,102,241,0.3)", color:"#818cf8", borderRadius:20, padding:"2px 8px" }}>🧘 Focus ×{meditationStacks}</div>}
+                  </div>
+                )}
 
                 {/* Round counter */}
                 <div style={{ textAlign:"center", marginBottom:14 }}>
