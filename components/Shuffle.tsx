@@ -47,10 +47,11 @@ function useShuffleAudio() {
   }, []);
 
   const sfx = React.useMemo(() => ({
-    pick:   () => { if (!muted) { stopMusic(); play("/audio/egg-pick.mp3",      0.8); } },
+    pick:   () => { stopMusic(); },
     common: () => { if (!muted) play("/audio/prize-common.mp3", 0.8); },
     rare:   () => { if (!muted) play("/audio/prize-rare.mp3",   0.9); },
     ultra:  () => { if (!muted) play("/audio/prize-ultra.mp3",  1.0); },
+    none:   () => { if (!muted) play("/audio/prize-none.mp3",   0.8); },
   }), [muted, play, stopMusic]);
 
   return { muted, toggleMute, startMusic, stopMusic, sfx };
@@ -1138,6 +1139,7 @@ setBusy(false);
 if (r === "ultra") shuffleSfx.ultra();
 else if (r === "rare") shuffleSfx.rare();
 else if (r === "common") shuffleSfx.common();
+else shuffleSfx.none();
     }, 350);
   };
  const resetAfterPrize = async () => {
