@@ -433,8 +433,8 @@ export default function TunnelShell() {
   const [dripStatus,     setDripStatus]     = useState("");
   const [showBuyPoints, setShowBuyPoints] = useState(false);
   const [showRules, setShowRules] = useState(false);
-  useEffect(() => { startAmbient(); return () => { stopAmbient(); }; }, []);
   const { muted, toggleMute, startAmbient, stopAmbient, sfx } = useAudio();
+  React.useEffect(() => { startAmbient(); return () => { stopAmbient(); }; }, []); // start ambient on mount, stop on unmount
   const [tunnelCfg, setTunnelCfg] = useState(DEFAULT_TUNNEL_CONFIG);
 
     const [boardTheme, setBoardTheme] = useState<BoardTheme>("colony");
