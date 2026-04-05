@@ -730,10 +730,13 @@ export default function FactionWars() {
                 {team.length>0&&(
                   <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
                     {team.map((fid,i)=>{const f=FACTIONS[fid];return(
-                      <div key={i} style={{ background:f.bgColor, border:`1px solid ${f.borderColor}`, borderRadius:10, padding:"8px 12px", fontSize:11, minWidth:130 }}>
-                        <div style={{ fontWeight:800, color:f.color, marginBottom:3 }}>{f.emoji} {f.name}</div>
-                        <div style={{ opacity:0.7, marginBottom:2 }}>⚡ {f.passive}</div>
-                        <div style={{ opacity:0.55, fontSize:10 }}>{f.passiveDesc}</div>
+                      <div key={i} style={{ background:f.bgColor, border:`1px solid ${f.borderColor}`, borderRadius:10, padding:"10px 12px", fontSize:11, minWidth:150, display:"flex", gap:10, alignItems:"flex-start" }}>
+                        <img src={factionImgPath(f.id,"symbol")} alt={f.name} style={{ width:36, height:36, objectFit:"contain", borderRadius:6, background:"rgba(0,0,0,0.4)", padding:3, flexShrink:0 }} onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
+                        <div style={{ minWidth:0 }}>
+                          <div style={{ fontWeight:900, color:f.color, marginBottom:3, fontSize:12 }}>{f.name}</div>
+                          <div style={{ opacity:0.75, marginBottom:2 }}>⚡ {f.passive}</div>
+                          <div style={{ opacity:0.55, fontSize:10 }}>{f.passiveDesc}</div>
+                        </div>
                       </div>
                     );})}
                   </div>
