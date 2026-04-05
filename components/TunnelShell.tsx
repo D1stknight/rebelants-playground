@@ -443,7 +443,7 @@ export default function TunnelShell() {
   const [layoutMode, setLayoutMode] = useState<"random"|"pick">("random");
   const [selectedLayout, setSelectedLayout] = useState<number|null>(null);
   const [layoutsExplored, setLayoutsExplored] = useState(0);
-  const [layoutChampions, setLayoutChampions] = useState<Array<{layoutIndex:number;layoutName:string;playerId:string;playerName:string;score:number}>>([]);
+  const [layoutChampions, setLayoutChampions] = useState<{layoutIndex:number;layoutName:string;topScores:{rank:number;playerId:string;playerName:string;score:number}[];fastestClears:{rank:number;playerId:string;playerName:string;clearTimeMs:number}[]}[]>([]);
 const [isPlaying, setIsPlaying] = useState(false);
 const [timeLeft, setTimeLeft] = useState(DEFAULT_TUNNEL_CONFIG.tunnelRunSeconds);
 const [score, setScore] = useState(0);
