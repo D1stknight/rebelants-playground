@@ -595,7 +595,8 @@ export default function FactionWars() {
   const plunderPendingRef = useRef(false);
   const [usedMoves, setUsedMoves] = useState<Record<string,number>>({});
   const [sacrificeBonus, setSacrificeBonus] = useState(0);
-  const [healBusy, setHealBusy] = useState(false);
+  const [healBusy, setHealBusy]   = useState(false);
+  const [healUsed, setHealUsed]     = useState(0);
   const [oneTimeUsed, setOneTimeUsed] = useState<string[]>([]);
   const [showHowToPlay, setShowHowToPlay] = useState(true);
   const { muted, toggleMute, startMusic, stopMusic, sfx } = useFWAudio();
@@ -1144,16 +1145,19 @@ export default function FactionWars() {
                     <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:8 }}>
                       <button
                         onClick={async()=>{
-                          if (healBusy||busy||playerHp>=MAX_HP) return;
-                          if (balance < healCost) { return; }
+                          const maxHeals = Number(cfg?.factionWarsHealMax??2);
+                          if (healBusy||busy||playerHp>=MAX_HP||healUsed>=maxHeals) return;
+                          if (balance < healCost) return;
                           setHealBusy(true);
-                          try { await spend(healCost,"faction-wars"); const newHp=Math.min(MAX_HP,playerHp+healAmt); setPlayerHp(newHp); await refresh(); } catch {}
+                          try { await spend(healCost,"faction-wars"); const newHp=Math.min(MAX_HP,playerHp+healAmt); setPlayerHp(newHp); setHealUsed(n=>n+1); await refresh(); } catch {}
                           setHealBusy(false);
                         }}
-                        disabled={healBusy||busy||playerHp>=MAX_HP||balance<Number(cfg?.factionWarsHealCost??25)}
+                        disabled={healBusy||busy||playerHp>=MAX_HP||balance<Number(cfg?.factionWarsHealCost??25)||healUsed>=Number(cfg?.factionWarsHealMax??2)}
                         title={`Spend ${healCost} REBEL to restore ${healAmt} HP`}
                         style={{ display:"flex", alignItems:"center", gap:6, padding:"6px 14px", borderRadius:20, border:"1px solid rgba(52,211,153,0.3)", background:"rgba(52,211,153,0.1)", color:"#34d399", fontSize:11, fontWeight:800, cursor:healBusy||busy||playerHp>=MAX_HP||balance<Number(cfg?.factionWarsHealCost??25)?"not-allowed":"pointer", opacity:healBusy||busy||playerHp>=MAX_HP||balance<Number(cfg?.factionWarsHealCost??25)?0.4:1 }}>
-                        🧪 Heal +{healAmt} HP <span style={{opacity:0.6,fontSize:10}}>(-{Number(cfg?.factionWarsHealCost??25)} {currency})</span>
+                        🧪 Heal +{healAmt} HP
+                        <span style={{opacity:0.6,fontSize:10}}>(-{healCost} {currency})</span>
+                        <span style={{opacity:0.5,fontSize:9,marginLeft:4}}>({Math.max(0,Number(cfg?.factionWarsHealMax??2)-healUsed)} left)</span>
                       </button>
                     </div>
                   );

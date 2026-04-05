@@ -24,6 +24,7 @@ type PointsConfigShape = {
   factionWarsPlunderBonus: number;
   factionWarsHealCost: number;
   factionWarsHealAmt: number;
+  factionWarsHealMax: number;
 
   // ✅ Raid settings
   raidCost: number;
@@ -158,6 +159,7 @@ const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
     factionWarsPlunderBonus: (defaultConfig as any).factionWarsPlunderBonus ?? 50,
     factionWarsHealCost: (defaultConfig as any).factionWarsHealCost ?? 25,
     factionWarsHealAmt: (defaultConfig as any).factionWarsHealAmt ?? 30,
+    factionWarsHealMax: (defaultConfig as any).factionWarsHealMax ?? 2,
   raidCarrierSurvival: (defaultConfig as any).raidCarrierSurvival ?? 0.20,
   raidUltraCarriers: (defaultConfig as any).raidUltraCarriers ?? 4,
   raidUltraRatio: (defaultConfig as any).raidUltraRatio ?? 0.65,
@@ -1218,6 +1220,10 @@ String(c.status).toUpperCase()==="PENDING"
                   <label style={{ fontSize: 12, opacity: 0.9 }}>Heal Potion Amount (HP restored)
                     <input value={cfg.factionWarsHealAmt} onChange={e => setCfg(c => ({ ...c, factionWarsHealAmt: safeNum(e.target.value, c.factionWarsHealAmt) }))}
                       type="number" min="1" max="100" style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} />
+                  </label>
+                  <label style={{ fontSize: 12, opacity: 0.9 }}>Max Heals Per Campaign
+                    <input value={cfg.factionWarsHealMax} onChange={e => setCfg(c => ({ ...c, factionWarsHealMax: safeNum(e.target.value, c.factionWarsHealMax) }))}
+                      type="number" min="0" max="10" style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} />
                   </label>
                 </div>
               </div>
