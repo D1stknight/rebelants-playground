@@ -44,7 +44,7 @@ function useRaidAudio() {
 
   const sfx = React.useMemo(() => ({
     survive: () => { if (!muted) play("/audio/ant-survive.mp3", 0.7); },
-    die:     () => { if (!muted) play("/audio/ant-die.mp3",     0.5); },
+    die:     () => { if (!muted) play("/audio/ant-die.mp3",     0.2); },
     ultra:   () => { if (!muted) { stopMarch(); play("/audio/raid-ultra.mp3", 0.9); } },
     fail:    () => { if (!muted) { stopMarch(); play("/audio/raid-fail.mp3",  0.7); } },
   }), [muted, play, stopMarch]);
