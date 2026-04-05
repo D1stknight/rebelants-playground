@@ -20,8 +20,8 @@ export default async function handler(req: any, res: any) {
     if (score > 0) {
       const prev = Number(await redis.hget("tunnel:player:" + playerId + ":stats", "bestScore") || 0);
       if (score > prev) await redis.hset("tunnel:player:" + playerId + ":stats", { bestScore: score });
-      await redis.zadd("tunnel:top:score", { score: Number(score), member }, { gt: true });
-      if (layoutIndex !== null) await redis.zadd("tunnel:layout:" + layoutIndex + ":scores", { score: Number(score), member }, { gt: true });
+      await redis.zadd("tunnel:top:score", { gt: true }, { score: Number(score), member });
+      if (layoutIndex !== null) await redis.zadd("tunnel:layout:" + layoutIndex + ":scores", { gt: true }, { score: Number(score), member });
     }
     if (fullClear && clearTimeMs > 0) {
       const pf = await redis.zscore("tunnel:top:clear", member);
