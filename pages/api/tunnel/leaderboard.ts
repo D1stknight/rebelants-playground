@@ -4,8 +4,8 @@ import { redis } from "../../../lib/server/redis";
 const PLAYER_NAMES = "ra:player_names_v1";
 
 // Tunnel-only leaderboard keys
-const TUNNEL_LB_SCORE = "ra:tunnel:lb:score:alltime";
-const TUNNEL_LB_FASTEST_CLEAR = "ra:tunnel:lb:fastest_clear";
+const TUNNEL_LB_SCORE = "tunnel:top:score";
+const TUNNEL_LB_FASTEST_CLEAR = "tunnel:top:clear";
 
 function tunnelStatsKey(playerId: string) {
   return `ra:tunnel:stats:${playerId}`;
