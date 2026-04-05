@@ -758,46 +758,170 @@ export default function FactionWars() {
 
         {phase === "battle" && currentPlayerFD && currentDefenderFD && (
           <div>
-            <div style={{ background:"rgba(0,0,0,0.4)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:14, padding:16, marginBottom:18 }}>
-              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:12 }}>
-                <div style={{ fontSize:13, fontWeight:800, opacity:0.8 }}>Territory {currentTerritory+1} of {TERRITORY_COUNT}</div>
-                <div style={{ fontSize:12, opacity:0.5 }}>{territoriesWon} won · {results.length-territoriesWon} lost</div>
+            {/* Territory progress bar */}
+            <div style={{ background:"rgba(0,0,0,0.5)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:14, padding:"12px 16px", marginBottom:14 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
+                <div style={{ fontSize:13, fontWeight:900, color:"#fbbf24", letterSpacing:"0.05em" }}>⚔️ TERRITORY {currentTerritory+1} / {TERRITORY_COUNT}</div>
+                <div style={{ display:"flex", gap:12, fontSize:11 }}>
+                  <span style={{ color:"#34d399", fontWeight:700 }}>✅ {territoriesWon} won</span>
+                  <span style={{ color:"#f87171", fontWeight:700 }}>💀 {results.length-territoriesWon} lost</span>
+                </div>
               </div>
-              <div style={{ display:"flex", gap:10, justifyContent:"center" }}>
+              <div style={{ display:"flex", gap:8, justifyContent:"center" }}>
                 {defenders.map((def,i)=>(<TerritoryBadge key={i} index={i} result={results[i]} isCurrent={i===currentTerritory} defender={def} />))}
               </div>
             </div>
-            <div style={{ background:"rgba(0,0,0,0.5)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:16, padding:20, marginBottom:18 }}>
-              <div style={{ display:"flex", justifyContent:"space-around", alignItems:"center", marginBottom:20 }}>
-                <div style={{ textAlign:"center" }}>
-                  <div style={{ width:88, height:88, borderRadius:14, overflow:"hidden", filter:battleAnim==="win"?"drop-shadow(0 0 20px #34d399)":battleAnim==="lose"?"grayscale(0.8)":"none", transform:battleAnim==="clash"?"scale(1.2) translateX(10px)":"scale(1)", transition:"all 0.3s", border:`2px solid ${currentPlayerFD.borderColor}`, boxShadow:`0 0 20px ${currentPlayerFD.color}44` }}>
-                    <img src={factionImgPath(currentPlayerFD.id,"char")} alt={currentPlayerFD.name} style={{ width:"100%", height:"100%", objectFit:"cover", objectPosition:"top" }} onError={(e)=>{ (e.target as HTMLImageElement).style.fontSize="48px"; }} />
+
+            {/* MAIN BATTLE ARENA */}
+            <div style={{ position:"relative", borderRadius:18, overflow:"hidden", marginBottom:16, border:"1px solid rgba(255,255,255,0.1)" }}>
+
+              {/* Animated arena background */}
+              <div style={{ position:"absolute", inset:0, background:`radial-gradient(ellipse at 25% 50%, ${currentPlayerFD.color}22 0%, transparent 60%), radial-gradient(ellipse at 75% 50%, ${currentDefenderFD.color}22 0%, transparent 60%), linear-gradient(180deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.9) 100%)`, transition:"background 0.5s ease" }} />
+              {/* Flash overlay on clash */}
+              {battleAnim==="clash" && <div style={{ position:"absolute", inset:0, background:"rgba(255,200,50,0.12)", zIndex:2, pointerEvents:"none", animation:"none" }} />}
+              {battleAnim==="win" && <div style={{ position:"absolute", inset:0, background:"rgba(52,211,153,0.08)", zIndex:2, pointerEvents:"none" }} />}
+              {battleAnim==="lose" && <div style={{ position:"absolute", inset:0, background:"rgba(239,68,68,0.08)", zIndex:2, pointerEvents:"none" }} />}
+
+              <div style={{ position:"relative", zIndex:1, padding:"24px 20px 20px" }}>
+
+                {/* VS Arena — big characters */}
+                <div style={{ display:"grid", gridTemplateColumns:"1fr auto 1fr", gap:16, alignItems:"center", marginBottom:20 }}>
+
+                  {/* Player side */}
+                  <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:8 }}>
+                    {/* Character image — big */}
+                    <div style={{ position:"relative", width:130, height:150, borderRadius:16, overflow:"hidden",
+                      border:`3px solid ${currentPlayerFD.borderColor}`,
+                      boxShadow:`0 0 ${battleAnim==="win"?"40px":"20px"} ${currentPlayerFD.color}${battleAnim==="win"?"88":"44"}`,
+                      transform: battleAnim==="clash"?"scale(1.08) translateX(12px) rotate(-2deg)":battleAnim==="win"?"scale(1.05)":battleAnim==="lose"?"scale(0.95) rotate(3deg)":"scale(1)",
+                      filter: battleAnim==="lose"?"grayscale(0.6) brightness(0.7)":"none",
+                      transition:"all 0.35s cubic-bezier(0.34,1.56,0.64,1)" }}>
+                      <img src={factionImgPath(currentPlayerFD.id,"char")} alt={currentPlayerFD.name} style={{ width:"100%", height:"100%", objectFit:"cover", objectPosition:"top" }} onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
+                      {/* Symbol badge overlay */}
+                      <div style={{ position:"absolute", bottom:4, right:4, width:28, height:28, borderRadius:6, overflow:"hidden", background:"rgba(0,0,0,0.7)", border:`1px solid ${currentPlayerFD.borderColor}` }}>
+                        <img src={factionImgPath(currentPlayerFD.id,"symbol")} alt="" style={{ width:"100%", height:"100%", objectFit:"contain", padding:3 }} />
+                      </div>
+                    </div>
+                    <div style={{ textAlign:"center" }}>
+                      <div style={{ fontWeight:900, fontSize:15, color:currentPlayerFD.color, letterSpacing:"0.04em" }}>{currentPlayerFD.name.toUpperCase()}</div>
+                      <div style={{ fontSize:10, opacity:0.5, marginTop:1 }}>Warrior {currentFactionIdx+1} of {TEAM_SIZE}</div>
+                    </div>
+                    {/* Player health bar style indicator */}
+                    <div style={{ width:"100%", height:5, borderRadius:3, background:"rgba(255,255,255,0.08)", overflow:"hidden" }}>
+                      <div style={{ height:"100%", borderRadius:3, background:`linear-gradient(90deg, ${currentPlayerFD.color}, ${currentPlayerFD.color}88)`, width:`${Math.round(((TEAM_SIZE-(currentFactionIdx))/TEAM_SIZE)*100)}%`, transition:"width 0.5s ease" }} />
+                    </div>
+                    <div style={{ fontSize:9, opacity:0.45 }}>{TEAM_SIZE - currentFactionIdx} warriors remaining</div>
                   </div>
-                  <div style={{ fontWeight:900, fontSize:14, color:currentPlayerFD.color, marginTop:6 }}>{currentPlayerFD.name}</div>
-                  <div style={{ fontSize:10, opacity:0.5 }}>Warrior {currentFactionIdx+1}</div>
+
+                  {/* Center VS */}
+                  <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:6, minWidth:60 }}>
+                    <div style={{ fontSize: battleAnim==="clash"?48:32, fontWeight:900, transition:"font-size 0.2s",
+                      textShadow: battleAnim==="clash"?"0 0 30px #fbbf24":"none",
+                      transform: battleAnim==="clash"?"scale(1.3)":"scale(1)", transition:"all 0.2s" }}>
+                      {battleAnim==="clash"?"💥":battleAnim==="win"?"✅":battleAnim==="lose"?"💀":"⚔️"}
+                    </div>
+                    <div style={{ fontSize:11, fontWeight:900, opacity: battleAnim==="idle"?0.5:0, letterSpacing:"0.12em", transition:"opacity 0.3s" }}>VS</div>
+                    <div style={{ fontSize:9, opacity:0.35, textAlign:"center", lineHeight:1.4 }}>Territory {currentTerritory+1}</div>
+                  </div>
+
+                  {/* Defender side */}
+                  <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:8 }}>
+                    <div style={{ position:"relative", width:130, height:150, borderRadius:16, overflow:"hidden",
+                      border:`3px solid ${currentDefenderFD.borderColor}`,
+                      boxShadow:`0 0 ${battleAnim==="lose"?"40px":"20px"} ${currentDefenderFD.color}${battleAnim==="lose"?"88":"33"}`,
+                      transform: battleAnim==="clash"?"scale(1.08) translateX(-12px) rotate(2deg)":battleAnim==="lose"?"scale(1.05)":battleAnim==="win"?"scale(0.92) rotate(-3deg)":"scale(1)",
+                      filter: battleAnim==="win"?"grayscale(0.6) brightness(0.6)":"none",
+                      transition:"all 0.35s cubic-bezier(0.34,1.56,0.64,1)" }}>
+                      <img src={factionImgPath(currentDefenderFD.id,"char")} alt={currentDefenderFD.name} style={{ width:"100%", height:"100%", objectFit:"cover", objectPosition:"top" }} onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
+                      <div style={{ position:"absolute", bottom:4, left:4, width:28, height:28, borderRadius:6, overflow:"hidden", background:"rgba(0,0,0,0.7)", border:`1px solid ${currentDefenderFD.borderColor}` }}>
+                        <img src={factionImgPath(currentDefenderFD.id,"symbol")} alt="" style={{ width:"100%", height:"100%", objectFit:"contain", padding:3 }} />
+                      </div>
+                    </div>
+                    <div style={{ textAlign:"center" }}>
+                      <div style={{ fontWeight:900, fontSize:15, color:currentDefenderFD.color, letterSpacing:"0.04em" }}>{currentDefenderFD.name.toUpperCase()}</div>
+                      <div style={{ fontSize:10, opacity:0.5, marginTop:1 }}>Territory Defender</div>
+                    </div>
+                    {/* Threat indicator */}
+                    <div style={{ width:"100%", height:5, borderRadius:3, background:"rgba(255,255,255,0.08)", overflow:"hidden" }}>
+                      <div style={{ height:"100%", borderRadius:3, background:`linear-gradient(90deg, ${currentDefenderFD.color}, ${currentDefenderFD.color}88)`, width:"100%", transition:"width 0.5s ease" }} />
+                    </div>
+                    <div style={{ fontSize:9, opacity:0.45 }}>Holding strong</div>
+                  </div>
                 </div>
-                <div style={{ fontSize:36, opacity:0.8, fontWeight:900 }}>{battleAnim==="clash"?"💥":battleAnim==="win"?"✅":battleAnim==="lose"?"💀":"VS"}</div>
-                <div style={{ textAlign:"center" }}>
-                  <div style={{ width:88, height:88, borderRadius:14, overflow:"hidden", filter:battleAnim==="win"?"grayscale(0.8) opacity(0.5)":battleAnim==="lose"?"drop-shadow(0 0 20px #f87171)":"none", transform:battleAnim==="clash"?"scale(1.2) translateX(-10px)":"scale(1)", transition:"all 0.3s", border:`2px solid ${currentDefenderFD.borderColor}`, boxShadow:`0 0 20px ${currentDefenderFD.color}33` }}>
-                    <img src={factionImgPath(currentDefenderFD.id,"char")} alt={currentDefenderFD.name} style={{ width:"100%", height:"100%", objectFit:"cover", objectPosition:"top" }} onError={(e)=>{ (e.target as HTMLImageElement).style.fontSize="48px"; }} />
+
+                {/* Faction matchup intel strip */}
+                <div style={{ display:"flex", gap:8, justifyContent:"center", marginBottom:16, flexWrap:"wrap" }}>
+                  {currentPlayerFD.strongVs.includes(currentDefenderFD.id as FactionId) && (
+                    <div style={{ fontSize:10, fontWeight:700, color:"#34d399", background:"rgba(52,211,153,0.1)", border:"1px solid rgba(52,211,153,0.25)", borderRadius:20, padding:"3px 10px" }}>
+                      ✅ {currentPlayerFD.name} has advantage
+                    </div>
+                  )}
+                  {currentPlayerFD.weakTo.includes(currentDefenderFD.id as FactionId) && (
+                    <div style={{ fontSize:10, fontWeight:700, color:"#f87171", background:"rgba(248,113,113,0.1)", border:"1px solid rgba(248,113,113,0.25)", borderRadius:20, padding:"3px 10px" }}>
+                      ⚠️ {currentDefenderFD.name} has advantage
+                    </div>
+                  )}
+                  {team[currentFactionIdx]==="bushi" && (
+                    <div style={{ fontSize:10, fontWeight:700, color:"#818cf8", background:"rgba(129,140,248,0.1)", border:"1px solid rgba(129,140,248,0.25)", borderRadius:20, padding:"3px 10px" }}>
+                      🧠 Bushi Intel: weak to {currentDefenderFD.weakTo.map(f=>FACTIONS[f]?.name).join(", ")}
+                    </div>
+                  )}
+                </div>
+
+                {/* Move selector */}
+                <div style={{ borderTop:"1px solid rgba(255,255,255,0.08)", paddingTop:16 }}>
+                  <div style={{ fontSize:12, fontWeight:800, marginBottom:10, opacity:0.7, letterSpacing:"0.04em" }}>
+                    ⚔️ CHOOSE {currentPlayerFD.name.toUpperCase()}'S MOVE
                   </div>
-                  <div style={{ fontWeight:900, fontSize:14, color:currentDefenderFD.color, marginTop:6 }}>{currentDefenderFD.name}</div>
-                  <div style={{ fontSize:10, opacity:0.5 }}>Defender</div>
+                  <div style={{ display:"flex", gap:8, flexDirection:"column" }}>
+                    {currentPlayerFD.moves.map(m=>{
+                      const tc: Record<string,string> = { attack:"#f87171", defend:"#34d399", magic:"#c084fc", trick:"#fbbf24" };
+                      const isSel = selectedMove?.id===m.id;
+                      return (
+                        <button key={m.id} onClick={()=>!busy&&setSelectedMove(m)} disabled={busy}
+                          style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 14px", borderRadius:12,
+                            border:`2px solid ${isSel ? currentPlayerFD.borderColor : "rgba(255,255,255,0.08)"}`,
+                            background: isSel ? currentPlayerFD.bgColor : "rgba(255,255,255,0.03)",
+                            cursor: busy?"not-allowed":"pointer", textAlign:"left",
+                            boxShadow: isSel ? `0 0 16px ${currentPlayerFD.color}44` : "none",
+                            transform: isSel ? "scale(1.01)" : "scale(1)", transition:"all 0.18s" }}>
+                          {/* Move symbol */}
+                          <div style={{ width:40, height:40, borderRadius:10, background: isSel?"rgba(0,0,0,0.4)":"rgba(0,0,0,0.3)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0, border:`1px solid ${tc[m.type]}44` }}>
+                            {m.emoji}
+                          </div>
+                          {/* Move info */}
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:3 }}>
+                              <span style={{ fontWeight:900, fontSize:14 }}>{m.label}</span>
+                              <span style={{ fontSize:9, background:tc[m.type], color:"#000", borderRadius:4, padding:"1px 6px", fontWeight:900 }}>{m.type.toUpperCase()}</span>
+                            </div>
+                            <div style={{ fontSize:11, opacity:0.6 }}>{m.desc}</div>
+                          </div>
+                          {/* Power meter */}
+                          <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:3, flexShrink:0, minWidth:44 }}>
+                            <div style={{ fontSize:13, fontWeight:900, color: isSel ? currentPlayerFD.color : "rgba(255,255,255,0.6)" }}>{m.power}</div>
+                            <div style={{ width:36, height:4, borderRadius:2, background:"rgba(255,255,255,0.1)", overflow:"hidden" }}>
+                              <div style={{ height:"100%", borderRadius:2, background:tc[m.type], width:`${m.power*10}%`, transition:"width 0.3s" }} />
+                            </div>
+                            <div style={{ fontSize:8, opacity:0.4 }}>PWR</div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <button onClick={fightTerritory} disabled={!selectedMove||busy}
+                    style={{ marginTop:14, padding:"14px 24px", borderRadius:12, border:"none",
+                      cursor:!selectedMove||busy?"not-allowed":"pointer",
+                      background:selectedMove?"linear-gradient(135deg,#fbbf24,#f59e0b)":"rgba(255,255,255,0.06)",
+                      color:selectedMove?"#000":"white", fontWeight:900, fontSize:15,
+                      opacity:!selectedMove?0.45:1, width:"100%", transition:"all 0.2s",
+                      boxShadow:selectedMove?"0 4px 24px rgba(251,191,36,0.4)":"none",
+                      transform:selectedMove?"translateY(-1px)":"none" }}>
+                    {busy?"⚔️ Fighting...":selectedMove?`⚔️ Strike with ${selectedMove.label}!`:"← Select a move above"}
+                  </button>
                 </div>
               </div>
-              {team[currentFactionIdx]==="bushi"&&(
-                <div style={{ background:"rgba(30,58,95,0.3)", border:"1px solid rgba(30,58,95,0.5)", borderRadius:10, padding:"8px 12px", marginBottom:14, fontSize:11 }}>
-                  🧠 <strong>Bushi Intel:</strong> {currentDefenderFD.name} is weak to <span style={{color:"#34d399"}}>{currentDefenderFD.weakTo.map(f=>FACTIONS[f]?.name).join(", ")}</span>
-                </div>
-              )}
-              <div style={{ fontSize:13, fontWeight:800, marginBottom:10, opacity:0.8 }}>Choose {currentPlayerFD.name}'s move:</div>
-              <div style={{ display:"flex", gap:10, flexDirection:"column" }}>
-                {currentPlayerFD.moves.map(m=>(<MoveButton key={m.id} move={m} selected={selectedMove?.id===m.id} onSelect={()=>setSelectedMove(m)} disabled={busy} faction={currentPlayerFD} />))}
-              </div>
-              <button onClick={fightTerritory} disabled={!selectedMove||busy}
-                style={{ marginTop:16, padding:"12px 24px", borderRadius:12, border:"none", cursor:!selectedMove||busy?"not-allowed":"pointer", background:selectedMove?"linear-gradient(135deg,#fbbf24,#f59e0b)":"rgba(255,255,255,0.06)", color:selectedMove?"#000":"white", fontWeight:900, fontSize:15, opacity:!selectedMove?0.5:1, width:"100%", transition:"all 0.2s" }}>
-                {busy?"⚔️ Fighting...":selectedMove?`⚔️ Strike with ${selectedMove.label}!`:"Select a move to attack"}
-              </button>
             </div>
           </div>
         )}
