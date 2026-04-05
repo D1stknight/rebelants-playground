@@ -6,7 +6,6 @@ import { usePoints } from "../lib/usePoints";
 import { loadProfile, saveProfile, getEffectivePlayerId } from "../lib/profile";
 import { addWin } from "../lib/winsStore";
 import BuyPointsModal from "./BuyPointsModal";
-import PrizeModal from "./PrizeModal";
 
 function useFWAudio() {
   const [muted, setMuted] = React.useState<boolean>(() => {
@@ -592,7 +591,7 @@ export default function FactionWars() {
   const [playerHp, setPlayerHp]         = useState(MAX_HP);
   const [enemyHp, setEnemyHp]           = useState(MAX_HP);
   const [currentRound, setCurrentRound] = useState(0);
-  const [roundLog, setRoundLog]         = useState<{playerMove:string;enemyMove:string;playerDmg:number;enemyDmg:number}[]>([]);
+  const [roundLog, setRoundLog]         = useState<{playerMove:string;enemyMove:string;playerDmg:number;enemyDmg:number;effect?:string}[]>([]);
   const [dmgFloats, setDmgFloats]       = useState<{id:number;side:"player"|"enemy"|"plunder";dmg:number}[]>([]);
   const [currentTerritoryRounds, setCurrentTerritoryRounds] = useState<RoundResult[]>([]);
   const dmgFloatId = useRef(0);
@@ -773,7 +772,24 @@ export default function FactionWars() {
     const newRounds = [...currentTerritoryRounds, roundResult];
     setCurrentTerritoryRounds(newRounds);
     setCurrentRound(n => n+1);
-    setRoundLog(prev => [{playerMove:selectedMove.label, enemyMove:enemyMove.label, playerDmg, enemyDmg}, ...prev.slice(0,5)]);
+    // Build effect tag for round log
+    const effectTag = (() => {
+      if (selectedMove.id==="iron_code"||selectedMove.id==="death_mark"||selectedMove.id==="battle_cry") return "⚡ Buff active";
+      if (selectedMove.id==="ambush" && ambushBonus>0) return "🎯 Ambush!";
+      if (selectedMove.id==="counter_strike") return "🔄 Counter!";
+      if (selectedMove.id==="endure") return "💪 Endured!";
+      if (selectedMove.id==="iron_meditation") return "💚 Healed!";
+      if (selectedMove.id==="war_stomp") return "👊 Stomped!";
+      if (selectedMove.id==="imperial_decree"||selectedMove.id==="final_command") return "📋 Decreed!";
+      if (selectedMove.id==="mirror_slash" && mirrorBonus>0) return "🪞 Reflected!";
+      if (selectedMove.id==="blood_price") return "🩸 Blood Price!";
+      if (selectedMove.id==="blade_harmony"||selectedMove.id==="honor_bond") return "🔗 Bonded!";
+      if (selectedMove.id==="command_strike") return "👑 Command!";
+      if (selectedMove.id==="plunder") return "💰 Plundered!";
+      if (selectedMove.id==="spirit_vision"||selectedMove.id==="mountain_seal") return "🔮 Sealed!";
+      return "";
+    })();
+    setRoundLog(prev => [{playerMove:selectedMove.label, enemyMove:enemyMove.label, playerDmg, enemyDmg, effect:effectTag}, ...prev.slice(0,5)]);
 
     // endure: can't lose this territory — but also can't win by using it alone
     const over = endureFlag ? false : (newPlayerHp <= 0 || newEnemyHp <= 0);
@@ -867,15 +883,43 @@ export default function FactionWars() {
     <div style={{ minHeight:"100vh", color:"white", fontFamily:"'Segoe UI',sans-serif", backgroundImage:"url('/bg/faction-wars-bg.png')", backgroundSize:"cover", backgroundPosition:"center top", backgroundAttachment:"fixed", backgroundRepeat:"no-repeat", position:"relative" }}>
       <div style={{ position:"fixed", inset:0, background:"rgba(8,11,20,0.82)", zIndex:0, pointerEvents:"none" }} />
       <BuyPointsModal open={showBuyPoints} onClose={()=>setShowBuyPoints(false)} playerId={effectivePlayerId} onClaimed={()=>{setShowBuyPoints(false);void refresh();}} />
-      <PrizeModal
-        open={showPrizeModal}
-        onClose={()=>setShowPrizeModal(false)}
-        label={prizeLabel}
-        sub={prizeSub}
-        claimId={prizeClaimId}
-        playerId={effectivePlayerId}
-        merchNeedsShipping={prizeMerchShipping}
-      />
+      {/* Crate Reveal Modal */}
+      {showPrizeModal && (()=>{
+        const rar = finalRarity as string;
+        const t = rar==="ultra"?"🏆 ULTRA CRATE!":rar==="rare"?"⚔️ Rare Crate!":"✅ Crate Unlocked";
+        const bc = rar==="ultra"?"#fbbf24":rar==="rare"?"#60a5fa":"#34d399";
+        const ac = rar==="ultra"?"rgba(251,191,36,0.4)":rar==="rare"?"rgba(96,165,250,0.35)":"rgba(52,211,153,0.3)";
+        const sub2 = rar==="ultra"?"5/5 conquered":rar==="rare"?"3-4 conquered":"1-2 conquered";
+        const sps = Array.from({length:24},(_,i)=>({ left:String(8+(i*4.1)%84)+'%', top:String(10+(i*7.3)%62)+'%', size:10+((i*3)%14), delay:(i*0.18)%3.2 }));
+        return (
+          <div style={{position:"fixed",inset:0,display:"grid",placeItems:"center",background:"rgba(0,0,0,0.7)",zIndex:1000}}>
+            <div style={{position:"relative",minWidth:300,maxWidth:400,padding:"32px 28px",borderRadius:20,background:"rgba(8,14,32,0.98)",border:"2px solid "+bc,boxShadow:"0 0 60px "+ac+", 0 24px 40px rgba(0,0,0,0.7)",textAlign:"center",overflow:"hidden"}}>
+              {sps.map((sp: {left:string;top:string;size:number;delay:number},i: number)=>(
+                <span key={i} className={"pm-sparkle "+rar} style={{position:"absolute",left:sp.left,top:sp.top,width:sp.size,height:sp.size,animationDelay:sp.delay+"s"}} />
+              ))}
+              <div style={{position:"absolute",left:"50%",top:"50%",transform:"translate(-50%,-50%)",width:200,height:200,borderRadius:"50%",background:ac,filter:"blur(40px)",pointerEvents:"none"}} />
+              <div style={{position:"relative",fontSize:22,fontWeight:900,color:bc,marginBottom:6,letterSpacing:"0.03em"}}>{t}</div>
+              <div style={{position:"relative",fontSize:12,opacity:0.55,marginBottom:16}}>{sub2}</div>
+              <div style={{position:"relative",marginBottom:16}}>
+                <img src={"/crates/"+rar+".png"} alt={rar+" crate"} style={{width:140,height:140,objectFit:"contain",filter:"drop-shadow(0 0 20px "+bc+")"}} />
+              </div>
+              <div style={{position:"relative",fontSize:17,fontWeight:900,color:"white",marginBottom:4}}>
+                You won: <span style={{color:bc}}>{prizeSub}</span>
+              </div>
+              {prizeClaimId && <div style={{position:"relative",fontSize:10,opacity:0.35,marginBottom:16,fontFamily:"monospace"}}>Claim: {prizeClaimId}</div>}
+              {!prizeClaimId && <div style={{height:20}} />}
+              {prizeMerchShipping && prizeClaimId && (
+                <div style={{position:"relative",textAlign:"left",marginBottom:12,fontSize:12,opacity:0.75,background:"rgba(255,255,255,0.05)",borderRadius:10,padding:12}}>
+                  🎁 Merch won! Contact support with your Claim ID to arrange shipping.
+                </div>
+              )}
+              <button onClick={()=>setShowPrizeModal(false)} style={{position:"relative",padding:"12px 36px",borderRadius:12,border:"none",cursor:"pointer",background:"linear-gradient(135deg,"+bc+","+bc+"99)",color:"#000",fontWeight:900,fontSize:15}}>
+                {rar==="ultra"?"⚔️ Legendary!":"Continue"}
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* DRIP Modal */}
       {showDripMigrate && (
