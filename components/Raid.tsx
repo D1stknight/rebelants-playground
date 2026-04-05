@@ -1,7 +1,7 @@
-  const [lastSquad, setLastSquad] = useState<AntRole[] | null>(() => { try { const v = localStorage.getItem("ra:raid:lastSquad"); return v ? JSON.parse(v) : null; } catch { return null; } });
+  const [lastSquad, setLastSquad] = useState<AntRole[] | null>(() => { if (typeof window === "undefined") return null; try { const v = localStorage.getItem("ra:raid:lastSquad"); return v ? JSON.parse(v) : null; } catch { return null; } });
 const LAST_SQUAD_KEY = "ra:raid:lastSquad";
-function saveLastSquad(s: AntRole[]) { try { localStorage.setItem(LAST_SQUAD_KEY, JSON.stringify(s)); } catch {} }
-function loadLastSquad(): AntRole[] | null { try { const v = localStorage.getItem(LAST_SQUAD_KEY); return v ? JSON.parse(v) : null; } catch { return null; } }
+function saveLastSquad(s: AntRole[]) { if (typeof window === "undefined") return; try { localStorage.setItem(LAST_SQUAD_KEY, JSON.stringify(s)); } catch {} }
+function loadLastSquad(): AntRole[] | null { if (typeof window === "undefined") return null; try { const v = localStorage.getItem(LAST_SQUAD_KEY); return v ? JSON.parse(v) : null; } catch { return null; } }
 // components/Raid.tsx — THE RAID (Epic Edition v3)
 import React, { useState, useEffect, useRef, useCallback } from "react";
 // components/Raid.tsx — THE RAID (Epic Edition v2)
@@ -921,7 +921,7 @@ export default function Raid() {
     setBusy(true); setPhase("launching"); startMarch();
     setSlots([]); setRevealedCount(0); setShowResult(false);
 
-  try { localStorage.setItem("ra:raid:lastSquad", JSON.stringify(squad)); setLastSquad([...squad]); } catch {}
+  if (typeof window !== "undefined") { try { localStorage.setItem("ra:raid:lastSquad", JSON.stringify(squad)); setLastSquad([...squad]); } catch {} }
   const isRepeatSquad = lastSquad !== null && JSON.stringify(squad) === JSON.stringify(lastSquad);
     await spend(totalCost,"expedition");
     await new Promise(r=>setTimeout(r,900));
@@ -964,7 +964,7 @@ export default function Raid() {
     setSlots([]); setRevealedCount(0);
     setRarity("none"); setPrize(null);
     setSquad([...DEFAULT_SQUAD]);
-    try { const v = localStorage.getItem("ra:raid:lastSquad"); setLastSquad(v ? JSON.parse(v) : null); } catch {}
+    if (typeof window !== "undefined") { try { const v = localStorage.getItem("ra:raid:lastSquad"); setLastSquad(v ? JSON.parse(v) : null); } catch {} }
   }
 
   function disconnectDiscord() {
