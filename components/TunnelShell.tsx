@@ -1397,7 +1397,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               </p>
 
               <SharedEconomyPanel
-                playerId={identityDisplay}
+                playerId={effectivePlayerId}
                 balance={balance}
                 totalPlaysLeft={totalEarnRoom}
                 dailyPlaysLeft={remainingDaily}
