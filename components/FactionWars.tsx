@@ -677,7 +677,7 @@ export default function FactionWars() {
     let rarity = calcRarity(territoriesWon);
     let pts = rarity==="ultra" ? Number(cfg?.rewards?.ultra??300) : rarity==="rare" ? Number(cfg?.rewards?.rare??100) : rarity==="common" ? Number(cfg?.rewards?.common??50) : 0;
     if (team.includes("shogun") && rarity==="ultra") pts = Math.floor(pts*1.15);
-    if (team.includes("buke") && rarity==="none") { const dc=allResults.filter(r=>r.playerMove.type==="defend").length; if(dc>=3){rarity="common";pts=Number(cfg?.rewards?.common??50);} }
+    if (team.includes("buke") && rarity==="none") { const dc=allResults.reduce((sum,r)=>sum+(r.rounds?.filter(rnd=>rnd.playerMove.type==="defend").length||0),0); if(dc>=3){rarity="common";pts=Number(cfg?.rewards?.common??50);} }
     setFinalRarity(rarity);
     if (pts>0) { const er:any=await earn(pts).catch(()=>null); if(er?.ok)await refresh().catch(()=>{}); }
 
