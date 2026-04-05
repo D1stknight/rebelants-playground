@@ -128,7 +128,8 @@ function calcDamage(move: Move, atk: FactionId, def: FactionId, bonus: number, t
     dmg += Math.floor(diff * 4);
   }
   dmg *= (0.82 + Math.random() * 0.36);
-  return Math.max(2, Math.min(Math.round(dmg), 24));
+  // AI gets slightly higher cap so fights feel dangerous
+  return Math.max(2, Math.min(Math.round(dmg), isPlayer ? 24 : 28));
 }
 
 function calcBlock(move: Move): number {
@@ -141,23 +142,42 @@ function calcBlock(move: Move): number {
   return 0;
 }
 
-function pickEnemyMove(def: FactionId, pm: Move, diff: number, eHp: number, pHp: number): Move {
+function pickEnemyMove(def: FactionId, pm: Move, diff: number, eHp: number, pHp: number, territory: number): Move {
   const df = FACTIONS[def];
-  if (diff > 0.7 && eHp < 30) return df.moves.reduce((a,b)=>a.power>b.power?a:b);
-  if (diff > 0.6 && pHp < 30) {
-    const press = df.moves.filter(m=>m.type==="attack"||m.type==="magic");
-    if (press.length) return press.reduce((a,b)=>a.power>b.power?a:b);
+  // Scale difficulty by territory — AI gets progressively meaner each territory
+  const scaledDiff = Math.min(1, diff + territory * 0.06);
+
+  // === DESPERATE MODE: enemy near death → always max power ===
+  if (eHp < 25) return df.moves.reduce((a,b)=>a.power>b.power?a:b);
+
+  // === PREDATOR MODE: player near death → keep attacking, never defend ===
+  if (pHp < 35) {
+    const killers = df.moves.filter(m=>m.type==="attack"||m.type==="magic").sort((a,b)=>b.power-a.power);
+    if (killers.length && Math.random() < scaledDiff) return killers[0];
   }
-  if (Math.random() < diff) {
-    const cm: Record<string,string[]> = { attack:["defend","trick"], defend:["magic","attack"], magic:["trick","defend"], trick:["attack","magic"] };
-    const counters = df.moves.filter(m=>(cm[pm.type]||[]).includes(m.type));
-    if (counters.length) {
-      counters.sort((a,b)=>b.power-a.power);
-      return counters[Math.floor(Math.pow(Math.random(),0.5)*counters.length)];
-    }
+
+  // === SMART COUNTER MODE: counter player's move type ===
+  const cm: Record<string,string[]> = { attack:["defend","trick"], defend:["magic","attack"], magic:["trick","defend"], trick:["attack","magic"] };
+  const counters = df.moves.filter(m=>(cm[pm.type]||[]).includes(m.type)).sort((a,b)=>b.power-a.power);
+
+  // Higher territory = AI counters more reliably (less random)
+  const counterThreshold = scaledDiff * (territory >= 3 ? 0.85 : 0.70);
+  if (counters.length && Math.random() < counterThreshold) {
+    // Pick from top 2 counters (weighted toward highest)
+    const topN = counters.slice(0, 2);
+    return Math.random() < 0.75 ? topN[0] : topN[topN.length-1];
   }
+
+  // === PRESSURE MODE: at high difficulty always pick top-3 moves ===
+  if (scaledDiff > 0.75) {
+    const top3 = [...df.moves].sort((a,b)=>b.power-a.power).slice(0,3);
+    return top3[Math.floor(Math.random()*top3.length)];
+  }
+
+  // === DEFAULT: weighted toward power (never picks bottom 2 moves at high diff) ===
   const sorted = [...df.moves].sort((a,b)=>b.power-a.power);
-  return sorted[Math.floor(Math.pow(Math.random(),0.7)*sorted.length)];
+  const cap = scaledDiff > 0.6 ? Math.ceil(sorted.length * 0.6) : sorted.length;
+  return sorted[Math.floor(Math.random() * cap)];
 }
 
 function calcPassiveBonus(faction: FactionId, territoriesWon: number, isT1: boolean): number {
@@ -566,7 +586,7 @@ export default function FactionWars() {
   const cfg        = cfgState as any;
   const fwCost        = Number(cfg?.factionWarsCost           ?? 150);
   const fwPlunderBonus = Number(cfg?.factionWarsPlunderBonus  ?? 50);
-  const difficulty = Number(cfg?.factionWarsAIDifficulty ?? 0.65);
+  const difficulty = Number(cfg?.factionWarsAIDifficulty ?? 0.75);
   const currency   = String(cfg?.currency || "REBEL");
 
   // ── Game State ───────────────────────────────────────────────────────
@@ -675,7 +695,7 @@ export default function FactionWars() {
     const imperialDecreeFlag = selectedMove.id === "imperial_decree" || selectedMove.id === "final_command";
     const enemyMove = imperialDecreeFlag
       ? FACTIONS[defender].moves.reduce((a,b)=>a.power<b.power?a:b)
-      : pickEnemyMove(defender, selectedMove, difficulty, enemyHp, playerHp);
+      : pickEnemyMove(defender, selectedMove, difficulty, enemyHp, playerHp, currentTerritory);
     const timesUsed = usedMoves[selectedMove.id] || 0;
     const degradedMove: Move = { ...selectedMove, power: Math.max(1, selectedMove.power - timesUsed) };
     setUsedMoves(prev => ({ ...prev, [selectedMove.id]: (prev[selectedMove.id]||0)+1 }));
@@ -1270,6 +1290,7 @@ export default function FactionWars() {
                         <span style={{ opacity:0.3 }}>|</span>
                         <span style={{ color:"#f87171", fontWeight:700, minWidth:70, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>🛡️ {r.enemyMove}</span>
                         <span style={{ color:"#34d399", fontWeight:800 }}>-{r.playerDmg} to enemy</span>
+                        {r.effect && <span style={{ marginLeft:4, color:"#fbbf24", fontWeight:900, fontSize:10, background:"rgba(251,191,36,0.18)", border:"1px solid rgba(251,191,36,0.35)", borderRadius:4, padding:"1px 6px", flexShrink:0 }}>{r.effect}</span>}
                       </div>
                     ))}
                   </div>
