@@ -1190,25 +1190,21 @@ String(c.status).toUpperCase()==="PENDING"
             {/* ✅ Raid Settings */}
             <div style={{ marginTop: 14, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,.12)" }}>
               <div style={{ fontWeight: 900, marginBottom: 10, color: "#f87171" }}>⚔️ Raid Settings</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                <label style={{ fontSize: 12, opacity: 0.9 }}>
-                  </div>
-              <hr style={{ borderColor: "rgba(255,255,255,0.1)", margin: "20px 0" }} />
-              <div style={{ fontWeight: 800, marginBottom: 12, color: "#fbbf24" }}>⚔️ Faction Wars Settings</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <label style={labelStyle}>Faction Wars Cost (REBEL)
-                  <input value={cfg.factionWarsCost} onChange={e => setCfg(c => ({ ...c, factionWarsCost: safeNum(e.target.value, c.factionWarsCost) }))}
-                    type="number" min="0" style={inputStyle} />
-                </label>
-                <label style={labelStyle}>AI Difficulty (0.0 easy → 1.0 brutal)
-                  <input value={cfg.factionWarsAIDifficulty} onChange={e => setCfg(c => ({ ...c, factionWarsAIDifficulty: Math.min(1, Math.max(0, safeNum(e.target.value, c.factionWarsAIDifficulty))) }))}
-                    type="number" min="0" max="1" step="0.05" style={inputStyle} />
-                </label>
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontWeight: 800, marginBottom: 10, color: "#fbbf24" }}>⚔️ Faction Wars Settings</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <label style={{ fontSize: 12, opacity: 0.9 }}>Faction Wars Cost (REBEL)
+                    <input value={cfg.factionWarsCost} onChange={e => setCfg(c => ({ ...c, factionWarsCost: safeNum(e.target.value, c.factionWarsCost) }))}
+                      type="number" min="0" style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} />
+                  </label>
+                  <label style={{ fontSize: 12, opacity: 0.9 }}>AI Difficulty (0.0 easy → 1.0 brutal)
+                    <input value={cfg.factionWarsAIDifficulty} onChange={e => setCfg(c => ({ ...c, factionWarsAIDifficulty: Math.min(1, Math.max(0, safeNum(e.target.value, c.factionWarsAIDifficulty))) }))}
+                      type="number" min="0" max="1" step="0.05" style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} />
+                  </label>
+                </div>
               </div>
-              <hr style={{ borderColor: "rgba(255,255,255,0.1)", margin: "20px 0" }} />
-              <div style={{ fontWeight: 800, marginBottom: 12, color: "#f87171" }}>⚔️ Raid Settings</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <label style={labelStyle}>Raid Cost (REBEL)
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <label style={{ fontSize: 12, opacity: 0.9 }}>Raid Cost (REBEL)
                   <input value={cfg.raidCost} onChange={e => setCfg(c => ({ ...c, raidCost: safeNum(e.target.value, c.raidCost) }))}
                     style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} />
                   <div style={{ fontSize: 10, opacity: 0.6, marginTop: 3 }}>How much it costs to launch one raid</div>
