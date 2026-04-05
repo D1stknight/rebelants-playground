@@ -4,6 +4,7 @@ import { redis } from "../../../lib/server/redis";
 import { addToEarnedTotal, updateBalanceLeaderboard } from "../../../lib/server/leaderboards";
 
 const LB_FW_WARLORDS  = "ra:fw:lb:warlords";
+const FW_FACTION_PLAYER = (fid: string) => `ra:fw:faction:${fid}`;
 const LB_FW_FACTIONS  = "ra:fw:lb:factions";
 const LB_FW_STREAKS   = "ra:fw:lb:streaks";
 const LB_FW_RICH      = "ra:fw:lb:rich";
@@ -26,7 +27,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (playerName) await redis.hset(FW_NAMES, { [playerId]: playerName }).catch(() => {});
     if (territoriesWon > 0) await redis.zincrby(LB_FW_WARLORDS, territoriesWon, playerId);
     if (rarity !== "none" && team.length > 0) {
-      for (const fid of team) await redis.zincrby(LB_FW_FACTIONS, 1, fid);
+      for (const fid of team) {
+        await redis.zincrby(LB_FW_FACTIONS, 1, fid);
+        // Track per-faction player wins
+        await redis.zincrby(FW_FACTION_PLAYER(fid), 1, playerId);
+      }
     }
     const streakKey = FW_STREAK_KEY(playerId);
     if (rarity !== "none") {
