@@ -208,8 +208,8 @@ function calcPrize(slots: AntSlot[], cfg: any): { rarity: Rarity; prize: Prize }
 
 // ── Role Picker ───────────────────────────────────────────────────────────────
 
-function RolePicker({ squad, onChange, disabled, carrierPct }: {
-  squad: AntRole[]; onChange: (n: AntRole[]) => void; disabled: boolean; carrierPct: number;
+function RolePicker({ squad, onChange, disabled, carrierPct, lastSquad, onLastSquad }: {
+  squad: AntRole[]; onChange: (n: AntRole[]) => void; disabled: boolean; carrierPct: number; lastSquad?: AntRole[] | null; onLastSquad?: (s: AntRole[]) => void;
 }) {
   const roles = Object.keys(ROLE_META) as AntRole[];
 
@@ -291,8 +291,8 @@ function RolePicker({ squad, onChange, disabled, carrierPct }: {
           style={{ fontSize: 11, padding: "6px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,.18)", background: "rgba(255,255,255,.08)", color: "white", cursor: disabled?"not-allowed":"pointer", opacity: disabled?0.5:1, fontWeight: 700 }}>
           ✕ Clear
         </button>
-        {lastSquad && lastSquad.length === SQUAD_SIZE && (
-          <button disabled={disabled} onClick={() => onChange([...lastSquad])}
+        {lastSquad && lastSquad.length === SQUAD_SIZE && onLastSquad && (
+          <button disabled={disabled} onClick={() => onLastSquad([...lastSquad])}
             style={{ fontSize:11, padding:"6px 12px", borderRadius:8, border:"1px solid rgba(251,191,36,.4)", background:"rgba(251,191,36,.1)", color:"#fbbf24", cursor:disabled?"not-allowed":"pointer", opacity:disabled?0.5:1, fontWeight:700 }}
             title="Reuse your last squad — survival odds are slightly lower for repeat squads">
             🔁 Last Squad <span style={{fontSize:9,opacity:0.65}}>(−10% survival)</span>
@@ -1017,7 +1017,7 @@ export default function Raid() {
           ⚠️ BRUTAL DIFFICULTY — Carriers only have {Math.round(Number(cfg?.raidCarrierSurvival ?? 20) * (Number(cfg?.raidCarrierSurvival ?? 20) <= 1 ? 100 : 1))}% survival. Place 🛡️ Guards next to them to boost their odds.
         </div>
 
-        <RolePicker squad={squad} onChange={setSquad} disabled={isBattling} carrierPct={Math.round(Number(cfg?.raidCarrierSurvival ?? 0.20) * (Number(cfg?.raidCarrierSurvival ?? 0.20) <= 1 ? 100 : 1))} />
+        <RolePicker lastSquad={lastSquad} onLastSquad={(s) => setSquad(s)} squad={squad} onChange={setSquad} disabled={isBattling} carrierPct={Math.round(Number(cfg?.raidCarrierSurvival ?? 0.20) * (Number(cfg?.raidCarrierSurvival ?? 0.20) <= 1 ? 100 : 1))} />
 
         {phase==="launching" && <LaunchAnimation />}
         {(phase==="battling"||phase==="revealed") && slots.length>0 && (
