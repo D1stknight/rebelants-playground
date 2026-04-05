@@ -589,12 +589,13 @@ export default function FactionWars() {
   const [enemyHp, setEnemyHp]           = useState(MAX_HP);
   const [currentRound, setCurrentRound] = useState(0);
   const [roundLog, setRoundLog]         = useState<{playerMove:string;enemyMove:string;playerDmg:number;enemyDmg:number}[]>([]);
-  const [dmgFloats, setDmgFloats]       = useState<{id:number;side:"player"|"enemy";dmg:number}[]>([]);
+  const [dmgFloats, setDmgFloats]       = useState<{id:number;side:"player"|"enemy"|"plunder";dmg:number}[]>([]);
   const [currentTerritoryRounds, setCurrentTerritoryRounds] = useState<RoundResult[]>([]);
   const dmgFloatId = useRef(0);
   const plunderPendingRef = useRef(false);
   const [usedMoves, setUsedMoves] = useState<Record<string,number>>({});
   const [sacrificeBonus, setSacrificeBonus] = useState(0);
+  const [berserkerActive, setBerserkerActive] = useState(false);
   const [healBusy, setHealBusy]   = useState(false);
   const [healUsed, setHealUsed]     = useState(0);
   const [oneTimeUsed, setOneTimeUsed] = useState<string[]>([]);
@@ -640,7 +641,7 @@ export default function FactionWars() {
   const startTerritory = () => {
     setPlayerHp(MAX_HP); setEnemyHp(MAX_HP);
     setCurrentRound(0); setRoundLog([]); setDmgFloats([]); setCurrentTerritoryRounds([]);
-    setUsedMoves({});
+    setUsedMoves({}); setBerserkerActive(false);
   };
 
   const fightTerritory = async () => {
@@ -654,11 +655,15 @@ export default function FactionWars() {
     setBusy(true); setBattleAnim("clash"); sfx.clash();
     await new Promise(r=>setTimeout(r,450));
 
-    const enemyMove = pickEnemyMove(defender, selectedMove, difficulty, enemyHp, playerHp);
+    const imperialDecreeFlag = selectedMove.id === "imperial_decree";
+    const enemyMove = imperialDecreeFlag
+      ? FACTIONS[defender].moves.reduce((a,b)=>a.power<b.power?a:b)  // forced weakest
+      : pickEnemyMove(defender, selectedMove, difficulty, enemyHp, playerHp);
     const timesUsed = usedMoves[selectedMove.id] || 0;
     const degradedMove: Move = { ...selectedMove, power: Math.max(1, selectedMove.power - timesUsed) };
     setUsedMoves(prev => ({ ...prev, [selectedMove.id]: (prev[selectedMove.id]||0)+1 }));
     if (selectedMove.oneTime) setOneTimeUsed(prev => [...prev, selectedMove.id]);
+    if (selectedMove.id === "berserker_rage") setBerserkerActive(true);
     // Track plunder use for this territory
     if (selectedMove.id === "plunder") { plunderPendingRef.current = true; }
     if (selectedMove.id === "noble_sacrifice") {
@@ -714,7 +719,10 @@ export default function FactionWars() {
         const plunderAmt = Number(cfg?.factionWarsPlunderBonus ?? 50);
         try { await earn(plunderAmt); await refresh(); } catch {}
         plunderPendingRef.current = false;
-        setDmgFloats(prev => [...prev, {id:++dmgFloatId.current, side:"enemy" as const, dmg:-plunderAmt}]);
+        // Big REBEL float on screen
+        const pid2 = ++dmgFloatId.current;
+        setDmgFloats(prev => [...prev, {id:pid2, side:"plunder" as const, dmg:plunderAmt}]);
+        setTimeout(()=>setDmgFloats(prev=>prev.filter(f=>f.id!==pid2)), 2000);
       }
       const result: TerritoryResult = {
         territory: currentTerritory, defender, playerFaction,
@@ -756,6 +764,7 @@ export default function FactionWars() {
           setPrizeSub(p.type === "nft" ? "You won an NFT!" : p.type === "merch" ? "You won merch!" : `+${p.points || pts} REBEL`);
           setPrizeClaimId(rollJ.claimId);
           setPrizeMerchShipping(p.type === "merch");
+          setShowPrizeModal(true);
         }
       } catch {}
     }
@@ -934,9 +943,10 @@ export default function FactionWars() {
             <div style={{ background:"rgba(0,0,0,0.5)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:14, padding:"12px 16px", marginBottom:14 }}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
                 <div style={{ fontSize:13, fontWeight:900, color:"#fbbf24", letterSpacing:"0.05em" }}>⚔️ TERRITORY {currentTerritory+1} / {TERRITORY_COUNT}</div>
-                <div style={{ display:"flex", gap:12, fontSize:11 }}>
+                <div style={{ display:"flex", gap:12, fontSize:11, alignItems:"center" }}>
                   <span style={{ color:"#34d399", fontWeight:700 }}>✅ {territoriesWon} won</span>
                   <span style={{ color:"#f87171", fontWeight:700 }}>💀 {results.length-territoriesWon} lost</span>
+                  <span style={{ color:"#fbbf24", fontWeight:800, background:"rgba(251,191,36,0.12)", border:"1px solid rgba(251,191,36,0.25)", borderRadius:8, padding:"2px 8px" }}>💰 {balance} {currency}</span>
                 </div>
               </div>
               <div style={{ display:"flex", gap:8, justifyContent:"center" }}>
@@ -984,6 +994,13 @@ export default function FactionWars() {
             {/* MAIN BATTLE ARENA */}
             <div style={{ position:"relative", borderRadius:18, overflow:"hidden", marginBottom:16, border:"1px solid rgba(255,255,255,0.1)" }}>
 
+              {/* Plunder REBEL float — centered over arena */}
+              {dmgFloats.filter(f=>f.side==="plunder").map(f=>(
+                <div key={f.id} style={{ position:"absolute", top:"20%", left:0, right:0, textAlign:"center", zIndex:99, pointerEvents:"none",
+                  fontSize:28, fontWeight:900, color:"#fbbf24", textShadow:"0 0 24px rgba(251,191,36,0.9)" }}>
+                  💰 +{f.dmg} {currency} PLUNDER!
+                </div>
+              ))}
               {/* Animated arena background */}
               <div style={{ position:"absolute", inset:0, background:`radial-gradient(ellipse at 25% 50%, ${currentPlayerFD.color}22 0%, transparent 60%), radial-gradient(ellipse at 75% 50%, ${currentDefenderFD.color}22 0%, transparent 60%), linear-gradient(180deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.9) 100%)`, transition:"background 0.5s ease" }} />
               {/* Flash overlay on clash */}
@@ -1174,7 +1191,7 @@ export default function FactionWars() {
                       const isSel = selectedMove?.id===m.id;
                       const timesUsedM = usedMoves[m.id] || 0;
                       const degradedPow = Math.max(1, m.power - timesUsedM);
-                      const isExhausted = m.oneTime && oneTimeUsed.includes(m.id);
+                      const isExhausted = (m.oneTime && oneTimeUsed.includes(m.id)) || (berserkerActive && m.type === "defend");
                       return (
                         <button key={m.id} onClick={()=>!busy&&!isExhausted&&setSelectedMove(m)} disabled={busy||isExhausted}
                           style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 14px", borderRadius:12,
@@ -1193,7 +1210,8 @@ export default function FactionWars() {
                               <span style={{ fontWeight:900, fontSize:14 }}>{m.label}</span>
                               <span style={{ fontSize:9, background:tc[m.type], color:"#000", borderRadius:4, padding:"1px 6px", fontWeight:900 }}>{m.type.toUpperCase()}</span>
                               {m.oneTime && !isExhausted && <span style={{ fontSize:9, background:"rgba(251,191,36,0.2)", color:"#fbbf24", borderRadius:4, padding:"1px 6px", fontWeight:900, border:"1px solid rgba(251,191,36,0.3)" }}>1× ONLY</span>}
-                              {isExhausted && <span style={{ fontSize:9, background:"rgba(255,255,255,0.1)", color:"#666", borderRadius:4, padding:"1px 6px", fontWeight:900 }}>USED</span>}
+                              {isExhausted && !berserkerActive && <span style={{ fontSize:9, background:"rgba(255,255,255,0.1)", color:"#666", borderRadius:4, padding:"1px 6px", fontWeight:900 }}>USED</span>}
+                              {isExhausted && berserkerActive && m.type==="defend" && <span style={{ fontSize:9, background:"rgba(251,100,36,0.25)", color:"#f87171", borderRadius:4, padding:"1px 6px", fontWeight:900 }}>🔥BERSERK</span>}
                             </div>
                             <div style={{ fontSize:11, opacity:0.6 }}>
                               {m.id === "plunder" ? `Win this territory → earn +${fwPlunderBonus} bonus REBEL` : m.desc}
