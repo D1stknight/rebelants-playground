@@ -592,6 +592,7 @@ export default function FactionWars() {
   const [dmgFloats, setDmgFloats]       = useState<{id:number;side:"player"|"enemy";dmg:number}[]>([]);
   const [currentTerritoryRounds, setCurrentTerritoryRounds] = useState<RoundResult[]>([]);
   const dmgFloatId = useRef(0);
+  const plunderPendingRef = useRef(false);
   const [usedMoves, setUsedMoves] = useState<Record<string,number>>({});
   const [sacrificeBonus, setSacrificeBonus] = useState(0);
   const [healBusy, setHealBusy] = useState(false);
@@ -658,7 +659,7 @@ export default function FactionWars() {
     setUsedMoves(prev => ({ ...prev, [selectedMove.id]: (prev[selectedMove.id]||0)+1 }));
     if (selectedMove.oneTime) setOneTimeUsed(prev => [...prev, selectedMove.id]);
     // Track plunder use for this territory
-    if (selectedMove.id === "plunder") { window._fw_plunder_pending = true; }
+    if (selectedMove.id === "plunder") { plunderPendingRef.current = true; }
     if (selectedMove.id === "noble_sacrifice") {
       setSacrificeBonus(12);
       setPlayerHp(0);
@@ -708,10 +709,10 @@ export default function FactionWars() {
       setBattleAnim("idle");
       const playerWon = newEnemyHp <= 0;
       // Plunder bonus on win
-      if (playerWon && window._fw_plunder_pending) {
+      if (playerWon && plunderPendingRef.current) {
         const plunderAmt = Number(cfg?.factionWarsPlunderBonus ?? 50);
         try { await earn(plunderAmt); await refresh(); } catch {}
-        window._fw_plunder_pending = false;
+        plunderPendingRef.current = false;
         setDmgFloats(prev => [...prev, {id:++dmgFloatId.current, side:"enemy" as const, dmg:-plunderAmt}]);
       }
       const result: TerritoryResult = {
