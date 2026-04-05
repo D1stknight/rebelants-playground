@@ -6,6 +6,7 @@ import { usePoints } from "../lib/usePoints";
 import { loadProfile, saveProfile, getEffectivePlayerId } from "../lib/profile";
 import { addWin } from "../lib/winsStore";
 import BuyPointsModal from "./BuyPointsModal";
+import PrizeModal from "./PrizeModal";
 
 function useFWAudio() {
   const [muted, setMuted] = React.useState<boolean>(() => {
@@ -58,37 +59,37 @@ type FWLeaderboards = { warlords: {playerId:string;playerName?:string;score:numb
 
 const FACTIONS: Record<FactionId, Faction> = {
   samurai: { id:"samurai", name:"Samurai", emoji:"🔴", color:"#dc2626", bgColor:"rgba(220,38,38,0.12)", borderColor:"rgba(220,38,38,0.4)", role:"Core soldiers", passive:"First Strike", passiveDesc:"+20% power on Territory 1", weapon:"Katana",
-    moves:[{id:"katana_strike",label:"Katana Strike",emoji:"⚔️",desc:"Precise high-damage slash",power:8,type:"attack"},{id:"honor_guard",label:"Honor Guard",emoji:"🛡️",desc:"Nullifies enemy tricks",power:6,type:"defend"},{id:"battle_cry",label:"Battle Cry",emoji:"📯",desc:"Boosts team power this territory",power:5,type:"magic"}],
+    moves:[{id:"katana_strike",label:"Katana Strike",emoji:"⚔️",desc:"Precise high-damage slash",power:8,type:"attack"},{id:"honor_guard",label:"Honor Guard",emoji:"🛡️",desc:"Nullifies enemy tricks",power:6,type:"defend"},{id:"battle_cry",label:"Battle Cry",emoji:"📯",desc:"Boosts team power this territory",power:5,type:"magic"},{id:"counter_strike",label:"Counter Strike",emoji:"🔄",desc:"Counter — deal back 150% of enemy power",power:7,type:"trick"},{id:"iron_code",label:"Iron Code",emoji:"📜",desc:"Honor buff — +3 power for next 2 territories",power:4,type:"magic"}],
     weakTo:["ronin","yamabushi"], strongVs:["ashigaru","buke"] },
   ronin: { id:"ronin", name:"Ronin", emoji:"⚫", color:"#9f1239", bgColor:"rgba(159,18,57,0.12)", borderColor:"rgba(159,18,57,0.45)", role:"Elite assassins", passive:"Comeback", passiveDesc:"+25% power after losing a territory", weapon:"Twin Daggers",
-    moves:[{id:"twin_daggers",label:"Twin Daggers",emoji:"🗡️",desc:"Double hit lower power",power:7,type:"attack"},{id:"shadow_step",label:"Shadow Step",emoji:"👤",desc:"Dodge — enemy misses",power:6,type:"trick"},{id:"last_stand",label:"Last Stand",emoji:"💀",desc:"Massive spike if losing",power:9,type:"magic"}],
+    moves:[{id:"twin_daggers",label:"Twin Daggers",emoji:"🗡️",desc:"Double hit lower power",power:7,type:"attack"},{id:"shadow_step",label:"Shadow Step",emoji:"👤",desc:"Dodge — enemy misses",power:6,type:"trick"},{id:"last_stand",label:"Last Stand",emoji:"💀",desc:"Massive spike if losing",power:9,type:"magic"},{id:"phantom_blade",label:"Phantom Blade",emoji:"🌑",desc:"Invisible strike — bypasses all defenses",power:8,type:"trick"},{id:"death_mark",label:"Death Mark",emoji:"☠️",desc:"Mark enemy — next 2 attacks gain +2 power",power:5,type:"magic"}],
     weakTo:["shogun","bushi"], strongVs:["samurai","warrior"] },
   warrior: { id:"warrior", name:"Warrior", emoji:"🟤", color:"#b45309", bgColor:"rgba(180,83,9,0.12)", borderColor:"rgba(180,83,9,0.4)", role:"Battle veterans", passive:"Relentless", passiveDesc:"Strike mode deals +30% damage", weapon:"Greatsword",
-    moves:[{id:"greatsword",label:"Greatsword Slam",emoji:"🔨",desc:"Highest raw damage",power:10,type:"attack"},{id:"iron_will",label:"Iron Will",emoji:"⛰️",desc:"Absorb enemy hit completely",power:7,type:"defend"},{id:"cracked_circle",label:"Cracked Circle",emoji:"💢",desc:"Sacrifice defense for +4 power",power:8,type:"magic"}],
+    moves:[{id:"greatsword",label:"Greatsword Slam",emoji:"🔨",desc:"Highest raw damage",power:10,type:"attack"},{id:"iron_will",label:"Iron Will",emoji:"⛰️",desc:"Absorb enemy hit completely",power:7,type:"defend"},{id:"cracked_circle",label:"Cracked Circle",emoji:"💢",desc:"Sacrifice defense for +4 power",power:8,type:"magic"},{id:"berserker_rage",label:"Berserker Rage",emoji:"🔥",desc:"Go berserk — power 11 but lose all defense",power:11,type:"attack"},{id:"war_stomp",label:"War Stomp",emoji:"👊",desc:"Stagger enemy — reduce their power by 3",power:6,type:"trick"}],
     weakTo:["kenshi","sohei"], strongVs:["ronin","ashigaru"] },
   ashigaru: { id:"ashigaru", name:"Ashigaru", emoji:"🟢", color:"#166534", bgColor:"rgba(22,101,52,0.12)", borderColor:"rgba(22,101,52,0.4)", role:"Infantry force", passive:"Humble Roots", passiveDesc:"Cost reduced by 25 REBEL", weapon:"Spear",
-    moves:[{id:"spear_thrust",label:"Spear Thrust",emoji:"🌿",desc:"Reliable steady damage",power:6,type:"attack"},{id:"shield_wall",label:"Shield Wall",emoji:"🛡️",desc:"Blocks 60% of damage",power:7,type:"defend"},{id:"rally",label:"Rally",emoji:"📣",desc:"Recover lost territory slot",power:5,type:"magic"}],
+    moves:[{id:"spear_thrust",label:"Spear Thrust",emoji:"🌿",desc:"Reliable steady damage",power:6,type:"attack"},{id:"shield_wall",label:"Shield Wall",emoji:"🛡️",desc:"Blocks 60% of damage",power:7,type:"defend"},{id:"rally",label:"Rally",emoji:"📣",desc:"Recover lost territory slot",power:5,type:"magic"},{id:"phalanx",label:"Phalanx",emoji:"🔰",desc:"Lock shields — guaranteed defend result",power:8,type:"defend"},{id:"endure",label:"Endure",emoji:"💪",desc:"Suffer but survive — can't lose this territory",power:5,type:"defend"}],
     weakTo:["warrior","ronin"], strongVs:["wokou","sohei"] },
   shogun: { id:"shogun", name:"Shogun", emoji:"🟡", color:"#854d0e", bgColor:"rgba(133,77,14,0.12)", borderColor:"rgba(133,77,14,0.45)", role:"Commander", passive:"Divine Authority", passiveDesc:"+15% reward on Ultra", weapon:"War Staff",
-    moves:[{id:"command_strike",label:"Command Strike",emoji:"👑",desc:"Multiplies next warrior damage",power:9,type:"magic"},{id:"strategic_ret",label:"Strategic Retreat",emoji:"🏳️",desc:"Preserve and guarantee min reward",power:5,type:"defend"},{id:"divine_auth",label:"Divine Authority",emoji:"⚡",desc:"Force minimum Common reward",power:7,type:"magic"}],
+    moves:[{id:"command_strike",label:"Command Strike",emoji:"👑",desc:"Multiplies next warrior damage",power:9,type:"magic"},{id:"strategic_ret",label:"Strategic Retreat",emoji:"🏳️",desc:"Preserve and guarantee min reward",power:5,type:"defend"},{id:"divine_auth",label:"Divine Authority",emoji:"⚡",desc:"Force minimum Common reward",power:7,type:"magic"},{id:"imperial_decree",label:"Imperial Decree",emoji:"📋",desc:"Issue decree — skip enemy strongest move",power:8,type:"trick"},{id:"warlords_fury",label:"Warlord's Fury",emoji:"⚡",desc:"Full power strike — scales with territories won",power:7,type:"attack"}],
     weakTo:["yamabushi","wokou"], strongVs:["ronin","bushi"] },
   buke: { id:"buke", name:"Buke", emoji:"🪖", color:"#4d7c0f", bgColor:"rgba(77,124,15,0.12)", borderColor:"rgba(77,124,15,0.4)", role:"Noble defenders", passive:"Noble Guard", passiveDesc:"Defense mode never gives Nothing", weapon:"Trident",
-    moves:[{id:"trident_stab",label:"Trident Stab",emoji:"🔱",desc:"Multi-hit 3 small strikes",power:7,type:"attack"},{id:"noble_defense",label:"Noble Defense",emoji:"🏰",desc:"Guarantee no wipe",power:8,type:"defend"},{id:"honor_bond",label:"Honor Bond",emoji:"🤝",desc:"Link warriors +3 combo power",power:6,type:"magic"}],
+    moves:[{id:"trident_stab",label:"Trident Stab",emoji:"🔱",desc:"Multi-hit 3 small strikes",power:7,type:"attack"},{id:"noble_defense",label:"Noble Defense",emoji:"🏰",desc:"Guarantee no wipe",power:8,type:"defend"},{id:"honor_bond",label:"Honor Bond",emoji:"🤝",desc:"Link warriors +3 combo power",power:6,type:"magic"},{id:"bastion",label:"Bastion",emoji:"🏯",desc:"Fortress stance — +4 defense power",power:9,type:"defend"},{id:"noble_sacrifice",label:"Noble Sacrifice",emoji:"💎",desc:"Sacrifice self to boost next warrior by +5",power:4,type:"magic"}],
     weakTo:["samurai","kenshi"], strongVs:["yamabushi","wokou"] },
   kenshi: { id:"kenshi", name:"Kenshi", emoji:"🩵", color:"#0f766e", bgColor:"rgba(15,118,110,0.12)", borderColor:"rgba(15,118,110,0.4)", role:"Sword masters", passive:"Blade Harmony", passiveDesc:"3 wins in a row: +15% power", weapon:"Katana",
-    moves:[{id:"precision_slash",label:"Precision Slash",emoji:"🌊",desc:"Bypass enemy defense",power:8,type:"attack"},{id:"blade_harmony",label:"Blade Harmony",emoji:"🌀",desc:"Chain to next warrior +3",power:7,type:"magic"},{id:"meditation",label:"Meditative Focus",emoji:"🧘",desc:"Build +2 power per territory",power:5,type:"defend"}],
+    moves:[{id:"precision_slash",label:"Precision Slash",emoji:"🌊",desc:"Bypass enemy defense",power:8,type:"attack"},{id:"blade_harmony",label:"Blade Harmony",emoji:"🌀",desc:"Chain to next warrior +3",power:7,type:"magic"},{id:"meditation",label:"Meditative Focus",emoji:"🧘",desc:"Build +2 power per territory",power:5,type:"defend"},{id:"blade_storm",label:"Blade Storm",emoji:"💨",desc:"Flurry — 4 rapid hits average power 6",power:9,type:"attack"},{id:"perfect_form",label:"Perfect Form",emoji:"✨",desc:"Flawless stance — +2 power if no damage taken",power:7,type:"defend"}],
     weakTo:["wokou","warrior"], strongVs:["buke","samurai"] },
   wokou: { id:"wokou", name:"Wokou", emoji:"🌊", color:"#475569", bgColor:"rgba(71,85,105,0.12)", borderColor:"rgba(71,85,105,0.4)", role:"Sea raiders", passive:"Sea Raider", passiveDesc:"Random chance to steal bonus reward", weapon:"Cutlass",
-    moves:[{id:"cutlass_raid",label:"Cutlass Raid",emoji:"🏴‍☠️",desc:"Steal enemy bonus on win",power:7,type:"trick"},{id:"sea_storm",label:"Sea Storm",emoji:"🌊",desc:"Chaotic random power 4-10",power:7,type:"magic"},{id:"ghost_tide",label:"Ghost Tide",emoji:"👻",desc:"Disappear — enemy nullified",power:6,type:"trick"}],
+    moves:[{id:"cutlass_raid",label:"Cutlass Raid",emoji:"🏴‍☠️",desc:"Steal enemy bonus on win",power:7,type:"trick"},{id:"sea_storm",label:"Sea Storm",emoji:"🌊",desc:"Chaotic random power 4-10",power:7,type:"magic"},{id:"ghost_tide",label:"Ghost Tide",emoji:"👻",desc:"Disappear — enemy nullified",power:6,type:"trick"},{id:"ambush",label:"Ambush",emoji:"🗺️",desc:"Surprise attack — +3 if enemy chose attack",power:8,type:"trick"},{id:"plunder",label:"Plunder",emoji:"💰",desc:"Loot bonus — extra REBEL if this territory won",power:6,type:"magic"}],
     weakTo:["ashigaru","buke"], strongVs:["kenshi","shogun"] },
   sohei: { id:"sohei", name:"Sohei", emoji:"🟠", color:"#c2410c", bgColor:"rgba(194,65,12,0.12)", borderColor:"rgba(194,65,12,0.4)", role:"Monk warriors", passive:"Monk Ward", passiveDesc:"Recover from one lost territory", weapon:"War Staff",
-    moves:[{id:"staff_sweep",label:"Staff Sweep",emoji:"🌅",desc:"Area attack all positions",power:7,type:"attack"},{id:"monks_ward",label:"Monk's Ward",emoji:"☯️",desc:"Nullify one enemy hit",power:8,type:"defend"},{id:"enlightened",label:"Enlightened Strike",emoji:"🔥",desc:"Spiritual damage bypasses armor",power:9,type:"magic"}],
+    moves:[{id:"staff_sweep",label:"Staff Sweep",emoji:"🌅",desc:"Area attack all positions",power:7,type:"attack"},{id:"monks_ward",label:"Monk's Ward",emoji:"☯️",desc:"Nullify one enemy hit",power:8,type:"defend"},{id:"enlightened",label:"Enlightened Strike",emoji:"🔥",desc:"Spiritual damage bypasses armor",power:9,type:"magic"},{id:"sacred_flame",label:"Sacred Flame",emoji:"🕯️",desc:"Holy fire — power 10 against magic users",power:8,type:"magic"},{id:"iron_meditation",label:"Iron Meditation",emoji:"🧘",desc:"Center self — +3 power and heal passive",power:6,type:"defend"}],
     weakTo:["ashigaru","kenshi"], strongVs:["warrior","yamabushi"] },
   yamabushi: { id:"yamabushi", name:"Yamabushi", emoji:"🔵", color:"#164e63", bgColor:"rgba(22,78,99,0.12)", borderColor:"rgba(22,78,99,0.4)", role:"Mountain mystics", passive:"Spirit Vision", passiveDesc:"Wildcard: one territory gets secret power-up", weapon:"Mystic Staff",
-    moves:[{id:"mystic_flame",label:"Mystic Flame",emoji:"🔮",desc:"Random elemental power 5-9",power:7,type:"magic"},{id:"spirit_vision",label:"Spirit Vision",emoji:"👁️",desc:"Reveal weakness +3 next",power:6,type:"trick"},{id:"mountain_seal",label:"Mountain Seal",emoji:"🗻",desc:"Seal enemy strongest counter",power:8,type:"magic"}],
+    moves:[{id:"mystic_flame",label:"Mystic Flame",emoji:"🔮",desc:"Random elemental power 5-9",power:7,type:"magic"},{id:"spirit_vision",label:"Spirit Vision",emoji:"👁️",desc:"Reveal weakness +3 next",power:6,type:"trick"},{id:"mountain_seal",label:"Mountain Seal",emoji:"🗻",desc:"Seal enemy strongest counter",power:8,type:"magic"},{id:"void_seal",label:"Void Seal",emoji:"🌀",desc:"Erase enemy move — they get power 1",power:9,type:"magic"},{id:"mountain_echo",label:"Mountain Echo",emoji:"📣",desc:"Echo last move — replay previous territory's power",power:6,type:"trick"}],
     weakTo:["sohei","samurai"], strongVs:["shogun","buke"] },
   bushi: { id:"bushi", name:"Bushi", emoji:"🔷", color:"#1e3a5f", bgColor:"rgba(30,58,95,0.12)", borderColor:"rgba(30,58,95,0.45)", role:"Tactical officers", passive:"Tactical Mind", passiveDesc:"See defender faction before choosing move", weapon:"Tactical Blade",
-    moves:[{id:"tactical_blade",label:"Tactical Blade",emoji:"🗡️",desc:"See result before confirming",power:7,type:"attack"},{id:"officers_order",label:"Officer's Order",emoji:"📋",desc:"Reorder attack +2 highest",power:6,type:"magic"},{id:"strategic_mind",label:"Strategic Mind",emoji:"🧠",desc:"Pick enemy territory order",power:8,type:"trick"}],
+    moves:[{id:"tactical_blade",label:"Tactical Blade",emoji:"🗡️",desc:"See result before confirming",power:7,type:"attack"},{id:"officers_order",label:"Officer's Order",emoji:"📋",desc:"Reorder attack +2 highest",power:6,type:"magic"},{id:"strategic_mind",label:"Strategic Mind",emoji:"🧠",desc:"Pick enemy territory order",power:8,type:"trick"},{id:"field_intel",label:"Field Intel",emoji:"🔭",desc:"Scout ahead — reveal enemy move before choosing",power:7,type:"trick"},{id:"tactical_strike",label:"Tactical Strike",emoji:"🎯",desc:"Calculated blow — power equals territories won",power:7,type:"attack"}],
     weakTo:["samurai","sohei"], strongVs:["ronin","wokou"] },
 };
 
@@ -530,6 +531,11 @@ export default function FactionWars() {
   const [runMessage, setRunMessage]     = useState("");
   const [busy, setBusy]                 = useState(false);
   const [showBuyPoints, setShowBuyPoints] = useState(false);
+  const [showPrizeModal, setShowPrizeModal] = useState(false);
+  const [prizeLabel, setPrizeLabel] = useState("");
+  const [prizeSub, setPrizeSub] = useState("");
+  const [prizeClaimId, setPrizeClaimId] = useState<string|undefined>(undefined);
+  const [prizeMerchShipping, setPrizeMerchShipping] = useState(false);
   const [lb, setLb]                     = useState<FWLeaderboards>({ warlords:[], factions:[], streaks:[], rich:[], perfect:[] });
   const [battleAnim, setBattleAnim]     = useState<"idle"|"clash"|"win"|"lose">("idle");
   const { muted, toggleMute, startMusic, stopMusic, sfx } = useFWAudio();
@@ -598,11 +604,30 @@ export default function FactionWars() {
     if (team.includes("buke") && rarity==="none") { const dc=allResults.filter(r=>r.playerMove.type==="defend").length; if(dc>=3){rarity="common";pts=Number(cfg?.rewards?.common??50);} }
     setFinalRarity(rarity);
     if (pts>0) { const er:any=await earn(pts).catch(()=>null); if(er?.ok)await refresh().catch(()=>{}); }
+
+    // Roll crate prize if won anything
+    if (rarity !== "none") {
+      try {
+        const rollR = await fetch("/api/prizes/roll", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ playerId: String(effectivePlayerId||"guest"), rarity, game: "faction-wars" })
+        });
+        const rollJ = await rollR.json().catch(() => null);
+        if (rollR.ok && rollJ?.ok && rollJ?.prize) {
+          const p = rollJ.prize;
+          setPrizeLabel(p.label || (rarity === "ultra" ? "🏆 ULTRA CRATE" : rarity === "rare" ? "⚔️ RARE CRATE" : "✅ COMMON CRATE"));
+          setPrizeSub(p.type === "nft" ? "You won an NFT!" : p.type === "merch" ? "You won merch!" : `+${p.points || pts} REBEL`);
+          setPrizeClaimId(rollJ.claimId);
+          setPrizeMerchShipping(p.type === "merch");
+        }
+      } catch {}
+    }
     const prof=loadProfile(); const pid=String(effectivePlayerId||getEffectivePlayerId(prof)||"guest").trim().slice(0,64)||"guest"; const pname=(prof?.discordName||playerName||prof?.name||"guest").trim()||"guest";
     addWin({id:`${Date.now()}-${Math.random().toString(36).slice(2,7)}`,ts:Date.now(),game:"faction-wars",playerId:pid,playerName:pname,rarity,pointsAwarded:pts});
     await fetch("/api/faction-wars/record",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({playerId:pid,playerName:pname,rarity,pointsAwarded:pts,territoriesWon,team,perfect:territoriesWon===5})}).catch(()=>{});
     window.dispatchEvent(new Event("ra:leaderboards-refresh")); void loadLB();
     if (rarity==="ultra") sfx.ultra(); else if (rarity!=="none") sfx.win(); else sfx.lose();
+    if (rarity !== "none") setShowPrizeModal(true);
     setPhase("final_result"); setBusy(false);
   };
 
@@ -621,6 +646,15 @@ export default function FactionWars() {
     <div style={{ minHeight:"100vh", color:"white", fontFamily:"'Segoe UI',sans-serif", backgroundImage:"url('/bg/faction-wars-bg.png')", backgroundSize:"cover", backgroundPosition:"center top", backgroundAttachment:"fixed", backgroundRepeat:"no-repeat", position:"relative" }}>
       <div style={{ position:"fixed", inset:0, background:"rgba(8,11,20,0.82)", zIndex:0, pointerEvents:"none" }} />
       <BuyPointsModal open={showBuyPoints} onClose={()=>setShowBuyPoints(false)} playerId={effectivePlayerId} onClaimed={()=>{setShowBuyPoints(false);void refresh();}} />
+      <PrizeModal
+        open={showPrizeModal}
+        onClose={()=>setShowPrizeModal(false)}
+        label={prizeLabel}
+        sub={prizeSub}
+        claimId={prizeClaimId}
+        playerId={effectivePlayerId}
+        merchNeedsShipping={prizeMerchShipping}
+      />
 
       {/* DRIP Modal */}
       {showDripMigrate && (
@@ -806,11 +840,14 @@ export default function FactionWars() {
                       <div style={{ fontWeight:900, fontSize:15, color:currentPlayerFD.color, letterSpacing:"0.04em" }}>{currentPlayerFD.name.toUpperCase()}</div>
                       <div style={{ fontSize:10, opacity:0.5, marginTop:1 }}>Warrior {currentFactionIdx+1} of {TEAM_SIZE}</div>
                     </div>
-                    {/* Player health bar style indicator */}
+                    {/* Player power bar — warriors remaining */}
                     <div style={{ width:"100%", height:5, borderRadius:3, background:"rgba(255,255,255,0.08)", overflow:"hidden" }}>
-                      <div style={{ height:"100%", borderRadius:3, background:`linear-gradient(90deg, ${currentPlayerFD.color}, ${currentPlayerFD.color}88)`, width:`${Math.round(((TEAM_SIZE-(currentFactionIdx))/TEAM_SIZE)*100)}%`, transition:"width 0.5s ease" }} />
+                      <div style={{ height:"100%", borderRadius:3, background:`linear-gradient(90deg, ${currentPlayerFD.color}, ${currentPlayerFD.color}88)`, width:`${Math.round(((TEAM_SIZE - currentFactionIdx) / TEAM_SIZE) * 100)}%`, transition:"width 0.6s ease" }} />
                     </div>
-                    <div style={{ fontSize:9, opacity:0.45 }}>{TEAM_SIZE - currentFactionIdx} warriors remaining</div>
+                    <div style={{ fontSize:9, opacity:0.45, display:"flex", gap:8 }}>
+                      <span>{TEAM_SIZE - currentFactionIdx} of {TEAM_SIZE} warriors left</span>
+                      {territoriesWon > 0 && <span style={{color:currentPlayerFD.color}}>✅ {territoriesWon} won</span>}
+                    </div>
                   </div>
 
                   {/* Center VS */}
@@ -841,11 +878,14 @@ export default function FactionWars() {
                       <div style={{ fontWeight:900, fontSize:15, color:currentDefenderFD.color, letterSpacing:"0.04em" }}>{currentDefenderFD.name.toUpperCase()}</div>
                       <div style={{ fontSize:10, opacity:0.5, marginTop:1 }}>Territory Defender</div>
                     </div>
-                    {/* Threat indicator */}
+                    {/* Defender power bar — territories remaining to defend */}
                     <div style={{ width:"100%", height:5, borderRadius:3, background:"rgba(255,255,255,0.08)", overflow:"hidden" }}>
-                      <div style={{ height:"100%", borderRadius:3, background:`linear-gradient(90deg, ${currentDefenderFD.color}, ${currentDefenderFD.color}88)`, width:"100%", transition:"width 0.5s ease" }} />
+                      <div style={{ height:"100%", borderRadius:3, background:`linear-gradient(90deg, ${currentDefenderFD.color}, ${currentDefenderFD.color}88)`, width:`${Math.round(((TERRITORY_COUNT - currentTerritory) / TERRITORY_COUNT) * 100)}%`, transition:"width 0.6s ease" }} />
                     </div>
-                    <div style={{ fontSize:9, opacity:0.45 }}>Holding strong</div>
+                    <div style={{ fontSize:9, opacity:0.45, display:"flex", gap:8 }}>
+                      <span>{TERRITORY_COUNT - currentTerritory} territories left to defend</span>
+                      {results.filter(r=>!r.won).length > 0 && <span style={{color:"#34d399"}}>💀 {results.filter(r=>!r.won).length} lost</span>}
+                    </div>
                   </div>
                 </div>
 
