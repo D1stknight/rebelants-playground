@@ -675,7 +675,7 @@ export default function FactionWars() {
   useEffect(() => {
     const h=()=>loadLB(); window.addEventListener("ra:leaderboards-refresh",h); return ()=>window.removeEventListener("ra:leaderboards-refresh",h);
   }, [loadLB]);
-  useEffect(() => { sfx.startTheme(); }, []);
+  useEffect(() => { sfx.startTheme(); return () => { stopMusic(); }; }, []);
 
   const toggleFaction = (fid: FactionId) => {
     if (phase !== "idle") return;
