@@ -883,43 +883,53 @@ export default function FactionWars() {
     <div style={{ minHeight:"100vh", color:"white", fontFamily:"'Segoe UI',sans-serif", backgroundImage:"url('/bg/faction-wars-bg.png')", backgroundSize:"cover", backgroundPosition:"center top", backgroundAttachment:"fixed", backgroundRepeat:"no-repeat", position:"relative" }}>
       <div style={{ position:"fixed", inset:0, background:"rgba(8,11,20,0.82)", zIndex:0, pointerEvents:"none" }} />
       <BuyPointsModal open={showBuyPoints} onClose={()=>setShowBuyPoints(false)} playerId={effectivePlayerId} onClaimed={()=>{setShowBuyPoints(false);void refresh();}} />
-      {/* Crate Reveal Modal */}
+      {/* Crate Reveal Modal — exact Shuffle style */}
       {showPrizeModal && (()=>{
         const rar = finalRarity as string;
-        const t = rar==="ultra"?"🏆 ULTRA CRATE!":rar==="rare"?"⚔️ Rare Crate!":"✅ Crate Unlocked";
-        const bc = rar==="ultra"?"#fbbf24":rar==="rare"?"#60a5fa":"#34d399";
-        const ac = rar==="ultra"?"rgba(251,191,36,0.4)":rar==="rare"?"rgba(96,165,250,0.35)":"rgba(52,211,153,0.3)";
-        const sub2 = rar==="ultra"?"5/5 conquered":rar==="rare"?"3-4 conquered":"1-2 conquered";
-        const sps = Array.from({length:24},(_,i)=>({ left:String(8+(i*4.1)%84)+'%', top:String(10+(i*7.3)%62)+'%', size:10+((i*3)%14), delay:(i*0.18)%3.2 }));
+        const crateTitle = rar==="ultra"?"🏆 ULTRA CRATE!":rar==="rare"?"⚔️ Rare Crate!":"✅ Crate Unlocked";
+        const subLine = rar==="ultra"?"5/5 territories — Legendary!":rar==="rare"?"3–4 territories — Strong campaign!":"1–2 territories — Soldiers hold!";
+        const sps = Array.from({length:24},(_,i)=>({
+          left: String(8+(i*4.1)%84)+'%',
+          top: String(10+(i*7.3)%62)+'%',
+          size: 10+((i*3)%14),
+          delay: (i*0.18)%3.2
+        }));
         return (
-          <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.75)",zIndex:9999,padding:20}}>
-            <div style={{position:"relative",minWidth:300,maxWidth:400,padding:"32px 28px",borderRadius:20,background:"rgba(8,14,32,0.98)",border:"2px solid "+bc,boxShadow:"0 0 60px "+ac+", 0 24px 40px rgba(0,0,0,0.7)",textAlign:"center",overflow:"hidden"}}>
-              {/* Inject sparkle CSS if not already present */}
-              <style>{".fw-sparkle{position:absolute;border-radius:50%;animation:fw-spark 2.4s ease-in-out infinite alternate;pointer-events:none}.fw-sparkle.ultra{background:radial-gradient(#fbbf24,#f59e0b)}.fw-sparkle.rare{background:radial-gradient(#60a5fa,#3b82f6)}.fw-sparkle.common{background:radial-gradient(#34d399,#059669)}@keyframes fw-spark{0%{opacity:0;transform:scale(0.4) translateY(0)}50%{opacity:0.9}100%{opacity:0.2;transform:scale(1.1) translateY(-12px)}}"}</style>
-              {sps.map((sp: {left:string;top:string;size:number;delay:number},i: number)=>(
-                <span key={i} className={"fw-sparkle "+rar} style={{left:sp.left,top:sp.top,width:sp.size+"px",height:sp.size+"px",animationDelay:sp.delay+"s"}} />
-              ))}
-              <div style={{position:"absolute",left:"50%",top:"50%",transform:"translate(-50%,-50%)",width:200,height:200,borderRadius:"50%",background:ac,filter:"blur(40px)",pointerEvents:"none"}} />
-              <div style={{position:"relative",fontSize:22,fontWeight:900,color:bc,marginBottom:6,letterSpacing:"0.03em"}}>{t}</div>
-              <div style={{position:"relative",fontSize:12,opacity:0.55,marginBottom:16}}>{sub2}</div>
-              <div style={{position:"relative",marginBottom:16}}>
-                <img src={"/crates/"+rar+".png"} alt={rar+" crate"} style={{width:140,height:140,objectFit:"contain",filter:"drop-shadow(0 0 20px "+bc+")"}} />
-              </div>
-              <div style={{position:"relative",fontSize:17,fontWeight:900,color:"white",marginBottom:4}}>
-                You won: <span style={{color:bc}}>{prizeSub}</span>
-              </div>
-              {prizeClaimId && <div style={{position:"relative",fontSize:10,opacity:0.35,marginBottom:16,fontFamily:"monospace"}}>Claim: {prizeClaimId}</div>}
-              {!prizeClaimId && <div style={{height:20}} />}
-              {prizeMerchShipping && prizeClaimId && (
-                <div style={{position:"relative",textAlign:"left",marginBottom:12,fontSize:12,opacity:0.75,background:"rgba(255,255,255,0.05)",borderRadius:10,padding:12}}>
-                  🎁 Merch won! Contact support with your Claim ID to arrange shipping.
+          <>
+            <style>{".fw-prize-modal{position:fixed;inset:0;display:grid;place-items:center;background:rgba(0,0,0,0.55);z-index:2147483647}.fw-prize-card{position:relative;min-width:320px;padding:28px 24px;border-radius:16px;text-align:center;background:rgba(10,18,40,0.97);border:2px solid rgba(148,163,184,0.2);box-shadow:0 24px 40px rgba(0,0,0,0.65);overflow:visible}.fw-sparkle-layer{position:absolute;inset:-8% -10%;pointer-events:none;z-index:0}.fw-pm-sparkle{position:absolute;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,0.95) 0%,rgba(255,255,255,0) 65%);filter:blur(0.3px) drop-shadow(0 0 12px rgba(255,255,255,0.65));opacity:0;animation:fwPmSpark 2.6s ease-in-out infinite}.fw-pm-sparkle.ultra{filter:blur(0.3px) drop-shadow(0 0 16px rgba(251,191,36,1))}.fw-pm-sparkle.rare{filter:blur(0.3px) drop-shadow(0 0 14px rgba(96,165,250,0.95))}.fw-pm-sparkle.common{filter:blur(0.3px) drop-shadow(0 0 14px rgba(52,211,153,0.85))}.fw-prize-art{display:block;width:200px;max-width:70vw;height:auto;margin:0 auto 16px;position:relative;z-index:1}.fw-prize-aura{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:220px;height:220px;border-radius:50%;pointer-events:none;z-index:0;filter:blur(45px)}.fw-prize-aura[data-rarity='ultra']{background:radial-gradient(circle,rgba(251,191,36,0.5),transparent 70%)}.fw-prize-aura[data-rarity='rare']{background:radial-gradient(circle,rgba(96,165,250,0.45),transparent 70%)}.fw-prize-aura[data-rarity='common']{background:radial-gradient(circle,rgba(52,211,153,0.4),transparent 70%)}@keyframes fwPmSpark{0%{transform:scale(0.4);opacity:0}20%{opacity:1}55%{transform:scale(1.1);opacity:0.9}85%{transform:scale(0.7);opacity:0.7}100%{transform:scale(0.3);opacity:0}}"}</style>
+            <div className="fw-prize-modal">
+              <div className="fw-prize-card">
+                {/* Sparkle layer */}
+                <div className="fw-sparkle-layer">
+                  {sps.map((sp,i)=>(
+                    <span key={i} className={"fw-pm-sparkle "+rar} style={{left:sp.left,top:sp.top,width:sp.size+"px",height:sp.size+"px",animationDelay:sp.delay+"s"}} />
+                  ))}
                 </div>
-              )}
-              <button onClick={()=>setShowPrizeModal(false)} style={{position:"relative",padding:"12px 36px",borderRadius:12,border:"none",cursor:"pointer",background:"linear-gradient(135deg,"+bc+","+bc+"99)",color:"#000",fontWeight:900,fontSize:15}}>
-                {rar==="ultra"?"⚔️ Legendary!":"Continue"}
-              </button>
+                {/* Aura glow */}
+                <div className="fw-prize-aura" data-rarity={rar} />
+                {/* Title */}
+                <div style={{position:"relative",fontSize:20,fontWeight:900,color:rar==="ultra"?"#fbbf24":rar==="rare"?"#60a5fa":"#34d399",margin:"0 0 4px",zIndex:1}}>{crateTitle}</div>
+                <div style={{position:"relative",fontSize:12,opacity:0.55,marginBottom:12,zIndex:1}}>{subLine}</div>
+                {/* Chest image */}
+                <img className="fw-prize-art" src={"/crates/"+rar+".png"} alt={rar+" crate"} />
+                {/* Prize text */}
+                <div style={{position:"relative",zIndex:1,fontSize:15,fontWeight:700,marginBottom:4}}>
+                  You won: <b style={{color:rar==="ultra"?"#fbbf24":rar==="rare"?"#60a5fa":"#34d399"}}>{prizeSub}</b>
+                </div>
+                <div style={{position:"relative",zIndex:1,fontSize:11,opacity:0.35,marginBottom:18,fontFamily:"monospace"}}>
+                  {prizeClaimId ? "Claim ID: "+prizeClaimId : "Tap continue to play again."}
+                </div>
+                {prizeMerchShipping && prizeClaimId && (
+                  <div style={{position:"relative",zIndex:1,textAlign:"left",marginBottom:14,fontSize:12,opacity:0.75,background:"rgba(255,255,255,0.05)",borderRadius:10,padding:"10px 12px"}}>
+                    🎁 Merch won! Save your Claim ID and contact support to arrange shipping.
+                  </div>
+                )}
+                <button onClick={()=>setShowPrizeModal(false)} style={{position:"relative",zIndex:1,padding:"12px 40px",borderRadius:12,border:"none",cursor:"pointer",background:rar==="ultra"?"linear-gradient(135deg,#fbbf24,#f59e0b)":rar==="rare"?"linear-gradient(135deg,#60a5fa,#3b82f6)":"linear-gradient(135deg,#34d399,#059669)",color:"#000",fontWeight:900,fontSize:15,letterSpacing:"0.03em",boxShadow:"0 4px 20px rgba(0,0,0,0.4)"}}>
+                  {rar==="ultra"?"⚔️ Legendary!":"Continue"}
+                </button>
+              </div>
             </div>
-          </div>
+          </>
         );
       })()}
 
