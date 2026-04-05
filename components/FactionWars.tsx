@@ -103,30 +103,30 @@ const MAX_HP = 100;
 
 function calcDamage(move: Move, atk: FactionId, def: FactionId, bonus: number, tWon: number, tLost: number, diff: number, isPlayer: boolean): number {
   const af = FACTIONS[atk];
-  let dmg = move.power * 6.5 + bonus * 3;
-  if (af.strongVs.includes(def)) dmg += 12;
-  if (af.weakTo.includes(def))   dmg -= 8;
+  let dmg = move.power * 3.2 + bonus * 2;
+  if (af.strongVs.includes(def)) dmg += 6;
+  if (af.weakTo.includes(def))   dmg -= 5;
   if (move.type === "defend") dmg *= 0.55;
   if (move.type === "trick")  dmg *= 0.80;
   if (move.type === "magic")  dmg *= 1.10;
   if (isPlayer) {
-    if (atk === "ronin" && tLost > 0) dmg += 15;
-    if (atk === "kenshi" && tWon >= 3) dmg += 12;
-    if (atk === "warrior" && (move.id === "cracked_circle" || move.id === "berserker_rage")) dmg += 20;
+    if (atk === "ronin" && tLost > 0) dmg += 8;
+    if (atk === "kenshi" && tWon >= 3) dmg += 6;
+    if (atk === "warrior" && (move.id === "cracked_circle" || move.id === "berserker_rage")) dmg += 10;
     if (move.id === "mystic_flame") dmg = (Math.floor(Math.random()*5)+5)*6.5;
-    if (move.id === "last_stand") dmg += 22;
-    if (move.id === "phantom_blade") dmg += 12;
-    if (move.id === "void_seal") dmg += 18;
-    if (move.id === "blade_storm") dmg += 14;
-    if (move.id === "enlightened" || move.id === "sacred_flame") dmg += 14;
-    if (move.id === "bastion") dmg += 10;
-    if (move.id === "warlords_fury") dmg += tWon * 7;
-    if (move.id === "tactical_strike") dmg += tWon * 6;
+    if (move.id === "last_stand") dmg += 12;
+    if (move.id === "phantom_blade") dmg += 6;
+    if (move.id === "void_seal") dmg += 9;
+    if (move.id === "blade_storm") dmg += 7;
+    if (move.id === "enlightened" || move.id === "sacred_flame") dmg += 7;
+    if (move.id === "bastion") dmg += 5;
+    if (move.id === "warlords_fury") dmg += tWon * 4;
+    if (move.id === "tactical_strike") dmg += tWon * 3;
   } else {
-    dmg += Math.floor(diff * 18);
+    dmg += Math.floor(diff * 8);
   }
   dmg *= (0.82 + Math.random() * 0.36);
-  return Math.max(4, Math.min(Math.round(dmg), 72));
+  return Math.max(3, Math.min(Math.round(dmg), 38));
 }
 
 function calcBlock(move: Move): number {
@@ -938,7 +938,8 @@ export default function FactionWars() {
                   <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:7 }}>
                     <div style={{ display:"flex", alignItems:"center", gap:6, width:110, flexShrink:0 }}>
                       <img src={factionImgPath(currentPlayerFD.id,"symbol")} alt="" style={{ width:22, height:22, objectFit:"contain", background:"rgba(0,0,0,0.4)", borderRadius:4, padding:2, flexShrink:0 }} />
-                      <span style={{ fontWeight:900, fontSize:11, color:currentPlayerFD.color, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{currentPlayerFD.name.toUpperCase()}</span>
+  <span style={{ fontWeight:900, fontSize:11, color:currentPlayerFD.color, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{currentPlayerFD.name.toUpperCase()}</span>
+                      <span style={{ fontSize:9, fontWeight:900, background:"rgba(52,211,153,0.2)", color:"#34d399", borderRadius:4, padding:"1px 5px", flexShrink:0 }}>YOU</span>
                     </div>
                     <div style={{ flex:1, height:20, borderRadius:5, background:"rgba(0,0,0,0.6)", border:"1px solid rgba(255,255,255,0.1)", overflow:"hidden", position:"relative" }}>
                       <div style={{ height:"100%", borderRadius:4,
@@ -957,7 +958,8 @@ export default function FactionWars() {
                   <div style={{ display:"flex", alignItems:"center", gap:10 }}>
                     <div style={{ display:"flex", alignItems:"center", gap:6, width:110, flexShrink:0 }}>
                       <img src={factionImgPath(currentDefenderFD.id,"symbol")} alt="" style={{ width:22, height:22, objectFit:"contain", background:"rgba(0,0,0,0.4)", borderRadius:4, padding:2, flexShrink:0 }} />
-                      <span style={{ fontWeight:900, fontSize:11, color:currentDefenderFD.color, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{currentDefenderFD.name.toUpperCase()}</span>
+  <span style={{ fontWeight:900, fontSize:11, color:currentDefenderFD.color, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{currentDefenderFD.name.toUpperCase()}</span>
+                      <span style={{ fontSize:9, fontWeight:900, background:"rgba(248,113,113,0.2)", color:"#f87171", borderRadius:4, padding:"1px 5px", flexShrink:0 }}>ENEMY</span>
                     </div>
                     <div style={{ flex:1, height:20, borderRadius:5, background:"rgba(0,0,0,0.6)", border:"1px solid rgba(255,255,255,0.1)", overflow:"hidden", position:"relative" }}>
                       <div style={{ height:"100%", borderRadius:4,
