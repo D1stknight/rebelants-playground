@@ -225,8 +225,17 @@ function TerritoryBadge({ index, result, isCurrent, defender }: { index: number;
   const df = defender ? FACTIONS[defender] : null;
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, opacity: result || isCurrent ? 1 : 0.35 }}>
-      <div style={{ width: 44, height: 44, borderRadius: 10, background: result ? (result.won ? "rgba(52,211,153,0.15)" : "rgba(239,68,68,0.12)") : isCurrent ? "rgba(251,191,36,0.15)" : "rgba(255,255,255,0.04)", border: `2px solid ${result ? (result.won ? "#34d399" : "#f87171") : isCurrent ? "#fbbf24" : "rgba(255,255,255,0.1)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, boxShadow: isCurrent ? "0 0 16px rgba(251,191,36,0.4)" : "none", transition: "all 0.3s" }}>
-        {result ? (result.won ? "✅" : "💀") : isCurrent ? "⚔️" : df ? df.emoji : "🏰"}
+      <div style={{ width: 48, height: 48, borderRadius: 10, position:"relative", border: `2px solid ${result ? (result.won ? "#34d399" : "#f87171") : isCurrent ? "#fbbf24" : "rgba(255,255,255,0.15)"}`, boxShadow: isCurrent ? "0 0 16px rgba(251,191,36,0.4)" : result?.won ? "0 0 10px rgba(52,211,153,0.3)" : "none", transition: "all 0.3s", overflow:"hidden", background:"rgba(0,0,0,0.5)", flexShrink:0 }}>
+        {df && <img src={factionImgPath(df.id,"symbol")} alt={df.name} style={{ width:"100%", height:"100%", objectFit:"contain", padding:4, filter: result && !result.won ? "grayscale(0.7) opacity(0.6)" : "none" }} onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />}
+        {!df && <div style={{ width:"100%", height:"100%", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>🏰</div>}
+        {result && (
+          <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", background: result.won ? "rgba(52,211,153,0.35)" : "rgba(239,68,68,0.35)", fontSize:18 }}>
+            {result.won ? "✅" : "💀"}
+          </div>
+        )}
+        {isCurrent && !result && (
+          <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", background:"rgba(251,191,36,0.3)", fontSize:16 }}>⚔️</div>
+        )}
       </div>
       <div style={{ fontSize: 9, opacity: 0.6 }}>T{index + 1}</div>
       {df && <div style={{ fontSize: 8, color: df.color, fontWeight: 700 }}>{df.name}</div>}
@@ -834,7 +843,10 @@ export default function FactionWars() {
                   <div key={i} style={{ display:"flex", alignItems:"center", gap:10, background:r.won?"rgba(52,211,153,0.08)":"rgba(239,68,68,0.08)", border:`1px solid ${r.won?"rgba(52,211,153,0.2)":"rgba(239,68,68,0.2)"}`, borderRadius:8, padding:"6px 12px", fontSize:12 }}>
                     <span>{r.won?"✅":"💀"}</span>
                     <span style={{opacity:0.6}}>T{i+1}</span>
-                    <span style={{color:FACTIONS[r.defender].color}}>{FACTIONS[r.defender].emoji} {FACTIONS[r.defender].name}</span>
+                    <span style={{display:"flex",alignItems:"center",gap:5,color:FACTIONS[r.defender].color}}>
+                      <img src={factionImgPath(r.defender,"symbol")} alt={FACTIONS[r.defender].name} style={{width:16,height:16,objectFit:"contain",background:"rgba(0,0,0,0.4)",borderRadius:3,padding:1}} onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
+                      {FACTIONS[r.defender].name}
+                    </span>
                     <span style={{marginLeft:"auto"}}>{r.playerMove.emoji} {r.playerMove.label} <span style={{opacity:0.5}}>vs</span> {r.enemyMove.emoji} {r.enemyMove.label}</span>
                   </div>
                 ))}
