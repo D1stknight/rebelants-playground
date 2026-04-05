@@ -892,10 +892,12 @@ export default function FactionWars() {
         const sub2 = rar==="ultra"?"5/5 conquered":rar==="rare"?"3-4 conquered":"1-2 conquered";
         const sps = Array.from({length:24},(_,i)=>({ left:String(8+(i*4.1)%84)+'%', top:String(10+(i*7.3)%62)+'%', size:10+((i*3)%14), delay:(i*0.18)%3.2 }));
         return (
-          <div style={{position:"fixed",inset:0,display:"grid",placeItems:"center",background:"rgba(0,0,0,0.7)",zIndex:1000}}>
+          <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.75)",zIndex:9999,padding:20}}>
             <div style={{position:"relative",minWidth:300,maxWidth:400,padding:"32px 28px",borderRadius:20,background:"rgba(8,14,32,0.98)",border:"2px solid "+bc,boxShadow:"0 0 60px "+ac+", 0 24px 40px rgba(0,0,0,0.7)",textAlign:"center",overflow:"hidden"}}>
+              {/* Inject sparkle CSS if not already present */}
+              <style>{".fw-sparkle{position:absolute;border-radius:50%;animation:fw-spark 2.4s ease-in-out infinite alternate;pointer-events:none}.fw-sparkle.ultra{background:radial-gradient(#fbbf24,#f59e0b)}.fw-sparkle.rare{background:radial-gradient(#60a5fa,#3b82f6)}.fw-sparkle.common{background:radial-gradient(#34d399,#059669)}@keyframes fw-spark{0%{opacity:0;transform:scale(0.4) translateY(0)}50%{opacity:0.9}100%{opacity:0.2;transform:scale(1.1) translateY(-12px)}}"}</style>
               {sps.map((sp: {left:string;top:string;size:number;delay:number},i: number)=>(
-                <span key={i} className={"pm-sparkle "+rar} style={{position:"absolute",left:sp.left,top:sp.top,width:sp.size,height:sp.size,animationDelay:sp.delay+"s"}} />
+                <span key={i} className={"fw-sparkle "+rar} style={{left:sp.left,top:sp.top,width:sp.size+"px",height:sp.size+"px",animationDelay:sp.delay+"s"}} />
               ))}
               <div style={{position:"absolute",left:"50%",top:"50%",transform:"translate(-50%,-50%)",width:200,height:200,borderRadius:"50%",background:ac,filter:"blur(40px)",pointerEvents:"none"}} />
               <div style={{position:"relative",fontSize:22,fontWeight:900,color:bc,marginBottom:6,letterSpacing:"0.03em"}}>{t}</div>
