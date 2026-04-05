@@ -142,13 +142,67 @@ function calcRarity(won: number): Rarity {
   return "none";
 }
 
+function factionImgPath(fid: string, type: "symbol"|"char"): string {
+  const jpgFactions: Record<string,boolean> = { "bushi-symbol": true, "bushi-char": true };
+  const jpgCharFactions: Record<string,boolean> = { "shogun-char": true };
+  const key = `${fid}-${type}`;
+  const ext = jpgFactions[key] ? "jpg" : jpgCharFactions[key] ? "JPG" : "PNG";
+  return `/factions/${fid}-${type}.${ext}`;
+}
+
 function FactionCard({ faction, selected, onSelect, disabled }: { faction: Faction; selected: boolean; onSelect: () => void; disabled: boolean; }) {
   return (
-    <button onClick={onSelect} disabled={disabled} style={{ background: selected ? faction.bgColor : "rgba(255,255,255,0.03)", border: `2px solid ${selected ? faction.borderColor : "rgba(255,255,255,0.08)"}`, borderRadius: 12, padding: "10px 8px", cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.5 : 1, transition: "all 0.2s", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, minWidth: 80, boxShadow: selected ? `0 0 16px ${faction.color}44` : "none", transform: selected ? "scale(1.04)" : "scale(1)" }}>
-      <div style={{ fontSize: 28 }}>{faction.emoji}</div>
-      <div style={{ fontSize: 10, fontWeight: 900, color: faction.color, letterSpacing: "0.05em" }}>{faction.name.toUpperCase()}</div>
-      <div style={{ fontSize: 8, opacity: 0.6, textAlign: "center" }}>{faction.weapon}</div>
-    </button>
+    <div
+      onClick={disabled ? undefined : onSelect}
+      style={{
+        width: 90, height: 110, cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.5 : 1, perspective: "600px", flexShrink: 0,
+      }}
+    >
+      <div style={{
+        width: "100%", height: "100%", position: "relative",
+        transformStyle: "preserve-3d",
+        transform: selected ? "rotateY(180deg)" : "rotateY(0deg)",
+        transition: "transform 0.5s cubic-bezier(0.4,0,0.2,1)",
+      }}>
+        {/* Front: symbol */}
+        <div style={{
+          position: "absolute", inset: 0, backfaceVisibility: "hidden",
+          borderRadius: 12, overflow: "hidden",
+          border: `2px solid ${selected ? faction.borderColor : "rgba(255,255,255,0.1)"}`,
+          background: "rgba(0,0,0,0.6)",
+          display: "flex", flexDirection: "column", alignItems: "center",
+          boxShadow: selected ? `0 0 20px ${faction.color}55` : "none",
+        }}>
+          <img src={factionImgPath(faction.id,"symbol")} alt={faction.name}
+            style={{ width: "100%", height: 72, objectFit: "cover", borderRadius: "10px 10px 0 0" }}
+            onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }}
+          />
+          <div style={{ padding: "4px 4px 6px", textAlign: "center" }}>
+            <div style={{ fontSize: 9, fontWeight: 900, color: faction.color, letterSpacing: "0.06em" }}>{faction.name.toUpperCase()}</div>
+            <div style={{ fontSize: 8, opacity: 0.5, marginTop: 1 }}>{faction.weapon}</div>
+          </div>
+        </div>
+        {/* Back: character */}
+        <div style={{
+          position: "absolute", inset: 0, backfaceVisibility: "hidden",
+          transform: "rotateY(180deg)", borderRadius: 12, overflow: "hidden",
+          border: `2px solid ${faction.borderColor}`,
+          background: faction.bgColor,
+          display: "flex", flexDirection: "column", alignItems: "center",
+          boxShadow: `0 0 24px ${faction.color}66`,
+        }}>
+          <img src={factionImgPath(faction.id,"char")} alt={faction.name + " warrior"}
+            style={{ width: "100%", height: 80, objectFit: "cover", objectPosition: "top", borderRadius: "10px 10px 0 0" }}
+            onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }}
+          />
+          <div style={{ padding: "4px 4px 6px", textAlign: "center" }}>
+            <div style={{ fontSize: 9, fontWeight: 900, color: faction.color, letterSpacing: "0.06em" }}>{faction.name.toUpperCase()}</div>
+            <div style={{ fontSize: 7, opacity: 0.7, marginTop: 1 }}>✓ Selected</div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -548,8 +602,13 @@ export default function FactionWars() {
                 <div style={{ fontSize:14, fontWeight:800, marginBottom:12, color:"#fbbf24" }}>⚔️ Assemble Your Team ({team.length}/{TEAM_SIZE})</div>
                 <div style={{ display:"flex", gap:8, marginBottom:16, flexWrap:"wrap", alignItems:"center" }}>
                   {Array.from({length:TEAM_SIZE},(_,i)=>{const fid=team[i];const f=fid?FACTIONS[fid]:null;return(
-                    <div key={i} style={{ width:60, height:70, borderRadius:10, background:f?f.bgColor:"rgba(255,255,255,0.03)", border:`2px solid ${f?f.borderColor:"rgba(255,255,255,0.1)"}`, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", fontSize:f?28:22, opacity:f?1:0.3, cursor:f?"pointer":"default", transition:"all 0.2s" }} onClick={()=>f&&setTeam(prev=>prev.filter((_,j)=>j!==i))}>
-                      {f?f.emoji:"＋"}{f&&<div style={{fontSize:8,color:f.color,fontWeight:700,marginTop:2}}>{f.name}</div>}
+                    <div key={i} title={f?"Click to remove "+f.name:undefined} onClick={()=>f&&setTeam(prev=>prev.filter((_,j)=>j!==i))} style={{ width:62, height:78, borderRadius:10, background:f?f.bgColor:"rgba(255,255,255,0.03)", border:`2px solid ${f?f.borderColor:"rgba(255,255,255,0.1)"}`, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", opacity:f?1:0.3, cursor:f?"pointer":"default", transition:"all 0.2s", overflow:"hidden", position:"relative", boxShadow:f?`0 0 14px ${f.color}44`:undefined }}>
+                      {f ? (
+                        <>
+                          <img src={factionImgPath(f.id,"char")} alt={f.name} style={{ width:"100%", height:55, objectFit:"cover", objectPosition:"top" }} onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
+                          <div style={{fontSize:7,color:f.color,fontWeight:900,padding:"2px 0",letterSpacing:"0.05em"}}>{f.name.toUpperCase()}</div>
+                        </>
+                      ) : <div style={{fontSize:20,opacity:0.4}}>＋</div>}
                     </div>
                   );})}
                   {team.length>0&&<span style={{fontSize:11,opacity:0.5,cursor:"pointer",textDecoration:"underline"}} onClick={()=>setTeam([])}>clear</span>}
@@ -588,13 +647,17 @@ export default function FactionWars() {
             <div style={{ background:"rgba(0,0,0,0.5)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:16, padding:20, marginBottom:18 }}>
               <div style={{ display:"flex", justifyContent:"space-around", alignItems:"center", marginBottom:20 }}>
                 <div style={{ textAlign:"center" }}>
-                  <div style={{ fontSize:64, lineHeight:1, filter:battleAnim==="win"?"drop-shadow(0 0 20px #34d399)":battleAnim==="lose"?"grayscale(0.8)":"none", transform:battleAnim==="clash"?"scale(1.2) translateX(10px)":"scale(1)", transition:"all 0.3s" }}>{currentPlayerFD.emoji}</div>
+                  <div style={{ width:88, height:88, borderRadius:14, overflow:"hidden", filter:battleAnim==="win"?"drop-shadow(0 0 20px #34d399)":battleAnim==="lose"?"grayscale(0.8)":"none", transform:battleAnim==="clash"?"scale(1.2) translateX(10px)":"scale(1)", transition:"all 0.3s", border:`2px solid ${currentPlayerFD.borderColor}`, boxShadow:`0 0 20px ${currentPlayerFD.color}44` }}>
+                    <img src={factionImgPath(currentPlayerFD.id,"char")} alt={currentPlayerFD.name} style={{ width:"100%", height:"100%", objectFit:"cover", objectPosition:"top" }} onError={(e)=>{ (e.target as HTMLImageElement).style.fontSize="48px"; }} />
+                  </div>
                   <div style={{ fontWeight:900, fontSize:14, color:currentPlayerFD.color, marginTop:6 }}>{currentPlayerFD.name}</div>
                   <div style={{ fontSize:10, opacity:0.5 }}>Warrior {currentFactionIdx+1}</div>
                 </div>
                 <div style={{ fontSize:36, opacity:0.8, fontWeight:900 }}>{battleAnim==="clash"?"💥":battleAnim==="win"?"✅":battleAnim==="lose"?"💀":"VS"}</div>
                 <div style={{ textAlign:"center" }}>
-                  <div style={{ fontSize:64, lineHeight:1, filter:battleAnim==="win"?"grayscale(0.8)":battleAnim==="lose"?"drop-shadow(0 0 20px #f87171)":"none", transform:battleAnim==="clash"?"scale(1.2) translateX(-10px)":"scale(1)", transition:"all 0.3s" }}>{currentDefenderFD.emoji}</div>
+                  <div style={{ width:88, height:88, borderRadius:14, overflow:"hidden", filter:battleAnim==="win"?"grayscale(0.8) opacity(0.5)":battleAnim==="lose"?"drop-shadow(0 0 20px #f87171)":"none", transform:battleAnim==="clash"?"scale(1.2) translateX(-10px)":"scale(1)", transition:"all 0.3s", border:`2px solid ${currentDefenderFD.borderColor}`, boxShadow:`0 0 20px ${currentDefenderFD.color}33` }}>
+                    <img src={factionImgPath(currentDefenderFD.id,"char")} alt={currentDefenderFD.name} style={{ width:"100%", height:"100%", objectFit:"cover", objectPosition:"top" }} onError={(e)=>{ (e.target as HTMLImageElement).style.fontSize="48px"; }} />
+                  </div>
                   <div style={{ fontWeight:900, fontSize:14, color:currentDefenderFD.color, marginTop:6 }}>{currentDefenderFD.name}</div>
                   <div style={{ fontSize:10, opacity:0.5 }}>Defender</div>
                 </div>
@@ -646,7 +709,11 @@ export default function FactionWars() {
               <div style={{ fontSize:22, fontWeight:900, color:rc[finalRarity], marginBottom:8 }}>{rl[finalRarity]}</div>
               <div style={{ fontSize:15, opacity:0.8, marginBottom:16 }}>{territoriesWon}/{TERRITORY_COUNT} territories conquered</div>
               <div style={{ display:"flex", gap:6, justifyContent:"center", marginBottom:16, flexWrap:"wrap" }}>
-                {team.map((fid,i)=>(<div key={i} style={{ fontSize:28, opacity:results[i]?.won===false?0.35:1 }} title={FACTIONS[fid].name}>{FACTIONS[fid].emoji}</div>))}
+                {team.map((fid,i)=>{const f=FACTIONS[fid];return(
+                  <div key={i} style={{ width:46, height:46, borderRadius:8, overflow:"hidden", opacity:results[i]?.won===false?0.25:1, border:`2px solid ${f.borderColor}`, boxShadow:results[i]?.won?`0 0 10px ${f.color}44`:undefined }}>
+                    <img src={factionImgPath(fid,"char")} alt={f.name} style={{ width:"100%", height:"100%", objectFit:"cover", objectPosition:"top" }} onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
+                  </div>
+                );})}
               </div>
               <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:20 }}>
                 {results.map((r,i)=>(
