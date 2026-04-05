@@ -1122,6 +1122,264 @@ String(c.status).toUpperCase()==="PENDING"
     </div>
   </div>
   </div>
+
+<div style={{ marginTop: 14, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,.12)" }}>
+  <div style={{ fontWeight: 900, marginBottom: 10 }}>Pro Odds</div>
+
+  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+    {(["ultra", "rare", "common", "none"] as const).map((k) => (
+      <label key={k} style={{ fontSize: 12, opacity: 0.9 }}>
+        Rarity Weight {k} (ex: 50%)
+        <input
+          value={`${(cfg.rarityWeights as any)?.[k] ?? 0}%`}
+          onChange={(e) =>
+            setCfg((c) => ({
+              ...c,
+              rarityWeights: {
+                ...(c.rarityWeights || { none: 45, common: 37, rare: 15, ultra: 3 }),
+                [k]: parsePercentLike(e.target.value, Number((c.rarityWeights as any)?.[k] ?? 0)),
+              },
+            }))
+          }
+          style={{
+            width: "100%",
+            marginTop: 6,
+            padding: "10px 12px",
+            borderRadius: 12,
+            border: "1px solid rgba(255,255,255,.18)",
+            background: "rgba(0,0,0,.25)",
+            color: "white",
+          }}
+        />
+      </label>
+    ))}
+
+   <label style={{ fontSize: 12, opacity: 0.9 }}>
+  Rare → Merch chance (ex: 10%)
+  <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6 }}>
+    <input
+      value={rareMerchChancePct}
+      onChange={(e) => {
+        const v = String(e.target.value || "").replace(/[^\d]/g, ""); // digits only
+        const pct = Math.max(0, Math.min(100, Number(v || 0))); // clamp 0-100
+        setRareMerchChancePct(String(pct));
+
+        // ✅ update cfg immediately (NO blur needed)
+        setCfg((c: any) => ({
+          ...c,
+          rareMerchChance: pct / 100,
+        }));
+      }}
+      placeholder="10"
+      style={{
+        width: 120,
+        padding: "10px 12px",
+        borderRadius: 12,
+        border: "1px solid rgba(255,255,255,.18)",
+        background: "rgba(0,0,0,.25)",
+        color: "white",
+      }}
+    />
+    <span style={{ opacity: 0.9, fontWeight: 800 }}>%</span>
+  </div>
+</label>
+  </div>
+
+  <div style={{ marginTop: 8, fontSize: 12, opacity: 0.8 }}>
+    These are <b>weights</b>. They do NOT need to add to 100. Higher = more likely.
+  </div>
+</div>
+          
+         {/* Economy Presets (affects real gameplay) */}
+<div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
+  <button
+    className="btn"
+    type="button"
+    onClick={() => {
+      // House Edge: more NONE, smaller points, rare merch low, ultra still pays points (NFTs only if you add them)
+      setCfg((c: any) => ({
+        ...c,
+
+        // ✅ real game knobs
+        rarityWeights: { none: 55, common: 33, rare: 10, ultra: 2 },
+        rewards: { none: 0, common: 50, rare: 100, ultra: 300 },
+        rareMerchChance: 0.01, // 1%
+
+        // ✅ pools only matter for rare merch + ultra NFTs (points here won't drive payouts)
+        prizePools: {
+          ...(c.prizePools || {}),
+          none: [{ type: "NONE", label: "Nothing this time", points: 0 }],
+          common: [{ type: "POINTS", label: "50 REBEL", points: 50 }], // harmless
+          rare: [
+            { type: "MERCH", label: "Sticker Pack", sku: "STICKERS", qty: 10, weight: 1 },
+          ],
+          ultra: [
+            // put NFTs here when ready; Ultra points are driven by rewards.ultra
+          ],
+        },
+      }));
+    }}
+  >
+    Preset: House Edge
+  </button>
+
+  <button
+    className="btn"
+    type="button"
+    onClick={() => {
+      // Promo Weekend: better odds, bigger points, higher rare merch chance
+      setCfg((c: any) => ({
+        ...c,
+
+        // ✅ real game knobs
+        rarityWeights: { none: 35, common: 40, rare: 20, ultra: 5 },
+        rewards: { none: 0, common: 75, rare: 150, ultra: 500 },
+        rareMerchChance: 0.05, // 5%
+
+        // ✅ pools only matter for rare merch + ultra NFTs
+        prizePools: {
+          ...(c.prizePools || {}),
+          none: [{ type: "NONE", label: "Nothing this time", points: 0 }],
+          common: [{ type: "POINTS", label: "75 REBEL", points: 75 }], // harmless
+          rare: [
+            { type: "MERCH", label: "Hat", sku: "HAT", qty: 3, weight: 1 },
+          ],
+          ultra: [
+            // put NFTs here when ready; Ultra points are driven by rewards.ultra
+          ],
+        },
+      }));
+    }}
+  >
+    Preset: Promo Weekend
+  </button>
+
+  <button
+    className="btn"
+    type="button"
+    onClick={() => {
+      // Reset: safe defaults (points-driven)
+      setCfg((c: any) => ({
+        ...c,
+        rarityWeights: { none: 45, common: 37, rare: 15, ultra: 3 },
+        rewards: { none: 0, common: 50, rare: 100, ultra: 200 },
+        rareMerchChance: 0.01,
+        prizePools: {
+          ...(c.prizePools || {}),
+          none: [{ type: "NONE", label: "Nothing this time", points: 0 }],
+          common: [{ type: "POINTS", label: "50 REBEL", points: 50 }],
+          rare: [{ type: "POINTS", label: "100 REBEL", points: 100 }],
+          ultra: [{ type: "POINTS", label: "200 REBEL", points: 200 }],
+        },
+      }));
+    }}
+  >
+    Reset Economy
+  </button>
+</div>
+          
+{/* Prize Pools (JSON) */}
+<div style={{ marginTop: 12 }}>
+  <div style={{ fontWeight: 900, marginBottom: 8 }}>Prize Pools (JSON)</div>
+  <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 10 }}>
+    These define what CAN be awarded for each rarity. If a pool is empty, it will fall back to points (if configured).
+  </div>
+
+  {(["none", "common", "rare", "ultra"] as const).map((k) => {
+    const currency = String((cfg as any)?.currency || "REBEL");
+
+    const sample =
+      k === "none"
+        ? `[{ "type":"NONE", "label":"Nothing this time", "points":0 }]`
+        : k === "common"
+        ? `[{ "type":"POINTS", "label":"50 ${currency}", "points":50 }]`
+        : k === "rare"
+        ? `[
+  { "type":"MERCH", "label":"Sticker Pack", "sku":"STICKERS", "qty":1, "weight":5 },
+  { "type":"MERCH", "label":"Rebel Ants Hat", "sku":"HAT", "qty":1, "weight":1 }
+]`
+        : `[{ "type":"NFT", "label":"Ultra NFT Prize", "weight":1 }]`;
+
+    return (
+      <label key={k} style={{ display: "block", marginBottom: 10, fontSize: 12, opacity: 0.95 }}>
+        Pool: <b>{k}</b>
+
+        <textarea
+          value={JSON.stringify((cfg as any).prizePools?.[k] ?? [], null, 2)}
+          onChange={(e) => {
+            try {
+              const nextArr = JSON.parse(e.target.value || "[]");
+              setCfg((c: any) => ({
+                ...c,
+                prizePools: {
+                  ...(c.prizePools || { none: [], common: [], rare: [], ultra: [] }),
+                  [k]: Array.isArray(nextArr) ? nextArr : [],
+                },
+              }));
+            } catch {
+              // ignore parse errors while typing
+            }
+          }}
+          style={{
+            width: "100%",
+            minHeight: 110,
+            marginTop: 6,
+            padding: "10px 12px",
+            borderRadius: 12,
+            border: "1px solid rgba(255,255,255,.18)",
+            background: "rgba(0,0,0,.25)",
+            color: "white",
+            fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+            fontSize: 12,
+          }}
+        />
+
+                {/* ✅ sample format so you never forget */}
+        <div style={{ marginTop: 6, fontSize: 12, opacity: 0.8, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <div>
+            Format example:{" "}
+            <code style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+              {sample}
+            </code>
+          </div>
+
+          <button
+            className="btn"
+            type="button"
+            onClick={() => {
+              try {
+                const nextArr = JSON.parse(String(sample || "[]"));
+                setCfg((c: any) => ({
+                  ...c,
+                  prizePools: {
+                    ...(c.prizePools || { none: [], common: [], rare: [], ultra: [] }),
+                    [k]: Array.isArray(nextArr) ? nextArr : [],
+                  },
+                }));
+              } catch {
+                // ignore
+              }
+            }}
+            style={{ padding: "6px 10px", fontSize: 12 }}
+            title="Restores the example JSON into this pool (you can edit after)"
+          >
+            Restore Example
+          </button>
+        </div>
+      </label>
+    );
+  })}
+</div>
+
+<div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
+  <button className="btn" onClick={loadConfig} style={{ padding: "10px 12px" }}>
+    Load Current
+  </button>
+  <button className="btn" onClick={saveConfig} style={{ padding: "10px 12px" }}>
+    Save
+  </button>
+</div>
+
           {/* Prize Inventory Dashboard */}
       <div
         style={{
