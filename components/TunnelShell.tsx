@@ -8,6 +8,8 @@ function useAudio() {
   const [muted, setMuted] = React.useState<boolean>(() => {
     try { return localStorage.getItem("ra:tunnel:muted") === "1"; } catch { return false; }
   });
+  const mutedRef = React.useRef(muted);
+  mutedRef.current = muted;
   const ambientRef = React.useRef<HTMLAudioElement | null>(null);
 
   const play = React.useCallback((src: string, volume = 1) => {
@@ -25,7 +27,7 @@ function useAudio() {
     try {
       const a = new Audio("/audio/ambient-tunnel.mp3");
       a.loop = true;
-      a.volume = muted ? 0 : 0.35;
+      a.volume = mutedRef.current ? 0 : 0.35;
       void a.play().catch(() => {});
       ambientRef.current = a;
     } catch {}
@@ -49,13 +51,13 @@ function useAudio() {
   }, []);
 
   const sfx = React.useMemo(() => ({
-    crumb:   () => { if (!muted) play("/audio/collect-crumb.mp3",   0.1); },
-    crystal: () => { if (!muted) play("/audio/collect-crystal.mp3", 1.0); },
-    sugar:   () => { if (!muted) play("/audio/collect-crumb.mp3",   0.1); },
-    wall:    () => { if (!muted) play("/audio/wall-break.mp3",      0.75); },
-    win:     () => { if (!muted) { stopAmbient(); play("/audio/tunnel-win.mp3", 0.9); } },
-    lose:    () => { if (!muted) { stopAmbient(); play("/audio/tunnel-lose.mp3", 0.8); } },
-  }), [muted, play, stopAmbient]);
+    crumb:   () => { if (!mutedRef.current) play("/audio/collect-crumb.mp3",   0.1); },
+    crystal: () => { if (!mutedRef.current) play("/audio/collect-crystal.mp3", 1.0); },
+    sugar:   () => { if (!mutedRef.current) play("/audio/collect-crumb.mp3",   0.1); },
+    wall:    () => { if (!mutedRef.current) play("/audio/wall-break.mp3",      0.75); },
+    win:     () => { if (!mutedRef.current) { stopAmbient(); play("/audio/tunnel-win.mp3", 0.9); } },
+    lose:    () => { if (!mutedRef.current) { stopAmbient(); play("/audio/tunnel-lose.mp3", 0.8); } },
+  }), [play, stopAmbient]);
 
   return { muted, toggleMute, startAmbient, stopAmbient, sfx };
 }
