@@ -235,38 +235,149 @@ function TerritoryBadge({ index, result, isCurrent, defender }: { index: number;
 }
 
 function FWLeaderboardPanel({ lb }: { lb: FWLeaderboards }) {
-  const [tab, setTab] = React.useState<"warlords"|"factions"|"streaks"|"rich"|"perfect">("warlords");
-  const tabs = [{id:"warlords",label:"🏆 Warlords"},{id:"factions",label:"⚔️ Factions"},{id:"streaks",label:"🔥 Streaks"},{id:"rich",label:"💰 Richest"},{id:"perfect",label:"👑 Perfect"}] as const;
   const shorten = (id: string) => id.startsWith("discord:") ? id.slice(8,16)+"…" : id.slice(0,10)+"…";
+  const MAX = 50;
+
+  const cardStyle: React.CSSProperties = {
+    background: "rgba(0,0,0,0.45)", border: "1px solid rgba(255,255,255,0.1)",
+    borderRadius: 14, padding: 16, display: "flex", flexDirection: "column",
+  };
+  const titleStyle: React.CSSProperties = {
+    fontWeight: 900, fontSize: 13, marginBottom: 4, letterSpacing: "0.04em",
+  };
+  const subtextStyle: React.CSSProperties = {
+    fontSize: 10, opacity: 0.45, marginBottom: 12, lineHeight: 1.4,
+  };
+  const scrollStyle: React.CSSProperties = {
+    overflowY: "auto", maxHeight: 260, flex: 1,
+    scrollbarWidth: "thin", scrollbarColor: "rgba(251,191,36,0.3) transparent",
+  };
+  const rowStyle: React.CSSProperties = {
+    display: "flex", alignItems: "center", gap: 10,
+    padding: "7px 0", borderBottom: "1px solid rgba(255,255,255,0.06)",
+  };
+  const rankStyle = (i: number): React.CSSProperties => ({
+    fontSize: 11, fontWeight: 800, minWidth: 22, color:
+      i === 0 ? "#fbbf24" : i === 1 ? "#94a3b8" : i === 2 ? "#b45309" : "rgba(255,255,255,0.35)",
+  });
+  const emptyStyle: React.CSSProperties = {
+    opacity: 0.35, fontSize: 12, padding: "16px 0", textAlign: "center",
+  };
+
   return (
-    <div style={{ marginTop: 24, borderRadius: 16, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(0,0,0,0.4)", overflow: "hidden" }}>
-      <div style={{ display: "flex", borderBottom: "1px solid rgba(255,255,255,0.08)", overflowX: "auto" }}>
-        {tabs.map(t => (<button key={t.id} onClick={() => setTab(t.id as any)} style={{ padding: "10px 14px", fontSize: 11, fontWeight: 700, cursor: "pointer", background: tab===t.id ? "rgba(255,255,255,0.08)" : "transparent", border: "none", color: tab===t.id ? "white" : "rgba(255,255,255,0.5)", borderBottom: tab===t.id ? "2px solid #fbbf24" : "2px solid transparent", whiteSpace: "nowrap" }}>{t.label}</button>))}
+    <div style={{ marginTop: 24 }}>
+      <div style={{ fontSize: 14, fontWeight: 900, marginBottom: 14, color: "#fbbf24", letterSpacing: "0.04em" }}>
+        ⚔️ FACTION WARS LEADERBOARDS
       </div>
-      <div style={{ padding: 16 }}>
-        {tab === "factions" ? (
-          <div>
-            <div style={{ fontSize: 11, opacity: 0.5, marginBottom: 10 }}>Community faction wins this season</div>
-            {lb.factions.length === 0 ? <div style={{ opacity: 0.4, fontSize: 12 }}>No data yet</div> :
-              lb.factions.slice(0,8).map((f,i) => { const fd = FACTIONS[f.faction as FactionId]; if (!fd) return null;
-                return (<div key={f.faction} style={{ display:"flex", alignItems:"center", gap:10, marginBottom:8 }}><span style={{ opacity:0.5, fontSize:11, width:18 }}>#{i+1}</span><span style={{ fontSize:16 }}>{fd.emoji}</span><span style={{ fontWeight:700, fontSize:13, color:fd.color, flex:1 }}>{fd.name}</span><span style={{ opacity:0.7, fontSize:12 }}>{f.wins} wins</span></div>); })}
+
+      {/* Top 4 in a 2x2 grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+
+        {/* 🏆 Warlords */}
+        <div style={cardStyle}>
+          <div style={{ ...titleStyle, color: "#fbbf24" }}>🏆 Warlords</div>
+          <div style={subtextStyle}>Most territories conquered all time across all campaigns</div>
+          <div style={scrollStyle}>
+            {lb.warlords.length === 0
+              ? <div style={emptyStyle}>No data yet — be the first!</div>
+              : lb.warlords.slice(0, MAX).map((e, i) => (
+                <div key={e.playerId+i} style={rowStyle}>
+                  <span style={rankStyle(i)}>#{i+1}</span>
+                  <span style={{ flex: 1, fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.playerName || shorten(e.playerId)}</span>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: "#fbbf24" }}>{e.score.toLocaleString()}</span>
+                  <span style={{ fontSize: 9, opacity: 0.45, marginLeft: 2 }}>🏰</span>
+                </div>
+              ))}
           </div>
-        ) : (
-          <div>
-            {(lb[tab as keyof Omit<FWLeaderboards,"factions">] as any[]).length === 0
-              ? <div style={{ opacity:0.4, fontSize:12 }}>No data yet — be first!</div>
-              : (lb[tab as keyof Omit<FWLeaderboards,"factions">] as any[]).slice(0,5).map((e:any,i:number) => (
-                <div key={e.playerId+i} style={{ display:"flex", alignItems:"center", gap:10, marginBottom:8 }}>
-                  <span style={{ opacity:0.5, fontSize:11, width:18 }}>#{i+1}</span>
-                  <span style={{ flex:1, fontSize:12, fontWeight:600 }}>{e.playerName || shorten(e.playerId)}</span>
-                  <span style={{ fontSize:13, fontWeight:800, color:"#fbbf24" }}>{e.score.toLocaleString()}</span>
-                </div>))}
+        </div>
+
+        {/* 🔥 Streaks */}
+        <div style={cardStyle}>
+          <div style={{ ...titleStyle, color: "#f87171" }}>🔥 Streaks</div>
+          <div style={subtextStyle}>Longest win streaks without a full campaign defeat</div>
+          <div style={scrollStyle}>
+            {lb.streaks.length === 0
+              ? <div style={emptyStyle}>No data yet — be the first!</div>
+              : lb.streaks.slice(0, MAX).map((e, i) => (
+                <div key={e.playerId+i} style={rowStyle}>
+                  <span style={rankStyle(i)}>#{i+1}</span>
+                  <span style={{ flex: 1, fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.playerName || shorten(e.playerId)}</span>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: "#f87171" }}>{e.score.toLocaleString()}</span>
+                  <span style={{ fontSize: 9, opacity: 0.45, marginLeft: 2 }}>🔥</span>
+                </div>
+              ))}
           </div>
-        )}
+        </div>
+
+        {/* 💰 Richest Commanders */}
+        <div style={cardStyle}>
+          <div style={{ ...titleStyle, color: "#34d399" }}>💰 Richest Commanders</div>
+          <div style={subtextStyle}>Most REBEL earned through Faction Wars victories</div>
+          <div style={scrollStyle}>
+            {lb.rich.length === 0
+              ? <div style={emptyStyle}>No data yet — be the first!</div>
+              : lb.rich.slice(0, MAX).map((e, i) => (
+                <div key={e.playerId+i} style={rowStyle}>
+                  <span style={rankStyle(i)}>#{i+1}</span>
+                  <span style={{ flex: 1, fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.playerName || shorten(e.playerId)}</span>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: "#34d399" }}>{e.score.toLocaleString()}</span>
+                  <span style={{ fontSize: 9, opacity: 0.45, marginLeft: 2 }}>REBEL</span>
+                </div>
+              ))}
+          </div>
+        </div>
+
+        {/* 👑 Perfect Campaigns */}
+        <div style={cardStyle}>
+          <div style={{ ...titleStyle, color: "#c084fc" }}>👑 Perfect Campaigns</div>
+          <div style={subtextStyle}>Most flawless 5/5 territory wins in a single campaign</div>
+          <div style={scrollStyle}>
+            {lb.perfect.length === 0
+              ? <div style={emptyStyle}>No data yet — be the first!</div>
+              : lb.perfect.slice(0, MAX).map((e, i) => (
+                <div key={e.playerId+i} style={rowStyle}>
+                  <span style={rankStyle(i)}>#{i+1}</span>
+                  <span style={{ flex: 1, fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.playerName || shorten(e.playerId)}</span>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: "#c084fc" }}>{e.score.toLocaleString()}</span>
+                  <span style={{ fontSize: 9, opacity: 0.45, marginLeft: 2 }}>5/5</span>
+                </div>
+              ))}
+          </div>
+        </div>
+
+      </div>
+
+      {/* ⚔️ Faction Standings — full width */}
+      <div style={{ ...cardStyle, background: "rgba(0,0,0,0.5)", border: "1px solid rgba(251,191,36,0.2)" }}>
+        <div style={{ ...titleStyle, color: "#fbbf24" }}>⚔️ Faction Standings</div>
+        <div style={subtextStyle}>Community-wide wins per faction this season — rally your faction on Discord to climb the ranks</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 6 }}>
+          {lb.factions.length === 0
+            ? <div style={{ ...emptyStyle, gridColumn: "1/-1" }}>No faction data yet — start a campaign!</div>
+            : lb.factions.slice(0, MAX).map((f, i) => {
+                const fd = FACTIONS[f.faction as FactionId];
+                if (!fd) return null;
+                const maxWins = lb.factions[0]?.wins || 1;
+                const pct = Math.round((f.wins / maxWins) * 100);
+                return (
+                  <div key={f.faction} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", background: "rgba(255,255,255,0.03)", borderRadius: 8, border: `1px solid ${fd.borderColor}` }}>
+                    <img src={factionImgPath(fd.id,"symbol")} alt={fd.name} style={{ width: 28, height: 28, objectFit: "contain", borderRadius: 6, background: "rgba(0,0,0,0.4)", padding: 2 }} onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: fd.color }}>{fd.name}</div>
+                      <div style={{ marginTop: 3, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: pct+"%", background: fd.color, borderRadius: 2, transition: "width 0.6s ease" }} />
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 12, fontWeight: 900, color: fd.color, minWidth: 28, textAlign: "right" }}>{f.wins}</div>
+                  </div>
+                );
+              })}
+        </div>
       </div>
     </div>
   );
 }
+
 
 export default function FactionWars() {
   // ── Identity ──────────────────────────────────────────────────────────

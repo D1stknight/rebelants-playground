@@ -9,7 +9,7 @@ const LB_FW_RICH      = "ra:fw:lb:rich";
 const LB_FW_PERFECT   = "ra:fw:lb:perfect";
 const FW_NAMES        = "ra:fw:player_names";
 
-async function topN(key: string, names: Record<string, string>, n = 5) {
+async function topN(key: string, names: Record<string, string>, n = 50) {
   const raw = await redis.zrange(key, 0, n - 1, { rev: true, withScores: true });
   const out: { playerId: string; playerName?: string; score: number }[] = [];
   for (let i = 0; i < raw.length; i += 2) {
@@ -30,7 +30,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       topN(LB_FW_RICH, names),
       topN(LB_FW_PERFECT, names),
     ]);
-    const factionRaw = await redis.zrange(LB_FW_FACTIONS, 0, 10, { rev: true, withScores: true });
+    const factionRaw = await redis.zrange(LB_FW_FACTIONS, 0, 49, { rev: true, withScores: true });
     const factions: { faction: string; wins: number }[] = [];
     for (let i = 0; i < factionRaw.length; i += 2) {
       factions.push({ faction: String(factionRaw[i]), wins: Number(factionRaw[i + 1]) });
