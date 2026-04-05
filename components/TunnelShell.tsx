@@ -57,7 +57,7 @@ function useAudio() {
     wall:    () => { if (!mutedRef.current) play("/audio/wall-break.mp3",      0.75); },
     win:     () => { if (!mutedRef.current) { stopAmbient(); play("/audio/tunnel-win.mp3", 0.9); } },
     lose:    () => { if (!mutedRef.current) { stopAmbient(); play("/audio/tunnel-lose.mp3", 0.8); } },
-    spiderHit: () => { if (!mutedRef.current) play("/audio/ant-die.mp3", 0.5); },
+    spiderHit: () => { if (!mutedRef.current) play("/audio/spider-hit.mp3", 0.6); },
   }), [play, stopAmbient]);
 
   return { muted, toggleMute, startAmbient, stopAmbient, sfx };
