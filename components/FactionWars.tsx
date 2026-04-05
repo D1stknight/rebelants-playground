@@ -1,4 +1,4 @@
-// components/FactionWars.tsx — FACTION WARS
+// components/FactionWars.tsx â FACTION WARS
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { pointsConfig as defaultPointsConfig } from "../lib/pointsConfig";
@@ -14,22 +14,28 @@ function useFWAudio() {
   const mutedRef = React.useRef(muted);
   mutedRef.current = muted;
   const musicRef = React.useRef<HTMLAudioElement | null>(null);
-  const play = React.useCallback((src: string, vol = 1) => {
-    if (typeof window === "undefined") return;
-    try { const a = new Audio(src); a.volume = vol; void a.play().catch(() => {}); } catch {}
+  const lowHpFiredRef = React.useRef(false);
+  const play = React.useCallback((file: string, vol = 1) => {
+    if (typeof window === "undefined" || mutedRef.current) return;
+    try { const a = new Audio("/audio/" + file + ".mp3"); a.volume = vol; void a.play().catch(() => {}); } catch {}
   }, []);
-  const startMusic = React.useCallback(() => {
+  const switchMusic = React.useCallback((file: string, vol = 0.35) => {
     if (typeof window === "undefined") return;
     if (musicRef.current) { musicRef.current.pause(); musicRef.current = null; }
+    if (mutedRef.current) return;
     try {
-      const a = new Audio("/audio/fw-battle.mp3");
-      a.loop = true; a.volume = mutedRef.current ? 0 : 0.35;
+      const a = new Audio("/audio/" + file + ".mp3");
+      a.loop = true; a.volume = vol;
       void a.play().catch(() => {}); musicRef.current = a;
     } catch {}
   }, []);
-  const stopMusic = React.useCallback(() => {
+  const startTheme = React.useCallback(() => switchMusic("fw-theme-intro", 0.4), [switchMusic]);
+  const startMusic = React.useCallback(() => switchMusic("fw-battle", 0.35), [switchMusic]);
+  const startEpic  = React.useCallback(() => switchMusic("fw-battle-epic", 0.5), [switchMusic]);
+  const stopMusic  = React.useCallback(() => {
     if (musicRef.current) { musicRef.current.pause(); musicRef.current.currentTime = 0; musicRef.current = null; }
   }, []);
+  const resetLowHp = React.useCallback(() => { lowHpFiredRef.current = false; }, []);
   const toggleMute = React.useCallback(() => {
     setMuted(m => {
       const next = !m;
@@ -39,12 +45,40 @@ function useFWAudio() {
     });
   }, []);
   const sfx = React.useMemo(() => ({
-    win:   () => { if (!mutedRef.current) { stopMusic(); play("/audio/fw-win.mp3",   0.9); } },
-    lose:  () => { if (!mutedRef.current) { stopMusic(); play("/audio/fw-lose.mp3",  0.7); } },
-    clash: () => { if (!mutedRef.current) play("/audio/fw-clash.mp3", 0.6); },
-    ultra: () => { if (!mutedRef.current) { stopMusic(); play("/audio/fw-ultra.mp3", 1.0); } },
-  }), [play, stopMusic]);
-  return { muted, toggleMute, startMusic, stopMusic, sfx };
+    startTheme:    () => startTheme(),
+    startBattle:   () => startMusic(),
+    startEpic:     () => startEpic(),
+    stopMusic:     () => stopMusic(),
+    clash:         () => play("fw-clash", 0.6),
+    roundStart:    () => play("fw-round-start", 0.6),
+    attackHit:     () => play("fw-attack-hit", 0.7),
+    defendBlock:   () => play("fw-defend-block", 0.7),
+    magicCast:     () => play("fw-magic-cast", 0.6),
+    trickDodge:    () => play("fw-trick-dodge", 0.7),
+    hitLight:      () => play("fw-hit-light", 0.5),
+    hitHeavy:      () => play("fw-hit-heavy", 0.8),
+    lowHp:         () => { if (!lowHpFiredRef.current) { lowHpFiredRef.current = true; play("fw-low-hp", 0.5); } },
+    berserker:     () => play("fw-berserker", 0.9),
+    sacrifice:     () => play("fw-sacrifice", 0.9),
+    imperial:      () => play("fw-imperial", 0.85),
+    heal:          () => play("fw-heal", 0.8),
+    plunder:       () => play("fw-plunder", 0.85),
+    bloodPrice:    () => play("fw-blood-price", 0.9),
+    counter:       () => play("fw-counter", 0.85),
+    rally:         () => play("fw-rally", 0.85),
+    ambush:        () => play("fw-ambush", 0.85),
+    cardFlip:      () => play("fw-card-flip", 0.4),
+    cardSelect:    () => play("fw-card-select", 0.5),
+    cardDeselect:  () => play("fw-card-deselect", 0.4),
+    territoryWin:  () => play("fw-territory-win", 0.8),
+    territoryLose: () => play("fw-territory-lose", 0.7),
+    win:           () => { stopMusic(); play("fw-win", 0.8); },
+    ultra:         () => { stopMusic(); play("fw-ultra", 0.9); },
+    lose:          () => { stopMusic(); play("fw-lose", 0.7); },
+    crateOpen:     () => play("fw-crate-open", 0.8),
+    crateReward:   () => play("fw-crate-reward", 0.7),
+  }), [play, startTheme, startMusic, startEpic, stopMusic]);
+  return { muted, toggleMute, startTheme, startMusic, startEpic, stopMusic, resetLowHp, sfx };
 }
 
 type Phase = "idle" | "battle" | "territory_result" | "final_result";
@@ -58,41 +92,41 @@ interface TerritoryResult { territory:number; defender:FactionId; playerFaction:
 type FWLeaderboards = { warlords: {playerId:string;playerName?:string;score:number}[]; factions:{faction:FactionId;wins:number;topPlayers?:{playerId:string;playerName?:string;wins:number}[]}[]; streaks:{playerId:string;playerName?:string;score:number}[]; rich:{playerId:string;playerName?:string;score:number}[]; perfect:{playerId:string;playerName?:string;score:number}[]; };
 
 const FACTIONS: Record<FactionId, Faction> = {
-  samurai: { id:"samurai", name:"Samurai", emoji:"🔴", color:"#dc2626", bgColor:"rgba(220,38,38,0.12)", borderColor:"rgba(220,38,38,0.4)", role:"Core soldiers", passive:"First Strike", passiveDesc:"1st territory: +2 bonus damage dealt per round", weapon:"Katana",
-    moves:[{id:"katana_strike",label:"Katana Strike",emoji:"⚔️",desc:"Full power slash — no reductions, straight damage",power:8,type:"attack"},{id:"honor_guard",label:"Honor Guard",emoji:"🛡️",desc:"Block stance — reduces incoming damage by 40%",power:6,type:"defend"},{id:"battle_cry",label:"Battle Cry",emoji:"📯",desc:"War cry — grants +4 damage for next 5 rounds",power:5,type:"magic"},{id:"counter_strike",label:"Counter Strike",emoji:"🔄",desc:"Counter — deal extra damage equal to enemy power",power:7,type:"trick"},{id:"iron_code",label:"Iron Code",emoji:"📜",desc:"+3 bonus damage for next 8 rounds (persists)",power:4,type:"magic"}],
+  samurai: { id:"samurai", name:"Samurai", emoji:"ð´", color:"#dc2626", bgColor:"rgba(220,38,38,0.12)", borderColor:"rgba(220,38,38,0.4)", role:"Core soldiers", passive:"First Strike", passiveDesc:"1st territory: +2 bonus damage dealt per round", weapon:"Katana",
+    moves:[{id:"katana_strike",label:"Katana Strike",emoji:"âï¸",desc:"Full power slash â no reductions, straight damage",power:8,type:"attack"},{id:"honor_guard",label:"Honor Guard",emoji:"ð¡ï¸",desc:"Block stance â reduces incoming damage by 40%",power:6,type:"defend"},{id:"battle_cry",label:"Battle Cry",emoji:"ð¯",desc:"War cry â grants +4 damage for next 5 rounds",power:5,type:"magic"},{id:"counter_strike",label:"Counter Strike",emoji:"ð",desc:"Counter â deal extra damage equal to enemy power",power:7,type:"trick"},{id:"iron_code",label:"Iron Code",emoji:"ð",desc:"+3 bonus damage for next 8 rounds (persists)",power:4,type:"magic"}],
     weakTo:["ronin","yamabushi"], strongVs:["ashigaru","buke"] },
-  ronin: { id:"ronin", name:"Ronin", emoji:"⚫", color:"#9f1239", bgColor:"rgba(159,18,57,0.12)", borderColor:"rgba(159,18,57,0.45)", role:"Elite assassins", passive:"Comeback", passiveDesc:"After losing a territory: next warrior deals +15 bonus damage per round", weapon:"Twin Daggers",
-    moves:[{id:"twin_daggers",label:"Twin Daggers",emoji:"🗡️",desc:"Double hit — two strikes at lower power each",power:7,type:"attack"},{id:"shadow_step",label:"Shadow Step",emoji:"👤",desc:"Dodge — enemy misses",power:6,type:"trick"},{id:"last_stand",oneTime:true,label:"Last Stand",emoji:"💀",desc:"Massive +15 bonus damage when your HP is below 40",power:9,type:"magic"},{id:"phantom_blade",oneTime:true,label:"Phantom Blade",emoji:"🌑",desc:"Strike through defenses — enemy block reduced 70%",power:8,type:"trick"},{id:"death_mark",label:"Death Mark",emoji:"☠️",desc:"+2 bonus damage for next 4 rounds",power:5,type:"magic"}],
+  ronin: { id:"ronin", name:"Ronin", emoji:"â«", color:"#9f1239", bgColor:"rgba(159,18,57,0.12)", borderColor:"rgba(159,18,57,0.45)", role:"Elite assassins", passive:"Comeback", passiveDesc:"After losing a territory: next warrior deals +15 bonus damage per round", weapon:"Twin Daggers",
+    moves:[{id:"twin_daggers",label:"Twin Daggers",emoji:"ð¡ï¸",desc:"Double hit â two strikes at lower power each",power:7,type:"attack"},{id:"shadow_step",label:"Shadow Step",emoji:"ð¤",desc:"Dodge â enemy misses",power:6,type:"trick"},{id:"last_stand",oneTime:true,label:"Last Stand",emoji:"ð",desc:"Massive +15 bonus damage when your HP is below 40",power:9,type:"magic"},{id:"phantom_blade",oneTime:true,label:"Phantom Blade",emoji:"ð",desc:"Strike through defenses â enemy block reduced 70%",power:8,type:"trick"},{id:"death_mark",label:"Death Mark",emoji:"â ï¸",desc:"+2 bonus damage for next 4 rounds",power:5,type:"magic"}],
     weakTo:["shogun","bushi"], strongVs:["samurai","warrior"] },
-  warrior: { id:"warrior", name:"Warrior", emoji:"🟤", color:"#b45309", bgColor:"rgba(180,83,9,0.12)", borderColor:"rgba(180,83,9,0.4)", role:"Battle veterans", passive:"Relentless", passiveDesc:"Cracked Circle & Berserker Rage deal +20 extra damage per use", weapon:"Greatsword",
-    moves:[{id:"greatsword",label:"Greatsword Slam",emoji:"🔨",desc:"Massive slam — highest base power of any attack",power:10,type:"attack"},{id:"iron_will",label:"Iron Will",emoji:"⛰️",desc:"Absorb enemy hit completely",power:7,type:"defend"},{id:"cracked_circle",label:"Cracked Circle",emoji:"💢",desc:"Sacrifice defense for +4 power",power:8,type:"magic"},{id:"berserker_rage",oneTime:true,label:"Berserker Rage",emoji:"🔥",desc:"Go berserk — max damage but all defend moves locked this territory",power:11,type:"attack"},{id:"blood_price",oneTime:true,label:"Blood Price",emoji:"🩸",desc:"Sacrifice 20 HP to deal double power damage this round",power:10,type:"attack"},
-      {id:"war_stomp",label:"War Stomp",emoji:"👊",desc:"Stagger hit — reduces enemy damage by 3 this round",power:6,type:"trick"}],
+  warrior: { id:"warrior", name:"Warrior", emoji:"ð¤", color:"#b45309", bgColor:"rgba(180,83,9,0.12)", borderColor:"rgba(180,83,9,0.4)", role:"Battle veterans", passive:"Relentless", passiveDesc:"Cracked Circle & Berserker Rage deal +20 extra damage per use", weapon:"Greatsword",
+    moves:[{id:"greatsword",label:"Greatsword Slam",emoji:"ð¨",desc:"Massive slam â highest base power of any attack",power:10,type:"attack"},{id:"iron_will",label:"Iron Will",emoji:"â°ï¸",desc:"Absorb enemy hit completely",power:7,type:"defend"},{id:"cracked_circle",label:"Cracked Circle",emoji:"ð¢",desc:"Sacrifice defense for +4 power",power:8,type:"magic"},{id:"berserker_rage",oneTime:true,label:"Berserker Rage",emoji:"ð¥",desc:"Go berserk â max damage but all defend moves locked this territory",power:11,type:"attack"},{id:"blood_price",oneTime:true,label:"Blood Price",emoji:"ð©¸",desc:"Sacrifice 20 HP to deal double power damage this round",power:10,type:"attack"},
+      {id:"war_stomp",label:"War Stomp",emoji:"ð",desc:"Stagger hit â reduces enemy damage by 3 this round",power:6,type:"trick"}],
     weakTo:["kenshi","sohei"], strongVs:["ronin","ashigaru"] },
-  ashigaru: { id:"ashigaru", name:"Ashigaru", emoji:"🟢", color:"#166534", bgColor:"rgba(22,101,52,0.12)", borderColor:"rgba(22,101,52,0.4)", role:"Infantry force", passive:"Humble Roots", passiveDesc:"Campaign costs 25 REBEL less (125 total instead of 150)", weapon:"Spear",
-    moves:[{id:"spear_thrust",label:"Spear Thrust",emoji:"🌿",desc:"Steady thrust — consistent reliable damage every round",power:6,type:"attack"},{id:"shield_wall",label:"Shield Wall",emoji:"🛡️",desc:"Blocks 60% of damage",power:7,type:"defend"},{id:"rally",label:"Rally",emoji:"📣",desc:"Rally — reduces incoming damage to 0 this round and fully blocks",power:5,type:"magic"},{id:"phalanx",label:"Phalanx",emoji:"🔰",desc:"Shield lock — 40% block with no damage penalty",power:8,type:"defend"},{id:"endure",label:"Endure",emoji:"💪",desc:"Endure — take 0 damage this round (can never finish a territory alone)",power:5,type:"defend"}],
+  ashigaru: { id:"ashigaru", name:"Ashigaru", emoji:"ð¢", color:"#166534", bgColor:"rgba(22,101,52,0.12)", borderColor:"rgba(22,101,52,0.4)", role:"Infantry force", passive:"Humble Roots", passiveDesc:"Campaign costs 25 REBEL less (125 total instead of 150)", weapon:"Spear",
+    moves:[{id:"spear_thrust",label:"Spear Thrust",emoji:"ð¿",desc:"Steady thrust â consistent reliable damage every round",power:6,type:"attack"},{id:"shield_wall",label:"Shield Wall",emoji:"ð¡ï¸",desc:"Blocks 60% of damage",power:7,type:"defend"},{id:"rally",label:"Rally",emoji:"ð£",desc:"Rally â reduces incoming damage to 0 this round and fully blocks",power:5,type:"magic"},{id:"phalanx",label:"Phalanx",emoji:"ð°",desc:"Shield lock â 40% block with no damage penalty",power:8,type:"defend"},{id:"endure",label:"Endure",emoji:"ðª",desc:"Endure â take 0 damage this round (can never finish a territory alone)",power:5,type:"defend"}],
     weakTo:["warrior","ronin"], strongVs:["wokou","sohei"] },
-  shogun: { id:"shogun", name:"Shogun", emoji:"🟡", color:"#854d0e", bgColor:"rgba(133,77,14,0.12)", borderColor:"rgba(133,77,14,0.45)", role:"Commander", passive:"Divine Authority", passiveDesc:"Ultra victory: REBEL reward boosted by 15%", weapon:"War Staff",
-    moves:[{id:"command_strike",label:"Command Strike",emoji:"👑",desc:"Command — next round gains permanent +8 flat damage bonus",power:9,type:"magic"},{id:"strategic_ret",label:"Strategic Retreat",emoji:"🏳️",desc:"Retreat — your team gets Common reward even if campaign fails",power:5,type:"defend"},{id:"divine_auth",label:"Divine Authority",emoji:"⚡",desc:"Authority — guarantees minimum Common reward this campaign",power:7,type:"magic"},{id:"imperial_decree",oneTime:true,label:"Imperial Decree",emoji:"📋",desc:"Decree — forces enemy to use their weakest move this round",power:8,type:"trick"},{id:"final_command",oneTime:true,label:"Final Command",emoji:"📣",desc:"Epic decree — forces enemy to 1 power AND you get +6 damage",power:9,type:"magic"},
-      {id:"warlords_fury",label:"Warlord's Fury",emoji:"⚡",desc:"Fury — base power +4 per territory already won",power:7,type:"attack"}],
+  shogun: { id:"shogun", name:"Shogun", emoji:"ð¡", color:"#854d0e", bgColor:"rgba(133,77,14,0.12)", borderColor:"rgba(133,77,14,0.45)", role:"Commander", passive:"Divine Authority", passiveDesc:"Ultra victory: REBEL reward boosted by 15%", weapon:"War Staff",
+    moves:[{id:"command_strike",label:"Command Strike",emoji:"ð",desc:"Command â next round gains permanent +8 flat damage bonus",power:9,type:"magic"},{id:"strategic_ret",label:"Strategic Retreat",emoji:"ð³ï¸",desc:"Retreat â your team gets Common reward even if campaign fails",power:5,type:"defend"},{id:"divine_auth",label:"Divine Authority",emoji:"â¡",desc:"Authority â guarantees minimum Common reward this campaign",power:7,type:"magic"},{id:"imperial_decree",oneTime:true,label:"Imperial Decree",emoji:"ð",desc:"Decree â forces enemy to use their weakest move this round",power:8,type:"trick"},{id:"final_command",oneTime:true,label:"Final Command",emoji:"ð£",desc:"Epic decree â forces enemy to 1 power AND you get +6 damage",power:9,type:"magic"},
+      {id:"warlords_fury",label:"Warlord's Fury",emoji:"â¡",desc:"Fury â base power +4 per territory already won",power:7,type:"attack"}],
     weakTo:["yamabushi","wokou"], strongVs:["ronin","bushi"] },
-  buke: { id:"buke", name:"Buke", emoji:"🪖", color:"#4d7c0f", bgColor:"rgba(77,124,15,0.12)", borderColor:"rgba(77,124,15,0.4)", role:"Noble defenders", passive:"Noble Guard", passiveDesc:"Mostly used defend moves? A campaign loss flips to Common win", weapon:"Trident",
-    moves:[{id:"trident_stab",label:"Trident Stab",emoji:"🔱",desc:"Triple strike — three fast hits, reliable damage",power:7,type:"attack"},{id:"noble_defense",label:"Noble Defense",emoji:"🏰",desc:"Noble stance — 40% block with honorable defense",power:8,type:"defend"},{id:"honor_bond",label:"Honor Bond",emoji:"🤝",desc:"+3 permanent damage bonus for rest of campaign",power:6,type:"magic"},{id:"bastion",label:"Bastion",emoji:"🏯",desc:"Fortress — 40% block + +5 bonus damage dealt",power:9,type:"defend"},{id:"noble_sacrifice",oneTime:true,label:"Noble Sacrifice",emoji:"💎",desc:"SACRIFICE: warrior dies instantly. Next warrior gets +12 permanent damage boost",power:4,type:"magic"}],
+  buke: { id:"buke", name:"Buke", emoji:"ðª", color:"#4d7c0f", bgColor:"rgba(77,124,15,0.12)", borderColor:"rgba(77,124,15,0.4)", role:"Noble defenders", passive:"Noble Guard", passiveDesc:"Mostly used defend moves? A campaign loss flips to Common win", weapon:"Trident",
+    moves:[{id:"trident_stab",label:"Trident Stab",emoji:"ð±",desc:"Triple strike â three fast hits, reliable damage",power:7,type:"attack"},{id:"noble_defense",label:"Noble Defense",emoji:"ð°",desc:"Noble stance â 40% block with honorable defense",power:8,type:"defend"},{id:"honor_bond",label:"Honor Bond",emoji:"ð¤",desc:"+3 permanent damage bonus for rest of campaign",power:6,type:"magic"},{id:"bastion",label:"Bastion",emoji:"ð¯",desc:"Fortress â 40% block + +5 bonus damage dealt",power:9,type:"defend"},{id:"noble_sacrifice",oneTime:true,label:"Noble Sacrifice",emoji:"ð",desc:"SACRIFICE: warrior dies instantly. Next warrior gets +12 permanent damage boost",power:4,type:"magic"}],
     weakTo:["samurai","kenshi"], strongVs:["yamabushi","wokou"] },
-  kenshi: { id:"kenshi", name:"Kenshi", emoji:"🩵", color:"#0f766e", bgColor:"rgba(15,118,110,0.12)", borderColor:"rgba(15,118,110,0.4)", role:"Sword masters", passive:"Blade Harmony", passiveDesc:"Win 3 territories in a row: all moves deal +12 extra damage", weapon:"Katana",
-    moves:[{id:"precision_slash",label:"Precision Slash",emoji:"🌊",desc:"Precision cut — reduces enemy block effectiveness by 70%",power:8,type:"attack"},{id:"blade_harmony",label:"Blade Harmony",emoji:"🌀",desc:"+3 permanent damage bonus for rest of campaign",power:7,type:"magic"},{id:"meditation",label:"Meditative Focus",emoji:"🧘",desc:"Focus — stacks +2 damage per territory you use this move",power:5,type:"defend"},{id:"blade_storm",oneTime:true,label:"Blade Storm",emoji:"💨",desc:"Blade storm — rapid strikes with +7 bonus damage",power:9,type:"attack"},{id:"mirror_slash",label:"Mirror Slash",emoji:"🪞",desc:"Reflect — deals damage equal to what you just took last round",power:7,type:"trick"},
-      {id:"perfect_form",label:"Perfect Form",emoji:"✨",desc:"+3 bonus if you took 0 damage last round",power:7,type:"defend"}],
+  kenshi: { id:"kenshi", name:"Kenshi", emoji:"ð©µ", color:"#0f766e", bgColor:"rgba(15,118,110,0.12)", borderColor:"rgba(15,118,110,0.4)", role:"Sword masters", passive:"Blade Harmony", passiveDesc:"Win 3 territories in a row: all moves deal +12 extra damage", weapon:"Katana",
+    moves:[{id:"precision_slash",label:"Precision Slash",emoji:"ð",desc:"Precision cut â reduces enemy block effectiveness by 70%",power:8,type:"attack"},{id:"blade_harmony",label:"Blade Harmony",emoji:"ð",desc:"+3 permanent damage bonus for rest of campaign",power:7,type:"magic"},{id:"meditation",label:"Meditative Focus",emoji:"ð§",desc:"Focus â stacks +2 damage per territory you use this move",power:5,type:"defend"},{id:"blade_storm",oneTime:true,label:"Blade Storm",emoji:"ð¨",desc:"Blade storm â rapid strikes with +7 bonus damage",power:9,type:"attack"},{id:"mirror_slash",label:"Mirror Slash",emoji:"ðª",desc:"Reflect â deals damage equal to what you just took last round",power:7,type:"trick"},
+      {id:"perfect_form",label:"Perfect Form",emoji:"â¨",desc:"+3 bonus if you took 0 damage last round",power:7,type:"defend"}],
     weakTo:["wokou","warrior"], strongVs:["buke","samurai"] },
-  wokou: { id:"wokou", name:"Wokou", emoji:"🌊", color:"#475569", bgColor:"rgba(71,85,105,0.12)", borderColor:"rgba(71,85,105,0.4)", role:"Sea raiders", passive:"Sea Raider", passiveDesc:"Win a territory: random chance to earn extra bonus REBEL", weapon:"Cutlass",
-    moves:[{id:"cutlass_raid",label:"Cutlass Raid",emoji:"🏴‍☠️",desc:"40% chance to earn +10 bonus REBEL when you win this territory",power:7,type:"trick"},{id:"sea_storm",label:"Sea Storm",emoji:"🌊",desc:"Chaos strike — random power 4-10 this round",power:7,type:"magic"},{id:"ghost_tide",label:"Ghost Tide",emoji:"👻",desc:"Disappear — enemy nullified",power:6,type:"trick"},{id:"ambush",oneTime:true,label:"Ambush",emoji:"🗺️",desc:"Ambush — deals +4 bonus damage if enemy also attacked",power:8,type:"trick"},{id:"plunder",label:"Plunder",emoji:"💰",desc:"Loot bonus — win this territory to earn extra REBEL (see reward)",power:6,type:"magic"}],
+  wokou: { id:"wokou", name:"Wokou", emoji:"ð", color:"#475569", bgColor:"rgba(71,85,105,0.12)", borderColor:"rgba(71,85,105,0.4)", role:"Sea raiders", passive:"Sea Raider", passiveDesc:"Win a territory: random chance to earn extra bonus REBEL", weapon:"Cutlass",
+    moves:[{id:"cutlass_raid",label:"Cutlass Raid",emoji:"ð´ââ ï¸",desc:"40% chance to earn +10 bonus REBEL when you win this territory",power:7,type:"trick"},{id:"sea_storm",label:"Sea Storm",emoji:"ð",desc:"Chaos strike â random power 4-10 this round",power:7,type:"magic"},{id:"ghost_tide",label:"Ghost Tide",emoji:"ð»",desc:"Disappear â enemy nullified",power:6,type:"trick"},{id:"ambush",oneTime:true,label:"Ambush",emoji:"ðºï¸",desc:"Ambush â deals +4 bonus damage if enemy also attacked",power:8,type:"trick"},{id:"plunder",label:"Plunder",emoji:"ð°",desc:"Loot bonus â win this territory to earn extra REBEL (see reward)",power:6,type:"magic"}],
     weakTo:["ashigaru","buke"], strongVs:["kenshi","shogun"] },
-  sohei: { id:"sohei", name:"Sohei", emoji:"🟠", color:"#c2410c", bgColor:"rgba(194,65,12,0.12)", borderColor:"rgba(194,65,12,0.4)", role:"Monk warriors", passive:"Monk Ward", passiveDesc:"Lose a territory with HP above 0: counts as a narrow escape", weapon:"War Staff",
-    moves:[{id:"staff_sweep",label:"Staff Sweep",emoji:"🌅",desc:"Wide sweep — strong consistent attack damage",power:7,type:"attack"},{id:"monks_ward",label:"Monk's Ward",emoji:"☯️",desc:"Ward — blocks 55% of enemy damage this round",power:8,type:"defend"},{id:"enlightened",label:"Enlightened Strike",emoji:"🔥",desc:"Spiritual damage bypasses armor",power:9,type:"magic"},{id:"sacred_flame",oneTime:true,label:"Sacred Flame",emoji:"🕯️",desc:"Sacred fire — +7 spiritual damage bonus",power:8,type:"magic"},{id:"iron_meditation",label:"Iron Meditation",emoji:"🧘",desc:"Meditate — heals +15 HP and gives +3 damage bonus for 4 rounds",power:6,type:"defend"}],
+  sohei: { id:"sohei", name:"Sohei", emoji:"ð ", color:"#c2410c", bgColor:"rgba(194,65,12,0.12)", borderColor:"rgba(194,65,12,0.4)", role:"Monk warriors", passive:"Monk Ward", passiveDesc:"Lose a territory with HP above 0: counts as a narrow escape", weapon:"War Staff",
+    moves:[{id:"staff_sweep",label:"Staff Sweep",emoji:"ð",desc:"Wide sweep â strong consistent attack damage",power:7,type:"attack"},{id:"monks_ward",label:"Monk's Ward",emoji:"â¯ï¸",desc:"Ward â blocks 55% of enemy damage this round",power:8,type:"defend"},{id:"enlightened",label:"Enlightened Strike",emoji:"ð¥",desc:"Spiritual damage bypasses armor",power:9,type:"magic"},{id:"sacred_flame",oneTime:true,label:"Sacred Flame",emoji:"ð¯ï¸",desc:"Sacred fire â +7 spiritual damage bonus",power:8,type:"magic"},{id:"iron_meditation",label:"Iron Meditation",emoji:"ð§",desc:"Meditate â heals +15 HP and gives +3 damage bonus for 4 rounds",power:6,type:"defend"}],
     weakTo:["ashigaru","kenshi"], strongVs:["warrior","yamabushi"] },
-  yamabushi: { id:"yamabushi", name:"Yamabushi", emoji:"🔵", color:"#164e63", bgColor:"rgba(22,78,99,0.12)", borderColor:"rgba(22,78,99,0.4)", role:"Mountain mystics", passive:"Spirit Vision", passiveDesc:"One random territory this campaign: hidden +5 damage bonus", weapon:"Mystic Staff",
-    moves:[{id:"mystic_flame",label:"Mystic Flame",emoji:"🔮",desc:"Random elemental power 4-10 via chaos magic",power:7,type:"magic"},{id:"spirit_vision",label:"Spirit Vision",emoji:"👁️",desc:"Vision — +3 damage bonus activates each round you use this",power:6,type:"trick"},{id:"mountain_seal",oneTime:true,label:"Mountain Seal",emoji:"🗻",desc:"Seal — +3 damage bonus after using (mountain power)",power:8,type:"magic"},{id:"void_seal",oneTime:true,label:"Void Seal",emoji:"🌀",desc:"Erase enemy move — they get power 1",power:9,type:"magic"},{id:"mountain_echo",label:"Mountain Echo",emoji:"📣",desc:"Echo — replays 70% of last round's damage as extra bonus",power:6,type:"trick"}],
+  yamabushi: { id:"yamabushi", name:"Yamabushi", emoji:"ðµ", color:"#164e63", bgColor:"rgba(22,78,99,0.12)", borderColor:"rgba(22,78,99,0.4)", role:"Mountain mystics", passive:"Spirit Vision", passiveDesc:"One random territory this campaign: hidden +5 damage bonus", weapon:"Mystic Staff",
+    moves:[{id:"mystic_flame",label:"Mystic Flame",emoji:"ð®",desc:"Random elemental power 4-10 via chaos magic",power:7,type:"magic"},{id:"spirit_vision",label:"Spirit Vision",emoji:"ðï¸",desc:"Vision â +3 damage bonus activates each round you use this",power:6,type:"trick"},{id:"mountain_seal",oneTime:true,label:"Mountain Seal",emoji:"ð»",desc:"Seal â +3 damage bonus after using (mountain power)",power:8,type:"magic"},{id:"void_seal",oneTime:true,label:"Void Seal",emoji:"ð",desc:"Erase enemy move â they get power 1",power:9,type:"magic"},{id:"mountain_echo",label:"Mountain Echo",emoji:"ð£",desc:"Echo â replays 70% of last round's damage as extra bonus",power:6,type:"trick"}],
     weakTo:["sohei","samurai"], strongVs:["shogun","buke"] },
-  bushi: { id:"bushi", name:"Bushi", emoji:"🔷", color:"#1e3a5f", bgColor:"rgba(30,58,95,0.12)", borderColor:"rgba(30,58,95,0.45)", role:"Tactical officers", passive:"Tactical Mind", passiveDesc:"Each round: see enemy faction weaknesses before choosing", weapon:"Tactical Blade",
-    moves:[{id:"tactical_blade",label:"Tactical Blade",emoji:"🗡️",desc:"Blade strike — +2 bonus damage for attack moves",power:7,type:"attack"},{id:"officers_order",label:"Officer's Order",emoji:"📋",desc:"+3 bonus damage for all attack moves this territory",power:6,type:"magic"},{id:"strategic_mind",oneTime:true,label:"Strategic Mind",emoji:"🧠",desc:"Tactical read — +2 damage per territory already won",power:8,type:"trick"},{id:"field_intel",label:"Field Intel",emoji:"🔭",desc:"Intel — +3 bonus if your move counters the enemy type",power:7,type:"trick"},{id:"tactical_strike",label:"Tactical Strike",emoji:"🎯",desc:"Calculated blow — power equals territories won",power:7,type:"attack"}],
+  bushi: { id:"bushi", name:"Bushi", emoji:"ð·", color:"#1e3a5f", bgColor:"rgba(30,58,95,0.12)", borderColor:"rgba(30,58,95,0.45)", role:"Tactical officers", passive:"Tactical Mind", passiveDesc:"Each round: see enemy faction weaknesses before choosing", weapon:"Tactical Blade",
+    moves:[{id:"tactical_blade",label:"Tactical Blade",emoji:"ð¡ï¸",desc:"Blade strike â +2 bonus damage for attack moves",power:7,type:"attack"},{id:"officers_order",label:"Officer's Order",emoji:"ð",desc:"+3 bonus damage for all attack moves this territory",power:6,type:"magic"},{id:"strategic_mind",oneTime:true,label:"Strategic Mind",emoji:"ð§ ",desc:"Tactical read â +2 damage per territory already won",power:8,type:"trick"},{id:"field_intel",label:"Field Intel",emoji:"ð­",desc:"Intel â +3 bonus if your move counters the enemy type",power:7,type:"trick"},{id:"tactical_strike",label:"Tactical Strike",emoji:"ð¯",desc:"Calculated blow â power equals territories won",power:7,type:"attack"}],
     weakTo:["samurai","sohei"], strongVs:["ronin","wokou"] },
 };
 
@@ -100,7 +134,7 @@ const FACTION_IDS = Object.keys(FACTIONS) as FactionId[];
 const TEAM_SIZE = 5;
 const TERRITORY_COUNT = 5;
 
-// ── HP COMBAT ENGINE ──────────────────────────────────────────────────────────
+// ââ HP COMBAT ENGINE ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 const MAX_HP = 100;
 
 function calcDamage(move: Move, atk: FactionId, def: FactionId, bonus: number, tWon: number, tLost: number, diff: number, isPlayer: boolean): number {
@@ -145,13 +179,13 @@ function calcBlock(move: Move): number {
 
 function pickEnemyMove(def: FactionId, pm: Move, diff: number, eHp: number, pHp: number, territory: number): Move {
   const df = FACTIONS[def];
-  // Scale difficulty by territory — AI gets progressively meaner each territory
+  // Scale difficulty by territory â AI gets progressively meaner each territory
   const scaledDiff = Math.min(1, diff + territory * 0.06);
 
-  // === DESPERATE MODE: enemy near death → always max power ===
+  // === DESPERATE MODE: enemy near death â always max power ===
   if (eHp < 25) return df.moves.reduce((a,b)=>a.power>b.power?a:b);
 
-  // === PREDATOR MODE: player near death → keep attacking, never defend ===
+  // === PREDATOR MODE: player near death â keep attacking, never defend ===
   if (pHp < 35) {
     const killers = df.moves.filter(m=>m.type==="attack"||m.type==="magic").sort((a,b)=>b.power-a.power);
     if (killers.length && Math.random() < scaledDiff) return killers[0];
@@ -250,7 +284,7 @@ function FactionCard({ faction, selected, onSelect, disabled }: { faction: Facti
           />
           <div style={{ padding: "4px 4px 6px", textAlign: "center" }}>
             <div style={{ fontSize: 9, fontWeight: 900, color: faction.color, letterSpacing: "0.06em" }}>{faction.name.toUpperCase()}</div>
-            <div style={{ fontSize: 7, opacity: 0.7, marginTop: 1 }}>✓ Selected</div>
+            <div style={{ fontSize: 7, opacity: 0.7, marginTop: 1 }}>â Selected</div>
           </div>
         </div>
       </div>
@@ -279,14 +313,14 @@ function TerritoryBadge({ index, result, isCurrent, defender }: { index: number;
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, opacity: result || isCurrent ? 1 : 0.35 }}>
       <div style={{ width: 48, height: 48, borderRadius: 10, position:"relative", border: `2px solid ${result ? (result.won ? "#34d399" : "#f87171") : isCurrent ? "#fbbf24" : "rgba(255,255,255,0.15)"}`, boxShadow: isCurrent ? "0 0 16px rgba(251,191,36,0.4)" : result?.won ? "0 0 10px rgba(52,211,153,0.3)" : "none", transition: "all 0.3s", overflow:"hidden", background:"rgba(0,0,0,0.5)", flexShrink:0 }}>
         {df && <img src={factionImgPath(df.id,"symbol")} alt={df.name} style={{ width:"100%", height:"100%", objectFit:"contain", padding:4, filter: result && !result.won ? "grayscale(0.7) opacity(0.6)" : "none" }} onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />}
-        {!df && <div style={{ width:"100%", height:"100%", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>🏰</div>}
+        {!df && <div style={{ width:"100%", height:"100%", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>ð°</div>}
         {result && (
           <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", background: result.won ? "rgba(52,211,153,0.35)" : "rgba(239,68,68,0.35)", fontSize:18 }}>
-            {result.won ? "✅" : "💀"}
+            {result.won ? "â" : "ð"}
           </div>
         )}
         {isCurrent && !result && (
-          <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", background:"rgba(251,191,36,0.3)", fontSize:16 }}>⚔️</div>
+          <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", background:"rgba(251,191,36,0.3)", fontSize:16 }}>âï¸</div>
         )}
       </div>
       <div style={{ fontSize: 9, opacity: 0.6 }}>T{index + 1}</div>
@@ -296,7 +330,7 @@ function TerritoryBadge({ index, result, isCurrent, defender }: { index: number;
 }
 
 function FWLeaderboardPanel({ lb }: { lb: FWLeaderboards }) {
-  const shorten = (id: string) => id.startsWith("discord:") ? id.slice(8,16)+"…" : id.slice(0,10)+"…";
+  const shorten = (id: string) => id.startsWith("discord:") ? id.slice(8,16)+"â¦" : id.slice(0,10)+"â¦";
   const MAX = 50;
 
   const cardStyle: React.CSSProperties = {
@@ -328,55 +362,55 @@ function FWLeaderboardPanel({ lb }: { lb: FWLeaderboards }) {
   return (
     <div style={{ marginTop: 24 }}>
       <div style={{ fontSize: 14, fontWeight: 900, marginBottom: 14, color: "#fbbf24", letterSpacing: "0.04em" }}>
-        ⚔️ FACTION WARS LEADERBOARDS
+        âï¸ FACTION WARS LEADERBOARDS
       </div>
 
       {/* Top 4 in a 2x2 grid */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
 
-        {/* 🏆 Warlords */}
+        {/* ð Warlords */}
         <div style={cardStyle}>
-          <div style={{ ...titleStyle, color: "#fbbf24" }}>🏆 Warlords</div>
+          <div style={{ ...titleStyle, color: "#fbbf24" }}>ð Warlords</div>
           <div style={subtextStyle}>Most territories conquered all time across all campaigns</div>
           <div style={scrollStyle}>
             {lb.warlords.length === 0
-              ? <div style={emptyStyle}>No data yet — be the first!</div>
+              ? <div style={emptyStyle}>No data yet â be the first!</div>
               : lb.warlords.slice(0, MAX).map((e, i) => (
                 <div key={e.playerId+i} style={rowStyle}>
                   <span style={rankStyle(i)}>#{i+1}</span>
                   <span style={{ flex: 1, fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.playerName || shorten(e.playerId)}</span>
                   <span style={{ fontSize: 13, fontWeight: 800, color: "#fbbf24" }}>{e.score.toLocaleString()}</span>
-                  <span style={{ fontSize: 9, opacity: 0.45, marginLeft: 2 }}>🏰</span>
+                  <span style={{ fontSize: 9, opacity: 0.45, marginLeft: 2 }}>ð°</span>
                 </div>
               ))}
           </div>
         </div>
 
-        {/* 🔥 Streaks */}
+        {/* ð¥ Streaks */}
         <div style={cardStyle}>
-          <div style={{ ...titleStyle, color: "#f87171" }}>🔥 Streaks</div>
+          <div style={{ ...titleStyle, color: "#f87171" }}>ð¥ Streaks</div>
           <div style={subtextStyle}>Longest win streaks without a full campaign defeat</div>
           <div style={scrollStyle}>
             {lb.streaks.length === 0
-              ? <div style={emptyStyle}>No data yet — be the first!</div>
+              ? <div style={emptyStyle}>No data yet â be the first!</div>
               : lb.streaks.slice(0, MAX).map((e, i) => (
                 <div key={e.playerId+i} style={rowStyle}>
                   <span style={rankStyle(i)}>#{i+1}</span>
                   <span style={{ flex: 1, fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.playerName || shorten(e.playerId)}</span>
                   <span style={{ fontSize: 13, fontWeight: 800, color: "#f87171" }}>{e.score.toLocaleString()}</span>
-                  <span style={{ fontSize: 9, opacity: 0.45, marginLeft: 2 }}>🔥</span>
+                  <span style={{ fontSize: 9, opacity: 0.45, marginLeft: 2 }}>ð¥</span>
                 </div>
               ))}
           </div>
         </div>
 
-        {/* 💰 Richest Commanders */}
+        {/* ð° Richest Commanders */}
         <div style={cardStyle}>
-          <div style={{ ...titleStyle, color: "#34d399" }}>💰 Richest Commanders</div>
+          <div style={{ ...titleStyle, color: "#34d399" }}>ð° Richest Commanders</div>
           <div style={subtextStyle}>Most REBEL earned through Faction Wars victories</div>
           <div style={scrollStyle}>
             {lb.rich.length === 0
-              ? <div style={emptyStyle}>No data yet — be the first!</div>
+              ? <div style={emptyStyle}>No data yet â be the first!</div>
               : lb.rich.slice(0, MAX).map((e, i) => (
                 <div key={e.playerId+i} style={rowStyle}>
                   <span style={rankStyle(i)}>#{i+1}</span>
@@ -388,13 +422,13 @@ function FWLeaderboardPanel({ lb }: { lb: FWLeaderboards }) {
           </div>
         </div>
 
-        {/* 👑 Perfect Campaigns */}
+        {/* ð Perfect Campaigns */}
         <div style={cardStyle}>
-          <div style={{ ...titleStyle, color: "#c084fc" }}>👑 Perfect Campaigns</div>
+          <div style={{ ...titleStyle, color: "#c084fc" }}>ð Perfect Campaigns</div>
           <div style={subtextStyle}>Most flawless 5/5 territory wins in a single campaign</div>
           <div style={scrollStyle}>
             {lb.perfect.length === 0
-              ? <div style={emptyStyle}>No data yet — be the first!</div>
+              ? <div style={emptyStyle}>No data yet â be the first!</div>
               : lb.perfect.slice(0, MAX).map((e, i) => (
                 <div key={e.playerId+i} style={rowStyle}>
                   <span style={rankStyle(i)}>#{i+1}</span>
@@ -408,12 +442,12 @@ function FWLeaderboardPanel({ lb }: { lb: FWLeaderboards }) {
 
       </div>
 
-      {/* ⚔️ Faction Standings — full width */}
+      {/* âï¸ Faction Standings â full width */}
       <div style={{ ...cardStyle, background: "rgba(0,0,0,0.5)", border: "1px solid rgba(251,191,36,0.2)" }}>
-        <div style={{ ...titleStyle, color: "#fbbf24" }}>⚔️ Faction Standings</div>
-        <div style={subtextStyle}>Community-wide wins per faction this season — rally your faction on Discord to climb the ranks</div>
+        <div style={{ ...titleStyle, color: "#fbbf24" }}>âï¸ Faction Standings</div>
+        <div style={subtextStyle}>Community-wide wins per faction this season â rally your faction on Discord to climb the ranks</div>
         {lb.factions.length === 0
-            ? <div style={{ ...emptyStyle }}>No faction data yet — start a campaign!</div>
+            ? <div style={{ ...emptyStyle }}>No faction data yet â start a campaign!</div>
             : <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))", gap:10 }}>
                 {lb.factions.slice(0,11).map((f,i)=>{
                   const fd = FACTIONS[f.faction as FactionId];
@@ -421,7 +455,7 @@ function FWLeaderboardPanel({ lb }: { lb: FWLeaderboards }) {
                   const maxWins = lb.factions[0]?.wins||1;
                   const pct = Math.round((f.wins/maxWins)*100);
                   const topPl = f.topPlayers||[];
-                  const shorten = (id:string) => id.startsWith("discord:")? id.slice(8,14)+"…":id.slice(0,8)+"…";
+                  const shorten = (id:string) => id.startsWith("discord:")? id.slice(8,14)+"â¦":id.slice(0,8)+"â¦";
                   return (
                     <div key={f.faction} style={{ background:"rgba(255,255,255,0.03)", borderRadius:10, border:`1px solid ${fd.borderColor}`, overflow:"hidden" }}>
                       {/* Faction header */}
@@ -435,7 +469,7 @@ function FWLeaderboardPanel({ lb }: { lb: FWLeaderboards }) {
                         </div>
                         <div style={{ fontSize:14, fontWeight:900, color:fd.color }}>{f.wins}</div>
                       </div>
-                      {/* Top players list — scrollable top 10 */}
+                      {/* Top players list â scrollable top 10 */}
                       <div style={{ maxHeight:130, overflowY:"auto", padding:"4px 0", scrollbarWidth:"thin", scrollbarColor:"rgba(255,255,255,0.1) transparent" }}>
                         {topPl.length === 0
                           ? <div style={{ fontSize:10, opacity:0.35, padding:"8px 10px" }}>No leaders yet</div>
@@ -460,7 +494,7 @@ function FWLeaderboardPanel({ lb }: { lb: FWLeaderboards }) {
 
 
 export default function FactionWars() {
-  // ── Identity ──────────────────────────────────────────────────────────
+  // ââ Identity ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
   const initialProfile = typeof window !== "undefined" ? loadProfile() : null;
   const initialEffectiveId = initialProfile ? getEffectivePlayerId(initialProfile) : "guest";
   const [effectivePlayerId, setEffectivePlayerId] = useState(initialEffectiveId);
@@ -532,12 +566,12 @@ export default function FactionWars() {
 
   async function claimDailyNow() {
     if (claimBusy||dailyClaimed||!effectivePlayerId) return;
-    setClaimBusy(true); setClaimStatus("Claiming…");
+    setClaimBusy(true); setClaimStatus("Claimingâ¦");
     try {
       const r=await fetch("/api/points/claim",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({playerId:effectivePlayerId,amount:cfg?.dailyClaim})});
       const j=await r.json().catch(()=>null);
       if (!r.ok||!j?.ok){setClaimStatus(j?.error||"Claim failed.");return;}
-      setDailyClaimed(true); setClaimStatus(`✅ +${j.added||cfg?.dailyClaim} ${cfg?.currency} claimed!`); if(j.msUntilNextClaim>0) setNextClaimTs(Date.now()+Number(j.msUntilNextClaim)); else setNextClaimTs(Date.now()+86400000);
+      setDailyClaimed(true); setClaimStatus(`â +${j.added||cfg?.dailyClaim} ${cfg?.currency} claimed!`); if(j.msUntilNextClaim>0) setNextClaimTs(Date.now()+Number(j.msUntilNextClaim)); else setNextClaimTs(Date.now()+86400000);
       await refresh();
     } catch(e:any){setClaimStatus(e?.message||"Claim error");}
     finally{setClaimBusy(false);}
@@ -568,20 +602,20 @@ export default function FactionWars() {
 
   async function migrateDripNow() {
     const amt=Math.floor(Number(dripAmount||0)); if(!amt||amt<=0){setDripStatus("Enter an amount > 0.");return;}
-    setDripBusy(true); setDripStatus("Migrating…");
+    setDripBusy(true); setDripStatus("Migratingâ¦");
     try {
       const idem=`${Date.now()}-${Math.random().toString(36).slice(2,10)}`;
       const r=await fetch("/api/drip/migrate",{method:"POST",headers:{"Content-Type":"application/json","x-idempotency-key":idem},body:JSON.stringify({amount:amt,playerId:effectivePlayerId,idempotencyKey:idem})});
       const j=await r.json().catch(()=>null);
       if (!r.ok||!j?.ok){setDripStatus(j?.error||"Migrate failed.");if(typeof j?.dripBalance==="number")setDripBalance(j.dripBalance);return;}
-      setDripStatus(`✅ Migrated ${amt} points into the game.`); await refresh();
+      setDripStatus(`â Migrated ${amt} points into the game.`); await refresh();
       const br=await fetch("/api/drip/balance",{cache:"no-store"}); const bj=await br.json().catch(()=>null);
       if(br.ok&&bj?.ok)setDripBalance(Number(bj.balance||0));
     } catch(e:any){setDripStatus(e?.message||"Migrate error");}
     finally{setDripBusy(false);}
   }
 
-  // ── Config ──────────────────────────────────────────────────────────
+  // ââ Config ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
   const [cfgState, setCfgState] = useState<any>(defaultPointsConfig);
   useEffect(() => { fetch("/api/config",{cache:"no-store"}).then(r=>r.json()).then(j=>{if(j?.pointsConfig)setCfgState((c:any)=>({...c,...j.pointsConfig}));}).catch(()=>{}); }, []);
   const cfg        = cfgState as any;
@@ -590,7 +624,7 @@ export default function FactionWars() {
   const difficulty = Number(cfg?.factionWarsAIDifficulty ?? 0.75);
   const currency   = String(cfg?.currency || "REBEL");
 
-  // ── Game State ───────────────────────────────────────────────────────
+  // ââ Game State âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
   const [phase, setPhase]               = useState<Phase>("idle");
   const [team, setTeam]                 = useState<FactionId[]>([]);
   const [defenders, setDefenders]       = useState<FactionId[]>([]);
@@ -632,7 +666,7 @@ export default function FactionWars() {
   const [healUsed, setHealUsed]     = useState(0);
   const [oneTimeUsed, setOneTimeUsed] = useState<string[]>([]);
   const [showHowToPlay, setShowHowToPlay] = useState(true);
-  const { muted, toggleMute, startMusic, stopMusic, sfx } = useFWAudio();
+  const { muted, toggleMute, startTheme, startMusic, startEpic, stopMusic, resetLowHp, sfx } = useFWAudio();
 
   const loadLB = useCallback(async () => {
     try { const r=await fetch("/api/faction-wars/leaderboard",{cache:"no-store"}); const j=await r.json(); if(j?.ok)setLb(j.lb); } catch {}
@@ -641,9 +675,12 @@ export default function FactionWars() {
   useEffect(() => {
     const h=()=>loadLB(); window.addEventListener("ra:leaderboards-refresh",h); return ()=>window.removeEventListener("ra:leaderboards-refresh",h);
   }, [loadLB]);
+  useEffect(() => { sfx.startTheme(); }, []);
 
   const toggleFaction = (fid: FactionId) => {
     if (phase !== "idle") return;
+    sfx.cardFlip();
+    if (team.includes(fid)) sfx.cardDeselect(); else sfx.cardSelect();
     setTeam(prev => { const idx=prev.indexOf(fid); if(idx>=0)return prev.filter((_,i)=>i!==idx); if(prev.length>=TEAM_SIZE)return prev; return [...prev,fid]; });
   };
 
@@ -671,6 +708,7 @@ export default function FactionWars() {
   };
 
   const startTerritory = () => {
+    sfx.roundStart();
     setPlayerHp(MAX_HP); setEnemyHp(MAX_HP);
     setCurrentRound(0); setRoundLog([]); setDmgFloats([]); setCurrentTerritoryRounds([]);
     setUsedMoves({}); setBerserkerActive(false);
@@ -692,6 +730,10 @@ export default function FactionWars() {
     if (powerBuffRounds > 0) setPowerBuffRounds(n => n - 1);
     if (commandActive) setCommandActive(false); // consumed after one use
     setBusy(true); setBattleAnim("clash"); sfx.clash();
+    if (selectedMove.type === "attack") sfx.attackHit();
+    else if (selectedMove.type === "defend") sfx.defendBlock();
+    else if (selectedMove.type === "magic") sfx.magicCast();
+    else if (selectedMove.type === "trick") sfx.trickDodge();
     await new Promise(r=>setTimeout(r,450));
 
     const imperialDecreeFlag = selectedMove.id === "imperial_decree" || selectedMove.id === "final_command";
@@ -702,8 +744,15 @@ export default function FactionWars() {
     const degradedMove: Move = { ...selectedMove, power: Math.max(1, selectedMove.power - timesUsed) };
     setUsedMoves(prev => ({ ...prev, [selectedMove.id]: (prev[selectedMove.id]||0)+1 }));
     if (selectedMove.oneTime) setOneTimeUsed(prev => [...prev, selectedMove.id]);
-    // ── Special move effects ──────────────────────────────────────
-    if (selectedMove.id === "berserker_rage")  setBerserkerActive(true);
+    // ââ Special move effects ââââââââââââââââââââââââââââââââââââââ
+    if (selectedMove.id === "berserker_rage") { setBerserkerActive(true); sfx.berserker(); }
+    if (selectedMove.id === "imperial_decree" || selectedMove.id === "final_command") sfx.imperial();
+    if (selectedMove.id === "iron_meditation") sfx.heal();
+    if (selectedMove.id === "plunder") sfx.plunder();
+    if (selectedMove.id === "blood_price") sfx.bloodPrice();
+    if (selectedMove.id === "counter_strike") sfx.counter();
+    if (selectedMove.id === "rally") sfx.rally();
+    if (selectedMove.id === "ambush") sfx.ambush();
     if (selectedMove.id === "iron_code")        { setPowerBuffAmt(3); setPowerBuffRounds(8); } // +3 dmg for 8 rounds (~2 territories)
     if (selectedMove.id === "death_mark")       { setPowerBuffAmt(2); setPowerBuffRounds(4); } // +2 dmg next 4 rounds
     if (selectedMove.id === "blade_harmony")    setComboBonus(prev => prev + 3); // permanent campaign +3
@@ -724,7 +773,7 @@ export default function FactionWars() {
     // Track plunder use for this territory
     if (selectedMove.id === "plunder") { plunderPendingRef.current = true; }
     if (selectedMove.id === "noble_sacrifice") {
-      setSacrificeBonus(12);
+      setSacrificeBonus(12); sfx.sacrifice();
       setPlayerHp(0);
       const sacRnd: RoundResult = {round:currentRound+1,playerMove:selectedMove,enemyMove:selectedMove,playerDmg:0,enemyDmg:100,playerHpAfter:0,enemyHpAfter:enemyHp};
       const sacRes: TerritoryResult = {territory:currentTerritory,defender,playerFaction,rounds:[...currentTerritoryRounds,sacRnd],playerHpFinal:0,enemyHpFinal:enemyHp,won:false};
@@ -732,7 +781,7 @@ export default function FactionWars() {
       setResults(prev=>[...prev,sacRes]); setSelectedMove(null); setBusy(false); setPhase("territory_result");
       return;
     }
-    // ── Conditional round effects ────────────────────────────────
+    // ââ Conditional round effects ââââââââââââââââââââââââââââââââ
     // war_stomp: reduce enemy damage this round by 3
     const warStompPenalty = selectedMove.id === "war_stomp" ? 3 : 0;
     // ambush: +4 bonus if enemy chose attack
@@ -779,6 +828,10 @@ export default function FactionWars() {
     const newEnemyHp  = Math.max(0, enemyHp  - playerDmg);
     setPlayerHp(newPlayerHp);
     setEnemyHp(newEnemyHp);
+    // Damage intensity sounds
+    if (playerDmg > 18) sfx.hitHeavy(); else if (playerDmg < 10) sfx.hitLight();
+    // Low HP warning (once per territory)
+    if (newPlayerHp < 25 && playerHp >= 25) sfx.lowHp();
 
     // Floating dmg numbers
     const fid = ++dmgFloatId.current;
@@ -797,26 +850,26 @@ export default function FactionWars() {
     setCurrentRound(n => n+1);
     // Build effect tag for round log
     const effectTag = (() => {
-      if (selectedMove.id==="iron_code"||selectedMove.id==="death_mark"||selectedMove.id==="battle_cry") return "⚡ Buff active";
-      if (selectedMove.id==="ambush" && ambushBonus>0) return "🎯 Ambush!";
-      if (selectedMove.id==="counter_strike") return "🔄 Counter!";
-      if (selectedMove.id==="endure") return "💪 Endured!";
-      if (selectedMove.id==="iron_meditation") return "💚 Healed!";
-      if (selectedMove.id==="war_stomp") return "👊 Stomped!";
-      if (selectedMove.id==="rally") return "🛡️ Rallied!";
-      if (selectedMove.id==="strategic_ret") return "🏳️ Retreat!";
-      if (selectedMove.id==="imperial_decree"||selectedMove.id==="final_command") return "📋 Decreed!";
-      if (selectedMove.id==="mirror_slash" && mirrorBonus>0) return "🪞 Reflected!";
-      if (selectedMove.id==="blood_price") return "🩸 Blood Price!";
-      if (selectedMove.id==="blade_harmony"||selectedMove.id==="honor_bond") return "🔗 Bonded!";
-      if (selectedMove.id==="command_strike") return "👑 Command!";
-      if (selectedMove.id==="plunder") return "💰 Plundered!";
-      if (selectedMove.id==="spirit_vision"||selectedMove.id==="mountain_seal") return "🔮 Sealed!";
+      if (selectedMove.id==="iron_code"||selectedMove.id==="death_mark"||selectedMove.id==="battle_cry") return "â¡ Buff active";
+      if (selectedMove.id==="ambush" && ambushBonus>0) return "ð¯ Ambush!";
+      if (selectedMove.id==="counter_strike") return "ð Counter!";
+      if (selectedMove.id==="endure") return "ðª Endured!";
+      if (selectedMove.id==="iron_meditation") return "ð Healed!";
+      if (selectedMove.id==="war_stomp") return "ð Stomped!";
+      if (selectedMove.id==="rally") return "ð¡ï¸ Rallied!";
+      if (selectedMove.id==="strategic_ret") return "ð³ï¸ Retreat!";
+      if (selectedMove.id==="imperial_decree"||selectedMove.id==="final_command") return "ð Decreed!";
+      if (selectedMove.id==="mirror_slash" && mirrorBonus>0) return "ðª Reflected!";
+      if (selectedMove.id==="blood_price") return "ð©¸ Blood Price!";
+      if (selectedMove.id==="blade_harmony"||selectedMove.id==="honor_bond") return "ð Bonded!";
+      if (selectedMove.id==="command_strike") return "ð Command!";
+      if (selectedMove.id==="plunder") return "ð° Plundered!";
+      if (selectedMove.id==="spirit_vision"||selectedMove.id==="mountain_seal") return "ð® Sealed!";
       return "";
     })();
     setRoundLog(prev => [{playerMove:selectedMove.label, enemyMove:enemyMove.label, playerDmg, enemyDmg, effect:effectTag}, ...prev.slice(0,5)]);
 
-    // endure: can't lose this territory — but also can't win by using it alone
+    // endure: can't lose this territory â but also can't win by using it alone
     const over = endureFlag ? false : (newPlayerHp <= 0 || newEnemyHp <= 0);
     setBattleAnim(newEnemyHp <= 0 ? "win" : newPlayerHp <= 0 ? "lose" : "idle");
     await new Promise(r=>setTimeout(r, over ? 700 : 250));
@@ -851,8 +904,11 @@ export default function FactionWars() {
 
   const nextTerritory = () => {
     const next = currentTerritory + 1;
+    const lastResult = results[results.length - 1];
+    if (lastResult?.won) sfx.territoryWin(); else sfx.territoryLose();
+    resetLowHp();
     if (next >= TERRITORY_COUNT) { void finishCampaign([...results]); }
-    else { setCurrentT(next); setCurrentFI(prev => (prev+1) % TEAM_SIZE); startTerritory(); setPhase("battle"); }
+    else { setCurrentT(next); setCurrentFI(prev => (prev+1) % TEAM_SIZE); startTerritory(); setPhase("battle"); if (next >= 3) sfx.startEpic(); }
   };
 
   const finishCampaign = async (allResults: TerritoryResult[]) => {
@@ -877,11 +933,13 @@ export default function FactionWars() {
         const rollJ = await rollR.json().catch(() => null);
         if (rollR.ok && rollJ?.ok && rollJ?.prize) {
           const p = rollJ.prize;
-          setPrizeLabel(p.label || (rarity === "ultra" ? "🏆 ULTRA CRATE" : rarity === "rare" ? "⚔️ RARE CRATE" : "✅ COMMON CRATE"));
+          setPrizeLabel(p.label || (rarity === "ultra" ? "ð ULTRA CRATE" : rarity === "rare" ? "âï¸ RARE CRATE" : "â COMMON CRATE"));
           setPrizeSub(p.type === "nft" ? "You won an NFT!" : p.type === "merch" ? "You won merch!" : `+${p.points || pts} REBEL`);
           setPrizeClaimId(rollJ.claimId);
           setPrizeMerchShipping(p.type === "merch");
           setShowPrizeModal(true);
+        sfx.crateOpen();
+        setTimeout(() => sfx.crateReward(), 1000);
         }
       } catch {}
     }
@@ -895,7 +953,7 @@ export default function FactionWars() {
   };
 
   const resetGame = () => {
-    stopMusic(); setPhase("idle"); setTeam([]); setDefenders([]); setResults([]); setCurrentT(0); setCurrentFI(0); setSelectedMove(null); setFinalRarity("none"); setRunMessage(""); setBusy(false); setBattleAnim("idle");
+    stopMusic(); sfx.startTheme(); setPhase("idle"); setTeam([]); setDefenders([]); setResults([]); setCurrentT(0); setCurrentFI(0); setSelectedMove(null); setFinalRarity("none"); setRunMessage(""); setBusy(false); setBattleAnim("idle");
     setPlayerHp(MAX_HP); setEnemyHp(MAX_HP); setCurrentRound(0); setRoundLog([]); setDmgFloats([]); setCurrentTerritoryRounds([]);
   };
 
@@ -904,17 +962,17 @@ export default function FactionWars() {
   const currentDefenderFD = defenders[currentTerritory] ? FACTIONS[defenders[currentTerritory]] : null;
   const territoriesWon = results.filter(r=>r.won).length;
   const rc = { ultra:"#fbbf24", rare:"#60a5fa", common:"#34d399", none:"#f87171" };
-  const rl = { ultra:"🏆 ULTRA — LEGENDARY VICTORY!", rare:"⚔️ RARE — STRONG CAMPAIGN!", common:"✅ COMMON — SOLDIERS HOLD!", none:"💀 DEFEAT — YOUR FORCES FELL" };
+  const rl = { ultra:"ð ULTRA â LEGENDARY VICTORY!", rare:"âï¸ RARE â STRONG CAMPAIGN!", common:"â COMMON â SOLDIERS HOLD!", none:"ð DEFEAT â YOUR FORCES FELL" };
 
   return (
     <div style={{ minHeight:"100vh", color:"white", fontFamily:"'Segoe UI',sans-serif", backgroundImage:"url('/bg/faction-wars-bg.png')", backgroundSize:"cover", backgroundPosition:"center top", backgroundAttachment:"fixed", backgroundRepeat:"no-repeat", position:"relative" }}>
       <div style={{ position:"fixed", inset:0, background:"rgba(8,11,20,0.82)", zIndex:0, pointerEvents:"none" }} />
       <BuyPointsModal open={showBuyPoints} onClose={()=>setShowBuyPoints(false)} playerId={effectivePlayerId} onClaimed={()=>{setShowBuyPoints(false);void refresh();}} />
-      {/* Crate Reveal Modal — exact Shuffle style */}
+      {/* Crate Reveal Modal â exact Shuffle style */}
       {showPrizeModal && (()=>{
         const rar = finalRarity as string;
-        const crateTitle = rar==="ultra"?"🏆 ULTRA CRATE!":rar==="rare"?"⚔️ Rare Crate!":"✅ Crate Unlocked";
-        const subLine = rar==="ultra"?"5/5 territories — Legendary!":rar==="rare"?"3–4 territories — Strong campaign!":"1–2 territories — Soldiers hold!";
+        const crateTitle = rar==="ultra"?"ð ULTRA CRATE!":rar==="rare"?"âï¸ Rare Crate!":"â Crate Unlocked";
+        const subLine = rar==="ultra"?"5/5 territories â Legendary!":rar==="rare"?"3â4 territories â Strong campaign!":"1â2 territories â Soldiers hold!";
         const sps = Array.from({length:24},(_,i)=>({
           left: String(8+(i*4.1)%84)+'%',
           top: String(10+(i*7.3)%62)+'%',
@@ -948,11 +1006,11 @@ export default function FactionWars() {
                 </div>
                 {prizeMerchShipping && prizeClaimId && (
                   <div style={{position:"relative",zIndex:1,textAlign:"left",marginBottom:14,fontSize:12,opacity:0.75,background:"rgba(255,255,255,0.05)",borderRadius:10,padding:"10px 12px"}}>
-                    🎁 Merch won! Save your Claim ID and contact support to arrange shipping.
+                    ð Merch won! Save your Claim ID and contact support to arrange shipping.
                   </div>
                 )}
                 <button onClick={()=>setShowPrizeModal(false)} style={{position:"relative",zIndex:1,padding:"12px 40px",borderRadius:12,border:"none",cursor:"pointer",background:rar==="ultra"?"linear-gradient(135deg,#fbbf24,#f59e0b)":rar==="rare"?"linear-gradient(135deg,#60a5fa,#3b82f6)":"linear-gradient(135deg,#34d399,#059669)",color:"#000",fontWeight:900,fontSize:15,letterSpacing:"0.03em",boxShadow:"0 4px 20px rgba(0,0,0,0.4)"}}>
-                  {rar==="ultra"?"⚔️ Legendary!":"Continue"}
+                  {rar==="ultra"?"âï¸ Legendary!":"Continue"}
                 </button>
               </div>
             </div>
@@ -964,10 +1022,10 @@ export default function FactionWars() {
       {showDripMigrate && (
         <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.7)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center" }} onClick={()=>setShowDripMigrate(false)}>
           <div style={{ background:"#0f172a", border:"1px solid rgba(255,255,255,0.15)", borderRadius:16, padding:24, maxWidth:380, width:"90%", position:"relative" }} onClick={e=>e.stopPropagation()}>
-            <div style={{ fontWeight:900, fontSize:16, marginBottom:12 }}>⚔️ Migrate DRIP Points</div>
+            <div style={{ fontWeight:900, fontSize:16, marginBottom:12 }}>âï¸ Migrate DRIP Points</div>
             {dripBalance !== null && <div style={{ fontSize:13, opacity:0.8, marginBottom:10 }}>DRIP Balance: <b>{dripBalance}</b></div>}
             <input type="number" value={dripAmount} onChange={e=>setDripAmount(Number(e.target.value))} min={0} max={dripBalance||0} placeholder="Amount to migrate" style={{ width:"100%", padding:"10px 12px", borderRadius:10, border:"1px solid rgba(255,255,255,0.2)", background:"rgba(0,0,0,0.3)", color:"white", marginBottom:10, fontSize:14 }} />
-            {dripStatus && <div style={{ fontSize:12, color:dripStatus.startsWith("✅")?"#34d399":"#f87171", marginBottom:10 }}>{dripStatus}</div>}
+            {dripStatus && <div style={{ fontSize:12, color:dripStatus.startsWith("â")?"#34d399":"#f87171", marginBottom:10 }}>{dripStatus}</div>}
             <div style={{ display:"flex", gap:10 }}>
               <button onClick={migrateDripNow} disabled={dripBusy} style={{ flex:1, padding:"10px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#fbbf24,#f59e0b)", color:"#000", fontWeight:900, cursor:"pointer" }}>Migrate</button>
               <button onClick={()=>setShowDripMigrate(false)} style={{ flex:1, padding:"10px", borderRadius:10, border:"1px solid rgba(255,255,255,0.2)", background:"transparent", color:"white", cursor:"pointer" }}>Close</button>
@@ -981,10 +1039,10 @@ export default function FactionWars() {
         <div style={{ maxWidth:900, margin:"0 auto", padding:"24px 20px" }}>
           <div style={{ fontSize:26, fontWeight:900, marginBottom:12, display:"flex", alignItems:"center", gap:10 }}>
             <Link href="/" style={{ textDecoration:"none", color:"inherit" }}>Rebel Ants Playground</Link>
-            <button onClick={toggleMute} title={muted?"Unmute":"Mute"} style={{ background:"rgba(0,0,0,0.4)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:20, padding:"3px 10px", cursor:"pointer", fontSize:16, color:"rgba(255,255,255,0.8)", lineHeight:1 }}>{muted?"🔇":"🔊"}</button>
+            <button onClick={toggleMute} title={muted?"Unmute":"Mute"} style={{ background:"rgba(0,0,0,0.4)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:20, padding:"3px 10px", cursor:"pointer", fontSize:16, color:"rgba(255,255,255,0.8)", lineHeight:1 }}>{muted?"ð":"ð"}</button>
           </div>
           <nav style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-            {([["tunnel","🐜 Ant Tunnel"],["hatch","⚔️ Faction Wars"],["expedition","⚔️ The Raid"],["shuffle","🃏 Shuffle"]] as [string,string][]).map(([href,label])=>(
+            {([["tunnel","ð Ant Tunnel"],["hatch","âï¸ Faction Wars"],["expedition","âï¸ The Raid"],["shuffle","ð Shuffle"]] as [string,string][]).map(([href,label])=>(
               <Link key={href} href={`/${href}`} style={{ padding:"8px 14px", borderRadius:20, textDecoration:"none", fontSize:13, fontWeight:700, background:href==="hatch"?"rgba(251,191,36,0.15)":"rgba(255,255,255,0.07)", border:`1px solid ${href==="hatch"?"rgba(251,191,36,0.4)":"rgba(255,255,255,0.12)"}`, color:href==="hatch"?"#fbbf24":"rgba(255,255,255,0.8)" }}>{label}</Link>
             ))}
           </nav>
@@ -997,46 +1055,46 @@ export default function FactionWars() {
             <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:16, padding:"24px 20px", marginBottom:18 }}>
               {/* Title */}
               <div style={{ textAlign:"center", marginBottom:14 }}>
-                <div style={{ fontSize:28, fontWeight:900, letterSpacing:"0.06em", background:"linear-gradient(135deg,#fbbf24,#f87171,#c084fc)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", marginBottom:4 }}>⚔️ FACTION WARS</div>
-                <div style={{ fontSize:13, opacity:0.65, letterSpacing:"0.04em" }}>🏰 Assemble 5 faction warriors. Battle 5 territories. Know your factions or fall.</div>
+                <div style={{ fontSize:28, fontWeight:900, letterSpacing:"0.06em", background:"linear-gradient(135deg,#fbbf24,#f87171,#c084fc)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", marginBottom:4 }}>âï¸ FACTION WARS</div>
+                <div style={{ fontSize:13, opacity:0.65, letterSpacing:"0.04em" }}>ð° Assemble 5 faction warriors. Battle 5 territories. Know your factions or fall.</div>
               </div>
 
               {/* Launch button */}
               <div style={{ marginTop:16, display:"flex", gap:10, flexWrap:"wrap", alignItems:"center" }}>
                 <button onClick={startCampaign} disabled={team.length<TEAM_SIZE||busy||balance<fwCost}
                   style={{ minWidth:240, height:48, fontSize:14, fontWeight:900, display:"inline-flex", alignItems:"center", justifyContent:"center", borderRadius:12, border:"1px solid rgba(251,191,36,0.35)", cursor:team.length<TEAM_SIZE||busy||balance<fwCost?"not-allowed":"pointer", background:team.length<TEAM_SIZE?"rgba(15,23,42,.7)":"linear-gradient(135deg,rgba(251,191,36,.18),rgba(192,132,252,.18))", color:"#fbbf24" }}>
-                  {team.length<TEAM_SIZE?`⚔️ Select ${TEAM_SIZE-team.length} more warriors`:busy?"Assembling...":`⚔️ Launch Campaign (-${team.includes("ashigaru") ? Math.max(0, fwCost-25) : fwCost} ${currency})`}
+                  {team.length<TEAM_SIZE?`âï¸ Select ${TEAM_SIZE-team.length} more warriors`:busy?"Assembling...":`âï¸ Launch Campaign (-${team.includes("ashigaru") ? Math.max(0, fwCost-25) : fwCost} ${currency})`}
                 </button>
-                <button onClick={()=>setShowBuyPoints(true)} style={{ padding:"10px 14px", fontSize:12, borderRadius:10, border:"1px solid rgba(255,255,255,0.15)", background:"rgba(255,255,255,0.07)", color:"white", cursor:"pointer", fontWeight:700 }}>💳 Buy Points</button>
+                <button onClick={()=>setShowBuyPoints(true)} style={{ padding:"10px 14px", fontSize:12, borderRadius:10, border:"1px solid rgba(255,255,255,0.15)", background:"rgba(255,255,255,0.07)", color:"white", cursor:"pointer", fontWeight:700 }}>ð³ Buy Points</button>
                 {isDiscordConnected
                   ? <button onClick={disconnectDiscord} style={{ padding:"10px 14px", fontSize:12, borderRadius:10, border:"1px solid rgba(255,255,255,0.15)", background:"rgba(255,255,255,0.07)", color:"white", cursor:"pointer", fontWeight:700 }}>Disconnect Discord</button>
-                  : <button onClick={()=>{ try{saveProfile({discordSkipLink:false});window.dispatchEvent(new Event("ra:identity-changed"));}catch{} window.location.href="/api/auth/discord/login"; }} style={{ padding:"10px 14px", fontSize:12, borderRadius:10, border:"1px solid rgba(88,101,242,0.4)", background:"rgba(88,101,242,0.15)", color:"#818cf8", cursor:"pointer", fontWeight:700 }}>🔗 Connect Discord</button>
+                  : <button onClick={()=>{ try{saveProfile({discordSkipLink:false});window.dispatchEvent(new Event("ra:identity-changed"));}catch{} window.location.href="/api/auth/discord/login"; }} style={{ padding:"10px 14px", fontSize:12, borderRadius:10, border:"1px solid rgba(88,101,242,0.4)", background:"rgba(88,101,242,0.15)", color:"#818cf8", cursor:"pointer", fontWeight:700 }}>ð Connect Discord</button>
                 }
                 <button onClick={async()=>{ if(!isDiscordConnected)return; await openDripModal(); }} disabled={dripBusy||!isDiscordConnected}
                   style={{ padding:"10px 14px", fontSize:12, borderRadius:10, border:"1px solid rgba(255,255,255,0.15)", background:"rgba(255,255,255,0.07)", color:"white", cursor:"pointer", fontWeight:700, opacity:isDiscordConnected?1:0.5 }}
                   title={isDiscordConnected?"Move points from Discord (DRIP) into the game":"Connect Discord to migrate DRIP points"}>
-                  {dripBusy?"Loading DRIP…":isDiscordConnected?"Migrate DRIP Points":"Connect Discord for DRIP"}
+                  {dripBusy?"Loading DRIPâ¦":isDiscordConnected?"Migrate DRIP Points":"Connect Discord for DRIP"}
                 </button>
-                <div style={{ fontSize:11, opacity:0.65 }}>Discord: <b>{isDiscordConnected?"✅":"❌"}</b></div>
+                <div style={{ fontSize:11, opacity:0.65 }}>Discord: <b>{isDiscordConnected?"â":"â"}</b></div>
               </div>
 
               {/* Balance info */}
               <div style={{ marginTop:10, fontSize:12, opacity:0.8, display:"flex", gap:14, flexWrap:"wrap" }}>
-                <span>⚔️ Balance: <b>{balance}</b> {currency}</span>
-                <span>🏰 Cost: <b>{fwCost}</b> {currency}</span>
+                <span>âï¸ Balance: <b>{balance}</b> {currency}</span>
+                <span>ð° Cost: <b>{fwCost}</b> {currency}</span>
                 {balance < fwCost && <span style={{ color:"#f87171" }}>Need {fwCost - balance} more {currency}</span>}
               </div>
               <div style={{ marginTop:6, fontSize:11, opacity:0.55, display:"flex", gap:10, flexWrap:"wrap" }}>
-                <span>🏆 Ultra: +{cfg?.rewards?.ultra}</span>
-                <span>⚔️ Rare: +{cfg?.rewards?.rare}</span>
-                <span>✅ Common: +{cfg?.rewards?.common}</span>
-                <span>📅 Daily cap: {cfg?.dailyEarnCap}</span>
+                <span>ð Ultra: +{cfg?.rewards?.ultra}</span>
+                <span>âï¸ Rare: +{cfg?.rewards?.rare}</span>
+                <span>â Common: +{cfg?.rewards?.common}</span>
+                <span>ð Daily cap: {cfg?.dailyEarnCap}</span>
               </div>
 
               {/* Name + daily claim */}
               <div style={{ marginTop:12, display:"flex", gap:10, flexWrap:"wrap", alignItems:"center" }}>
                 <label style={{ fontSize:12, opacity:0.85 }}>
-                  ⚔️ Commander:&nbsp;
+                  âï¸ Commander:&nbsp;
                   <input value={playerName}
                     onChange={e=>{ const v=(e.target.value.slice(0,18)||"guest").trim()||"guest"; setPlayerName(v); const p=loadProfile(); saveProfile({name:v,id:(p?.id||playerId||"guest").trim()||"guest"}); }}
                     style={{ padding:"6px 10px", borderRadius:10, border:"1px solid rgba(255,255,255,.18)", background:"rgba(15,23,42,.55)", color:"inherit" }}
@@ -1045,10 +1103,10 @@ export default function FactionWars() {
                 </label>
                 <button onClick={claimDailyNow} disabled={claimBusy||dailyClaimed}
                   style={{ padding:"8px 12px", fontSize:12, borderRadius:10, border:"1px solid rgba(251,191,36,0.3)", background:"rgba(251,191,36,0.12)", color:"#fbbf24", cursor:claimBusy||dailyClaimed?"not-allowed":"pointer", fontWeight:700, opacity:claimBusy||dailyClaimed?0.6:1 }}>
-                  {dailyClaimed ? (countdownStr ? `⏱ Next claim in ${countdownStr}` : "✅ Claimed Today") : `⚔️ Daily +${cfg?.dailyClaim} ${currency}`}
+                  {dailyClaimed ? (countdownStr ? `â± Next claim in ${countdownStr}` : "â Claimed Today") : `âï¸ Daily +${cfg?.dailyClaim} ${currency}`}
                 </button>
                 {process.env.NODE_ENV!=="production" && (
-                  <button onClick={async()=>{ await devGrant(5000); await refresh(); alert("Dev grant ✅"); }} style={{ padding:"8px 12px", fontSize:12, borderRadius:10, border:"1px solid rgba(255,255,255,0.15)", background:"rgba(255,255,255,0.07)", color:"white", cursor:"pointer" }}>Dev +5000</button>
+                  <button onClick={async()=>{ await devGrant(5000); await refresh(); alert("Dev grant â"); }} style={{ padding:"8px 12px", fontSize:12, borderRadius:10, border:"1px solid rgba(255,255,255,0.15)", background:"rgba(255,255,255,0.07)", color:"white", cursor:"pointer" }}>Dev +5000</button>
                 )}
                 {claimStatus && <div style={{ fontSize:11, opacity:0.85 }}>{claimStatus}</div>}
               </div>
@@ -1057,7 +1115,7 @@ export default function FactionWars() {
 
               {/* Team builder */}
               <div style={{ marginTop:20, paddingTop:16, borderTop:"1px solid rgba(255,255,255,0.08)" }}>
-                <div style={{ fontSize:14, fontWeight:800, marginBottom:12, color:"#fbbf24" }}>⚔️ Assemble Your Team ({team.length}/{TEAM_SIZE})</div>
+                <div style={{ fontSize:14, fontWeight:800, marginBottom:12, color:"#fbbf24" }}>âï¸ Assemble Your Team ({team.length}/{TEAM_SIZE})</div>
                 <div style={{ display:"flex", gap:8, marginBottom:16, flexWrap:"wrap", alignItems:"center" }}>
                   {Array.from({length:TEAM_SIZE},(_,i)=>{const fid=team[i];const f=fid?FACTIONS[fid]:null;return(
                     <div key={i} title={f?"Click to remove "+f.name:undefined} onClick={()=>f&&setTeam(prev=>prev.filter((_,j)=>j!==i))} style={{ width:62, height:78, borderRadius:10, background:f?f.bgColor:"rgba(255,255,255,0.03)", border:`2px solid ${f?f.borderColor:"rgba(255,255,255,0.1)"}`, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", opacity:f?1:0.3, cursor:f?"pointer":"default", transition:"all 0.2s", overflow:"hidden", position:"relative", boxShadow:f?`0 0 14px ${f.color}44`:undefined }}>
@@ -1066,7 +1124,7 @@ export default function FactionWars() {
                           <img src={factionImgPath(f.id,"char")} alt={f.name} style={{ width:"100%", height:55, objectFit:"cover", objectPosition:"top" }} onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
                           <div style={{fontSize:7,color:f.color,fontWeight:900,padding:"2px 0",letterSpacing:"0.05em"}}>{f.name.toUpperCase()}</div>
                         </>
-                      ) : <div style={{fontSize:20,opacity:0.4}}>＋</div>}
+                      ) : <div style={{fontSize:20,opacity:0.4}}>ï¼</div>}
                     </div>
                   );})}
                   {team.length>0&&<span style={{fontSize:11,opacity:0.5,cursor:"pointer",textDecoration:"underline"}} onClick={()=>setTeam([])}>clear</span>}
@@ -1081,7 +1139,7 @@ export default function FactionWars() {
                         <img src={factionImgPath(f.id,"symbol")} alt={f.name} style={{ width:36, height:36, objectFit:"contain", borderRadius:6, background:"rgba(0,0,0,0.4)", padding:3, flexShrink:0 }} onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
                         <div style={{ minWidth:0 }}>
                           <div style={{ fontWeight:900, color:f.color, marginBottom:3, fontSize:12 }}>{f.name}</div>
-                          <div style={{ opacity:0.75, marginBottom:2 }}>⚡ {f.passive}</div>
+                          <div style={{ opacity:0.75, marginBottom:2 }}>â¡ {f.passive}</div>
                           <div style={{ opacity:0.55, fontSize:10 }}>{f.passiveDesc}</div>
                         </div>
                       </div>
@@ -1099,11 +1157,11 @@ export default function FactionWars() {
             {/* Territory progress bar */}
             <div style={{ background:"rgba(0,0,0,0.5)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:14, padding:"12px 16px", marginBottom:14 }}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
-                <div style={{ fontSize:13, fontWeight:900, color:"#fbbf24", letterSpacing:"0.05em" }}>⚔️ TERRITORY {currentTerritory+1} / {TERRITORY_COUNT}</div>
+                <div style={{ fontSize:13, fontWeight:900, color:"#fbbf24", letterSpacing:"0.05em" }}>âï¸ TERRITORY {currentTerritory+1} / {TERRITORY_COUNT}</div>
                 <div style={{ display:"flex", gap:12, fontSize:11, alignItems:"center" }}>
-                  <span style={{ color:"#34d399", fontWeight:700 }}>✅ {territoriesWon} won</span>
-                  <span style={{ color:"#f87171", fontWeight:700 }}>💀 {results.length-territoriesWon} lost</span>
-                  <span style={{ color:"#fbbf24", fontWeight:800, background:"rgba(251,191,36,0.12)", border:"1px solid rgba(251,191,36,0.25)", borderRadius:8, padding:"2px 8px" }}>💰 {balance} {currency}</span>
+                  <span style={{ color:"#34d399", fontWeight:700 }}>â {territoriesWon} won</span>
+                  <span style={{ color:"#f87171", fontWeight:700 }}>ð {results.length-territoriesWon} lost</span>
+                  <span style={{ color:"#fbbf24", fontWeight:800, background:"rgba(251,191,36,0.12)", border:"1px solid rgba(251,191,36,0.25)", borderRadius:8, padding:"2px 8px" }}>ð° {balance} {currency}</span>
                 </div>
               </div>
               <div style={{ display:"flex", gap:8, justifyContent:"center" }}>
@@ -1111,38 +1169,38 @@ export default function FactionWars() {
               </div>
             </div>
 
-            {/* HOW TO PLAY — collapsible */}
+            {/* HOW TO PLAY â collapsible */}
             <div style={{ marginBottom:12 }}>
               <button onClick={()=>setShowHowToPlay(h=>!h)} style={{ display:"flex", alignItems:"center", gap:8, background:"rgba(251,191,36,0.08)", border:"1px solid rgba(251,191,36,0.2)", borderRadius:10, padding:"8px 14px", cursor:"pointer", width:"100%", color:"white" }}>
-                <span style={{ fontSize:14 }}>📖</span>
+                <span style={{ fontSize:14 }}>ð</span>
                 <span style={{ fontWeight:800, fontSize:12, color:"#fbbf24", flex:1, textAlign:"left" }}>How to Play</span>
-                <span style={{ fontSize:11, opacity:0.5 }}>{showHowToPlay ? "▲ hide" : "▼ show"}</span>
+                <span style={{ fontSize:11, opacity:0.5 }}>{showHowToPlay ? "â² hide" : "â¼ show"}</span>
               </button>
               {showHowToPlay && (
                 <div style={{ background:"rgba(0,0,0,0.5)", border:"1px solid rgba(251,191,36,0.15)", borderRadius:"0 0 10px 10px", padding:"12px 16px", fontSize:12 }}>
                   <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
                     <div style={{ background:"rgba(255,255,255,0.04)", borderRadius:8, padding:"8px 10px" }}>
-                      <div style={{ fontWeight:900, color:"#fbbf24", marginBottom:4 }}>⚔️ Goal</div>
+                      <div style={{ fontWeight:900, color:"#fbbf24", marginBottom:4 }}>âï¸ Goal</div>
                       <div style={{ opacity:0.75, lineHeight:1.5 }}>Win as many of the 5 territories as possible. Each territory is one fight between your warrior and the defender. Win 3+ to earn rewards. Win all 5 for the Ultra crate.</div>
                     </div>
                     <div style={{ background:"rgba(255,255,255,0.04)", borderRadius:8, padding:"8px 10px" }}>
-                      <div style={{ fontWeight:900, color:"#60a5fa", marginBottom:4 }}>🎯 Moves</div>
-                      <div style={{ opacity:0.75, lineHeight:1.5 }}>Pick one of your warrior's 5 moves. Each move has a <b>Power value</b> (1–11). Higher power = better chance to win that territory. The enemy AI picks its best counter automatically.</div>
+                      <div style={{ fontWeight:900, color:"#60a5fa", marginBottom:4 }}>ð¯ Moves</div>
+                      <div style={{ opacity:0.75, lineHeight:1.5 }}>Pick one of your warrior's 5 moves. Each move has a <b>Power value</b> (1â11). Higher power = better chance to win that territory. The enemy AI picks its best counter automatically.</div>
                     </div>
                     <div style={{ background:"rgba(255,255,255,0.04)", borderRadius:8, padding:"8px 10px" }}>
-                      <div style={{ fontWeight:900, color:"#34d399", marginBottom:4 }}>📊 Power Bars</div>
-                      <div style={{ opacity:0.75, lineHeight:1.5 }}>Each territory is a <b>HP fight</b> — both you and the defender start at 100 HP. Pick a move each round, both sides deal damage simultaneously. First to <b>0 HP loses the territory</b>. Win 3+ territories to earn rewards.</div>
+                      <div style={{ fontWeight:900, color:"#34d399", marginBottom:4 }}>ð Power Bars</div>
+                      <div style={{ opacity:0.75, lineHeight:1.5 }}>Each territory is a <b>HP fight</b> â both you and the defender start at 100 HP. Pick a move each round, both sides deal damage simultaneously. First to <b>0 HP loses the territory</b>. Win 3+ territories to earn rewards.</div>
                     </div>
                     <div style={{ background:"rgba(255,255,255,0.04)", borderRadius:8, padding:"8px 10px" }}>
-                      <div style={{ fontWeight:900, color:"#c084fc", marginBottom:4 }}>⚡ Passives</div>
-                      <div style={{ opacity:0.75, lineHeight:1.5 }}>Each faction has a passive bonus — like Ronin getting stronger after a loss, or Samurai hitting harder on Territory 1. Combine factions to stack advantages.</div>
+                      <div style={{ fontWeight:900, color:"#c084fc", marginBottom:4 }}>â¡ Passives</div>
+                      <div style={{ opacity:0.75, lineHeight:1.5 }}>Each faction has a passive bonus â like Ronin getting stronger after a loss, or Samurai hitting harder on Territory 1. Combine factions to stack advantages.</div>
                     </div>
                   </div>
                   <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-                    <div style={{ fontSize:11, background:"rgba(248,113,113,0.12)", border:"1px solid rgba(248,113,113,0.2)", borderRadius:6, padding:"3px 8px", color:"#f87171" }}>🔴 ATTACK — raw damage</div>
-                    <div style={{ fontSize:11, background:"rgba(52,211,153,0.12)", border:"1px solid rgba(52,211,153,0.2)", borderRadius:6, padding:"3px 8px", color:"#34d399" }}>🟢 DEFEND — blocks counters</div>
-                    <div style={{ fontSize:11, background:"rgba(192,132,252,0.12)", border:"1px solid rgba(192,132,252,0.2)", borderRadius:6, padding:"3px 8px", color:"#c084fc" }}>🟣 MAGIC — special effects</div>
-                    <div style={{ fontSize:11, background:"rgba(251,191,36,0.12)", border:"1px solid rgba(251,191,36,0.2)", borderRadius:6, padding:"3px 8px", color:"#fbbf24" }}>🟡 TRICK — dodge or steal</div>
+                    <div style={{ fontSize:11, background:"rgba(248,113,113,0.12)", border:"1px solid rgba(248,113,113,0.2)", borderRadius:6, padding:"3px 8px", color:"#f87171" }}>ð´ ATTACK â raw damage</div>
+                    <div style={{ fontSize:11, background:"rgba(52,211,153,0.12)", border:"1px solid rgba(52,211,153,0.2)", borderRadius:6, padding:"3px 8px", color:"#34d399" }}>ð¢ DEFEND â blocks counters</div>
+                    <div style={{ fontSize:11, background:"rgba(192,132,252,0.12)", border:"1px solid rgba(192,132,252,0.2)", borderRadius:6, padding:"3px 8px", color:"#c084fc" }}>ð£ MAGIC â special effects</div>
+                    <div style={{ fontSize:11, background:"rgba(251,191,36,0.12)", border:"1px solid rgba(251,191,36,0.2)", borderRadius:6, padding:"3px 8px", color:"#fbbf24" }}>ð¡ TRICK â dodge or steal</div>
                   </div>
                 </div>
               )}
@@ -1151,11 +1209,11 @@ export default function FactionWars() {
             {/* MAIN BATTLE ARENA */}
             <div style={{ position:"relative", borderRadius:18, overflow:"hidden", marginBottom:16, border:"1px solid rgba(255,255,255,0.1)" }}>
 
-              {/* Plunder REBEL float — centered over arena */}
+              {/* Plunder REBEL float â centered over arena */}
               {dmgFloats.filter(f=>f.side==="plunder").map(f=>(
                 <div key={f.id} style={{ position:"absolute", top:"20%", left:0, right:0, textAlign:"center", zIndex:99, pointerEvents:"none",
                   fontSize:28, fontWeight:900, color:"#fbbf24", textShadow:"0 0 24px rgba(251,191,36,0.9)" }}>
-                  💰 +{f.dmg} {currency} PLUNDER!
+                  ð° +{f.dmg} {currency} PLUNDER!
                 </div>
               ))}
               {/* Animated arena background */}
@@ -1167,7 +1225,7 @@ export default function FactionWars() {
 
               <div style={{ position:"relative", zIndex:1, padding:"24px 20px 20px" }}>
 
-                {/* ── HP BARS ── MK Style ───────────────────────── */}
+                {/* ââ HP BARS ââ MK Style âââââââââââââââââââââââââ */}
                 <div style={{ marginBottom:14 }}>
                   {/* Player HP bar */}
                   <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:7 }}>
@@ -1214,22 +1272,22 @@ export default function FactionWars() {
                 {/* Active buff indicators */}
                 {(powerBuffRounds > 0 || comboBonus > 0 || commandActive || meditationStacks > 0) && (
                   <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:8, justifyContent:"center" }}>
-                    {powerBuffRounds > 0 && <div style={{ fontSize:10, fontWeight:800, background:"rgba(52,211,153,0.15)", border:"1px solid rgba(52,211,153,0.3)", color:"#34d399", borderRadius:20, padding:"2px 8px" }}>⚡ +{powerBuffAmt} dmg ({powerBuffRounds})</div>}
-                    {comboBonus > 0 && <div style={{ fontSize:10, fontWeight:800, background:"rgba(192,132,252,0.15)", border:"1px solid rgba(192,132,252,0.3)", color:"#c084fc", borderRadius:20, padding:"2px 8px" }}>🔗 Combo +{comboBonus}</div>}
-                    {commandActive && <div style={{ fontSize:10, fontWeight:800, background:"rgba(251,191,36,0.15)", border:"1px solid rgba(251,191,36,0.3)", color:"#fbbf24", borderRadius:20, padding:"2px 8px" }}>👑 Command +8 READY</div>}
-                    {meditationStacks > 0 && <div style={{ fontSize:10, fontWeight:800, background:"rgba(99,102,241,0.15)", border:"1px solid rgba(99,102,241,0.3)", color:"#818cf8", borderRadius:20, padding:"2px 8px" }}>🧘 Focus ×{meditationStacks}</div>}
+                    {powerBuffRounds > 0 && <div style={{ fontSize:10, fontWeight:800, background:"rgba(52,211,153,0.15)", border:"1px solid rgba(52,211,153,0.3)", color:"#34d399", borderRadius:20, padding:"2px 8px" }}>â¡ +{powerBuffAmt} dmg ({powerBuffRounds})</div>}
+                    {comboBonus > 0 && <div style={{ fontSize:10, fontWeight:800, background:"rgba(192,132,252,0.15)", border:"1px solid rgba(192,132,252,0.3)", color:"#c084fc", borderRadius:20, padding:"2px 8px" }}>ð Combo +{comboBonus}</div>}
+                    {commandActive && <div style={{ fontSize:10, fontWeight:800, background:"rgba(251,191,36,0.15)", border:"1px solid rgba(251,191,36,0.3)", color:"#fbbf24", borderRadius:20, padding:"2px 8px" }}>ð Command +8 READY</div>}
+                    {meditationStacks > 0 && <div style={{ fontSize:10, fontWeight:800, background:"rgba(99,102,241,0.15)", border:"1px solid rgba(99,102,241,0.3)", color:"#818cf8", borderRadius:20, padding:"2px 8px" }}>ð§ Focus Ã{meditationStacks}</div>}
                   </div>
                 )}
 
                 {/* Round counter */}
                 <div style={{ textAlign:"center", marginBottom:14 }}>
                   <span style={{ fontSize:11, fontWeight:900, color:"#fbbf24", letterSpacing:"0.12em", opacity:0.9 }}>
-                    ⚔️ ROUND {currentRound + 1}
+                    âï¸ ROUND {currentRound + 1}
                   </span>
-                  <span style={{ fontSize:10, opacity:0.4, marginLeft:8 }}>— first to 0 HP loses the territory</span>
+                  <span style={{ fontSize:10, opacity:0.4, marginLeft:8 }}>â first to 0 HP loses the territory</span>
                 </div>
 
-                {/* Characters — big portraits */}
+                {/* Characters â big portraits */}
                 <div style={{ display:"grid", gridTemplateColumns:"1fr auto 1fr", gap:12, alignItems:"center", marginBottom:14 }}>
                   {/* Player */}
                   <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:6 }}>
@@ -1258,7 +1316,7 @@ export default function FactionWars() {
                     <div style={{ fontSize:battleAnim==="clash"?44:26, fontWeight:900, transition:"all 0.2s",
                       textShadow:battleAnim==="clash"?"0 0 30px #fbbf24":battleAnim==="win"?"0 0 20px #34d399":battleAnim==="lose"?"0 0 20px #f87171":"none",
                       transform:battleAnim==="clash"?"scale(1.3)":"scale(1)" }}>
-                      {battleAnim==="clash"?"💥":battleAnim==="win"?"✅":battleAnim==="lose"?"💀":"⚔️"}
+                      {battleAnim==="clash"?"ð¥":battleAnim==="win"?"â":battleAnim==="lose"?"ð":"âï¸"}
                     </div>
                     <div style={{ fontSize:9, fontWeight:900, opacity:0.35, letterSpacing:"0.12em" }}>VS</div>
                   </div>
@@ -1292,10 +1350,10 @@ export default function FactionWars() {
                     <div style={{ fontSize:9, opacity:0.35, marginBottom:5, letterSpacing:"0.06em", fontWeight:700 }}>ROUND HISTORY</div>
                     {roundLog.slice(0,5).map((r,i)=>(
                       <div key={i} style={{ display:"flex", gap:10, fontSize:10, marginBottom:4, opacity:i===0?1:0.5, alignItems:"center" }}>
-                        <span style={{ color:"#34d399", fontWeight:700, minWidth:70, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>⚔️ {r.playerMove}</span>
+                        <span style={{ color:"#34d399", fontWeight:700, minWidth:70, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>âï¸ {r.playerMove}</span>
                         <span style={{ color:"#f87171", fontWeight:800 }}>-{r.enemyDmg} to you</span>
                         <span style={{ opacity:0.3 }}>|</span>
-                        <span style={{ color:"#f87171", fontWeight:700, minWidth:70, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>🛡️ {r.enemyMove}</span>
+                        <span style={{ color:"#f87171", fontWeight:700, minWidth:70, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>ð¡ï¸ {r.enemyMove}</span>
                         <span style={{ color:"#34d399", fontWeight:800 }}>-{r.playerDmg} to enemy</span>
                         {r.effect && <span style={{ marginLeft:4, color:"#fbbf24", fontWeight:900, fontSize:10, background:"rgba(251,191,36,0.18)", border:"1px solid rgba(251,191,36,0.35)", borderRadius:4, padding:"1px 6px", flexShrink:0 }}>{r.effect}</span>}
                       </div>
@@ -1307,17 +1365,17 @@ export default function FactionWars() {
                 <div style={{ display:"flex", gap:8, justifyContent:"center", marginBottom:16, flexWrap:"wrap" }}>
                   {currentPlayerFD.strongVs.includes(currentDefenderFD.id as FactionId) && (
                     <div style={{ fontSize:10, fontWeight:700, color:"#34d399", background:"rgba(52,211,153,0.1)", border:"1px solid rgba(52,211,153,0.25)", borderRadius:20, padding:"3px 10px" }}>
-                      ✅ {currentPlayerFD.name} has advantage
+                      â {currentPlayerFD.name} has advantage
                     </div>
                   )}
                   {currentPlayerFD.weakTo.includes(currentDefenderFD.id as FactionId) && (
                     <div style={{ fontSize:10, fontWeight:700, color:"#f87171", background:"rgba(248,113,113,0.1)", border:"1px solid rgba(248,113,113,0.25)", borderRadius:20, padding:"3px 10px" }}>
-                      ⚠️ {currentDefenderFD.name} has advantage
+                      â ï¸ {currentDefenderFD.name} has advantage
                     </div>
                   )}
                   {team[currentFactionIdx]==="bushi" && (
                     <div style={{ fontSize:10, fontWeight:700, color:"#818cf8", background:"rgba(129,140,248,0.1)", border:"1px solid rgba(129,140,248,0.25)", borderRadius:20, padding:"3px 10px" }}>
-                      🧠 Bushi Intel: weak to {currentDefenderFD.weakTo.map(f=>FACTIONS[f]?.name).join(", ")}
+                      ð§  Bushi Intel: weak to {currentDefenderFD.weakTo.map(f=>FACTIONS[f]?.name).join(", ")}
                     </div>
                   )}
                 </div>
@@ -1340,7 +1398,7 @@ export default function FactionWars() {
                         disabled={healBusy||busy||playerHp>=MAX_HP||balance<Number(cfg?.factionWarsHealCost??25)||healUsed>=Number(cfg?.factionWarsHealMax??2)}
                         title={`Spend ${healCost} REBEL to restore ${healAmt} HP`}
                         style={{ display:"flex", alignItems:"center", gap:6, padding:"6px 14px", borderRadius:20, border:"1px solid rgba(52,211,153,0.3)", background:"rgba(52,211,153,0.1)", color:"#34d399", fontSize:11, fontWeight:800, cursor:healBusy||busy||playerHp>=MAX_HP||balance<Number(cfg?.factionWarsHealCost??25)?"not-allowed":"pointer", opacity:healBusy||busy||playerHp>=MAX_HP||balance<Number(cfg?.factionWarsHealCost??25)?0.4:1 }}>
-                        🧪 Heal +{healAmt} HP
+                        ð§ª Heal +{healAmt} HP
                         <span style={{opacity:0.6,fontSize:10}}>(-{healCost} {currency})</span>
                         <span style={{opacity:0.5,fontSize:9,marginLeft:4}}>({Math.max(0,Number(cfg?.factionWarsHealMax??2)-healUsed)} left)</span>
                       </button>
@@ -1351,7 +1409,7 @@ export default function FactionWars() {
                 {/* Move selector */}
                 <div style={{ borderTop:"1px solid rgba(255,255,255,0.08)", paddingTop:16 }}>
                   <div style={{ fontSize:12, fontWeight:800, marginBottom:10, opacity:0.7, letterSpacing:"0.04em" }}>
-                    ⚔️ CHOOSE {currentPlayerFD.name.toUpperCase()}'S MOVE
+                    âï¸ CHOOSE {currentPlayerFD.name.toUpperCase()}'S MOVE
                   </div>
                   <div style={{ display:"flex", gap:8, flexDirection:"column" }}>
                     {currentPlayerFD.moves.map(m=>{
@@ -1377,19 +1435,19 @@ export default function FactionWars() {
                             <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:3 }}>
                               <span style={{ fontWeight:900, fontSize:14 }}>{m.label}</span>
                               <span style={{ fontSize:9, background:tc[m.type], color:"#000", borderRadius:4, padding:"1px 6px", fontWeight:900 }}>{m.type.toUpperCase()}</span>
-                              {m.oneTime && !isExhausted && <span style={{ fontSize:9, background:"rgba(251,191,36,0.2)", color:"#fbbf24", borderRadius:4, padding:"1px 6px", fontWeight:900, border:"1px solid rgba(251,191,36,0.3)" }}>1× ONLY</span>}
+                              {m.oneTime && !isExhausted && <span style={{ fontSize:9, background:"rgba(251,191,36,0.2)", color:"#fbbf24", borderRadius:4, padding:"1px 6px", fontWeight:900, border:"1px solid rgba(251,191,36,0.3)" }}>1Ã ONLY</span>}
                               {isExhausted && !berserkerActive && <span style={{ fontSize:9, background:"rgba(255,255,255,0.1)", color:"#666", borderRadius:4, padding:"1px 6px", fontWeight:900 }}>USED</span>}
-                              {isExhausted && berserkerActive && m.type==="defend" && <span style={{ fontSize:9, background:"rgba(251,100,36,0.25)", color:"#f87171", borderRadius:4, padding:"1px 6px", fontWeight:900 }}>🔥BERSERK</span>}
+                              {isExhausted && berserkerActive && m.type==="defend" && <span style={{ fontSize:9, background:"rgba(251,100,36,0.25)", color:"#f87171", borderRadius:4, padding:"1px 6px", fontWeight:900 }}>ð¥BERSERK</span>}
                             </div>
                             <div style={{ fontSize:11, opacity:0.6 }}>
-                              {m.id === "plunder" ? `Win this territory → earn +${fwPlunderBonus} bonus REBEL` : m.desc}
+                              {m.id === "plunder" ? `Win this territory â earn +${fwPlunderBonus} bonus REBEL` : m.desc}
                             </div>
                           </div>
                           {/* Power meter */}
                           <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:3, flexShrink:0, minWidth:44 }}>
                             <div style={{ fontSize:13, fontWeight:900, color: isExhausted?"#666": isSel ? currentPlayerFD.color : "rgba(255,255,255,0.6)" }}>
-                              {isExhausted ? "✗" : degradedPow}
-                              {!isExhausted && timesUsedM > 0 && <span style={{fontSize:9,color:"#f87171",marginLeft:2}}>↓{timesUsedM}</span>}
+                              {isExhausted ? "â" : degradedPow}
+                              {!isExhausted && timesUsedM > 0 && <span style={{fontSize:9,color:"#f87171",marginLeft:2}}>â{timesUsedM}</span>}
                             </div>
                             <div style={{ width:36, height:4, borderRadius:2, background:"rgba(255,255,255,0.1)", overflow:"hidden" }}>
                               <div style={{ height:"100%", borderRadius:2, background:tc[m.type], width:`${m.power*10}%`, transition:"width 0.3s" }} />
@@ -1409,7 +1467,7 @@ export default function FactionWars() {
                       opacity:!selectedMove?0.45:1, width:"100%", transition:"all 0.2s",
                       boxShadow:selectedMove?"0 4px 24px rgba(251,191,36,0.4)":"none",
                       transform:selectedMove?"translateY(-1px)":"none" }}>
-                    {busy?"⚔️ Fighting...":selectedMove?`⚔️ Strike with ${selectedMove.label}!`:"← Select a move above"}
+                    {busy?"âï¸ Fighting...":selectedMove?`âï¸ Strike with ${selectedMove.label}!`:"â Select a move above"}
                   </button>
                 </div>
               </div>
@@ -1422,7 +1480,7 @@ export default function FactionWars() {
           const df = FACTIONS[last.defender];
           return (
             <div style={{ background:"rgba(0,0,0,0.5)", border:`2px solid ${last.won?"#34d399":"#f87171"}`, borderRadius:16, padding:24, marginBottom:18, textAlign:"center" }}>
-              <div style={{ fontSize:48, marginBottom:10 }}>{last.won?"✅":"💀"}</div>
+              <div style={{ fontSize:48, marginBottom:10 }}>{last.won?"â":"ð"}</div>
               <div style={{ fontSize:22, fontWeight:900, color:last.won?"#34d399":"#f87171", marginBottom:8 }}>{last.won?`Territory ${last.territory+1} Captured!`:`Territory ${last.territory+1} Lost`}</div>
               {/* HP final display */}
               <div style={{ display:"flex", justifyContent:"center", gap:24, marginBottom:14 }}>
@@ -1441,13 +1499,13 @@ export default function FactionWars() {
               {/* Round recap - last 3 rounds */}
               {last.rounds && last.rounds.length > 0 && (
                 <div style={{ background:"rgba(0,0,0,0.3)", borderRadius:10, padding:"8px 12px", marginBottom:14, maxHeight:90, overflowY:"auto" }}>
-                  <div style={{ fontSize:9, opacity:0.4, marginBottom:5, letterSpacing:"0.06em" }}>FIGHT RECAP — {last.rounds.length} rounds</div>
+                  <div style={{ fontSize:9, opacity:0.4, marginBottom:5, letterSpacing:"0.06em" }}>FIGHT RECAP â {last.rounds.length} rounds</div>
                   {last.rounds.slice(-3).reverse().map((r,i)=>(
                     <div key={i} style={{ display:"flex", gap:8, fontSize:10, marginBottom:3, opacity:i===0?1:0.6 }}>
                       <span style={{ opacity:0.4 }}>R{r.round}</span>
-                      <span style={{ color:"#34d399" }}>⚔️ {r.playerMove.label} <b>-{r.playerDmg}</b></span>
+                      <span style={{ color:"#34d399" }}>âï¸ {r.playerMove.label} <b>-{r.playerDmg}</b></span>
                       <span style={{ opacity:0.3 }}>|</span>
-                      <span style={{ color:"#f87171" }}>🛡️ {r.enemyMove.label} <b>-{r.enemyDmg}</b></span>
+                      <span style={{ color:"#f87171" }}>ð¡ï¸ {r.enemyMove.label} <b>-{r.enemyDmg}</b></span>
                     </div>
                   ))}
                 </div>
@@ -1457,7 +1515,7 @@ export default function FactionWars() {
               </div>
               <button onClick={nextTerritory}
                 style={{ padding:"12px 28px", borderRadius:12, border:"none", cursor:"pointer", background:currentTerritory+1<TERRITORY_COUNT?"linear-gradient(135deg,#fbbf24,#f59e0b)":"linear-gradient(135deg,#34d399,#059669)", color:"#000", fontWeight:900, fontSize:15 }}>
-                {currentTerritory+1<TERRITORY_COUNT?`⚔️ Next Territory (${currentTerritory+2}/${TERRITORY_COUNT})`:"🏁 See Final Results"}
+                {currentTerritory+1<TERRITORY_COUNT?`âï¸ Next Territory (${currentTerritory+2}/${TERRITORY_COUNT})`:"ð See Final Results"}
               </button>
             </div>
           );
@@ -1466,7 +1524,7 @@ export default function FactionWars() {
         {phase === "final_result" && (
           <div>
             <div style={{ background:"rgba(0,0,0,0.6)", border:`2px solid ${rc[finalRarity]}`, borderRadius:16, padding:28, marginBottom:18, textAlign:"center", boxShadow:`0 0 40px ${rc[finalRarity]}33` }}>
-              <div style={{ fontSize:52, marginBottom:12 }}>{finalRarity==="ultra"?"🏆":finalRarity==="rare"?"⚔️":finalRarity==="common"?"✅":"💀"}</div>
+              <div style={{ fontSize:52, marginBottom:12 }}>{finalRarity==="ultra"?"ð":finalRarity==="rare"?"âï¸":finalRarity==="common"?"â":"ð"}</div>
               <div style={{ fontSize:22, fontWeight:900, color:rc[finalRarity], marginBottom:8 }}>{rl[finalRarity]}</div>
               <div style={{ fontSize:15, opacity:0.8, marginBottom:16 }}>{territoriesWon}/{TERRITORY_COUNT} territories conquered</div>
               <div style={{ display:"flex", gap:6, justifyContent:"center", marginBottom:16, flexWrap:"wrap" }}>
@@ -1479,19 +1537,19 @@ export default function FactionWars() {
               <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:20 }}>
                 {results.map((r,i)=>(
                   <div key={i} style={{ display:"flex", alignItems:"center", gap:10, background:r.won?"rgba(52,211,153,0.08)":"rgba(239,68,68,0.08)", border:`1px solid ${r.won?"rgba(52,211,153,0.2)":"rgba(239,68,68,0.2)"}`, borderRadius:8, padding:"6px 12px", fontSize:12 }}>
-                    <span>{r.won?"✅":"💀"}</span>
+                    <span>{r.won?"â":"ð"}</span>
                     <span style={{opacity:0.6}}>T{i+1}</span>
                     <span style={{display:"flex",alignItems:"center",gap:5,color:FACTIONS[r.defender].color}}>
                       <img src={factionImgPath(r.defender,"symbol")} alt={FACTIONS[r.defender].name} style={{width:16,height:16,objectFit:"contain",background:"rgba(0,0,0,0.4)",borderRadius:3,padding:1}} onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
                       {FACTIONS[r.defender].name}
                     </span>
                     <span style={{marginLeft:"auto", fontSize:11, opacity:0.7}}>
-                      {r.rounds?.length ?? 0} rounds · final HP {r.playerHpFinal} vs {r.enemyHpFinal}
+                      {r.rounds?.length ?? 0} rounds Â· final HP {r.playerHpFinal} vs {r.enemyHpFinal}
                     </span>
                   </div>
                 ))}
               </div>
-              <button onClick={resetGame} style={{ padding:"12px 28px", borderRadius:12, border:"none", cursor:"pointer", background:"linear-gradient(135deg,#fbbf24,#f59e0b)", color:"#000", fontWeight:900, fontSize:15 }}>⚔️ New Campaign</button>
+              <button onClick={resetGame} style={{ padding:"12px 28px", borderRadius:12, border:"none", cursor:"pointer", background:"linear-gradient(135deg,#fbbf24,#f59e0b)", color:"#000", fontWeight:900, fontSize:15 }}>âï¸ New Campaign</button>
             </div>
             <FWLeaderboardPanel lb={lb} />
           </div>
