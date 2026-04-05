@@ -18,6 +18,10 @@ type PointsConfigShape = {
   tunnelWallBreaks: number;
   tunnelSpiderSpeedMs: number;
 
+  // ✅ Faction Wars settings
+  factionWarsCost: number;
+  factionWarsAIDifficulty: number;
+
   // ✅ Raid settings
   raidCost: number;
   raidCarrierSurvival: number;
@@ -146,6 +150,8 @@ const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
   tunnelWallBreaks: (defaultConfig as any).tunnelWallBreaks ?? 5,
   tunnelSpiderSpeedMs: (defaultConfig as any).tunnelSpiderSpeedMs ?? 160,
   raidCost: (defaultConfig as any).raidCost ?? 600,
+    factionWarsCost: (defaultConfig as any).factionWarsCost ?? 150,
+    factionWarsAIDifficulty: (defaultConfig as any).factionWarsAIDifficulty ?? 0.65,
   raidCarrierSurvival: (defaultConfig as any).raidCarrierSurvival ?? 0.20,
   raidUltraCarriers: (defaultConfig as any).raidUltraCarriers ?? 4,
   raidUltraRatio: (defaultConfig as any).raidUltraRatio ?? 0.65,
@@ -1186,7 +1192,23 @@ String(c.status).toUpperCase()==="PENDING"
               <div style={{ fontWeight: 900, marginBottom: 10, color: "#f87171" }}>⚔️ Raid Settings</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 <label style={{ fontSize: 12, opacity: 0.9 }}>
-                  Raid Cost (REBEL)
+                  </div>
+              <hr style={{ borderColor: "rgba(255,255,255,0.1)", margin: "20px 0" }} />
+              <div style={{ fontWeight: 800, marginBottom: 12, color: "#fbbf24" }}>⚔️ Faction Wars Settings</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <label style={labelStyle}>Faction Wars Cost (REBEL)
+                  <input value={cfg.factionWarsCost} onChange={e => setCfg(c => ({ ...c, factionWarsCost: safeNum(e.target.value, c.factionWarsCost) }))}
+                    type="number" min="0" style={inputStyle} />
+                </label>
+                <label style={labelStyle}>AI Difficulty (0.0 easy → 1.0 brutal)
+                  <input value={cfg.factionWarsAIDifficulty} onChange={e => setCfg(c => ({ ...c, factionWarsAIDifficulty: Math.min(1, Math.max(0, safeNum(e.target.value, c.factionWarsAIDifficulty))) }))}
+                    type="number" min="0" max="1" step="0.05" style={inputStyle} />
+                </label>
+              </div>
+              <hr style={{ borderColor: "rgba(255,255,255,0.1)", margin: "20px 0" }} />
+              <div style={{ fontWeight: 800, marginBottom: 12, color: "#f87171" }}>⚔️ Raid Settings</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <label style={labelStyle}>Raid Cost (REBEL)
                   <input value={cfg.raidCost} onChange={e => setCfg(c => ({ ...c, raidCost: safeNum(e.target.value, c.raidCost) }))}
                     style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} />
                   <div style={{ fontSize: 10, opacity: 0.6, marginTop: 3 }}>How much it costs to launch one raid</div>

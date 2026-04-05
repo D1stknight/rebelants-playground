@@ -1385,7 +1385,7 @@ return (
         </div>
         <nav className="tabs" aria-label="Main">
           <Link href="/tunnel"     className="tab">🐜 Ant Tunnel</Link>
-          <Link href="/hatch"      className="tab">🥚 Queen&apos;s Egg Hatch</Link>
+          <Link href="/hatch"      className="tab">⚔️ Faction Wars</Link>
           <Link href="/expedition" className="tab">⚔️ The Raid</Link>
           <Link href="/shuffle"    className="tab tab-active">🃏 Shuffle</Link>
         </nav>
