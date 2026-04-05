@@ -1991,6 +1991,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
         })}
       </div>
     </div>
+      </div>
     <div style={{...leaderboardCardRedStyle,marginTop:14}}>
               <div style={leaderboardCardHeaderStyle}>
                 <div><div style={{...leaderboardTitleStyle,color:"#f87171"}}>🐜 Your Stats</div><div style={leaderboardSubtitleStyle}>Your personal progress. Only you can see this.</div></div>
