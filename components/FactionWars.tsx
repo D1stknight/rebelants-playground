@@ -815,7 +815,7 @@ export default function FactionWars() {
 
                   {/* Center VS */}
                   <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:6, minWidth:60 }}>
-                    <div style={{ fontSize: battleAnim==="clash"?48:32, fontWeight:900, transition:"font-size 0.2s",
+                    <div style={{ fontSize: battleAnim==="clash"?48:32, fontWeight:900,
                       textShadow: battleAnim==="clash"?"0 0 30px #fbbf24":"none",
                       transform: battleAnim==="clash"?"scale(1.3)":"scale(1)", transition:"all 0.2s" }}>
                       {battleAnim==="clash"?"💥":battleAnim==="win"?"✅":battleAnim==="lose"?"💀":"⚔️"}
