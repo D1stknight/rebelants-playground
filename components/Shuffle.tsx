@@ -618,7 +618,6 @@ export default function Shuffle() {
     const p = loadProfile();
 
     const name = (p?.name || "guest").trim() || "guest";
-  useEffect(() => { startMusic(); return () => { stopMusic(); }; }, []);
     let id = (p?.id || "").trim();
 
     if (!id) {
@@ -640,6 +639,9 @@ export default function Shuffle() {
 
   // ✅ NEW: this is what points + wins should use going forward
   const [effectivePlayerId, setEffectivePlayerId] = useState(initialEffectiveId);
+
+  // Start music on mount, stop on unmount
+  React.useEffect(() => { startMusic(); return () => { stopMusic(); }; }, []);
 
   // ✅ If profile identity changes (wallet connect / discord connect), refresh effective id
  React.useEffect(() => {
