@@ -879,6 +879,7 @@ export default function Raid() {
   const commonSurvivorsThreshold = Number(cfg?.raidCommonSurvivors ?? DEFAULT_COMMON_SURVIVORS);
 
   // Leaderboards
+  useEffect(() => { startMarch(); return () => { stopMarch(); }; }, []);
   const [lb, setLb] = useState<RaidLeaderboards>({ topCommanders:[], brutalRaids:[], ultraHaul:[], recentRaids:[] });
 
   const loadLb = useCallback(async () => {
