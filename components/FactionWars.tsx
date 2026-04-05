@@ -283,7 +283,7 @@ export default function FactionWars() {
     return [h,m,s].map(n=>String(n).padStart(2,'0')).join(':');
   }
 
-  useEffect(() => { if (!effectivePlayerId) return; fetch(`/api/points/claim?playerId=${encodeURIComponent(effectivePlayerId)}`,{cache:"no-store"}).then(r=>r.json()).then(j=>{if(j?.ok)setDailyClaimed(!!j.claimed);}).catch(()=>{}); }, [effectivePlayerId]);
+  useEffect(() => { if (!effectivePlayerId) return; fetch(`/api/points/claim?playerId=${encodeURIComponent(effectivePlayerId)}`,{cache:"no-store"}).then(r=>r.json()).then(j=>{ if(j?.ok){ setDailyClaimed(!!j.claimed); if(j.claimed && j.msUntilNextClaim>0) setNextClaimTs(Date.now()+Number(j.msUntilNextClaim)); } }).catch(()=>{}); }, [effectivePlayerId]);
 
   async function claimDailyNow() {
     if (claimBusy||dailyClaimed||!effectivePlayerId) return;
@@ -292,7 +292,7 @@ export default function FactionWars() {
       const r=await fetch("/api/points/claim",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({playerId:effectivePlayerId,amount:cfg?.dailyClaim})});
       const j=await r.json().catch(()=>null);
       if (!r.ok||!j?.ok){setClaimStatus(j?.error||"Claim failed.");return;}
-      setDailyClaimed(true); setClaimStatus(`✅ +${j.added||cfg?.dailyClaim} ${cfg?.currency} claimed!`);
+      setDailyClaimed(true); setClaimStatus(`✅ +${j.added||cfg?.dailyClaim} ${cfg?.currency} claimed!`); if(j.msUntilNextClaim>0) setNextClaimTs(Date.now()+Number(j.msUntilNextClaim)); else setNextClaimTs(Date.now()+86400000);
       await refresh();
     } catch(e:any){setClaimStatus(e?.message||"Claim error");}
     finally{setClaimBusy(false);}
