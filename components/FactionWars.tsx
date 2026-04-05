@@ -155,7 +155,7 @@ function FactionCard({ faction, selected, onSelect, disabled }: { faction: Facti
     <div
       onClick={disabled ? undefined : onSelect}
       style={{
-        width: 90, height: 110, cursor: disabled ? "not-allowed" : "pointer",
+        width: 96, height: 132, cursor: disabled ? "not-allowed" : "pointer",
         opacity: disabled ? 0.5 : 1, perspective: "600px", flexShrink: 0,
       }}
     >
@@ -175,7 +175,7 @@ function FactionCard({ faction, selected, onSelect, disabled }: { faction: Facti
           boxShadow: selected ? `0 0 20px ${faction.color}55` : "none",
         }}>
           <img src={factionImgPath(faction.id,"symbol")} alt={faction.name}
-            style={{ width: "100%", height: 72, objectFit: "cover", borderRadius: "10px 10px 0 0" }}
+            style={{ width: "100%", height: 90, objectFit: "contain", padding: "6px 4px 2px", background: "rgba(0,0,0,0.45)", borderRadius: "10px 10px 0 0", boxSizing: "border-box" }}
             onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }}
           />
           <div style={{ padding: "4px 4px 6px", textAlign: "center" }}>
@@ -193,7 +193,7 @@ function FactionCard({ faction, selected, onSelect, disabled }: { faction: Facti
           boxShadow: `0 0 24px ${faction.color}66`,
         }}>
           <img src={factionImgPath(faction.id,"char")} alt={faction.name + " warrior"}
-            style={{ width: "100%", height: 80, objectFit: "cover", objectPosition: "top", borderRadius: "10px 10px 0 0" }}
+            style={{ width: "100%", height: 98, objectFit: "cover", objectPosition: "top", borderRadius: "10px 10px 0 0" }}
             onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }}
           />
           <div style={{ padding: "4px 4px 6px", textAlign: "center" }}>
@@ -613,7 +613,7 @@ export default function FactionWars() {
                   );})}
                   {team.length>0&&<span style={{fontSize:11,opacity:0.5,cursor:"pointer",textDecoration:"underline"}} onClick={()=>setTeam([])}>clear</span>}
                 </div>
-                <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(88px,1fr))", gap:8, marginBottom:16 }}>
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(96px,1fr))", gap:8, marginBottom:16 }}>
                   {FACTION_IDS.map(fid=>(<FactionCard key={fid} faction={FACTIONS[fid]} selected={team.includes(fid)} onSelect={()=>toggleFaction(fid)} disabled={false} />))}
                 </div>
                 {team.length>0&&(
