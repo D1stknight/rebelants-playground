@@ -1,7 +1,3 @@
-  const [lastSquad, setLastSquad] = useState<AntRole[] | null>(() => { if (typeof window === "undefined") return null; try { const v = localStorage.getItem("ra:raid:lastSquad"); return v ? JSON.parse(v) : null; } catch { return null; } });
-const LAST_SQUAD_KEY = "ra:raid:lastSquad";
-function saveLastSquad(s: AntRole[]) { if (typeof window === "undefined") return; try { localStorage.setItem(LAST_SQUAD_KEY, JSON.stringify(s)); } catch {} }
-function loadLastSquad(): AntRole[] | null { if (typeof window === "undefined") return null; try { const v = localStorage.getItem(LAST_SQUAD_KEY); return v ? JSON.parse(v) : null; } catch { return null; } }
 // components/Raid.tsx — THE RAID (Epic Edition v3)
 import React, { useState, useEffect, useRef, useCallback } from "react";
 // components/Raid.tsx — THE RAID (Epic Edition v2)
