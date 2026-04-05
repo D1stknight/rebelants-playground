@@ -431,6 +431,7 @@ export default function TunnelShell() {
   const [dripBalance,    setDripBalance]    = useState<number|null>(null);
   const [dripStatus,     setDripStatus]     = useState("");
   const [showBuyPoints, setShowBuyPoints] = useState(false);
+  const [showRules, setShowRules] = useState(false);
   const { muted, toggleMute, startAmbient, stopAmbient, sfx } = useAudio();
   const [tunnelCfg, setTunnelCfg] = useState(DEFAULT_TUNNEL_CONFIG);
 
@@ -1530,9 +1531,8 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                   Move with purpose. Break what stands in your way. In the dark, hesitation is defeat.
                 </div>
 
-                <Link href="/tunnel-rules" style={tunnelRulesLinkStyle}>
-                  How to Play + Official Rules
-                </Link>
+            <Link href="/tunnel-rules" style={tunnelRulesLinkStyle}>How to Play</Link>
+            <button onClick={()=>setShowRules(true)} style={{...tunnelRulesLinkStyle, background:"none", border:"none", cursor:"pointer", marginLeft:8}}>Official Rules</button>
               </div>
               {discordUserId && (
                 <div style={{fontSize:11,opacity:0.6,marginTop:4}}>
@@ -2782,3 +2782,25 @@ const mobileRotatePromptCardStyle: React.CSSProperties = {
   textAlign: "center",
   boxShadow: "0 16px 40px rgba(0,0,0,0.32)",
 };
+      {showRules && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.8)", zIndex:3000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }} onClick={()=>setShowRules(false)}>
+          <div style={{ background:"#0f172a", border:"1px solid rgba(255,255,255,0.15)", borderRadius:16, padding:28, maxWidth:560, width:"100%", maxHeight:"85vh", overflowY:"auto" }} onClick={e=>e.stopPropagation()}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
+              <div style={{ fontWeight:900, fontSize:18 }}>📋 Official Rules</div>
+              <button onClick={()=>setShowRules(false)} style={{ background:"rgba(255,255,255,0.1)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:8, padding:"6px 14px", color:"white", cursor:"pointer", fontSize:13 }}>✕ Close</button>
+            </div>
+            <div style={{ fontSize:13, lineHeight:1.7, display:"flex", flexDirection:"column", gap:12, opacity:0.9 }}>
+              <p><b>Free-to-play.</b> No purchase necessary to play. Void where prohibited.</p>
+              <p><b>Game currency:</b> REBEL Points are an in-app promotional points system. No guaranteed cash value, not redeemable for cash.</p>
+              <p><b>Optional purchase (APE):</b> You may optionally buy REBEL Points using APE to support the project. <b>All purchases are final</b> (no refunds). Gas fees may apply.</p>
+              <p><b>Prizes:</b> Crates may award REBEL Points and/or digital collectibles and/or merch (when available). Availability may vary by location.</p>
+              <p><b>Daily limits:</b> Daily claim and play limits apply to ensure fair access. Daily plays reset every 24 hours. Purchased bonus plays do not expire.</p>
+              <p><b>Fair play:</b> Multi-accounting, bots, exploits, or abuse may result in disqualification, prize forfeiture, or account blocking.</p>
+              <p><b>Odds:</b> Prize odds and point values may change over time based on live configuration and promotions.</p>
+              <p><b>Taxes:</b> You are responsible for any taxes associated with prizes, if applicable.</p>
+              <p style={{ opacity:0.7 }}>By playing, you agree to these rules and acknowledge this is an entertainment experience with promotional rewards.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
