@@ -433,6 +433,7 @@ export default function TunnelShell() {
   const [dripStatus,     setDripStatus]     = useState("");
   const [showBuyPoints, setShowBuyPoints] = useState(false);
   const [showRules, setShowRules] = useState(false);
+  useEffect(() => { startAmbient(); return () => { stopAmbient(); }; }, []);
   const { muted, toggleMute, startAmbient, stopAmbient, sfx } = useAudio();
   const [tunnelCfg, setTunnelCfg] = useState(DEFAULT_TUNNEL_CONFIG);
 
