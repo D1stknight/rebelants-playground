@@ -84,6 +84,9 @@ type RaidLeaderboards = {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const SQUAD_SIZE   = 20;
+const LAST_SQUAD_KEY="ra:raid:lastSquad";
+function saveLastSquad(s:AntRole[]){if(typeof window==="undefined")return;try{localStorage.setItem(LAST_SQUAD_KEY,JSON.stringify(s));}catch{}}
+function loadLastSquad():AntRole[]|null{if(typeof window==="undefined")return null;try{const v=localStorage.getItem(LAST_SQUAD_KEY);return v?JSON.parse(v):null;}catch{return null;}}
 const REVEAL_MS    = 700; // slower = more drama
 
 // Default survival odds (can be overridden by admin via pointsConfig)
@@ -853,6 +856,7 @@ export default function Raid() {
 
   // Game state
   const [squad, setSquad]                 = useState<AntRole[]>([...DEFAULT_SQUAD]);
+  const [lastSquad,setLastSquad]=useState<AntRole[]|null>(()=>{if(typeof window==="undefined")return null;try{const v=localStorage.getItem(LAST_SQUAD_KEY);return v?JSON.parse(v):null;}catch{return null;}});
   const [phase, setPhase]                 = useState<Phase>("idle");
   const { muted: raidMuted, toggleMute: toggleRaidMute, startMarch, stopMarch, sfx: raidSfx } = useRaidAudio();
   const [busy, setBusy]                   = useState(false);
@@ -918,6 +922,7 @@ export default function Raid() {
     setSlots([]); setRevealedCount(0); setShowResult(false);
 
   if (typeof window !== "undefined") { try { localStorage.setItem("ra:raid:lastSquad", JSON.stringify(squad)); setLastSquad([...squad]); } catch {} }
+  if(typeof window!=="undefined"){try{localStorage.setItem(LAST_SQUAD_KEY,JSON.stringify(squad));setLastSquad([...squad]);}catch{}}
   const isRepeatSquad = lastSquad !== null && JSON.stringify(squad) === JSON.stringify(lastSquad);
     await spend(totalCost,"expedition");
     await new Promise(r=>setTimeout(r,900));
@@ -960,6 +965,7 @@ export default function Raid() {
     setSlots([]); setRevealedCount(0);
     setRarity("none"); setPrize(null);
     setSquad([...DEFAULT_SQUAD]);
+    if(typeof window!=="undefined"){try{const v=localStorage.getItem(LAST_SQUAD_KEY);setLastSquad(v?JSON.parse(v):null);}catch{}}
     if (typeof window !== "undefined") { try { const v = localStorage.getItem("ra:raid:lastSquad"); setLastSquad(v ? JSON.parse(v) : null); } catch {} }
   }
 
