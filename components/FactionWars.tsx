@@ -215,30 +215,136 @@ function FWLeaderboardPanel({ lb }: { lb: FWLeaderboards }) {
 }
 
 export default function FactionWars() {
+  // ── Identity ──────────────────────────────────────────────────────────
   const initialProfile = typeof window !== "undefined" ? loadProfile() : null;
   const initialEffectiveId = initialProfile ? getEffectivePlayerId(initialProfile) : "guest";
   const [effectivePlayerId, setEffectivePlayerId] = useState(initialEffectiveId);
   const [playerName, setPlayerName] = useState(initialProfile?.discordName || initialProfile?.name || "");
-  const lastPidRef = useRef("");
+  const playerId = effectivePlayerId;
+
   useEffect(() => {
     const u = () => { const p = loadProfile(); const id = getEffectivePlayerId(p)||"guest"; setEffectivePlayerId(id); setPlayerName(p?.discordName||p?.name||""); };
     u(); window.addEventListener("ra:identity-changed", u); return () => window.removeEventListener("ra:identity-changed", u);
   }, []);
-  const { balance, spend, earn, refresh, totalEarnRoom } = usePoints(effectivePlayerId);
+
+  const { balance, spend, earn, refresh, totalEarnRoom, devGrant } = usePoints(effectivePlayerId);
+  const lastPidRef = useRef<string>("");
   useEffect(() => { if (!effectivePlayerId||lastPidRef.current===effectivePlayerId) return; lastPidRef.current=effectivePlayerId; refresh().catch(()=>{}); }, [effectivePlayerId, refresh]);
+
   const [profile, setProfile] = useState(initialProfile);
   useEffect(() => { const s=()=>setProfile(loadProfile()); s(); window.addEventListener("ra:identity-changed",s); return ()=>window.removeEventListener("ra:identity-changed",s); }, []);
+
+  const isDiscordConnected = !!profile?.discordUserId && !(profile as any)?.discordSkipLink;
+
+  // Discord auto-link
+  const didDiscordLinkRef = useRef(false);
+  useEffect(() => {
+    if (didDiscordLinkRef.current) return;
+    didDiscordLinkRef.current = true;
+    let cancelled = false;
+    (async () => {
+      try {
+        const gate = loadProfile();
+        if ((gate as any)?.discordSkipLink) return;
+        const sr = await fetch("/api/auth/discord/session",{cache:"no-store"});
+        const sj = await sr.json().catch(()=>null);
+        if (!sr.ok||!sj?.ok||!sj?.discordUserId) return;
+        const prof = loadProfile();
+        const fromId = getEffectivePlayerId(prof);
+        const toId = `discord:${sj.discordUserId}`;
+        if (String(prof.primaryId||"")===toId) return;
+        const lr = await fetch("/api/identity/link-discord",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({fromId})});
+        const lj = await lr.json().catch(()=>null);
+        if (!lr.ok||!lj?.ok) return;
+        saveProfile({discordUserId:sj.discordUserId,discordName:sj.discordName,primaryId:toId,name:sj.discordName||prof.name,discordSkipLink:false});
+        if (typeof window!=="undefined") window.dispatchEvent(new Event("ra:identity-changed"));
+        if (!cancelled) await refresh();
+      } catch {}
+    })();
+    return ()=>{ cancelled=true; };
+  }, []);
+
   useEffect(() => { if (typeof window!=="undefined"&&new URLSearchParams(window.location.search).get("discord")==="1") window.dispatchEvent(new Event("ra:identity-changed")); }, []);
 
-  const [cfg, setCfg] = useState<any>(defaultPointsConfig);
-  useEffect(() => { fetch("/api/config",{cache:"no-store"}).then(r=>r.json()).then(j=>{if(j?.pointsConfig)setCfg((c:any)=>({...c,...j.pointsConfig}));}).catch(()=>{}); }, []);
-  const fwCost       = Number((cfg as any)?.factionWarsCost        ?? 150);
-  const difficulty   = Number((cfg as any)?.factionWarsAIDifficulty ?? 0.65);
-  const currency     = String(cfg?.currency || "REBEL");
-  const rewardCommon = Number(cfg?.rewards?.common ?? 50);
-  const rewardRare   = Number(cfg?.rewards?.rare   ?? 100);
-  const rewardUltra  = Number(cfg?.rewards?.ultra  ?? 300);
+  function disconnectDiscord() {
+    try { saveProfile({ discordUserId: undefined, discordName: undefined, primaryId: undefined, discordSkipLink: true }); window.dispatchEvent(new Event("ra:identity-changed")); window.location.href = "/api/auth/discord/logout"; } catch {}
+  }
 
+  // Daily claim
+  const [dailyClaimed, setDailyClaimed] = useState(false);
+  const [nextClaimTs, setNextClaimTs]   = useState<number|null>(null);
+  const [countdownStr, setCountdownStr] = useState<string>('');
+  const [claimStatus, setClaimStatus]   = useState("");
+  const [claimBusy, setClaimBusy]       = useState(false);
+
+  function formatCountdown(ms: number): string {
+    if (ms<=0) return '00:00:00';
+    const totalSec=Math.floor(ms/1000); const h=Math.floor(totalSec/3600); const m=Math.floor((totalSec%3600)/60); const s=totalSec%60;
+    return [h,m,s].map(n=>String(n).padStart(2,'0')).join(':');
+  }
+
+  useEffect(() => { if (!effectivePlayerId) return; fetch(`/api/points/claim?playerId=${encodeURIComponent(effectivePlayerId)}`,{cache:"no-store"}).then(r=>r.json()).then(j=>{if(j?.ok)setDailyClaimed(!!j.claimed);}).catch(()=>{}); }, [effectivePlayerId]);
+
+  async function claimDailyNow() {
+    if (claimBusy||dailyClaimed||!effectivePlayerId) return;
+    setClaimBusy(true); setClaimStatus("Claiming…");
+    try {
+      const r=await fetch("/api/points/claim",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({playerId:effectivePlayerId,amount:cfg?.dailyClaim})});
+      const j=await r.json().catch(()=>null);
+      if (!r.ok||!j?.ok){setClaimStatus(j?.error||"Claim failed.");return;}
+      setDailyClaimed(true); setClaimStatus(`✅ +${j.added||cfg?.dailyClaim} ${cfg?.currency} claimed!`);
+      await refresh();
+    } catch(e:any){setClaimStatus(e?.message||"Claim error");}
+    finally{setClaimBusy(false);}
+  }
+
+  useEffect(() => {
+    if (!nextClaimTs) return;
+    const id=setInterval(()=>{ const ms=nextClaimTs-Date.now(); if(ms<=0){setCountdownStr(''); clearInterval(id); setDailyClaimed(false); return;} setCountdownStr(formatCountdown(ms)); },1000);
+    return ()=>clearInterval(id);
+  }, [nextClaimTs]);
+
+  // DRIP migrate
+  const [showDripMigrate, setShowDripMigrate] = useState(false);
+  const [dripBalance, setDripBalance]         = useState<number|null>(null);
+  const [dripAmount, setDripAmount]           = useState<number>(0);
+  const [dripBusy, setDripBusy]               = useState(false);
+  const [dripStatus, setDripStatus]           = useState("");
+
+  async function openDripModal() {
+    setDripStatus(""); setDripBusy(true); setDripBalance(null);
+    try {
+      const r=await fetch("/api/drip/balance",{cache:"no-store"}); const j=await r.json().catch(()=>null);
+      if (!r.ok||!j?.ok){setDripStatus(j?.error||"Could not load DRIP balance.");setShowDripMigrate(true);return;}
+      setDripBalance(Number(j.balance||0)); setDripAmount(0); setShowDripMigrate(true);
+    } catch(e:any){setDripStatus(e?.message||"DRIP error");setShowDripMigrate(true);}
+    finally{setDripBusy(false);}
+  }
+
+  async function migrateDripNow() {
+    const amt=Math.floor(Number(dripAmount||0)); if(!amt||amt<=0){setDripStatus("Enter an amount > 0.");return;}
+    setDripBusy(true); setDripStatus("Migrating…");
+    try {
+      const idem=`${Date.now()}-${Math.random().toString(36).slice(2,10)}`;
+      const r=await fetch("/api/drip/migrate",{method:"POST",headers:{"Content-Type":"application/json","x-idempotency-key":idem},body:JSON.stringify({amount:amt,playerId:effectivePlayerId,idempotencyKey:idem})});
+      const j=await r.json().catch(()=>null);
+      if (!r.ok||!j?.ok){setDripStatus(j?.error||"Migrate failed.");if(typeof j?.dripBalance==="number")setDripBalance(j.dripBalance);return;}
+      setDripStatus(`✅ Migrated ${amt} points into the game.`); await refresh();
+      const br=await fetch("/api/drip/balance",{cache:"no-store"}); const bj=await br.json().catch(()=>null);
+      if(br.ok&&bj?.ok)setDripBalance(Number(bj.balance||0));
+    } catch(e:any){setDripStatus(e?.message||"Migrate error");}
+    finally{setDripBusy(false);}
+  }
+
+  // ── Config ──────────────────────────────────────────────────────────
+  const [cfgState, setCfgState] = useState<any>(defaultPointsConfig);
+  useEffect(() => { fetch("/api/config",{cache:"no-store"}).then(r=>r.json()).then(j=>{if(j?.pointsConfig)setCfgState((c:any)=>({...c,...j.pointsConfig}));}).catch(()=>{}); }, []);
+  const cfg        = cfgState as any;
+  const fwCost     = Number(cfg?.factionWarsCost        ?? 150);
+  const difficulty = Number(cfg?.factionWarsAIDifficulty ?? 0.65);
+  const currency   = String(cfg?.currency || "REBEL");
+
+  // ── Game State ───────────────────────────────────────────────────────
   const [phase, setPhase]               = useState<Phase>("idle");
   const [team, setTeam]                 = useState<FactionId[]>([]);
   const [defenders, setDefenders]       = useState<FactionId[]>([]);
@@ -258,6 +364,9 @@ export default function FactionWars() {
     try { const r=await fetch("/api/faction-wars/leaderboard",{cache:"no-store"}); const j=await r.json(); if(j?.ok)setLb(j.lb); } catch {}
   }, []);
   useEffect(() => { void loadLB(); }, [loadLB]);
+  useEffect(() => {
+    const h=()=>loadLB(); window.addEventListener("ra:leaderboards-refresh",h); return ()=>window.removeEventListener("ra:leaderboards-refresh",h);
+  }, [loadLB]);
 
   const toggleFaction = (fid: FactionId) => {
     if (phase !== "idle") return;
@@ -297,8 +406,7 @@ export default function FactionWars() {
     await new Promise(r=>setTimeout(r,600));
     setBattleAnim("idle");
     const result: TerritoryResult = { territory: currentTerritory, defender, playerFaction, playerMove: selectedMove, enemyMove: res.enemyMove, playerPower: res.playerPower, enemyPower: res.enemyPower, won: res.won };
-    const newResults = [...results, result];
-    setResults(newResults); setSelectedMove(null); setPhase("territory_result"); setBusy(false);
+    setResults(prev => [...prev, result]); setSelectedMove(null); setPhase("territory_result"); setBusy(false);
   };
 
   const nextTerritory = () => {
@@ -311,9 +419,9 @@ export default function FactionWars() {
     setBusy(true);
     const territoriesWon = allResults.filter(r=>r.won).length;
     let rarity = calcRarity(territoriesWon);
-    let pts = rarity==="ultra" ? rewardUltra : rarity==="rare" ? rewardRare : rarity==="common" ? rewardCommon : 0;
+    let pts = rarity==="ultra" ? Number(cfg?.rewards?.ultra??300) : rarity==="rare" ? Number(cfg?.rewards?.rare??100) : rarity==="common" ? Number(cfg?.rewards?.common??50) : 0;
     if (team.includes("shogun") && rarity==="ultra") pts = Math.floor(pts*1.15);
-    if (team.includes("buke") && rarity==="none") { const dc=allResults.filter(r=>r.playerMove.type==="defend").length; if(dc>=3){rarity="common";pts=rewardCommon;} }
+    if (team.includes("buke") && rarity==="none") { const dc=allResults.filter(r=>r.playerMove.type==="defend").length; if(dc>=3){rarity="common";pts=Number(cfg?.rewards?.common??50);} }
     setFinalRarity(rarity);
     if (pts>0) { const er:any=await earn(pts).catch(()=>null); if(er?.ok)await refresh().catch(()=>{}); }
     const prof=loadProfile(); const pid=String(effectivePlayerId||getEffectivePlayerId(prof)||"guest").trim().slice(0,64)||"guest"; const pname=(prof?.discordName||playerName||prof?.name||"guest").trim()||"guest";
@@ -328,7 +436,6 @@ export default function FactionWars() {
     stopMusic(); setPhase("idle"); setTeam([]); setDefenders([]); setResults([]); setCurrentT(0); setCurrentFI(0); setSelectedMove(null); setFinalRarity("none"); setRunMessage(""); setBusy(false); setBattleAnim("idle");
   };
 
-  const isDiscordConnected = !!profile?.discordUserId && !(profile as any)?.discordSkipLink;
   const currentPlayerFaction = phase==="battle" ? (team[currentFactionIdx]||team[0]) : null;
   const currentPlayerFD = currentPlayerFaction ? FACTIONS[currentPlayerFaction] : null;
   const currentDefenderFD = defenders[currentTerritory] ? FACTIONS[defenders[currentTerritory]] : null;
@@ -339,6 +446,24 @@ export default function FactionWars() {
   return (
     <div style={{ minHeight:"100vh", background:"#080b14", color:"white", fontFamily:"'Segoe UI',sans-serif" }}>
       <BuyPointsModal open={showBuyPoints} onClose={()=>setShowBuyPoints(false)} playerId={effectivePlayerId} onClaimed={()=>{setShowBuyPoints(false);void refresh();}} />
+
+      {/* DRIP Modal */}
+      {showDripMigrate && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.7)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center" }} onClick={()=>setShowDripMigrate(false)}>
+          <div style={{ background:"#0f172a", border:"1px solid rgba(255,255,255,0.15)", borderRadius:16, padding:24, maxWidth:380, width:"90%", position:"relative" }} onClick={e=>e.stopPropagation()}>
+            <div style={{ fontWeight:900, fontSize:16, marginBottom:12 }}>⚔️ Migrate DRIP Points</div>
+            {dripBalance !== null && <div style={{ fontSize:13, opacity:0.8, marginBottom:10 }}>DRIP Balance: <b>{dripBalance}</b></div>}
+            <input type="number" value={dripAmount} onChange={e=>setDripAmount(Number(e.target.value))} min={0} max={dripBalance||0} placeholder="Amount to migrate" style={{ width:"100%", padding:"10px 12px", borderRadius:10, border:"1px solid rgba(255,255,255,0.2)", background:"rgba(0,0,0,0.3)", color:"white", marginBottom:10, fontSize:14 }} />
+            {dripStatus && <div style={{ fontSize:12, color:dripStatus.startsWith("✅")?"#34d399":"#f87171", marginBottom:10 }}>{dripStatus}</div>}
+            <div style={{ display:"flex", gap:10 }}>
+              <button onClick={migrateDripNow} disabled={dripBusy} style={{ flex:1, padding:"10px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#fbbf24,#f59e0b)", color:"#000", fontWeight:900, cursor:"pointer" }}>Migrate</button>
+              <button onClick={()=>setShowDripMigrate(false)} style={{ flex:1, padding:"10px", borderRadius:10, border:"1px solid rgba(255,255,255,0.2)", background:"transparent", color:"white", cursor:"pointer" }}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
       <div style={{ backgroundImage:"url('/bg/faction-wars-bg.png')", backgroundSize:"cover", backgroundPosition:"center top", backgroundRepeat:"no-repeat", position:"relative", overflow:"hidden" }}>
         <div style={{ position:"absolute", inset:0, background:"linear-gradient(to bottom, rgba(8,11,20,0.35) 0%, rgba(8,11,20,0.85) 100%)", zIndex:0, pointerEvents:"none" }} />
         <div style={{ maxWidth:900, margin:"0 auto", padding:"24px 20px", position:"relative", zIndex:1 }}>
@@ -355,49 +480,95 @@ export default function FactionWars() {
       </div>
 
       <div style={{ maxWidth:900, margin:"0 auto", padding:"20px 16px" }}>
-        <div style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:14, padding:"14px 18px", marginBottom:18, display:"flex", gap:16, alignItems:"center", flexWrap:"wrap" }}>
-          <div style={{ flex:1, display:"flex", gap:20, flexWrap:"wrap", alignItems:"center" }}>
-            <div><span style={{ opacity:0.6, fontSize:12 }}>Balance </span><span style={{ fontWeight:900, fontSize:16, color:"#fbbf24" }}>{balance.toLocaleString()} {currency}</span></div>
-            <div><span style={{ opacity:0.6, fontSize:12 }}>Cost </span><span style={{ fontWeight:700, fontSize:14, color:"#f87171" }}>{fwCost} {currency}</span></div>
-            {!isDiscordConnected && <button onClick={()=>{window.location.href="/api/auth/discord/login";}} style={{ background:"rgba(88,101,242,0.2)", border:"1px solid rgba(88,101,242,0.4)", borderRadius:20, padding:"5px 14px", cursor:"pointer", fontSize:12, fontWeight:700, color:"#818cf8" }}>🔗 Connect Discord</button>}
-          </div>
-          <button onClick={()=>setShowBuyPoints(true)} style={{ background:"rgba(251,191,36,0.15)", border:"1px solid rgba(251,191,36,0.3)", borderRadius:20, padding:"6px 16px", cursor:"pointer", fontSize:12, fontWeight:700, color:"#fbbf24" }}>+ Buy Points</button>
-        </div>
-
         {phase === "idle" && (
           <div>
             <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:16, padding:"24px 20px", marginBottom:18 }}>
-              <div style={{ fontSize:28, fontWeight:900, marginBottom:6 }}>⚔️ Faction Wars</div>
-              <p style={{ opacity:0.7, fontSize:13, marginBottom:18 }}>Assemble 5 faction warriors. Battle through 5 enemy territories. Each faction brings unique weapons, magic, and passives. The AI fights back hard — know your factions or fall.</p>
-              <div style={{ display:"flex", gap:8, marginBottom:16, flexWrap:"wrap", alignItems:"center" }}>
-                {Array.from({length:TEAM_SIZE},(_,i)=>{const fid=team[i];const f=fid?FACTIONS[fid]:null;return(
-                  <div key={i} style={{ width:60, height:70, borderRadius:10, background:f?f.bgColor:"rgba(255,255,255,0.03)", border:`2px solid ${f?f.borderColor:"rgba(255,255,255,0.1)"}`, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", fontSize:f?28:22, opacity:f?1:0.3, cursor:f?"pointer":"default", transition:"all 0.2s" }} onClick={()=>f&&setTeam(prev=>prev.filter((_,j)=>j!==i))}>
-                    {f?f.emoji:"＋"}{f&&<div style={{fontSize:8,color:f.color,fontWeight:700,marginTop:2}}>{f.name}</div>}
-                  </div>
-                );})}
-                <div style={{ fontSize:11, opacity:0.5 }}>
-                  {team.length}/{TEAM_SIZE}
-                  {team.length>0&&<span style={{marginLeft:8,cursor:"pointer",textDecoration:"underline"}} onClick={()=>setTeam([])}>clear</span>}
-                </div>
+              {/* Title */}
+              <div style={{ textAlign:"center", marginBottom:14 }}>
+                <div style={{ fontSize:28, fontWeight:900, letterSpacing:"0.06em", background:"linear-gradient(135deg,#fbbf24,#f87171,#c084fc)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", marginBottom:4 }}>⚔️ FACTION WARS</div>
+                <div style={{ fontSize:13, opacity:0.65, letterSpacing:"0.04em" }}>🏰 Assemble 5 faction warriors. Battle 5 territories. Know your factions or fall.</div>
               </div>
-              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(88px,1fr))", gap:8, marginBottom:20 }}>
-                {FACTION_IDS.map(fid=>(<FactionCard key={fid} faction={FACTIONS[fid]} selected={team.includes(fid)} onSelect={()=>toggleFaction(fid)} disabled={false} />))}
+
+              {/* Launch button */}
+              <div style={{ marginTop:16, display:"flex", gap:10, flexWrap:"wrap", alignItems:"center" }}>
+                <button onClick={startCampaign} disabled={team.length<TEAM_SIZE||busy||balance<fwCost}
+                  style={{ minWidth:240, height:48, fontSize:14, fontWeight:900, display:"inline-flex", alignItems:"center", justifyContent:"center", borderRadius:12, border:"1px solid rgba(251,191,36,0.35)", cursor:team.length<TEAM_SIZE||busy||balance<fwCost?"not-allowed":"pointer", background:team.length<TEAM_SIZE?"rgba(15,23,42,.7)":"linear-gradient(135deg,rgba(251,191,36,.18),rgba(192,132,252,.18))", color:"#fbbf24" }}>
+                  {team.length<TEAM_SIZE?`⚔️ Select ${TEAM_SIZE-team.length} more warriors`:busy?"Assembling...":`⚔️ Launch Campaign (-${fwCost} ${currency})`}
+                </button>
+                <button onClick={()=>setShowBuyPoints(true)} style={{ padding:"10px 14px", fontSize:12, borderRadius:10, border:"1px solid rgba(255,255,255,0.15)", background:"rgba(255,255,255,0.07)", color:"white", cursor:"pointer", fontWeight:700 }}>💳 Buy Points</button>
+                {isDiscordConnected
+                  ? <button onClick={disconnectDiscord} style={{ padding:"10px 14px", fontSize:12, borderRadius:10, border:"1px solid rgba(255,255,255,0.15)", background:"rgba(255,255,255,0.07)", color:"white", cursor:"pointer", fontWeight:700 }}>Disconnect Discord</button>
+                  : <button onClick={()=>{ try{saveProfile({discordSkipLink:false});window.dispatchEvent(new Event("ra:identity-changed"));}catch{} window.location.href="/api/auth/discord/login"; }} style={{ padding:"10px 14px", fontSize:12, borderRadius:10, border:"1px solid rgba(88,101,242,0.4)", background:"rgba(88,101,242,0.15)", color:"#818cf8", cursor:"pointer", fontWeight:700 }}>🔗 Connect Discord</button>
+                }
+                <button onClick={async()=>{ if(!isDiscordConnected)return; await openDripModal(); }} disabled={dripBusy||!isDiscordConnected}
+                  style={{ padding:"10px 14px", fontSize:12, borderRadius:10, border:"1px solid rgba(255,255,255,0.15)", background:"rgba(255,255,255,0.07)", color:"white", cursor:"pointer", fontWeight:700, opacity:isDiscordConnected?1:0.5 }}
+                  title={isDiscordConnected?"Move points from Discord (DRIP) into the game":"Connect Discord to migrate DRIP points"}>
+                  {dripBusy?"Loading DRIP…":isDiscordConnected?"Migrate DRIP Points":"Connect Discord for DRIP"}
+                </button>
+                <div style={{ fontSize:11, opacity:0.65 }}>Discord: <b>{isDiscordConnected?"✅":"❌"}</b></div>
               </div>
-              {team.length>0&&(
-                <div style={{ display:"flex", gap:10, flexWrap:"wrap", marginBottom:16 }}>
-                  {team.map((fid,i)=>{const f=FACTIONS[fid];return(
-                    <div key={i} style={{ background:f.bgColor, border:`1px solid ${f.borderColor}`, borderRadius:10, padding:"8px 12px", fontSize:11, minWidth:130 }}>
-                      <div style={{ fontWeight:800, color:f.color, marginBottom:3 }}>{f.emoji} {f.name}</div>
-                      <div style={{ opacity:0.7, marginBottom:2 }}>⚡ {f.passive}</div>
-                      <div style={{ opacity:0.55, fontSize:10 }}>{f.passiveDesc}</div>
+
+              {/* Balance info */}
+              <div style={{ marginTop:10, fontSize:12, opacity:0.8, display:"flex", gap:14, flexWrap:"wrap" }}>
+                <span>⚔️ Balance: <b>{balance}</b> {currency}</span>
+                <span>🏰 Cost: <b>{fwCost}</b> {currency}</span>
+                {balance < fwCost && <span style={{ color:"#f87171" }}>Need {fwCost - balance} more {currency}</span>}
+              </div>
+              <div style={{ marginTop:6, fontSize:11, opacity:0.55, display:"flex", gap:10, flexWrap:"wrap" }}>
+                <span>🏆 Ultra: +{cfg?.rewards?.ultra}</span>
+                <span>⚔️ Rare: +{cfg?.rewards?.rare}</span>
+                <span>✅ Common: +{cfg?.rewards?.common}</span>
+                <span>📅 Daily cap: {cfg?.dailyEarnCap}</span>
+              </div>
+
+              {/* Name + daily claim */}
+              <div style={{ marginTop:12, display:"flex", gap:10, flexWrap:"wrap", alignItems:"center" }}>
+                <label style={{ fontSize:12, opacity:0.85 }}>
+                  ⚔️ Commander:&nbsp;
+                  <input value={playerName}
+                    onChange={e=>{ const v=(e.target.value.slice(0,18)||"guest").trim()||"guest"; setPlayerName(v); const p=loadProfile(); saveProfile({name:v,id:(p?.id||playerId||"guest").trim()||"guest"}); }}
+                    style={{ padding:"6px 10px", borderRadius:10, border:"1px solid rgba(255,255,255,.18)", background:"rgba(15,23,42,.55)", color:"inherit" }}
+                  />
+                  <div style={{ fontSize:10, opacity:0.55, marginTop:3 }}>ID: {profile?.discordName || playerName}</div>
+                </label>
+                <button onClick={claimDailyNow} disabled={claimBusy||dailyClaimed}
+                  style={{ padding:"8px 12px", fontSize:12, borderRadius:10, border:"1px solid rgba(251,191,36,0.3)", background:"rgba(251,191,36,0.12)", color:"#fbbf24", cursor:claimBusy||dailyClaimed?"not-allowed":"pointer", fontWeight:700, opacity:claimBusy||dailyClaimed?0.6:1 }}>
+                  {dailyClaimed ? (countdownStr ? `⏱ Next claim in ${countdownStr}` : "✅ Claimed Today") : `⚔️ Daily +${cfg?.dailyClaim} ${currency}`}
+                </button>
+                {process.env.NODE_ENV!=="production" && (
+                  <button onClick={async()=>{ await devGrant(5000); await refresh(); alert("Dev grant ✅"); }} style={{ padding:"8px 12px", fontSize:12, borderRadius:10, border:"1px solid rgba(255,255,255,0.15)", background:"rgba(255,255,255,0.07)", color:"white", cursor:"pointer" }}>Dev +5000</button>
+                )}
+                {claimStatus && <div style={{ fontSize:11, opacity:0.85 }}>{claimStatus}</div>}
+              </div>
+
+              {runMessage && <div style={{ color:"#f87171", fontSize:13, marginTop:10 }}>{runMessage}</div>}
+
+              {/* Team builder */}
+              <div style={{ marginTop:20, paddingTop:16, borderTop:"1px solid rgba(255,255,255,0.08)" }}>
+                <div style={{ fontSize:14, fontWeight:800, marginBottom:12, color:"#fbbf24" }}>⚔️ Assemble Your Team ({team.length}/{TEAM_SIZE})</div>
+                <div style={{ display:"flex", gap:8, marginBottom:16, flexWrap:"wrap", alignItems:"center" }}>
+                  {Array.from({length:TEAM_SIZE},(_,i)=>{const fid=team[i];const f=fid?FACTIONS[fid]:null;return(
+                    <div key={i} style={{ width:60, height:70, borderRadius:10, background:f?f.bgColor:"rgba(255,255,255,0.03)", border:`2px solid ${f?f.borderColor:"rgba(255,255,255,0.1)"}`, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", fontSize:f?28:22, opacity:f?1:0.3, cursor:f?"pointer":"default", transition:"all 0.2s" }} onClick={()=>f&&setTeam(prev=>prev.filter((_,j)=>j!==i))}>
+                      {f?f.emoji:"＋"}{f&&<div style={{fontSize:8,color:f.color,fontWeight:700,marginTop:2}}>{f.name}</div>}
                     </div>
                   );})}
+                  {team.length>0&&<span style={{fontSize:11,opacity:0.5,cursor:"pointer",textDecoration:"underline"}} onClick={()=>setTeam([])}>clear</span>}
                 </div>
-              )}
-              {runMessage&&<div style={{ color:"#f87171", fontSize:13, marginBottom:12 }}>{runMessage}</div>}
-              <button onClick={startCampaign} disabled={team.length<TEAM_SIZE||busy||balance<fwCost} style={{ padding:"13px 28px", borderRadius:12, border:"none", cursor:team.length<TEAM_SIZE||busy||balance<fwCost?"not-allowed":"pointer", background:team.length<TEAM_SIZE?"rgba(255,255,255,0.08)":"linear-gradient(135deg,#dc2626,#9f1239)", color:"white", fontWeight:900, fontSize:16, opacity:team.length<TEAM_SIZE||balance<fwCost?0.5:1, boxShadow:team.length===TEAM_SIZE?"0 0 24px rgba(220,38,38,0.4)":"none", transition:"all 0.2s" }}>
-                {team.length<TEAM_SIZE?`⚔️ Select ${TEAM_SIZE-team.length} more warriors`:busy?"Assembling...":`⚔️ Launch Campaign (-${fwCost} ${currency})`}
-              </button>
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(88px,1fr))", gap:8, marginBottom:16 }}>
+                  {FACTION_IDS.map(fid=>(<FactionCard key={fid} faction={FACTIONS[fid]} selected={team.includes(fid)} onSelect={()=>toggleFaction(fid)} disabled={false} />))}
+                </div>
+                {team.length>0&&(
+                  <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+                    {team.map((fid,i)=>{const f=FACTIONS[fid];return(
+                      <div key={i} style={{ background:f.bgColor, border:`1px solid ${f.borderColor}`, borderRadius:10, padding:"8px 12px", fontSize:11, minWidth:130 }}>
+                        <div style={{ fontWeight:800, color:f.color, marginBottom:3 }}>{f.emoji} {f.name}</div>
+                        <div style={{ opacity:0.7, marginBottom:2 }}>⚡ {f.passive}</div>
+                        <div style={{ opacity:0.55, fontSize:10 }}>{f.passiveDesc}</div>
+                      </div>
+                    );})}
+                  </div>
+                )}
+              </div>
             </div>
             <FWLeaderboardPanel lb={lb} />
           </div>
@@ -417,13 +588,13 @@ export default function FactionWars() {
             <div style={{ background:"rgba(0,0,0,0.5)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:16, padding:20, marginBottom:18 }}>
               <div style={{ display:"flex", justifyContent:"space-around", alignItems:"center", marginBottom:20 }}>
                 <div style={{ textAlign:"center" }}>
-                  <div style={{ fontSize:60, lineHeight:1, filter:battleAnim==="win"?"drop-shadow(0 0 20px #34d399)":battleAnim==="lose"?"grayscale(0.8)":"none", transform:battleAnim==="clash"?"scale(1.2) translateX(10px)":"scale(1)", transition:"all 0.3s" }}>{currentPlayerFD.emoji}</div>
+                  <div style={{ fontSize:64, lineHeight:1, filter:battleAnim==="win"?"drop-shadow(0 0 20px #34d399)":battleAnim==="lose"?"grayscale(0.8)":"none", transform:battleAnim==="clash"?"scale(1.2) translateX(10px)":"scale(1)", transition:"all 0.3s" }}>{currentPlayerFD.emoji}</div>
                   <div style={{ fontWeight:900, fontSize:14, color:currentPlayerFD.color, marginTop:6 }}>{currentPlayerFD.name}</div>
                   <div style={{ fontSize:10, opacity:0.5 }}>Warrior {currentFactionIdx+1}</div>
                 </div>
-                <div style={{ fontSize:32, opacity:0.8, fontWeight:900 }}>{battleAnim==="clash"?"💥":battleAnim==="win"?"✅":battleAnim==="lose"?"💀":"VS"}</div>
+                <div style={{ fontSize:36, opacity:0.8, fontWeight:900 }}>{battleAnim==="clash"?"💥":battleAnim==="win"?"✅":battleAnim==="lose"?"💀":"VS"}</div>
                 <div style={{ textAlign:"center" }}>
-                  <div style={{ fontSize:60, lineHeight:1, filter:battleAnim==="win"?"grayscale(0.8)":battleAnim==="lose"?"drop-shadow(0 0 20px #f87171)":"none", transform:battleAnim==="clash"?"scale(1.2) translateX(-10px)":"scale(1)", transition:"all 0.3s" }}>{currentDefenderFD.emoji}</div>
+                  <div style={{ fontSize:64, lineHeight:1, filter:battleAnim==="win"?"grayscale(0.8)":battleAnim==="lose"?"drop-shadow(0 0 20px #f87171)":"none", transform:battleAnim==="clash"?"scale(1.2) translateX(-10px)":"scale(1)", transition:"all 0.3s" }}>{currentDefenderFD.emoji}</div>
                   <div style={{ fontWeight:900, fontSize:14, color:currentDefenderFD.color, marginTop:6 }}>{currentDefenderFD.name}</div>
                   <div style={{ fontSize:10, opacity:0.5 }}>Defender</div>
                 </div>
@@ -437,7 +608,8 @@ export default function FactionWars() {
               <div style={{ display:"flex", gap:10, flexDirection:"column" }}>
                 {currentPlayerFD.moves.map(m=>(<MoveButton key={m.id} move={m} selected={selectedMove?.id===m.id} onSelect={()=>setSelectedMove(m)} disabled={busy} faction={currentPlayerFD} />))}
               </div>
-              <button onClick={fightTerritory} disabled={!selectedMove||busy} style={{ marginTop:16, padding:"12px 24px", borderRadius:12, border:"none", cursor:!selectedMove||busy?"not-allowed":"pointer", background:selectedMove?"linear-gradient(135deg,#dc2626,#9f1239)":"rgba(255,255,255,0.06)", color:"white", fontWeight:900, fontSize:15, opacity:!selectedMove?0.5:1, boxShadow:selectedMove?"0 0 20px rgba(220,38,38,0.35)":"none", width:"100%", transition:"all 0.2s" }}>
+              <button onClick={fightTerritory} disabled={!selectedMove||busy}
+                style={{ marginTop:16, padding:"12px 24px", borderRadius:12, border:"none", cursor:!selectedMove||busy?"not-allowed":"pointer", background:selectedMove?"linear-gradient(135deg,#fbbf24,#f59e0b)":"rgba(255,255,255,0.06)", color:selectedMove?"#000":"white", fontWeight:900, fontSize:15, opacity:!selectedMove?0.5:1, width:"100%", transition:"all 0.2s" }}>
                 {busy?"⚔️ Fighting...":selectedMove?`⚔️ Strike with ${selectedMove.label}!`:"Select a move to attack"}
               </button>
             </div>
@@ -453,13 +625,14 @@ export default function FactionWars() {
               <div style={{ fontSize:22, fontWeight:900, color:last.won?"#34d399":"#f87171", marginBottom:8 }}>{last.won?`Territory ${last.territory+1} Captured!`:`Territory ${last.territory+1} Lost`}</div>
               <div style={{ display:"flex", justifyContent:"center", gap:24, marginBottom:16 }}>
                 <div><div style={{fontSize:11,opacity:0.5,marginBottom:4}}>Your move</div><div style={{fontSize:14,fontWeight:800}}>{last.playerMove.emoji} {last.playerMove.label}</div><div style={{fontSize:12,color:"#60a5fa"}}>Power: {last.playerPower.toFixed(1)}</div></div>
-                <div style={{ fontSize:24, alignSelf:"center", opacity:0.6 }}>VS</div>
+                <div style={{fontSize:24,alignSelf:"center",opacity:0.6}}>VS</div>
                 <div><div style={{fontSize:11,opacity:0.5,marginBottom:4}}>{df.name}'s counter</div><div style={{fontSize:14,fontWeight:800}}>{last.enemyMove.emoji} {last.enemyMove.label}</div><div style={{fontSize:12,color:"#f87171"}}>Power: {last.enemyPower.toFixed(1)}</div></div>
               </div>
               <div style={{ display:"flex", gap:10, justifyContent:"center", marginBottom:20 }}>
                 {defenders.map((def,i)=>(<TerritoryBadge key={i} index={i} result={results[i]} isCurrent={false} defender={def} />))}
               </div>
-              <button onClick={nextTerritory} style={{ padding:"12px 28px", borderRadius:12, border:"none", cursor:"pointer", background:currentTerritory+1<TERRITORY_COUNT?"linear-gradient(135deg,#dc2626,#9f1239)":"linear-gradient(135deg,#fbbf24,#f59e0b)", color:currentTerritory+1<TERRITORY_COUNT?"white":"#000", fontWeight:900, fontSize:15 }}>
+              <button onClick={nextTerritory}
+                style={{ padding:"12px 28px", borderRadius:12, border:"none", cursor:"pointer", background:currentTerritory+1<TERRITORY_COUNT?"linear-gradient(135deg,#fbbf24,#f59e0b)":"linear-gradient(135deg,#34d399,#059669)", color:"#000", fontWeight:900, fontSize:15 }}>
                 {currentTerritory+1<TERRITORY_COUNT?`⚔️ Next Territory (${currentTerritory+2}/${TERRITORY_COUNT})`:"🏁 See Final Results"}
               </button>
             </div>
@@ -485,7 +658,7 @@ export default function FactionWars() {
                   </div>
                 ))}
               </div>
-              <button onClick={resetGame} style={{ padding:"12px 28px", borderRadius:12, border:"none", cursor:"pointer", background:"linear-gradient(135deg,#dc2626,#9f1239)", color:"white", fontWeight:900, fontSize:15, boxShadow:"0 0 20px rgba(220,38,38,0.3)" }}>⚔️ New Campaign</button>
+              <button onClick={resetGame} style={{ padding:"12px 28px", borderRadius:12, border:"none", cursor:"pointer", background:"linear-gradient(135deg,#fbbf24,#f59e0b)", color:"#000", fontWeight:900, fontSize:15 }}>⚔️ New Campaign</button>
             </div>
             <FWLeaderboardPanel lb={lb} />
           </div>
