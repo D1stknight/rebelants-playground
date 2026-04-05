@@ -338,7 +338,7 @@ export default function FactionWars() {
 
   return (
     <div style={{ minHeight:"100vh", background:"#080b14", color:"white", fontFamily:"'Segoe UI',sans-serif" }}>
-      {showBuyPoints && <BuyPointsModal onClose={()=>setShowBuyPoints(false)} playerId={effectivePlayerId} onSuccess={()=>{setShowBuyPoints(false);void refresh();}} />}
+      <BuyPointsModal open={showBuyPoints} onClose={()=>setShowBuyPoints(false)} playerId={effectivePlayerId} onClaimed={()=>{setShowBuyPoints(false);void refresh();}} />
       <div style={{ backgroundImage:"url('/bg/faction-wars-bg.png')", backgroundSize:"cover", backgroundPosition:"center top", backgroundRepeat:"no-repeat", position:"relative", overflow:"hidden" }}>
         <div style={{ position:"absolute", inset:0, background:"linear-gradient(to bottom, rgba(8,11,20,0.35) 0%, rgba(8,11,20,0.85) 100%)", zIndex:0, pointerEvents:"none" }} />
         <div style={{ maxWidth:900, margin:"0 auto", padding:"24px 20px", position:"relative", zIndex:1 }}>
