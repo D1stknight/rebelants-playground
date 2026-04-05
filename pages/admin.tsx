@@ -1564,8 +1564,6 @@ String(c.status).toUpperCase()==="PENDING"
 </div>
 
             </div>
-          </div>
-          </div>
 <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
   <button className="btn" onClick={loadConfig} style={{ padding: "10px 12px" }}>
     Load Current
