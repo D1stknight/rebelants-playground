@@ -12,6 +12,8 @@ function useRaidAudio() {
   const [muted, setMuted] = React.useState<boolean>(() => {
     try { return localStorage.getItem("ra:raid:muted") === "1"; } catch { return false; }
   });
+  const mutedRef = React.useRef(muted);
+  mutedRef.current = muted;
   const marchRef = React.useRef<HTMLAudioElement | null>(null);
 
   const play = React.useCallback((src: string, volume = 1) => {
@@ -24,10 +26,10 @@ function useRaidAudio() {
     if (marchRef.current) { marchRef.current.pause(); marchRef.current = null; }
     try {
       const a = new Audio("/audio/raid-march.mp3");
-      a.loop = true; a.volume = muted ? 0 : 0.4;
+      a.loop = true; a.volume = mutedRef.current ? 0 : 0.4;
       void a.play().catch(()=>{}); marchRef.current = a;
     } catch {}
-  }, [muted]);
+  }, []);
 
   const stopMarch = React.useCallback(() => {
     if (marchRef.current) { marchRef.current.pause(); marchRef.current.currentTime = 0; marchRef.current = null; }
@@ -43,11 +45,11 @@ function useRaidAudio() {
   }, []);
 
   const sfx = React.useMemo(() => ({
-    survive: () => { if (!muted) play("/audio/ant-survive.mp3", 0.6); },
-    die:     () => { if (!muted) play("/audio/ant-die.mp3",     0.3); },
-    ultra:   () => { if (!muted) { stopMarch(); play("/audio/raid-ultra.mp3", 0.9); } },
-    fail:    () => { if (!muted) { stopMarch(); play("/audio/raid-fail.mp3",  0.7); } },
-  }), [muted, play, stopMarch]);
+    survive: () => { if (!mutedRef.current) play("/audio/ant-survive.mp3", 0.6); },
+    die:     () => { if (!mutedRef.current) play("/audio/ant-die.mp3",     0.3); },
+    ultra:   () => { if (!mutedRef.current) { stopMarch(); play("/audio/raid-ultra.mp3", 0.9); } },
+    fail:    () => { if (!mutedRef.current) { stopMarch(); play("/audio/raid-fail.mp3",  0.7); } },
+  }), [play, stopMarch]);
 
   return { muted, toggleMute, startMarch, stopMarch, sfx };
 }

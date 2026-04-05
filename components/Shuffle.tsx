@@ -10,6 +10,54 @@ import { usePoints } from "../lib/usePoints";
 import { loadProfile, saveProfile, getEffectivePlayerId } from "../lib/profile";
 import { addWin } from "../lib/winsStore";
 import LeaderboardPanel from "./LeaderboardPanel";
+
+// ── Shuffle Audio ─────────────────────────────────────────────────────────────
+function useShuffleAudio() {
+  const [muted, setMuted] = React.useState<boolean>(() => {
+    try { return localStorage.getItem("ra:shuffle:muted") === "1"; } catch { return false; }
+  });
+  const mutedRef = React.useRef(muted);
+  mutedRef.current = muted;
+  const musicRef = React.useRef<HTMLAudioElement | null>(null);
+
+  const play = React.useCallback((src: string, volume = 1) => {
+    if (typeof window === "undefined") return;
+    try { const a = new Audio(src); a.volume = volume; void a.play().catch(()=>{}); } catch {}
+  }, []);
+
+  const startMusic = React.useCallback(() => {
+    if (typeof window === "undefined") return;
+    if (musicRef.current) { musicRef.current.pause(); musicRef.current = null; }
+    try {
+      const a = new Audio("/audio/shuffle-music.mp3");
+      a.loop = true; a.volume = mutedRef.current ? 0 : 0.4;
+      void a.play().catch(()=>{}); musicRef.current = a;
+    } catch {}
+  }, [muted]);
+
+  const stopMusic = React.useCallback(() => {
+    if (musicRef.current) { musicRef.current.pause(); musicRef.current.currentTime = 0; musicRef.current = null; }
+  }, []);
+
+  const toggleMute = React.useCallback(() => {
+    setMuted(m => {
+      const next = !m;
+      try { localStorage.setItem("ra:shuffle:muted", next ? "1" : "0"); } catch {}
+      if (musicRef.current) musicRef.current.volume = next ? 0 : 0.4;
+      return next;
+    });
+  }, []);
+
+  const sfx = React.useMemo(() => ({
+    pick:   () => { stopMusic(); },
+    common: () => { if (!mutedRef.current) play("/audio/prize-common.mp3", 0.8); },
+    rare:   () => { if (!mutedRef.current) play("/audio/prize-rare.mp3",   0.9); },
+    ultra:  () => { if (!mutedRef.current) play("/audio/prize-ultra.mp3",  1.0); },
+    none:   () => { if (!mutedRef.current) play("/audio/prize-none.mp3",   0.8); },
+  }), [play, stopMusic]);
+
+  return { muted, toggleMute, startMusic, stopMusic, sfx };
+}
 import BuyPointsModal from "./BuyPointsModal";
 
 // lazy-load queen so 3D never blocks SSR
@@ -784,6 +832,7 @@ console.log("PLAYER ID (guest) =", playerId, "| effective =", effectivePlayerId)
   const needMore = Math.max(0, cost - balance);
 
 const [phase, setPhase] = useState<Phase>("idle");
+const { muted: shuffleMuted, toggleMute: toggleShuffleMute, startMusic, stopMusic, sfx: shuffleSfx } = useShuffleAudio();
 const [showHowPointsWork, setShowHowPointsWork] = useState(false);
 const [order, setOrder] = useState<number[]>(() => Array.from({ length: EGG_COUNT }, (_, i) => i));
 const [progress, setProgress] = useState(0);
@@ -934,7 +983,7 @@ const runShuffle = async () => {
 
   setWinText("");
   setBusy(true);
-  setPhase("shuffling");
+  setPhase("shuffling"); startMusic();
   setProgress(0);
   setShowPrize(false);
 
@@ -957,7 +1006,7 @@ const runShuffle = async () => {
 };
   const onPick = () => {
     if (phase !== "pick" || busy) return;
-
+    shuffleSfx.pick();
     setBusy(true);
 
 setTimeout(async () => {
@@ -1089,6 +1138,10 @@ setRarity(r);
 setPhase("revealed");
 setShowPrize(true);
 setBusy(false);
+if (r === "ultra") shuffleSfx.ultra();
+else if (r === "rare") shuffleSfx.rare();
+else if (r === "common") shuffleSfx.common();
+else shuffleSfx.none();
     }, 350);
   };
  const resetAfterPrize = async () => {
@@ -1111,6 +1164,7 @@ setBusy(false);
     console.error("Claim creation failed", e);
   }
 
+  stopMusic();
   setShowPrize(false);
   setRarity("none");
   setWinText("");
@@ -1323,8 +1377,11 @@ return (
 
       {/* HEADER */}
       <header className="page-head" role="banner">
-        <div className="site-title">
+        <div className="site-title" style={{ display:"flex", alignItems:"center", gap:10 }}>
           <Link href="/">Rebel Ants Playground</Link>
+          <button onClick={toggleShuffleMute} title={shuffleMuted ? "Unmute" : "Mute"} style={{ background:"rgba(0,0,0,0.4)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:20, padding:"3px 10px", cursor:"pointer", fontSize:16, color:"rgba(255,255,255,0.8)", lineHeight:1 }}>
+            {shuffleMuted ? "🔇" : "🔊"}
+          </button>
         </div>
         <nav className="tabs" aria-label="Main">
           <Link href="/tunnel"     className="tab">🐜 Ant Tunnel</Link>
