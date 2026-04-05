@@ -16,6 +16,8 @@ function useShuffleAudio() {
   const [muted, setMuted] = React.useState<boolean>(() => {
     try { return localStorage.getItem("ra:shuffle:muted") === "1"; } catch { return false; }
   });
+  const mutedRef = React.useRef(muted);
+  mutedRef.current = muted;
   const musicRef = React.useRef<HTMLAudioElement | null>(null);
 
   const play = React.useCallback((src: string, volume = 1) => {
@@ -28,7 +30,7 @@ function useShuffleAudio() {
     if (musicRef.current) { musicRef.current.pause(); musicRef.current = null; }
     try {
       const a = new Audio("/audio/shuffle-music.mp3");
-      a.loop = true; a.volume = muted ? 0 : 0.4;
+      a.loop = true; a.volume = mutedRef.current ? 0 : 0.4;
       void a.play().catch(()=>{}); musicRef.current = a;
     } catch {}
   }, [muted]);
@@ -48,11 +50,11 @@ function useShuffleAudio() {
 
   const sfx = React.useMemo(() => ({
     pick:   () => { stopMusic(); },
-    common: () => { if (!muted) play("/audio/prize-common.mp3", 0.8); },
-    rare:   () => { if (!muted) play("/audio/prize-rare.mp3",   0.9); },
-    ultra:  () => { if (!muted) play("/audio/prize-ultra.mp3",  1.0); },
-    none:   () => { if (!muted) play("/audio/prize-none.mp3",   0.8); },
-  }), [muted, play, stopMusic]);
+    common: () => { if (!mutedRef.current) play("/audio/prize-common.mp3", 0.8); },
+    rare:   () => { if (!mutedRef.current) play("/audio/prize-rare.mp3",   0.9); },
+    ultra:  () => { if (!mutedRef.current) play("/audio/prize-ultra.mp3",  1.0); },
+    none:   () => { if (!mutedRef.current) play("/audio/prize-none.mp3",   0.8); },
+  }), [play, stopMusic]);
 
   return { muted, toggleMute, startMusic, stopMusic, sfx };
 }
