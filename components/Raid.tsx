@@ -6,6 +6,51 @@ import Link from "next/link";
 import { pointsConfig as defaultPointsConfig } from "../lib/pointsConfig";
 import { usePoints } from "../lib/usePoints";
 import { loadProfile, saveProfile, getEffectivePlayerId } from "../lib/profile";
+
+// ── Raid Audio ────────────────────────────────────────────────────────────────
+function useRaidAudio() {
+  const [muted, setMuted] = React.useState<boolean>(() => {
+    try { return localStorage.getItem("ra:raid:muted") === "1"; } catch { return false; }
+  });
+  const marchRef = React.useRef<HTMLAudioElement | null>(null);
+
+  const play = React.useCallback((src: string, volume = 1) => {
+    if (typeof window === "undefined") return;
+    try { const a = new Audio(src); a.volume = volume; void a.play().catch(()=>{}); } catch {}
+  }, []);
+
+  const startMarch = React.useCallback(() => {
+    if (typeof window === "undefined") return;
+    if (marchRef.current) { marchRef.current.pause(); marchRef.current = null; }
+    try {
+      const a = new Audio("/audio/raid-march.mp3");
+      a.loop = true; a.volume = muted ? 0 : 0.4;
+      void a.play().catch(()=>{}); marchRef.current = a;
+    } catch {}
+  }, [muted]);
+
+  const stopMarch = React.useCallback(() => {
+    if (marchRef.current) { marchRef.current.pause(); marchRef.current.currentTime = 0; marchRef.current = null; }
+  }, []);
+
+  const toggleMute = React.useCallback(() => {
+    setMuted(m => {
+      const next = !m;
+      try { localStorage.setItem("ra:raid:muted", next ? "1" : "0"); } catch {}
+      if (marchRef.current) marchRef.current.volume = next ? 0 : 0.4;
+      return next;
+    });
+  }, []);
+
+  const sfx = React.useMemo(() => ({
+    survive: () => { if (!muted) play("/audio/ant-survive.mp3", 0.6); },
+    die:     () => { if (!muted) play("/audio/ant-die.mp3",     0.3); },
+    ultra:   () => { if (!muted) { stopMarch(); play("/audio/raid-ultra.mp3", 0.9); } },
+    fail:    () => { if (!muted) { stopMarch(); play("/audio/raid-fail.mp3",  0.7); } },
+  }), [muted, play, stopMarch]);
+
+  return { muted, toggleMute, startMarch, stopMarch, sfx };
+}
 import { addWin } from "../lib/winsStore";
 import BuyPointsModal from "./BuyPointsModal";
 
@@ -799,6 +844,7 @@ export default function Raid() {
   // Game state
   const [squad, setSquad]                 = useState<AntRole[]>([...DEFAULT_SQUAD]);
   const [phase, setPhase]                 = useState<Phase>("idle");
+  const { muted: raidMuted, toggleMute: toggleRaidMute, startMarch, stopMarch, sfx: raidSfx } = useRaidAudio();
   const [busy, setBusy]                   = useState(false);
   const [slots, setSlots]                 = useState<AntSlot[]>([]);
   const [revealedCount, setRevealedCount] = useState(0);
@@ -858,7 +904,7 @@ export default function Raid() {
 
   async function launchRaid() {
     if (busy||squad.length<SQUAD_SIZE||balance<cost) return;
-    setBusy(true); setPhase("launching");
+    setBusy(true); setPhase("launching"); startMarch();
     setSlots([]); setRevealedCount(0); setShowResult(false);
 
     await spend(totalCost,"expedition");
@@ -870,6 +916,7 @@ export default function Raid() {
     for (let i=1; i<=SQUAD_SIZE; i++) {
       await new Promise(r=>setTimeout(r,REVEAL_MS));
       setRevealedCount(i);
+      if (battleSlots[i-1]?.survived) raidSfx.survive(); else raidSfx.die();
     }
     await new Promise(r=>setTimeout(r,800));
 
@@ -891,10 +938,12 @@ export default function Raid() {
     }).catch(()=>{});
 
     window.dispatchEvent(new Event("ra:leaderboards-refresh"));
+    if (r === "ultra" || r === "rare") raidSfx.ultra(); else raidSfx.fail();
     setRarity(r); setPrize(pz); setPhase("revealed"); setShowResult(true); setBusy(false);
   }
 
   function resetRaid() {
+    stopMarch();
     setShowResult(false); setPhase("idle");
     setSlots([]); setRevealedCount(0);
     setRarity("none"); setPrize(null);
@@ -919,7 +968,12 @@ export default function Raid() {
       <div className="ant-colony-bg" aria-hidden="true" />
 
       <header className="page-head" role="banner">
-        <div className="site-title"><Link href="/">Rebel Ants Playground</Link></div>
+        <div className="site-title" style={{ display:"flex", alignItems:"center", gap:10 }}>
+          <Link href="/">Rebel Ants Playground</Link>
+          <button onClick={toggleRaidMute} title={raidMuted ? "Unmute" : "Mute"} style={{ background:"rgba(0,0,0,0.4)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:20, padding:"3px 10px", cursor:"pointer", fontSize:16, color:"rgba(255,255,255,0.8)", lineHeight:1 }}>
+            {raidMuted ? "🔇" : "🔊"}
+          </button>
+        </div>
         <nav className="tabs" aria-label="Main">
           <Link href="/tunnel"     className="tab">🐜 Ant Tunnel</Link>
           <Link href="/hatch"      className="tab">🥚 Queen&apos;s Egg Hatch</Link>
