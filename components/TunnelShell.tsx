@@ -1343,7 +1343,8 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               borderBottom:"2px solid "+themeMap[boardTheme].accent+"66",
               boxShadow:"0 4px 20px rgba(0,0,0,0.5)",
             }}>
-              <span style={{color:timeLeft<=10?"#ff4444":themeMap[boardTheme].accent,fontWeight:900,fontSize:18,letterSpacing:1}}>⏱ {timeLeft}s</span>
+              <span style={{color:"rgba(255,255,255,0.5)",fontWeight:700,fontSize:13,maxWidth:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{LAYOUT_NAMES[layoutIndex]||"#"+(layoutIndex+1)}</span>
+          <span style={{color:timeLeft<=10?"#ff4444":themeMap[boardTheme].accent,fontWeight:900,fontSize:18,letterSpacing:1}}>⏱ {timeLeft}s</span>
               <span style={{color:themeMap[boardTheme].crystal,fontWeight:700,fontSize:16}}>💎 {score}</span>
               <span style={{color:"#ff8c00",fontWeight:700,fontSize:16}}>💥 {wallBreaksLeft}</span>
               <span style={{color:"rgba(255,255,255,0.6)",fontWeight:700,fontSize:14}}>💎 {crystals.length} left</span>
@@ -1574,6 +1575,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               <div style={boardHeaderStyle}>
                 <div>
                   <div style={{ fontSize: 20, fontWeight: 900 }}>{theme.name}</div>
+            <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,0.55)",marginBottom:2}}>🗺️ {LAYOUT_NAMES[layoutIndex]||"Layout #"+(layoutIndex+1)}</div>
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
               <span style={{background:themeMap[boardTheme].accent+"22",border:"1px solid "+themeMap[boardTheme].accent+"66",color:themeMap[boardTheme].accent,borderRadius:12,padding:"2px 10px",fontSize:11,fontWeight:700}}>
                 {DIFFICULTY[boardTheme].emoji} {DIFFICULTY[boardTheme].label}
@@ -1944,6 +1946,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
             </div>
             <div style={{marginTop:14}}>
       <div style={{fontSize:13,fontWeight:800,opacity:0.6,marginBottom:10,letterSpacing:"0.06em"}}>🗺️ LAYOUT LEADERBOARDS — 31 MAPS</div>
+      <div style={{maxHeight:isMobileView?480:520,overflowY:"auto",paddingRight:4,scrollbarWidth:"thin"}}>
       <div style={{display:"grid",gridTemplateColumns:isMobileView?"1fr":"repeat(2,1fr)",gap:10}}>
         {layoutChampions.map((lc,idx)=>{
           const hasScores=lc.topScores&&lc.topScores.length>0;
