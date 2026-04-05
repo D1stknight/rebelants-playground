@@ -1129,6 +1129,12 @@ String(c.status).toUpperCase()==="PENDING"
   />
 </label>
 
+          {/* ── 2-column game settings grid ── */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 14 }}>
+            {/* LEFT: Tunnel & Shuffle */}
+            <div style={ padding: 14, border: "1px solid rgba(255,255,255,.14)", borderRadius: 14, background: "rgba(15,23,42,.55)" }>
+              <div style={{ fontWeight: 900, marginBottom: 12, color: "#60a5fa", fontSize: 13, letterSpacing: "0.05em" }}>🐜 TUNNEL & SHUFFLE</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
 <label style={{ fontSize: 12, opacity: 0.9 }}>
   Tunnel Cost
   <input
@@ -1195,10 +1201,15 @@ String(c.status).toUpperCase()==="PENDING"
             
             </div>
 
+              </div>
+            </div>
+            {/* RIGHT: Raid & Faction Wars */}
+            <div style={ padding: 14, border: "1px solid rgba(255,255,255,.14)", borderRadius: 14, background: "rgba(15,23,42,.55)" }>
             {/* ✅ Raid Settings */}
             <div style={{ marginTop: 14, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,.12)" }}>
               <div style={{ fontWeight: 900, marginBottom: 10, color: "#f87171" }}>⚔️ Raid Settings</div>
-              <div style={{ marginBottom: 12 }}>
+            </div>
+            <div style={{ marginTop: 14, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,.12)" }}>
                 <div style={{ fontWeight: 800, marginBottom: 10, color: "#fbbf24" }}>⚔️ Faction Wars Settings</div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                   <label style={{ fontSize: 12, opacity: 0.9 }}>Faction Wars Cost (REBEL)
@@ -1552,6 +1563,9 @@ String(c.status).toUpperCase()==="PENDING"
   })}
 </div>
 
+            </div>
+          </div>
+          </div>
 <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
   <button className="btn" onClick={loadConfig} style={{ padding: "10px 12px" }}>
     Load Current
