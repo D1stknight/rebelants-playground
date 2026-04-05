@@ -1532,7 +1532,6 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                 </div>
 
             <Link href="/tunnel-rules" style={tunnelRulesLinkStyle}>How to Play</Link>
-            <button onClick={()=>setShowRules(true)} style={{ fontSize:12, textDecoration:"underline", opacity:0.55, background:"none", border:"none", color:"inherit", cursor:"pointer", padding:0, marginLeft:12 }}>Official Rules</button>
               </div>
               {discordUserId && (
                 <div style={{fontSize:11,opacity:0.6,marginTop:4}}>
@@ -2804,3 +2803,9 @@ const mobileRotatePromptCardStyle: React.CSSProperties = {
   textAlign: "center",
   boxShadow: "0 16px 40px rgba(0,0,0,0.32)",
 };
+            {discordUserId && (
+              <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", fontSize:11, opacity:0.6, marginTop:4}}>
+                <span>ID: {identityDisplay}</span>
+                <button onClick={()=>setShowRules(true)} style={{ fontSize:11, textDecoration:"underline", opacity:0.8, background:"none", border:"none", color:"inherit", cursor:"pointer", padding:0 }}>Official Rules</button>
+              </div>
+            )}
