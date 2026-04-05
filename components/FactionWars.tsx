@@ -498,7 +498,8 @@ export default function FactionWars() {
   const rl = { ultra:"🏆 ULTRA — LEGENDARY VICTORY!", rare:"⚔️ RARE — STRONG CAMPAIGN!", common:"✅ COMMON — SOLDIERS HOLD!", none:"💀 DEFEAT — YOUR FORCES FELL" };
 
   return (
-    <div style={{ minHeight:"100vh", background:"#080b14", color:"white", fontFamily:"'Segoe UI',sans-serif" }}>
+    <div style={{ minHeight:"100vh", color:"white", fontFamily:"'Segoe UI',sans-serif", backgroundImage:"url('/bg/faction-wars-bg.png')", backgroundSize:"cover", backgroundPosition:"center top", backgroundAttachment:"fixed", backgroundRepeat:"no-repeat", position:"relative" }}>
+      <div style={{ position:"fixed", inset:0, background:"rgba(8,11,20,0.82)", zIndex:0, pointerEvents:"none" }} />
       <BuyPointsModal open={showBuyPoints} onClose={()=>setShowBuyPoints(false)} playerId={effectivePlayerId} onClaimed={()=>{setShowBuyPoints(false);void refresh();}} />
 
       {/* DRIP Modal */}
@@ -518,9 +519,8 @@ export default function FactionWars() {
       )}
 
       {/* Header */}
-      <div style={{ backgroundImage:"url('/bg/faction-wars-bg.png')", backgroundSize:"cover", backgroundPosition:"center top", backgroundRepeat:"no-repeat", position:"relative", overflow:"hidden" }}>
-        <div style={{ position:"absolute", inset:0, background:"linear-gradient(to bottom, rgba(8,11,20,0.35) 0%, rgba(8,11,20,0.85) 100%)", zIndex:0, pointerEvents:"none" }} />
-        <div style={{ maxWidth:900, margin:"0 auto", padding:"24px 20px", position:"relative", zIndex:1 }}>
+      <div style={{ position:"relative", zIndex:1 }}>
+        <div style={{ maxWidth:900, margin:"0 auto", padding:"24px 20px" }}>
           <div style={{ fontSize:26, fontWeight:900, marginBottom:12, display:"flex", alignItems:"center", gap:10 }}>
             <Link href="/" style={{ textDecoration:"none", color:"inherit" }}>Rebel Ants Playground</Link>
             <button onClick={toggleMute} title={muted?"Unmute":"Mute"} style={{ background:"rgba(0,0,0,0.4)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:20, padding:"3px 10px", cursor:"pointer", fontSize:16, color:"rgba(255,255,255,0.8)", lineHeight:1 }}>{muted?"🔇":"🔊"}</button>
@@ -533,7 +533,7 @@ export default function FactionWars() {
         </div>
       </div>
 
-      <div style={{ maxWidth:900, margin:"0 auto", padding:"20px 16px" }}>
+      <div style={{ maxWidth:900, margin:"0 auto", padding:"20px 16px", position:"relative", zIndex:1 }}>
         {phase === "idle" && (
           <div>
             <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:16, padding:"24px 20px", marginBottom:18 }}>
