@@ -1573,6 +1573,7 @@ export default function FactionWars() {
               </div>
               <button onClick={resetGame} style={{ padding:"12px 28px", borderRadius:12, border:"none", cursor:"pointer", background:"linear-gradient(135deg,#fbbf24,#f59e0b)", color:"#000", fontWeight:900, fontSize:15 }}>⚔️ New Campaign</button>
             </div>
+        <div style={{ textAlign:"right", marginBottom:8 }}><button onClick={()=>setShowRules(true)} style={{ fontSize:12, textDecoration:"underline", opacity:0.65, background:"none", border:"none", color:"inherit", cursor:"pointer", padding:0 }}>Official Rules</button></div>
             <FWLeaderboardPanel lb={lb} />
           </div>
         )}
