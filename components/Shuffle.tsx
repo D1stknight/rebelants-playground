@@ -863,6 +863,7 @@ const [shippingForm, setShippingForm] = useState<any>({
 // ✅ DRIP migrate UI
 const [showDripMigrate, setShowDripMigrate] = useState(false);
   const [showRules, setShowRules] = useState(false);
+  useEffect(() => { startMusic(); return () => { stopMusic(); }; }, []);
 const [dripBalance, setDripBalance] = useState<number | null>(null);
 
 const [dripAmount, setDripAmount] = useState<number>(0);
