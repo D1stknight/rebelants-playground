@@ -586,7 +586,7 @@ export default function FactionWars() {
   // DRIP migrate
   const [showDripMigrate, setShowDripMigrate] = useState(false);
   const [dripBalance, setDripBalance]         = useState<number|null>(null);
-  const [dripAmount, setDripAmount]           = useState<number>(0);
+  const [dripAmount, setDripAmount]           = useState<string>("");
   const [dripBusy, setDripBusy]               = useState(false);
   const [dripStatus, setDripStatus]           = useState("");
 
