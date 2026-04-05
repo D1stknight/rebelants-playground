@@ -54,7 +54,8 @@ type FactionId = "samurai"|"ronin"|"warrior"|"ashigaru"|"shogun"|"buke"|"kenshi"
 
 interface Move { id: string; label: string; emoji: string; desc: string; power: number; type: "attack"|"defend"|"magic"|"trick"; }
 interface Faction { id: FactionId; name: string; emoji: string; color: string; bgColor: string; borderColor: string; role: string; passive: string; passiveDesc: string; weapon: string; moves: Move[]; weakTo: FactionId[]; strongVs: FactionId[]; }
-interface TerritoryResult { territory: number; defender: FactionId; playerFaction: FactionId; playerMove: Move; enemyMove: Move; playerPower: number; enemyPower: number; won: boolean; }
+interface RoundResult { round:number; playerMove:Move; enemyMove:Move; playerDmg:number; enemyDmg:number; playerHpAfter:number; enemyHpAfter:number; }
+interface TerritoryResult { territory:number; defender:FactionId; playerFaction:FactionId; rounds:RoundResult[]; playerHpFinal:number; enemyHpFinal:number; won:boolean; }
 type FWLeaderboards = { warlords: {playerId:string;playerName?:string;score:number}[]; factions:{faction:FactionId;wins:number}[]; streaks:{playerId:string;playerName?:string;score:number}[]; rich:{playerId:string;playerName?:string;score:number}[]; perfect:{playerId:string;playerName?:string;score:number}[]; };
 
 const FACTIONS: Record<FactionId, Faction> = {
@@ -97,37 +98,54 @@ const FACTION_IDS = Object.keys(FACTIONS) as FactionId[];
 const TEAM_SIZE = 5;
 const TERRITORY_COUNT = 5;
 
-function simulateBattle(playerFaction: FactionId, playerMove: Move, defenderFaction: FactionId, difficulty: number, bonusFromPassive: number, territoriesWon: number, territoriesLost: number): { won: boolean; playerPower: number; enemyPower: number; enemyMove: Move } {
-  const pf = FACTIONS[playerFaction];
-  const df = FACTIONS[defenderFaction];
-  let pp = playerMove.power + bonusFromPassive;
-  if (pf.strongVs.includes(defenderFaction)) pp += 2;
-  if (pf.weakTo.includes(defenderFaction))   pp -= 2;
-  if (playerFaction === "ronin" && territoriesLost > 0) pp += 2;
-  if (playerFaction === "warrior" && playerMove.id === "cracked_circle") pp += 3;
-  if (playerFaction === "kenshi" && territoriesWon >= 3) pp += 2;
-  if (playerMove.id === "mystic_flame") pp = Math.floor(Math.random() * 5) + 5 + bonusFromPassive;
-  let enemyMove: Move;
-  if (Math.random() < difficulty) {
-    const cm: Record<string,string[]> = { attack:["defend","trick"], defend:["magic","attack"], magic:["trick","defend"], trick:["attack","magic"] };
-    const pref = cm[playerMove.type] || [];
-    const smart = df.moves.filter(m => pref.includes(m.type));
-    enemyMove = smart.length ? smart[Math.floor(Math.random() * smart.length)] : df.moves[Math.floor(Math.random() * df.moves.length)];
+// ── HP COMBAT ENGINE ──────────────────────────────────────────────────────────
+const MAX_HP = 100;
+
+function calcDamage(move: Move, atk: FactionId, def: FactionId, bonus: number, tWon: number, tLost: number, diff: number, isPlayer: boolean): number {
+  const af = FACTIONS[atk];
+  let dmg = move.power * 6.5 + bonus * 3;
+  if (af.strongVs.includes(def)) dmg += 12;
+  if (af.weakTo.includes(def))   dmg -= 8;
+  if (move.type === "defend") dmg *= 0.55;
+  if (move.type === "trick")  dmg *= 0.80;
+  if (move.type === "magic")  dmg *= 1.10;
+  if (isPlayer) {
+    if (atk === "ronin" && tLost > 0) dmg += 15;
+    if (atk === "kenshi" && tWon >= 3) dmg += 12;
+    if (atk === "warrior" && (move.id === "cracked_circle" || move.id === "berserker_rage")) dmg += 20;
+    if (move.id === "mystic_flame") dmg = (Math.floor(Math.random()*5)+5)*6.5;
+    if (move.id === "last_stand") dmg += 22;
+    if (move.id === "phantom_blade") dmg += 12;
+    if (move.id === "void_seal") dmg += 18;
+    if (move.id === "blade_storm") dmg += 14;
+    if (move.id === "enlightened" || move.id === "sacred_flame") dmg += 14;
+    if (move.id === "bastion") dmg += 10;
+    if (move.id === "warlords_fury") dmg += tWon * 7;
+    if (move.id === "tactical_strike") dmg += tWon * 6;
   } else {
-    enemyMove = df.moves[Math.floor(Math.random() * df.moves.length)];
+    dmg += Math.floor(diff * 18);
   }
-  let ep = enemyMove.power;
-  if (df.strongVs.includes(playerFaction)) ep += 2;
-  if (df.weakTo.includes(playerFaction))   ep -= 2;
-  ep += Math.floor(difficulty * 3);
-  pp += (Math.random() * 2 - 1);
-  ep += (Math.random() * 2 - 1);
-  if (playerMove.id === "shadow_step" || playerMove.id === "ghost_tide") ep *= 0.5;
-  if (playerMove.id === "noble_defense" || playerMove.id === "honor_guard") pp += 2;
-  if (playerMove.id === "monks_ward") ep = Math.min(ep, pp);
-  if (playerMove.id === "enlightened") pp += 2;
-  pp = Math.max(1, pp); ep = Math.max(1, ep);
-  return { won: pp > ep, playerPower: pp, enemyPower: ep, enemyMove };
+  dmg *= (0.82 + Math.random() * 0.36);
+  return Math.max(4, Math.min(Math.round(dmg), 72));
+}
+
+function calcBlock(move: Move): number {
+  if (["shadow_step","ghost_tide"].includes(move.id)) return 0.45;
+  if (["monks_ward"].includes(move.id)) return 0.55;
+  if (["noble_defense","honor_guard","phalanx","bastion"].includes(move.id)) return 0.40;
+  if (["shield_wall","iron_will","endure"].includes(move.id)) return 0.35;
+  if (move.type === "defend") return 0.25;
+  return 0;
+}
+
+function pickEnemyMove(def: FactionId, pm: Move, diff: number): Move {
+  const df = FACTIONS[def];
+  if (Math.random() < diff) {
+    const cm: Record<string,string[]> = { attack:["defend","trick"], defend:["magic","attack"], magic:["trick","defend"], trick:["attack","magic"] };
+    const smart = df.moves.filter(m => (cm[pm.type]||[]).includes(m.type));
+    return smart.length ? smart[Math.floor(Math.random()*smart.length)] : df.moves[Math.floor(Math.random()*df.moves.length)];
+  }
+  return df.moves[Math.floor(Math.random()*df.moves.length)];
 }
 
 function calcPassiveBonus(faction: FactionId, territoriesWon: number, isT1: boolean): number {
@@ -538,6 +556,13 @@ export default function FactionWars() {
   const [prizeMerchShipping, setPrizeMerchShipping] = useState(false);
   const [lb, setLb]                     = useState<FWLeaderboards>({ warlords:[], factions:[], streaks:[], rich:[], perfect:[] });
   const [battleAnim, setBattleAnim]     = useState<"idle"|"clash"|"win"|"lose">("idle");
+  const [playerHp, setPlayerHp]         = useState(MAX_HP);
+  const [enemyHp, setEnemyHp]           = useState(MAX_HP);
+  const [currentRound, setCurrentRound] = useState(0);
+  const [roundLog, setRoundLog]         = useState<{playerMove:string;enemyMove:string;playerDmg:number;enemyDmg:number}[]>([]);
+  const [dmgFloats, setDmgFloats]       = useState<{id:number;side:"player"|"enemy";dmg:number}[]>([]);
+  const [currentTerritoryRounds, setCurrentTerritoryRounds] = useState<RoundResult[]>([]);
+  const dmgFloatId = useRef(0);
   const [showHowToPlay, setShowHowToPlay] = useState(true);
   const { muted, toggleMute, startMusic, stopMusic, sfx } = useFWAudio();
 
@@ -570,30 +595,80 @@ export default function FactionWars() {
       defs.push(available[idx]); available.splice(idx, 1);
       if (available.length === 0) available.push(...FACTION_IDS.filter(f => !defs.slice(-3).includes(f)));
     }
-    setDefenders(defs); setResults([]); setCurrentT(0); setCurrentFI(0); setSelectedMove(null); setFinalRarity("none"); setRunMessage(""); setPhase("battle"); startMusic(); setBusy(false);
+    setDefenders(defs); setResults([]); setCurrentT(0); setCurrentFI(0); setSelectedMove(null); setFinalRarity("none"); setRunMessage("");
+    setPlayerHp(MAX_HP); setEnemyHp(MAX_HP); setCurrentRound(0); setRoundLog([]); setDmgFloats([]); setCurrentTerritoryRounds([]);
+    setPhase("battle"); startMusic(); setBusy(false);
+  };
+
+  const startTerritory = () => {
+    setPlayerHp(MAX_HP); setEnemyHp(MAX_HP);
+    setCurrentRound(0); setRoundLog([]); setDmgFloats([]); setCurrentTerritoryRounds([]);
   };
 
   const fightTerritory = async () => {
     if (!selectedMove || busy) return;
     const playerFaction = team[currentFactionIdx] || team[0];
     const defender = defenders[currentTerritory];
-    const won = results.filter(r=>r.won).length;
-    const lost = results.filter(r=>!r.won).length;
-    const bonus = calcPassiveBonus(playerFaction, won, currentTerritory === 0);
+    const tWon = results.filter(r=>r.won).length;
+    const tLost = results.filter(r=>!r.won).length;
+    const bonus = calcPassiveBonus(playerFaction, tWon, currentTerritory === 0);
     setBusy(true); setBattleAnim("clash"); sfx.clash();
-    await new Promise(r=>setTimeout(r,800));
-    const res = simulateBattle(playerFaction, selectedMove, defender, difficulty, bonus, won, lost);
-    setBattleAnim(res.won ? "win" : "lose");
-    await new Promise(r=>setTimeout(r,600));
-    setBattleAnim("idle");
-    const result: TerritoryResult = { territory: currentTerritory, defender, playerFaction, playerMove: selectedMove, enemyMove: res.enemyMove, playerPower: res.playerPower, enemyPower: res.enemyPower, won: res.won };
-    setResults(prev => [...prev, result]); setSelectedMove(null); setPhase("territory_result"); setBusy(false);
+    await new Promise(r=>setTimeout(r,450));
+
+    const enemyMove = pickEnemyMove(defender, selectedMove, difficulty);
+    const playerDmg = calcDamage(selectedMove, playerFaction, defender, bonus, tWon, tLost, difficulty, true);
+    const rawEnemyDmg = calcDamage(enemyMove, defender, playerFaction, 0, 0, 0, difficulty, false);
+    const block = calcBlock(selectedMove);
+    const enemyDmg = Math.round(rawEnemyDmg * (1 - block));
+
+    const newPlayerHp = Math.max(0, playerHp - enemyDmg);
+    const newEnemyHp  = Math.max(0, enemyHp  - playerDmg);
+    setPlayerHp(newPlayerHp);
+    setEnemyHp(newEnemyHp);
+
+    // Floating dmg numbers
+    const fid = ++dmgFloatId.current;
+    setDmgFloats(prev => [...prev,
+      {id:fid,   side:"player" as const, dmg:enemyDmg},
+      {id:fid+1, side:"enemy"  as const, dmg:playerDmg}
+    ]);
+    setTimeout(() => setDmgFloats(prev => prev.filter(f => f.id!==fid && f.id!==fid+1)), 1500);
+
+    const roundResult: RoundResult = {
+      round: currentRound+1, playerMove: selectedMove, enemyMove,
+      playerDmg, enemyDmg, playerHpAfter: newPlayerHp, enemyHpAfter: newEnemyHp,
+    };
+    const newRounds = [...currentTerritoryRounds, roundResult];
+    setCurrentTerritoryRounds(newRounds);
+    setCurrentRound(n => n+1);
+    setRoundLog(prev => [{playerMove:selectedMove.label, enemyMove:enemyMove.label, playerDmg, enemyDmg}, ...prev.slice(0,5)]);
+
+    const over = newPlayerHp <= 0 || newEnemyHp <= 0;
+    setBattleAnim(newEnemyHp <= 0 ? "win" : newPlayerHp <= 0 ? "lose" : "idle");
+    await new Promise(r=>setTimeout(r, over ? 700 : 250));
+    if (!over) { setBattleAnim("idle"); }
+
+    setSelectedMove(null);
+    setBusy(false);
+
+    if (over) {
+      await new Promise(r=>setTimeout(r,500));
+      setBattleAnim("idle");
+      const playerWon = newEnemyHp <= 0;
+      const result: TerritoryResult = {
+        territory: currentTerritory, defender, playerFaction,
+        rounds: newRounds, playerHpFinal: newPlayerHp, enemyHpFinal: newEnemyHp, won: playerWon,
+      };
+      setResults(prev => [...prev, result]);
+      setSelectedMove(null);
+      setPhase("territory_result");
+    }
   };
 
   const nextTerritory = () => {
     const next = currentTerritory + 1;
     if (next >= TERRITORY_COUNT) { void finishCampaign([...results]); }
-    else { setCurrentT(next); setCurrentFI(prev => (prev+1) % TEAM_SIZE); setPhase("battle"); }
+    else { setCurrentT(next); setCurrentFI(prev => (prev+1) % TEAM_SIZE); startTerritory(); setPhase("battle"); }
   };
 
   const finishCampaign = async (allResults: TerritoryResult[]) => {
@@ -634,6 +709,7 @@ export default function FactionWars() {
 
   const resetGame = () => {
     stopMusic(); setPhase("idle"); setTeam([]); setDefenders([]); setResults([]); setCurrentT(0); setCurrentFI(0); setSelectedMove(null); setFinalRarity("none"); setRunMessage(""); setBusy(false); setBattleAnim("idle");
+    setPlayerHp(MAX_HP); setEnemyHp(MAX_HP); setCurrentRound(0); setRoundLog([]); setDmgFloats([]); setCurrentTerritoryRounds([]);
   };
 
   const currentPlayerFaction = phase==="battle" ? (team[currentFactionIdx]||team[0]) : null;
@@ -856,76 +932,128 @@ export default function FactionWars() {
 
               <div style={{ position:"relative", zIndex:1, padding:"24px 20px 20px" }}>
 
-                {/* VS Arena — big characters */}
-                <div style={{ display:"grid", gridTemplateColumns:"1fr auto 1fr", gap:16, alignItems:"center", marginBottom:20 }}>
+                {/* ── HP BARS ── MK Style ───────────────────────── */}
+                <div style={{ marginBottom:14 }}>
+                  {/* Player HP bar */}
+                  <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:7 }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:6, width:110, flexShrink:0 }}>
+                      <img src={factionImgPath(currentPlayerFD.id,"symbol")} alt="" style={{ width:22, height:22, objectFit:"contain", background:"rgba(0,0,0,0.4)", borderRadius:4, padding:2, flexShrink:0 }} />
+                      <span style={{ fontWeight:900, fontSize:11, color:currentPlayerFD.color, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{currentPlayerFD.name.toUpperCase()}</span>
+                    </div>
+                    <div style={{ flex:1, height:20, borderRadius:5, background:"rgba(0,0,0,0.6)", border:"1px solid rgba(255,255,255,0.1)", overflow:"hidden", position:"relative" }}>
+                      <div style={{ height:"100%", borderRadius:4,
+                        background: playerHp>50 ? "linear-gradient(90deg,#34d399,#10b981)" : playerHp>25 ? "linear-gradient(90deg,#fbbf24,#f59e0b)" : "linear-gradient(90deg,#f87171,#dc2626)",
+                        width:`${playerHp}%`, transition:"width 0.45s ease",
+                        boxShadow: playerHp>50 ? "0 0 10px rgba(52,211,153,0.6)" : playerHp>25 ? "0 0 10px rgba(251,191,36,0.5)" : "0 0 10px rgba(248,113,113,0.6)"
+                      }} />
+                      {dmgFloats.filter(f=>f.side==="player").map(f=>(
+                        <div key={f.id} style={{ position:"absolute", right:6, top:1, fontSize:13, fontWeight:900, color:"#f87171", pointerEvents:"none" }}>-{f.dmg}</div>
+                      ))}
+                    </div>
+                    <div style={{ minWidth:40, textAlign:"right", fontWeight:900, fontSize:14,
+                      color:playerHp>50?"#34d399":playerHp>25?"#fbbf24":"#f87171" }}>{playerHp}<span style={{fontSize:9,opacity:0.5}}>/100</span></div>
+                  </div>
+                  {/* Enemy HP bar */}
+                  <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:6, width:110, flexShrink:0 }}>
+                      <img src={factionImgPath(currentDefenderFD.id,"symbol")} alt="" style={{ width:22, height:22, objectFit:"contain", background:"rgba(0,0,0,0.4)", borderRadius:4, padding:2, flexShrink:0 }} />
+                      <span style={{ fontWeight:900, fontSize:11, color:currentDefenderFD.color, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{currentDefenderFD.name.toUpperCase()}</span>
+                    </div>
+                    <div style={{ flex:1, height:20, borderRadius:5, background:"rgba(0,0,0,0.6)", border:"1px solid rgba(255,255,255,0.1)", overflow:"hidden", position:"relative" }}>
+                      <div style={{ height:"100%", borderRadius:4,
+                        background: enemyHp>50 ? `linear-gradient(90deg,${currentDefenderFD.color},${currentDefenderFD.color}bb)` : enemyHp>25 ? "linear-gradient(90deg,#fbbf24,#f59e0b)" : "linear-gradient(90deg,#f87171,#dc2626)",
+                        width:`${enemyHp}%`, transition:"width 0.45s ease",
+                        boxShadow:`0 0 10px ${currentDefenderFD.color}66`
+                      }} />
+                      {dmgFloats.filter(f=>f.side==="enemy").map(f=>(
+                        <div key={f.id} style={{ position:"absolute", right:6, top:1, fontSize:13, fontWeight:900, color:"#34d399", pointerEvents:"none" }}>-{f.dmg}</div>
+                      ))}
+                    </div>
+                    <div style={{ minWidth:40, textAlign:"right", fontWeight:900, fontSize:14,
+                      color:enemyHp>50?"#34d399":enemyHp>25?"#fbbf24":"#f87171" }}>{enemyHp}<span style={{fontSize:9,opacity:0.5}}>/100</span></div>
+                  </div>
+                </div>
 
-                  {/* Player side */}
-                  <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:8 }}>
-                    {/* Character image — big */}
-                    <div style={{ position:"relative", width:130, height:150, borderRadius:16, overflow:"hidden",
+                {/* Round counter */}
+                <div style={{ textAlign:"center", marginBottom:14 }}>
+                  <span style={{ fontSize:11, fontWeight:900, color:"#fbbf24", letterSpacing:"0.12em", opacity:0.9 }}>
+                    ⚔️ ROUND {currentRound + 1}
+                  </span>
+                  <span style={{ fontSize:10, opacity:0.4, marginLeft:8 }}>— first to 0 HP loses the territory</span>
+                </div>
+
+                {/* Characters — big portraits */}
+                <div style={{ display:"grid", gridTemplateColumns:"1fr auto 1fr", gap:12, alignItems:"center", marginBottom:14 }}>
+                  {/* Player */}
+                  <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:6 }}>
+                    <div style={{ position:"relative", width:120, height:140, borderRadius:14, overflow:"hidden",
                       border:`3px solid ${currentPlayerFD.borderColor}`,
-                      boxShadow:`0 0 ${battleAnim==="win"?"40px":"20px"} ${currentPlayerFD.color}${battleAnim==="win"?"88":"44"}`,
-                      transform: battleAnim==="clash"?"scale(1.08) translateX(12px) rotate(-2deg)":battleAnim==="win"?"scale(1.05)":battleAnim==="lose"?"scale(0.95) rotate(3deg)":"scale(1)",
-                      filter: battleAnim==="lose"?"grayscale(0.6) brightness(0.7)":"none",
+                      boxShadow: battleAnim==="win" ? `0 0 40px ${currentPlayerFD.color}99` : `0 0 14px ${currentPlayerFD.color}44`,
+                      transform: battleAnim==="clash"?"scale(1.1) translateX(14px) rotate(-3deg)":battleAnim==="win"?"scale(1.06)":battleAnim==="lose"?"scale(0.9) rotate(4deg)":"scale(1)",
+                      filter: battleAnim==="lose"?"grayscale(0.7) brightness(0.55)":playerHp<25?"brightness(0.8)":"none",
                       transition:"all 0.35s cubic-bezier(0.34,1.56,0.64,1)" }}>
-                      <img src={factionImgPath(currentPlayerFD.id,"char")} alt={currentPlayerFD.name} style={{ width:"100%", height:"100%", objectFit:"cover", objectPosition:"top" }} onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
-                      {/* Symbol badge overlay */}
-                      <div style={{ position:"absolute", bottom:4, right:4, width:28, height:28, borderRadius:6, overflow:"hidden", background:"rgba(0,0,0,0.7)", border:`1px solid ${currentPlayerFD.borderColor}` }}>
-                        <img src={factionImgPath(currentPlayerFD.id,"symbol")} alt="" style={{ width:"100%", height:"100%", objectFit:"contain", padding:3 }} />
+                      <img src={factionImgPath(currentPlayerFD.id,"char")} alt={currentPlayerFD.name}
+                        style={{ width:"100%", height:"100%", objectFit:"cover", objectPosition:"top" }}
+                        onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
+                      <div style={{ position:"absolute", bottom:4, right:4, width:26, height:26, borderRadius:5, overflow:"hidden", background:"rgba(0,0,0,0.75)", border:`1px solid ${currentPlayerFD.borderColor}` }}>
+                        <img src={factionImgPath(currentPlayerFD.id,"symbol")} alt="" style={{ width:"100%", height:"100%", objectFit:"contain", padding:2 }} />
                       </div>
+                      {playerHp < 25 && <div style={{ position:"absolute", inset:0, border:"3px solid #f87171", borderRadius:12, pointerEvents:"none", boxShadow:"inset 0 0 20px rgba(248,113,113,0.4)" }} />}
                     </div>
                     <div style={{ textAlign:"center" }}>
-                      <div style={{ fontWeight:900, fontSize:15, color:currentPlayerFD.color, letterSpacing:"0.04em" }}>{currentPlayerFD.name.toUpperCase()}</div>
-                      <div style={{ fontSize:10, opacity:0.5, marginTop:1 }}>Warrior {currentFactionIdx+1} of {TEAM_SIZE}</div>
-                    </div>
-                    {/* Player power bar — warriors remaining (NOT health points) */}
-                    <div style={{ width:"100%", height:5, borderRadius:3, background:"rgba(255,255,255,0.08)", overflow:"hidden" }}>
-                      <div style={{ height:"100%", borderRadius:3, background:`linear-gradient(90deg, ${currentPlayerFD.color}, ${currentPlayerFD.color}88)`, width:`${Math.round(((TEAM_SIZE - currentFactionIdx) / TEAM_SIZE) * 100)}%`, transition:"width 0.6s ease" }} />
-                    </div>
-                    <div style={{ fontSize:9, opacity:0.55, display:"flex", gap:8, fontWeight:600 }}>
-                      <span>👥 {TEAM_SIZE - currentFactionIdx}/{TEAM_SIZE} warriors left</span>
-                      {territoriesWon > 0 && <span style={{color:"#34d399"}}>✅ {territoriesWon} won</span>}
+                      <div style={{ fontWeight:900, fontSize:12, color:currentPlayerFD.color }}>{currentPlayerFD.name.toUpperCase()}</div>
+                      <div style={{ fontSize:9, opacity:0.45 }}>Warrior {currentFactionIdx+1}/{TEAM_SIZE}</div>
                     </div>
                   </div>
 
                   {/* Center VS */}
-                  <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:6, minWidth:60 }}>
-                    <div style={{ fontSize: battleAnim==="clash"?48:32, fontWeight:900,
-                      textShadow: battleAnim==="clash"?"0 0 30px #fbbf24":"none",
-                      transform: battleAnim==="clash"?"scale(1.3)":"scale(1)", transition:"all 0.2s" }}>
+                  <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4, minWidth:52 }}>
+                    <div style={{ fontSize:battleAnim==="clash"?44:26, fontWeight:900, transition:"all 0.2s",
+                      textShadow:battleAnim==="clash"?"0 0 30px #fbbf24":battleAnim==="win"?"0 0 20px #34d399":battleAnim==="lose"?"0 0 20px #f87171":"none",
+                      transform:battleAnim==="clash"?"scale(1.3)":"scale(1)" }}>
                       {battleAnim==="clash"?"💥":battleAnim==="win"?"✅":battleAnim==="lose"?"💀":"⚔️"}
                     </div>
-                    <div style={{ fontSize:11, fontWeight:900, opacity: battleAnim==="idle"?0.5:0, letterSpacing:"0.12em", transition:"opacity 0.3s" }}>VS</div>
-                    <div style={{ fontSize:9, opacity:0.35, textAlign:"center", lineHeight:1.4 }}>Territory {currentTerritory+1}</div>
+                    <div style={{ fontSize:9, fontWeight:900, opacity:0.35, letterSpacing:"0.12em" }}>VS</div>
                   </div>
 
-                  {/* Defender side */}
-                  <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:8 }}>
-                    <div style={{ position:"relative", width:130, height:150, borderRadius:16, overflow:"hidden",
+                  {/* Defender */}
+                  <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:6 }}>
+                    <div style={{ position:"relative", width:120, height:140, borderRadius:14, overflow:"hidden",
                       border:`3px solid ${currentDefenderFD.borderColor}`,
-                      boxShadow:`0 0 ${battleAnim==="lose"?"40px":"20px"} ${currentDefenderFD.color}${battleAnim==="lose"?"88":"33"}`,
-                      transform: battleAnim==="clash"?"scale(1.08) translateX(-12px) rotate(2deg)":battleAnim==="lose"?"scale(1.05)":battleAnim==="win"?"scale(0.92) rotate(-3deg)":"scale(1)",
-                      filter: battleAnim==="win"?"grayscale(0.6) brightness(0.6)":"none",
+                      boxShadow: battleAnim==="lose" ? `0 0 40px ${currentDefenderFD.color}99` : `0 0 14px ${currentDefenderFD.color}33`,
+                      transform: battleAnim==="clash"?"scale(1.1) translateX(-14px) rotate(3deg)":battleAnim==="lose"?"scale(1.06)":battleAnim==="win"?"scale(0.9) rotate(-4deg)":"scale(1)",
+                      filter: battleAnim==="win"?"grayscale(0.7) brightness(0.55)":enemyHp<25?"brightness(0.8)":"none",
                       transition:"all 0.35s cubic-bezier(0.34,1.56,0.64,1)" }}>
-                      <img src={factionImgPath(currentDefenderFD.id,"char")} alt={currentDefenderFD.name} style={{ width:"100%", height:"100%", objectFit:"cover", objectPosition:"top" }} onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
-                      <div style={{ position:"absolute", bottom:4, left:4, width:28, height:28, borderRadius:6, overflow:"hidden", background:"rgba(0,0,0,0.7)", border:`1px solid ${currentDefenderFD.borderColor}` }}>
-                        <img src={factionImgPath(currentDefenderFD.id,"symbol")} alt="" style={{ width:"100%", height:"100%", objectFit:"contain", padding:3 }} />
+                      <img src={factionImgPath(currentDefenderFD.id,"char")} alt={currentDefenderFD.name}
+                        style={{ width:"100%", height:"100%", objectFit:"cover", objectPosition:"top" }}
+                        onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
+                      <div style={{ position:"absolute", bottom:4, left:4, width:26, height:26, borderRadius:5, overflow:"hidden", background:"rgba(0,0,0,0.75)", border:`1px solid ${currentDefenderFD.borderColor}` }}>
+                        <img src={factionImgPath(currentDefenderFD.id,"symbol")} alt="" style={{ width:"100%", height:"100%", objectFit:"contain", padding:2 }} />
                       </div>
+                      {enemyHp < 25 && <div style={{ position:"absolute", inset:0, border:"3px solid #f87171", borderRadius:12, pointerEvents:"none", boxShadow:"inset 0 0 20px rgba(248,113,113,0.4)" }} />}
                     </div>
                     <div style={{ textAlign:"center" }}>
-                      <div style={{ fontWeight:900, fontSize:15, color:currentDefenderFD.color, letterSpacing:"0.04em" }}>{currentDefenderFD.name.toUpperCase()}</div>
-                      <div style={{ fontSize:10, opacity:0.5, marginTop:1 }}>Territory Defender</div>
-                    </div>
-                    {/* Defender power bar — territories remaining to defend */}
-                    <div style={{ width:"100%", height:5, borderRadius:3, background:"rgba(255,255,255,0.08)", overflow:"hidden" }}>
-                      <div style={{ height:"100%", borderRadius:3, background:`linear-gradient(90deg, ${currentDefenderFD.color}, ${currentDefenderFD.color}88)`, width:`${Math.round(((TERRITORY_COUNT - currentTerritory) / TERRITORY_COUNT) * 100)}%`, transition:"width 0.6s ease" }} />
-                    </div>
-                    <div style={{ fontSize:9, opacity:0.55, display:"flex", gap:8, fontWeight:600 }}>
-                      <span>🏰 {TERRITORY_COUNT - currentTerritory}/{TERRITORY_COUNT} defending</span>
-                      {results.filter(r=>!r.won).length > 0 && <span style={{color:"#f87171"}}>💀 {results.filter(r=>!r.won).length} lost</span>}
+                      <div style={{ fontWeight:900, fontSize:12, color:currentDefenderFD.color }}>{currentDefenderFD.name.toUpperCase()}</div>
+                      <div style={{ fontSize:9, opacity:0.45 }}>Territory Defender</div>
                     </div>
                   </div>
                 </div>
+
+                {/* Round log */}
+                {roundLog.length > 0 && (
+                  <div style={{ background:"rgba(0,0,0,0.45)", borderRadius:10, padding:"8px 12px", marginBottom:12, maxHeight:96, overflowY:"auto" }}>
+                    <div style={{ fontSize:9, opacity:0.35, marginBottom:5, letterSpacing:"0.06em", fontWeight:700 }}>ROUND HISTORY</div>
+                    {roundLog.slice(0,5).map((r,i)=>(
+                      <div key={i} style={{ display:"flex", gap:10, fontSize:10, marginBottom:4, opacity:i===0?1:0.5, alignItems:"center" }}>
+                        <span style={{ color:"#34d399", fontWeight:700, minWidth:70, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>⚔️ {r.playerMove}</span>
+                        <span style={{ color:"#f87171", fontWeight:800 }}>-{r.enemyDmg} to you</span>
+                        <span style={{ opacity:0.3 }}>|</span>
+                        <span style={{ color:"#f87171", fontWeight:700, minWidth:70, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>🛡️ {r.enemyMove}</span>
+                        <span style={{ color:"#34d399", fontWeight:800 }}>-{r.playerDmg} to enemy</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {/* Faction matchup intel strip */}
                 <div style={{ display:"flex", gap:8, justifyContent:"center", marginBottom:16, flexWrap:"wrap" }}>
@@ -1011,11 +1139,34 @@ export default function FactionWars() {
             <div style={{ background:"rgba(0,0,0,0.5)", border:`2px solid ${last.won?"#34d399":"#f87171"}`, borderRadius:16, padding:24, marginBottom:18, textAlign:"center" }}>
               <div style={{ fontSize:48, marginBottom:10 }}>{last.won?"✅":"💀"}</div>
               <div style={{ fontSize:22, fontWeight:900, color:last.won?"#34d399":"#f87171", marginBottom:8 }}>{last.won?`Territory ${last.territory+1} Captured!`:`Territory ${last.territory+1} Lost`}</div>
-              <div style={{ display:"flex", justifyContent:"center", gap:24, marginBottom:16 }}>
-                <div><div style={{fontSize:11,opacity:0.5,marginBottom:4}}>Your move</div><div style={{fontSize:14,fontWeight:800}}>{last.playerMove.emoji} {last.playerMove.label}</div><div style={{fontSize:12,color:"#60a5fa"}}>Power: {last.playerPower.toFixed(1)}</div></div>
-                <div style={{fontSize:24,alignSelf:"center",opacity:0.6}}>VS</div>
-                <div><div style={{fontSize:11,opacity:0.5,marginBottom:4}}>{df.name}'s counter</div><div style={{fontSize:14,fontWeight:800}}>{last.enemyMove.emoji} {last.enemyMove.label}</div><div style={{fontSize:12,color:"#f87171"}}>Power: {last.enemyPower.toFixed(1)}</div></div>
+              {/* HP final display */}
+              <div style={{ display:"flex", justifyContent:"center", gap:24, marginBottom:14 }}>
+                <div style={{ textAlign:"center" }}>
+                  <img src={factionImgPath(FACTIONS[last.playerFaction].id,"symbol")} alt="" style={{ width:32, height:32, objectFit:"contain", background:"rgba(0,0,0,0.4)", borderRadius:6, padding:3, marginBottom:4 }} />
+                  <div style={{ fontSize:11, opacity:0.5, marginBottom:2 }}>{FACTIONS[last.playerFaction].name}</div>
+                  <div style={{ fontSize:16, fontWeight:900, color: last.playerHpFinal>0?"#34d399":"#f87171" }}>{last.playerHpFinal} HP</div>
+                </div>
+                <div style={{ alignSelf:"center", fontSize:20, opacity:0.5 }}>VS</div>
+                <div style={{ textAlign:"center" }}>
+                  <img src={factionImgPath(df.id,"symbol")} alt="" style={{ width:32, height:32, objectFit:"contain", background:"rgba(0,0,0,0.4)", borderRadius:6, padding:3, marginBottom:4 }} />
+                  <div style={{ fontSize:11, opacity:0.5, marginBottom:2 }}>{df.name}</div>
+                  <div style={{ fontSize:16, fontWeight:900, color: last.enemyHpFinal>0?"#34d399":"#f87171" }}>{last.enemyHpFinal} HP</div>
+                </div>
               </div>
+              {/* Round recap - last 3 rounds */}
+              {last.rounds && last.rounds.length > 0 && (
+                <div style={{ background:"rgba(0,0,0,0.3)", borderRadius:10, padding:"8px 12px", marginBottom:14, maxHeight:90, overflowY:"auto" }}>
+                  <div style={{ fontSize:9, opacity:0.4, marginBottom:5, letterSpacing:"0.06em" }}>FIGHT RECAP — {last.rounds.length} rounds</div>
+                  {last.rounds.slice(-3).reverse().map((r,i)=>(
+                    <div key={i} style={{ display:"flex", gap:8, fontSize:10, marginBottom:3, opacity:i===0?1:0.6 }}>
+                      <span style={{ opacity:0.4 }}>R{r.round}</span>
+                      <span style={{ color:"#34d399" }}>⚔️ {r.playerMove.label} <b>-{r.playerDmg}</b></span>
+                      <span style={{ opacity:0.3 }}>|</span>
+                      <span style={{ color:"#f87171" }}>🛡️ {r.enemyMove.label} <b>-{r.enemyDmg}</b></span>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div style={{ display:"flex", gap:10, justifyContent:"center", marginBottom:20 }}>
                 {defenders.map((def,i)=>(<TerritoryBadge key={i} index={i} result={results[i]} isCurrent={false} defender={def} />))}
               </div>
@@ -1049,7 +1200,9 @@ export default function FactionWars() {
                       <img src={factionImgPath(r.defender,"symbol")} alt={FACTIONS[r.defender].name} style={{width:16,height:16,objectFit:"contain",background:"rgba(0,0,0,0.4)",borderRadius:3,padding:1}} onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
                       {FACTIONS[r.defender].name}
                     </span>
-                    <span style={{marginLeft:"auto"}}>{r.playerMove.emoji} {r.playerMove.label} <span style={{opacity:0.5}}>vs</span> {r.enemyMove.emoji} {r.enemyMove.label}</span>
+                    <span style={{marginLeft:"auto", fontSize:11, opacity:0.7}}>
+                      {r.rounds?.length ?? 0} rounds · final HP {r.playerHpFinal} vs {r.enemyHpFinal}
+                    </span>
                   </div>
                 ))}
               </div>
