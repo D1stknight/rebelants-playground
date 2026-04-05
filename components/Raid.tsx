@@ -809,6 +809,7 @@ export default function Raid() {
 
   // DRIP migrate (mirrors Shuffle)
   const [showDripMigrate, setShowDripMigrate] = useState(false);
+  const [showRules, setShowRules] = useState(false);
   const [dripBalance, setDripBalance]         = useState<number|null>(null);
   const [dripAmount, setDripAmount]           = useState<number>(0);
   const [dripBusy, setDripBusy]               = useState(false);
@@ -1088,7 +1089,7 @@ export default function Raid() {
         </div>
 
         <div style={{ marginTop:10 }}>
-          <a href="/rules" style={{ fontSize:12, textDecoration:"underline", opacity:0.65 }}>Official Rules</a>
+          <button onClick={()=>setShowRules(true)} style={{ fontSize:12, textDecoration:"underline", opacity:0.65, background:"none", border:"none", color:"inherit", cursor:"pointer", padding:0 }}>Official Rules</button>
         </div>
 
         <RaidLeaderboardPanel lb={lb} />
@@ -1130,6 +1131,28 @@ export default function Raid() {
           </div>
         )}
       </div>
+
+      {showRules && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.8)", zIndex:3000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }} onClick={()=>setShowRules(false)}>
+          <div style={{ background:"#0f172a", border:"1px solid rgba(255,255,255,0.15)", borderRadius:16, padding:28, maxWidth:560, width:"100%", maxHeight:"85vh", overflowY:"auto", position:"relative" }} onClick={e=>e.stopPropagation()}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
+              <div style={{ fontWeight:900, fontSize:18 }}>📋 Official Rules</div>
+              <button onClick={()=>setShowRules(false)} style={{ background:"rgba(255,255,255,0.1)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:8, padding:"6px 14px", color:"white", cursor:"pointer", fontSize:13 }}>✕ Close</button>
+            </div>
+            <div style={{ fontSize:13, lineHeight:1.7, display:"flex", flexDirection:"column", gap:12, opacity:0.9 }}>
+              <p><b>Free-to-play.</b> No purchase necessary to play. Void where prohibited.</p>
+              <p><b>Game currency:</b> REBEL Points are an in-app, promotional points system. They have no guaranteed cash value and are not redeemable for cash.</p>
+              <p><b>Optional purchase (APE):</b> You may optionally buy REBEL Points using APE to support the project. <b>All purchases are final</b> (no refunds). Network fees (gas) may apply.</p>
+              <p><b>Prizes:</b> Crates may award REBEL Points and/or digital collectibles and/or merch (when available). Prize availability may vary by location.</p>
+              <p><b>Daily limits:</b> Daily claim limits and daily play limits apply to support fair access and prevent abuse. Daily plays reset every 24 hours. Purchased bonus plays do not expire.</p>
+              <p><b>Fair play:</b> Multi-accounting, automation/bots, exploits, or abuse may result in disqualification, prize forfeiture, or account blocking.</p>
+              <p><b>Odds:</b> Prize odds and point values may change over time based on live configuration and promotions.</p>
+              <p><b>Taxes:</b> You are responsible for any taxes associated with prizes, if applicable.</p>
+              <p style={{ opacity:0.7 }}>By playing, you agree to these rules and acknowledge this is an entertainment experience with promotional rewards.</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         .ant-colony-bg {
