@@ -1,3 +1,7 @@
+  const [lastSquad, setLastSquad] = useState<AntRole[] | null>(() => { try { const v = localStorage.getItem("ra:raid:lastSquad"); return v ? JSON.parse(v) : null; } catch { return null; } });
+const LAST_SQUAD_KEY = "ra:raid:lastSquad";
+function saveLastSquad(s: AntRole[]) { try { localStorage.setItem(LAST_SQUAD_KEY, JSON.stringify(s)); } catch {} }
+function loadLastSquad(): AntRole[] | null { try { const v = localStorage.getItem(LAST_SQUAD_KEY); return v ? JSON.parse(v) : null; } catch { return null; } }
 // components/Raid.tsx — THE RAID (Epic Edition v3)
 import React, { useState, useEffect, useRef, useCallback } from "react";
 // components/Raid.tsx — THE RAID (Epic Edition v2)
@@ -135,7 +139,7 @@ const DEFAULT_SQUAD: AntRole[] = [
 
 // ── Battle Engine ─────────────────────────────────────────────────────────────
 
-function simulateBattle(squad: AntRole[], cfg: any): AntSlot[] {
+function simulateBattle(squad: AntRole[], cfg: any, survivalMult = 1.0): AntSlot[] {
   const slots: AntSlot[] = squad.map(role => ({ role, survived: null, boosted: false }));
 
   // Pull survival overrides from admin config if present
@@ -171,7 +175,7 @@ function simulateBattle(squad: AntRole[], cfg: any): AntSlot[] {
       continue;
     }
 
-    slots[i].survived = Math.random() < Math.min(chance, 0.88);
+    slots[i].survived = Math.random() < Math.min(chance * survivalMult, 0.88);
   }
 
   return slots;
@@ -288,6 +292,12 @@ function RolePicker({ squad, onChange, disabled, carrierPct }: {
           style={{ fontSize: 11, padding: "6px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,.18)", background: "rgba(255,255,255,.08)", color: "white", cursor: disabled?"not-allowed":"pointer", opacity: disabled?0.5:1, fontWeight: 700 }}>
           ✕ Clear
         </button>
+        {lastSquad && lastSquad.length === SQUAD_SIZE && (
+          <button disabled={busy||phase!=="idle"} onClick={() => setSquad([...lastSquad!])}
+            style={{ fontSize:11, padding:"6px 12px", borderRadius:8, border:"1px solid rgba(251,191,36,.4)", background:"rgba(251,191,36,.1)", color:"#fbbf24", cursor:(busy||phase!=="idle")?"not-allowed":"pointer", opacity:(busy||phase!=="idle")?0.5:1, fontWeight:700 }}>
+            🔁 Last Squad <span style={{fontSize:9,opacity:0.65}}>(−10% survival)</span>
+          </button>
+        )}
       </div>
     </div>
   );
@@ -910,10 +920,12 @@ export default function Raid() {
     setBusy(true); setPhase("launching"); startMarch();
     setSlots([]); setRevealedCount(0); setShowResult(false);
 
+  try { localStorage.setItem("ra:raid:lastSquad", JSON.stringify(squad)); setLastSquad([...squad]); } catch {}
+  const isRepeatSquad = lastSquad !== null && JSON.stringify(squad) === JSON.stringify(lastSquad);
     await spend(totalCost,"expedition");
     await new Promise(r=>setTimeout(r,900));
 
-    const battleSlots = simulateBattle(squad, cfg);
+    const battleSlots = simulateBattle(squad, cfg, isRepeatSquad ? 0.9 : 1.0);
     setSlots(battleSlots); setPhase("battling");
 
     for (let i=1; i<=SQUAD_SIZE; i++) {
@@ -951,6 +963,7 @@ export default function Raid() {
     setSlots([]); setRevealedCount(0);
     setRarity("none"); setPrize(null);
     setSquad([...DEFAULT_SQUAD]);
+    try { const v = localStorage.getItem("ra:raid:lastSquad"); setLastSquad(v ? JSON.parse(v) : null); } catch {}
   }
 
   function disconnectDiscord() {
