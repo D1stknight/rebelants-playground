@@ -1381,6 +1381,17 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           </nav>
         </header>
 
+    {!isPlaying && lastRunResult && (
+      <div style={{margin:"12px 0",padding:"14px 16px",borderRadius:14,border:lastRunResult.wasFullClear?"1px solid rgba(250,204,21,0.4)":"1px solid rgba(255,255,255,0.1)",background:lastRunResult.wasFullClear?"rgba(250,204,21,0.08)":"rgba(255,255,255,0.04)"}}>
+        <div style={{fontSize:11,fontWeight:800,opacity:0.5,letterSpacing:"0.06em",marginBottom:8}}>{lastRunResult.wasFullClear?"💎 CRYSTAL SWEEP COMPLETE":"⏱ RUN COMPLETE"}</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:10,alignItems:"center"}}>
+          <div style={{fontSize:13,fontWeight:900,color:"#fde68a"}}>🗺️ #{lastRunResult.layoutNum} {lastRunResult.layoutName}</div>
+          <div style={{fontSize:13,fontWeight:700,color:"#93c5fd"}}>🎯 {lastRunResult.score.toLocaleString()} pts</div>
+          {lastRunResult.clearTimeMs!==null && <div style={{fontSize:13,fontWeight:700,color:"#fbbf24"}}>⚡ {formatMs(lastRunResult.clearTimeMs)}</div>}
+          {lastRunResult.wasFullClear && personalStats?.bestClearTimeMs && lastRunResult.clearTimeMs!==null && lastRunResult.clearTimeMs<=personalStats.bestClearTimeMs && <div style={{fontSize:11,fontWeight:800,color:"#fde68a",background:"rgba(250,204,21,0.15)",border:"1px solid rgba(250,204,21,0.3)",borderRadius:8,padding:"2px 8px"}}>🏆 PB!</div>}
+        </div>
+      </div>
+    )}
               <div
           style={{
             ...cardStyle,
@@ -1656,17 +1667,6 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
   </div>
 ) : null}
                                                                             <div
-    {!isPlaying && lastRunResult && (
-      <div style={{margin:"12px 0",padding:"14px 16px",borderRadius:14,border:lastRunResult.wasFullClear?"1px solid rgba(250,204,21,0.4)":"1px solid rgba(255,255,255,0.1)",background:lastRunResult.wasFullClear?"rgba(250,204,21,0.08)":"rgba(255,255,255,0.04)"}}>
-        <div style={{fontSize:11,fontWeight:800,opacity:0.5,letterSpacing:"0.06em",marginBottom:8}}>{lastRunResult.wasFullClear?"💎 CRYSTAL SWEEP COMPLETE":"⏱ RUN COMPLETE"}</div>
-        <div style={{display:"flex",flexWrap:"wrap",gap:10,alignItems:"center"}}>
-          <div style={{fontSize:13,fontWeight:900,color:"#fde68a"}}>🗺️ #{lastRunResult.layoutNum} {lastRunResult.layoutName}</div>
-          <div style={{fontSize:13,fontWeight:700,color:"#93c5fd"}}>🎯 {lastRunResult.score.toLocaleString()} pts</div>
-          {lastRunResult.clearTimeMs!==null && <div style={{fontSize:13,fontWeight:700,color:"#fbbf24"}}>⚡ {formatMs(lastRunResult.clearTimeMs)}</div>}
-          {lastRunResult.wasFullClear && personalStats?.bestClearTimeMs && lastRunResult.clearTimeMs!==null && lastRunResult.clearTimeMs<=personalStats.bestClearTimeMs && <div style={{fontSize:11,fontWeight:800,color:"#fde68a",background:"rgba(250,204,21,0.15)",border:"1px solid rgba(250,204,21,0.3)",borderRadius:8,padding:"2px 8px"}}>🏆 PB!</div>}
-        </div>
-      </div>
-    )}
                   ref={boardScrollRef}
                   className={hitShake ? "hitShake" : ""}
                   onTouchStart={handleSwipeStart}
