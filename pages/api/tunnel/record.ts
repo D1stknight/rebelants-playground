@@ -28,6 +28,12 @@ export default async function handler(req: any, res: any) {
       if (pf === null || clearTimeMs < -Number(pf)) {
         await redis.zadd("tunnel:top:clear", { score: -clearTimeMs, member });
         await redis.hset("tunnel:player:" + playerId + ":stats", { bestClearTimeMs: clearTimeMs });
+      if (layoutIndex !== null) {
+        const prevLayout = await redis.zscore("tunnel:layout:" + layoutIndex + ":clears", member);
+        if (prevLayout === null || clearTimeMs < -Number(prevLayout)) {
+          await redis.zadd("tunnel:layout:" + layoutIndex + ":clears", { gt: true }, { score: -clearTimeMs, member });
+        }
+      }
       }
     }
     if (layoutIndex !== null) await redis.sadd("tunnel:player:" + playerId + ":explored", String(layoutIndex));
