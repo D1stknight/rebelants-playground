@@ -677,20 +677,29 @@ export default function FactionWars() {
     const h=()=>loadLB(); window.addEventListener("ra:leaderboards-refresh",h); return ()=>window.removeEventListener("ra:leaderboards-refresh",h);
   }, [loadLB]);
   useEffect(() => {
-    const unlock = () => {
+    // Try to play immediately (works when navigating via tab click — user already interacted)
+    // Falls back to waiting for first interaction (works on direct URL load)
+    let started = false;
+    const tryStart = () => {
+      if (started) return;
+      started = true;
       sfx.startTheme();
-      document.removeEventListener('click', unlock);
-      document.removeEventListener('keydown', unlock);
-      document.removeEventListener('touchstart', unlock);
+      document.removeEventListener('click', tryStart);
+      document.removeEventListener('keydown', tryStart);
+      document.removeEventListener('touchstart', tryStart);
     };
-    document.addEventListener('click', unlock);
-    document.addEventListener('keydown', unlock);
-    document.addEventListener('touchstart', unlock);
+    // Attempt immediate play — browser allows this if a user gesture already occurred
+    try { sfx.startTheme(); started = true; } catch (_) {}
+    if (!started) {
+      document.addEventListener('click', tryStart);
+      document.addEventListener('keydown', tryStart);
+      document.addEventListener('touchstart', tryStart);
+    }
     return () => {
       stopMusic();
-      document.removeEventListener('click', unlock);
-      document.removeEventListener('keydown', unlock);
-      document.removeEventListener('touchstart', unlock);
+      document.removeEventListener('click', tryStart);
+      document.removeEventListener('keydown', tryStart);
+      document.removeEventListener('touchstart', tryStart);
     };
   }, []);
 
