@@ -11,7 +11,7 @@ export default function QueenEgg() {
     if (busy) return
     setBusy(true)
     try {
-      const res = await fetch('/api/hatch', { method:'POST' })
+      const res = await fetch('/api/faction-wars', { method:'POST' })
       const data:Result = await res.json()
       if (data.ok) {
         setModal({ open:true, label: data.prizeLabel ?? 'You found something!', sub: data.rarity ? `Rarity: ${data.rarity}` : '' })
