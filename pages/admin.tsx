@@ -18,6 +18,10 @@ type PointsConfigShape = {
   tunnelWallBreaks: number;
   tunnelSpiderSpeedMs: number;
 
+  // ✅ Faction Wars settings
+  factionWarsCost: number;
+  factionWarsAIDifficulty: number;
+
   // ✅ Raid settings
   raidCost: number;
   raidCarrierSurvival: number;
@@ -146,6 +150,8 @@ const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
   tunnelWallBreaks: (defaultConfig as any).tunnelWallBreaks ?? 5,
   tunnelSpiderSpeedMs: (defaultConfig as any).tunnelSpiderSpeedMs ?? 160,
   raidCost: (defaultConfig as any).raidCost ?? 600,
+    factionWarsCost: (defaultConfig as any).factionWarsCost ?? 150,
+    factionWarsAIDifficulty: (defaultConfig as any).factionWarsAIDifficulty ?? 0.65,
   raidCarrierSurvival: (defaultConfig as any).raidCarrierSurvival ?? 0.20,
   raidUltraCarriers: (defaultConfig as any).raidUltraCarriers ?? 4,
   raidUltraRatio: (defaultConfig as any).raidUltraRatio ?? 0.65,
@@ -1074,193 +1080,48 @@ String(c.status).toUpperCase()==="PENDING"
     Tip: Type a Discord name, click the correct result, then hit Grant.
   </div>
 </div>
-        {/* Config */}
-        <div style={{ padding: 14, border: "1px solid rgba(255,255,255,.14)", borderRadius: 14, background: "rgba(15,23,42,.55)" }}>
-          <div style={{ fontWeight: 900, marginBottom: 10 }}>Economy Config</div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <label style={{ fontSize: 12, opacity: 0.9 }}>
-              Shuffle Cost
-              <input
-                value={cfg.shuffleCost}
-                onChange={(e) => setCfg((c) => ({ ...c, shuffleCost: safeNum(e.target.value, c.shuffleCost) }))}
-                style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
-              />
-            </label>
-
-            <label style={{ fontSize: 12, opacity: 0.9 }}>
-              Daily Claim
-              <input
-                value={cfg.dailyClaim}
-                onChange={(e) => setCfg((c) => ({ ...c, dailyClaim: safeNum(e.target.value, c.dailyClaim) }))}
-                style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
-              />
-            </label>
-
-            <label style={{ fontSize: 12, opacity: 0.9 }}>
-              Daily Cap
-              <input
-                value={cfg.dailyEarnCap}
-                onChange={(e) => setCfg((c) => ({ ...c, dailyEarnCap: safeNum(e.target.value, c.dailyEarnCap) }))}
-                style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
-              />
-            </label>
-
-            <label style={{ fontSize: 12, opacity: 0.9 }}>
-  Currency
-  <input
-    value={cfg.currency}
-    onChange={(e) => setCfg((c) => ({ ...c, currency: e.target.value || c.currency }))}
-    style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
-  />
-</label>
-
-<label style={{ fontSize: 12, opacity: 0.9 }}>
-  Tunnel Cost
-  <input
-    value={cfg.tunnelCost}
-    onChange={(e) => setCfg((c) => ({ ...c, tunnelCost: safeNum(e.target.value, c.tunnelCost) }))}
-    style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
-  />
-</label>
-
-<label style={{ fontSize: 12, opacity: 0.9 }}>
-  Tunnel Run Seconds
-  <input
-    value={cfg.tunnelRunSeconds}
-    onChange={(e) => setCfg((c) => ({ ...c, tunnelRunSeconds: safeNum(e.target.value, c.tunnelRunSeconds) }))}
-    style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
-  />
-</label>
-
-<label style={{ fontSize: 12, opacity: 0.9 }}>
-  Tunnel Crystal Count
-  <input
-    value={cfg.tunnelCrystalCount}
-    onChange={(e) => setCfg((c) => ({ ...c, tunnelCrystalCount: safeNum(e.target.value, c.tunnelCrystalCount) }))}
-    style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
-  />
-</label>
-
-<label style={{ fontSize: 12, opacity: 0.9 }}>
-  Tunnel Sugar Count
-  <input
-    value={cfg.tunnelSugarCount}
-    onChange={(e) => setCfg((c) => ({ ...c, tunnelSugarCount: safeNum(e.target.value, c.tunnelSugarCount) }))}
-    style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
-  />
-</label>
-
-<label style={{ fontSize: 12, opacity: 0.9 }}>
-  Tunnel Crumb Count
-  <input
-    value={cfg.tunnelCrumbCount}
-    onChange={(e) => setCfg((c) => ({ ...c, tunnelCrumbCount: safeNum(e.target.value, c.tunnelCrumbCount) }))}
-    style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
-  />
-</label>
-
-<label style={{ fontSize: 12, opacity: 0.9 }}>
-  Tunnel Wall Breaks
-  <input
-    value={cfg.tunnelWallBreaks}
-    onChange={(e) => setCfg((c) => ({ ...c, tunnelWallBreaks: safeNum(e.target.value, c.tunnelWallBreaks) }))}
-    style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
-  />
-</label>
-
-<label style={{ fontSize: 12, opacity: 0.9 }}>
-  Tunnel Spider Speed (ms)
-  <input
-    value={cfg.tunnelSpiderSpeedMs}
-    onChange={(e) => setCfg((c) => ({ ...c, tunnelSpiderSpeedMs: safeNum(e.target.value, c.tunnelSpiderSpeedMs) }))}
-    style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
-  />
-</label>
-
-            
-            </div>
-
-            {/* ✅ Raid Settings */}
-            <div style={{ marginTop: 14, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,.12)" }}>
-              <div style={{ fontWeight: 900, marginBottom: 10, color: "#f87171" }}>⚔️ Raid Settings</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                <label style={{ fontSize: 12, opacity: 0.9 }}>
-                  Raid Cost (REBEL)
-                  <input value={cfg.raidCost} onChange={e => setCfg(c => ({ ...c, raidCost: safeNum(e.target.value, c.raidCost) }))}
-                    style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} />
-                  <div style={{ fontSize: 10, opacity: 0.6, marginTop: 3 }}>How much it costs to launch one raid</div>
-                </label>
-                <label style={{ fontSize: 12, opacity: 0.9 }}>
-                  Carrier Survival % (0–100)
-                  <input
-                    value={Math.round((cfg.raidCarrierSurvival ?? 0.20) * 100)}
-                    onChange={e => { const pct = Math.min(100, Math.max(0, safeNum(e.target.value, 20))); setCfg(c => ({ ...c, raidCarrierSurvival: pct / 100 })); }}
-                    style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} />
-                  <div style={{ fontSize: 10, opacity: 0.6, marginTop: 3 }}>Base survival chance for Carrier ants. Lower = harder.</div>
-                </label>
-                <label style={{ fontSize: 12, opacity: 0.9 }}>
-                  Ultra Carriers Required
-                  <input value={cfg.raidUltraCarriers} onChange={e => setCfg(c => ({ ...c, raidUltraCarriers: safeNum(e.target.value, c.raidUltraCarriers) }))}
-                    style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} />
-                  <div style={{ fontSize: 10, opacity: 0.6, marginTop: 3 }}>Min carriers home needed for Ultra crate (default 4)</div>
-                </label>
-                <label style={{ fontSize: 12, opacity: 0.9 }}>
-                  Ultra Squad Survival % (0–100)
-                  <input
-                    value={Math.round((cfg.raidUltraRatio ?? 0.65) * 100)}
-                    onChange={e => { const pct = Math.min(100, Math.max(0, safeNum(e.target.value, 65))); setCfg(c => ({ ...c, raidUltraRatio: pct / 100 })); }}
-                    style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} />
-                  <div style={{ fontSize: 10, opacity: 0.6, marginTop: 3 }}>% of squad that must survive for Ultra (default 65%)</div>
-                </label>
-              </div>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            
-
-<label style={{ fontSize: 12, opacity: 0.9 }}>
-  Ultra Min Reward
-  <input
-    value={cfg.ultraMinReward}
-    onChange={(e) =>
-      setCfg((c) => ({ ...c, ultraMinReward: safeNum(e.target.value, c.ultraMinReward) }))
-    }
-    style={{
-      width: "100%",
-      marginTop: 6,
-      padding: "10px 12px",
-      borderRadius: 12,
-      border: "1px solid rgba(255,255,255,.18)",
-      background: "rgba(0,0,0,.25)",
-      color: "white",
-    }}
-  />
-</label>            
-          </div>
-
-       <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10 }}>
-  {(["none", "common", "rare", "ultra"] as const).map((k) => (
-    <label key={k} style={{ fontSize: 12, opacity: 0.9 }}>
-      Reward {k}
-      <input
-        value={cfg.rewards[k]}
-        onChange={(e) =>
-          setCfg((c) => ({ ...c, rewards: { ...c.rewards, [k]: safeNum(e.target.value, c.rewards[k]) } }))
-        }
-        style={{
-          width: "100%",
-          marginTop: 6,
-          padding: "10px 12px",
-          borderRadius: 12,
-          border: "1px solid rgba(255,255,255,.18)",
-          background: "rgba(0,0,0,.25)",
-          color: "white",
-        }}
-      />
-    </label>
-  ))}
-</div>
+  {/* Config */}
+  <div style={{ padding: 14, border: "1px solid rgba(255,255,255,.14)", borderRadius: 14, background: "rgba(15,23,42,.55)" }}>
+    <div style={{ fontWeight: 900, marginBottom: 14, fontSize: 16 }}>⚙️ Game Settings</div>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 14, padding: 12, borderRadius: 12, background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.08)" }}>
+      <label style={{ fontSize: 12, opacity: 0.9, gridColumn: "1/-1" }}><span style={{ fontWeight: 800, fontSize: 11, color: "rgba(255,255,255,.45)", letterSpacing: "0.05em" }}>🌐 SHARED ECONOMY</span></label>
+      <label style={{ fontSize: 12, opacity: 0.9 }}>Daily Claim<input value={cfg.dailyClaim} onChange={(e) => setCfg((c) => ({ ...c, dailyClaim: safeNum(e.target.value, c.dailyClaim) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+      <label style={{ fontSize: 12, opacity: 0.9 }}>Daily Cap<input value={cfg.dailyEarnCap} onChange={(e) => setCfg((c) => ({ ...c, dailyEarnCap: safeNum(e.target.value, c.dailyEarnCap) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+      <label style={{ fontSize: 12, opacity: 0.9 }}>Currency<input value={cfg.currency} onChange={(e) => setCfg((c) => ({ ...c, currency: e.target.value || c.currency }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+    </div>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+      <div style={{ padding: 14, borderRadius: 14, border: "1px solid rgba(96,165,250,.3)", background: "rgba(96,165,250,.04)" }}>
+        <div style={{ fontWeight: 900, fontSize: 12, marginBottom: 10, color: "#60a5fa" }}>🐜 ANT TUNNEL</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>Cost<input value={cfg.tunnelCost} onChange={(e) => setCfg((c) => ({ ...c, tunnelCost: safeNum(e.target.value, c.tunnelCost) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>Run Seconds<input value={cfg.tunnelRunSeconds} onChange={(e) => setCfg((c) => ({ ...c, tunnelRunSeconds: safeNum(e.target.value, c.tunnelRunSeconds) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>Crystals<input value={cfg.tunnelCrystalCount} onChange={(e) => setCfg((c) => ({ ...c, tunnelCrystalCount: safeNum(e.target.value, c.tunnelCrystalCount) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>Sugar<input value={cfg.tunnelSugarCount} onChange={(e) => setCfg((c) => ({ ...c, tunnelSugarCount: safeNum(e.target.value, c.tunnelSugarCount) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>Crumbs<input value={cfg.tunnelCrumbCount} onChange={(e) => setCfg((c) => ({ ...c, tunnelCrumbCount: safeNum(e.target.value, c.tunnelCrumbCount) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>Wall Breaks<input value={cfg.tunnelWallBreaks} onChange={(e) => setCfg((c) => ({ ...c, tunnelWallBreaks: safeNum(e.target.value, c.tunnelWallBreaks) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+          <label style={{ fontSize: 12, opacity: 0.9, gridColumn:"1/-1" }}>Spider Speed (ms)<input value={cfg.tunnelSpiderSpeedMs} onChange={(e) => setCfg((c) => ({ ...c, tunnelSpiderSpeedMs: safeNum(e.target.value, c.tunnelSpiderSpeedMs) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+        </div>
+        <div style={{ fontWeight: 900, fontSize: 12, margin: "12px 0 10px", color: "#60a5fa", paddingTop: 10, borderTop: "1px solid rgba(96,165,250,.2)" }}>🃏 SHUFFLE</div>
+        <label style={{ fontSize: 12, opacity: 0.9 }}>Shuffle Cost<input value={cfg.shuffleCost} onChange={(e) => setCfg((c) => ({ ...c, shuffleCost: safeNum(e.target.value, c.shuffleCost) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+      </div>
+      <div style={{ padding: 14, borderRadius: 14, border: "1px solid rgba(248,113,113,.3)", background: "rgba(248,113,113,.04)" }}>
+        <div style={{ fontWeight: 900, fontSize: 12, marginBottom: 10, color: "#f87171" }}>⚔️ THE RAID</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>Raid Cost (REBEL)<input value={cfg.raidCost} onChange={e => setCfg(c => ({ ...c, raidCost: safeNum(e.target.value, c.raidCost) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>Carrier Survival % (0–100)<input value={Math.round((cfg.raidCarrierSurvival ?? 0.20) * 100)} onChange={e => { const pct = Math.min(100, Math.max(0, safeNum(e.target.value, 20))); setCfg(c => ({ ...c, raidCarrierSurvival: pct / 100 })); }} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>Ultra Carriers Required<input value={cfg.raidUltraCarriers} onChange={e => setCfg(c => ({ ...c, raidUltraCarriers: safeNum(e.target.value, c.raidUltraCarriers) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>Ultra Squad Surv % (0–100)<input value={Math.round((cfg.raidUltraRatio ?? 0.65) * 100)} onChange={e => { const pct = Math.min(100, Math.max(0, safeNum(e.target.value, 65))); setCfg(c => ({ ...c, raidUltraRatio: pct / 100 })); }} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>Ultra Min Reward<input value={cfg.ultraMinReward} onChange={e => setCfg(c => ({ ...c, ultraMinReward: safeNum(e.target.value, c.ultraMinReward) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+        </div>
+        <div style={{ fontWeight: 900, fontSize: 12, margin: "12px 0 10px", color: "#fbbf24", paddingTop: 10, borderTop: "1px solid rgba(248,113,113,.2)" }}>🏰 FACTION WARS</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>FW Cost (REBEL)<input value={cfg.factionWarsCost} onChange={e => setCfg(c => ({ ...c, factionWarsCost: safeNum(e.target.value, c.factionWarsCost) }))} type="number" min="0" style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>AI Difficulty (0.0–1.0)<input value={cfg.factionWarsAIDifficulty} onChange={e => setCfg(c => ({ ...c, factionWarsAIDifficulty: Math.min(1, Math.max(0, safeNum(e.target.value, c.factionWarsAIDifficulty))) }))} type="number" min="0" max="1" step="0.05" style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
 
 <div style={{ marginTop: 14, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,.12)" }}>
   <div style={{ fontWeight: 900, marginBottom: 10 }}>Pro Odds</div>
@@ -1518,8 +1379,6 @@ String(c.status).toUpperCase()==="PENDING"
     Save
   </button>
 </div>
-        </div>
-      </div>
 
           {/* Prize Inventory Dashboard */}
       <div

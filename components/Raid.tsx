@@ -84,6 +84,9 @@ type RaidLeaderboards = {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const SQUAD_SIZE   = 20;
+const LAST_SQUAD_KEY="ra:raid:lastSquad";
+function saveLastSquad(s:AntRole[]){if(typeof window==="undefined")return;try{localStorage.setItem(LAST_SQUAD_KEY,JSON.stringify(s));}catch{}}
+function loadLastSquad():AntRole[]|null{if(typeof window==="undefined")return null;try{const v=localStorage.getItem(LAST_SQUAD_KEY);return v?JSON.parse(v):null;}catch{return null;}}
 const REVEAL_MS    = 700; // slower = more drama
 
 // Default survival odds (can be overridden by admin via pointsConfig)
@@ -135,7 +138,7 @@ const DEFAULT_SQUAD: AntRole[] = [
 
 // ── Battle Engine ─────────────────────────────────────────────────────────────
 
-function simulateBattle(squad: AntRole[], cfg: any): AntSlot[] {
+function simulateBattle(squad: AntRole[], cfg: any, survivalMult = 1.0): AntSlot[] {
   const slots: AntSlot[] = squad.map(role => ({ role, survived: null, boosted: false }));
 
   // Pull survival overrides from admin config if present
@@ -171,7 +174,7 @@ function simulateBattle(squad: AntRole[], cfg: any): AntSlot[] {
       continue;
     }
 
-    slots[i].survived = Math.random() < Math.min(chance, 0.88);
+    slots[i].survived = Math.random() < Math.min(chance * survivalMult, 0.88);
   }
 
   return slots;
@@ -205,8 +208,8 @@ function calcPrize(slots: AntSlot[], cfg: any): { rarity: Rarity; prize: Prize }
 
 // ── Role Picker ───────────────────────────────────────────────────────────────
 
-function RolePicker({ squad, onChange, disabled, carrierPct }: {
-  squad: AntRole[]; onChange: (n: AntRole[]) => void; disabled: boolean; carrierPct: number;
+function RolePicker({ squad, onChange, disabled, carrierPct, lastSquad, onLastSquad }: {
+  squad: AntRole[]; onChange: (n: AntRole[]) => void; disabled: boolean; carrierPct: number; lastSquad?: AntRole[] | null; onLastSquad?: (s: AntRole[]) => void;
 }) {
   const roles = Object.keys(ROLE_META) as AntRole[];
 
@@ -288,6 +291,13 @@ function RolePicker({ squad, onChange, disabled, carrierPct }: {
           style={{ fontSize: 11, padding: "6px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,.18)", background: "rgba(255,255,255,.08)", color: "white", cursor: disabled?"not-allowed":"pointer", opacity: disabled?0.5:1, fontWeight: 700 }}>
           ✕ Clear
         </button>
+        {lastSquad && lastSquad.length === SQUAD_SIZE && onLastSquad && (
+          <button disabled={disabled} onClick={() => onLastSquad([...lastSquad])}
+            style={{ fontSize:11, padding:"6px 12px", borderRadius:8, border:"1px solid rgba(251,191,36,.4)", background:"rgba(251,191,36,.1)", color:"#fbbf24", cursor:disabled?"not-allowed":"pointer", opacity:disabled?0.5:1, fontWeight:700 }}
+            title="Reuse your last squad — survival odds are slightly lower for repeat squads">
+            🔁 Last Squad <span style={{fontSize:9,opacity:0.65}}>(−10% survival)</span>
+          </button>
+        )}
       </div>
     </div>
   );
@@ -667,6 +677,7 @@ export default function Raid() {
   const [playerId]                               = useState(initialId);
   const [effectivePlayerId, setEffectivePlayerId]= useState(initialEffectiveId);
 
+  useEffect(() => { startMarch(); return () => { stopMarch(); }; }, []);
   useEffect(() => {
     const u = () => setEffectivePlayerId(getEffectivePlayerId(loadProfile()));
     u(); window.addEventListener("ra:identity-changed", u);
@@ -809,6 +820,7 @@ export default function Raid() {
 
   // DRIP migrate (mirrors Shuffle)
   const [showDripMigrate, setShowDripMigrate] = useState(false);
+  const [showRules, setShowRules] = useState(false);
   const [dripBalance, setDripBalance]         = useState<number|null>(null);
   const [dripAmount, setDripAmount]           = useState<number>(0);
   const [dripBusy, setDripBusy]               = useState(false);
@@ -845,6 +857,7 @@ export default function Raid() {
 
   // Game state
   const [squad, setSquad]                 = useState<AntRole[]>([...DEFAULT_SQUAD]);
+  const [lastSquad,setLastSquad]=useState<AntRole[]|null>(()=>{if(typeof window==="undefined")return null;try{const v=localStorage.getItem(LAST_SQUAD_KEY);return v?JSON.parse(v):null;}catch{return null;}});
   const [phase, setPhase]                 = useState<Phase>("idle");
   const { muted: raidMuted, toggleMute: toggleRaidMute, startMarch, stopMarch, sfx: raidSfx } = useRaidAudio();
   const [busy, setBusy]                   = useState(false);
@@ -909,10 +922,13 @@ export default function Raid() {
     setBusy(true); setPhase("launching"); startMarch();
     setSlots([]); setRevealedCount(0); setShowResult(false);
 
+  if (typeof window !== "undefined") { try { localStorage.setItem("ra:raid:lastSquad", JSON.stringify(squad)); setLastSquad([...squad]); } catch {} }
+  if(typeof window!=="undefined"){try{localStorage.setItem(LAST_SQUAD_KEY,JSON.stringify(squad));setLastSquad([...squad]);}catch{}}
+  const isRepeatSquad = lastSquad !== null && JSON.stringify(squad) === JSON.stringify(lastSquad);
     await spend(totalCost,"expedition");
     await new Promise(r=>setTimeout(r,900));
 
-    const battleSlots = simulateBattle(squad, cfg);
+    const battleSlots = simulateBattle(squad, cfg, isRepeatSquad ? 0.9 : 1.0);
     setSlots(battleSlots); setPhase("battling");
 
     for (let i=1; i<=SQUAD_SIZE; i++) {
@@ -950,6 +966,8 @@ export default function Raid() {
     setSlots([]); setRevealedCount(0);
     setRarity("none"); setPrize(null);
     setSquad([...DEFAULT_SQUAD]);
+    if(typeof window!=="undefined"){try{const v=localStorage.getItem(LAST_SQUAD_KEY);setLastSquad(v?JSON.parse(v):null);}catch{}}
+    if (typeof window !== "undefined") { try { const v = localStorage.getItem("ra:raid:lastSquad"); setLastSquad(v ? JSON.parse(v) : null); } catch {} }
   }
 
   function disconnectDiscord() {
@@ -978,8 +996,8 @@ export default function Raid() {
         </div>
         <nav className="tabs" aria-label="Main">
           <Link href="/tunnel"     className="tab">🐜 Ant Tunnel</Link>
-          <Link href="/hatch"      className="tab">🥚 Queen&apos;s Egg Hatch</Link>
-          <Link href="/expedition" className="tab tab-active">⚔️ The Raid</Link>
+          <Link href="/faction-wars"      className="tab">⚔️ Faction Wars</Link>
+          <Link href="/the-raid" className="tab tab-active">⚔️ The Raid</Link>
           <Link href="/shuffle"    className="tab">🃏 Shuffle</Link>
         </nav>
       </header>
@@ -1000,7 +1018,7 @@ export default function Raid() {
           ⚠️ BRUTAL DIFFICULTY — Carriers only have {Math.round(Number(cfg?.raidCarrierSurvival ?? 20) * (Number(cfg?.raidCarrierSurvival ?? 20) <= 1 ? 100 : 1))}% survival. Place 🛡️ Guards next to them to boost their odds.
         </div>
 
-        <RolePicker squad={squad} onChange={setSquad} disabled={isBattling} carrierPct={Math.round(Number(cfg?.raidCarrierSurvival ?? 0.20) * (Number(cfg?.raidCarrierSurvival ?? 0.20) <= 1 ? 100 : 1))} />
+        <RolePicker lastSquad={lastSquad} onLastSquad={(s) => setSquad(s)} squad={squad} onChange={setSquad} disabled={isBattling} carrierPct={Math.round(Number(cfg?.raidCarrierSurvival ?? 0.20) * (Number(cfg?.raidCarrierSurvival ?? 0.20) <= 1 ? 100 : 1))} />
 
         {phase==="launching" && <LaunchAnimation />}
         {(phase==="battling"||phase==="revealed") && slots.length>0 && (
@@ -1088,7 +1106,7 @@ export default function Raid() {
         </div>
 
         <div style={{ marginTop:10 }}>
-          <a href="/rules" style={{ fontSize:12, textDecoration:"underline", opacity:0.65 }}>Official Rules</a>
+          <button onClick={()=>setShowRules(true)} style={{ fontSize:12, textDecoration:"underline", opacity:0.65, background:"none", border:"none", color:"inherit", cursor:"pointer", padding:0 }}>Official Rules</button>
         </div>
 
         <RaidLeaderboardPanel lb={lb} />
@@ -1130,6 +1148,28 @@ export default function Raid() {
           </div>
         )}
       </div>
+
+      {showRules && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.8)", zIndex:3000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }} onClick={()=>setShowRules(false)}>
+          <div style={{ background:"#0f172a", border:"1px solid rgba(255,255,255,0.15)", borderRadius:16, padding:28, maxWidth:560, width:"100%", maxHeight:"85vh", overflowY:"auto", position:"relative" }} onClick={e=>e.stopPropagation()}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
+              <div style={{ fontWeight:900, fontSize:18 }}>📋 Official Rules</div>
+              <button onClick={()=>setShowRules(false)} style={{ background:"rgba(255,255,255,0.1)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:8, padding:"6px 14px", color:"white", cursor:"pointer", fontSize:13 }}>✕ Close</button>
+            </div>
+            <div style={{ fontSize:13, lineHeight:1.7, display:"flex", flexDirection:"column", gap:12, opacity:0.9 }}>
+              <p><b>Free-to-play.</b> No purchase necessary to play. Void where prohibited.</p>
+              <p><b>Game currency:</b> REBEL Points are an in-app, promotional points system. They have no guaranteed cash value and are not redeemable for cash.</p>
+              <p><b>Optional purchase (APE):</b> You may optionally buy REBEL Points using APE to support the project. <b>All purchases are final</b> (no refunds). Network fees (gas) may apply.</p>
+              <p><b>Prizes:</b> Crates may award REBEL Points and/or digital collectibles and/or merch (when available). Prize availability may vary by location.</p>
+              <p><b>Daily limits:</b> Daily claim limits and daily play limits apply to support fair access and prevent abuse. Daily plays reset every 24 hours. Purchased bonus plays do not expire.</p>
+              <p><b>Fair play:</b> Multi-accounting, automation/bots, exploits, or abuse may result in disqualification, prize forfeiture, or account blocking.</p>
+              <p><b>Odds:</b> Prize odds and point values may change over time based on live configuration and promotions.</p>
+              <p><b>Taxes:</b> You are responsible for any taxes associated with prizes, if applicable.</p>
+              <p style={{ opacity:0.7 }}>By playing, you agree to these rules and acknowledge this is an entertainment experience with promotional rewards.</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         .ant-colony-bg {

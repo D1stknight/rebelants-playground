@@ -20,14 +20,20 @@ export default async function handler(req: any, res: any) {
     if (score > 0) {
       const prev = Number(await redis.hget("tunnel:player:" + playerId + ":stats", "bestScore") || 0);
       if (score > prev) await redis.hset("tunnel:player:" + playerId + ":stats", { bestScore: score });
-      await redis.zadd("tunnel:top:score", { score: Number(score), member });
-      if (layoutIndex !== null) await redis.zadd("tunnel:layout:" + layoutIndex + ":scores", { score: Number(score), member });
+      await redis.zadd("tunnel:top:score", { gt: true }, { score: Number(score), member });
+      if (layoutIndex !== null) await redis.zadd("tunnel:layout:" + layoutIndex + ":scores", { gt: true }, { score: Number(score), member });
     }
     if (fullClear && clearTimeMs > 0) {
       const pf = await redis.zscore("tunnel:top:clear", member);
       if (pf === null || clearTimeMs < -Number(pf)) {
         await redis.zadd("tunnel:top:clear", { score: -clearTimeMs, member });
         await redis.hset("tunnel:player:" + playerId + ":stats", { bestClearTimeMs: clearTimeMs });
+      if (layoutIndex !== null) {
+        const prevLayout = await redis.zscore("tunnel:layout:" + layoutIndex + ":clears", member);
+        if (prevLayout === null || clearTimeMs < -Number(prevLayout)) {
+          await redis.zadd("tunnel:layout:" + layoutIndex + ":clears", { gt: true }, { score: -clearTimeMs, member });
+        }
+      }
       }
     }
     if (layoutIndex !== null) await redis.sadd("tunnel:player:" + playerId + ":explored", String(layoutIndex));

@@ -640,6 +640,9 @@ export default function Shuffle() {
   // ✅ NEW: this is what points + wins should use going forward
   const [effectivePlayerId, setEffectivePlayerId] = useState(initialEffectiveId);
 
+  // Start music on mount, stop on unmount
+  React.useEffect(() => { startMusic(); return () => { stopMusic(); }; }, []);
+
   // ✅ If profile identity changes (wallet connect / discord connect), refresh effective id
  React.useEffect(() => {
   const updateIdentity = () => {
@@ -862,6 +865,7 @@ const [shippingForm, setShippingForm] = useState<any>({
 });
 // ✅ DRIP migrate UI
 const [showDripMigrate, setShowDripMigrate] = useState(false);
+  const [showRules, setShowRules] = useState(false);
 const [dripBalance, setDripBalance] = useState<number | null>(null);
 
 const [dripAmount, setDripAmount] = useState<number>(0);
@@ -1385,8 +1389,8 @@ return (
         </div>
         <nav className="tabs" aria-label="Main">
           <Link href="/tunnel"     className="tab">🐜 Ant Tunnel</Link>
-          <Link href="/hatch"      className="tab">🥚 Queen&apos;s Egg Hatch</Link>
-          <Link href="/expedition" className="tab">⚔️ The Raid</Link>
+          <Link href="/faction-wars"      className="tab">⚔️ Faction Wars</Link>
+          <Link href="/the-raid" className="tab">⚔️ The Raid</Link>
           <Link href="/shuffle"    className="tab tab-active">🃏 Shuffle</Link>
         </nav>
       </header>
@@ -1571,7 +1575,7 @@ return (
   • Daily plays reset every 24 hours.<br />
   • Point purchases may include <b>bonus plays</b>, which are used after daily plays run out and do not expire.<br />
   • Optional: you can buy points with <b>APE</b> (final sale, gas may apply).<br />
-  • See <a href="/rules" style={{ textDecoration: "underline" }}>Official Rules</a> for details.
+  • See <button onClick={()=>setShowRules(true)} style={{ fontSize:12, textDecoration:"underline", background:"none", border:"none", color:"inherit", cursor:"pointer", padding:0 }}>Official Rules</button> for details.
 </div>
       <button
         type="button"
@@ -1768,9 +1772,9 @@ return (
 </div>
         {/* Official Rules link */}
         <div className="rules-row">
-          <a className="rules-link" href="/rules">
+          <button className="rules-link" onClick={()=>setShowRules(true)} style={{background:"none",border:"none",cursor:"pointer",padding:0}}>
             Official Rules
-          </a>
+          </button>
         </div>
 
        <div
@@ -1800,6 +1804,28 @@ return (
   />
 )}
         
+      {showRules && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.8)", zIndex:3000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }} onClick={()=>setShowRules(false)}>
+          <div style={{ background:"#0f172a", border:"1px solid rgba(255,255,255,0.15)", borderRadius:16, padding:28, maxWidth:560, width:"100%", maxHeight:"85vh", overflowY:"auto" }} onClick={e=>e.stopPropagation()}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
+              <div style={{ fontWeight:900, fontSize:18 }}>📋 Official Rules</div>
+              <button onClick={()=>setShowRules(false)} style={{ background:"rgba(255,255,255,0.1)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:8, padding:"6px 14px", color:"white", cursor:"pointer", fontSize:13 }}>✕ Close</button>
+            </div>
+            <div style={{ fontSize:13, lineHeight:1.7, display:"flex", flexDirection:"column", gap:12, opacity:0.9 }}>
+              <p><b>Free-to-play.</b> No purchase necessary to play. Void where prohibited.</p>
+              <p><b>Game currency:</b> REBEL Points are an in-app promotional points system. No guaranteed cash value, not redeemable for cash.</p>
+              <p><b>Optional purchase (APE):</b> You may optionally buy REBEL Points using APE to support the project. <b>All purchases are final</b> (no refunds). Gas fees may apply.</p>
+              <p><b>Prizes:</b> Crates may award REBEL Points and/or digital collectibles and/or merch (when available). Availability may vary by location.</p>
+              <p><b>Daily limits:</b> Daily claim and play limits apply to ensure fair access. Daily plays reset every 24 hours. Purchased bonus plays do not expire.</p>
+              <p><b>Fair play:</b> Multi-accounting, bots, exploits, or abuse may result in disqualification, prize forfeiture, or account blocking.</p>
+              <p><b>Odds:</b> Prize odds and point values may change over time based on live configuration and promotions.</p>
+              <p><b>Taxes:</b> You are responsible for any taxes associated with prizes, if applicable.</p>
+              <p style={{ opacity:0.7 }}>By playing, you agree to these rules and acknowledge this is an entertainment experience with promotional rewards.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
 <BuyPointsModal
   open={showBuyPoints}
   onClose={() => setShowBuyPoints(false)}

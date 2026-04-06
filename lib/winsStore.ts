@@ -2,7 +2,7 @@
 export type WinEvent = {
   id: string;            // unique event id
   ts: number;            // timestamp
-  game: "shuffle" | "tunnel" | "hatch" | "expedition";
+  game: "shuffle" | "tunnel" | "hatch" | "expedition" | "faction-wars";
   playerId: string;
   playerName: string;
   rarity: "none" | "common" | "rare" | "ultra";

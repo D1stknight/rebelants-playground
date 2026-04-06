@@ -57,6 +57,7 @@ function useAudio() {
     wall:    () => { if (!mutedRef.current) play("/audio/wall-break.mp3",      0.75); },
     win:     () => { if (!mutedRef.current) { stopAmbient(); play("/audio/tunnel-win.mp3", 0.9); } },
     lose:    () => { if (!mutedRef.current) { stopAmbient(); play("/audio/tunnel-lose.mp3", 0.8); } },
+    spiderHit: () => { if (!mutedRef.current) play("/audio/spider-hit.mp3", 0.6); },
   }), [play, stopAmbient]);
 
   return { muted, toggleMute, startAmbient, stopAmbient, sfx };
@@ -431,7 +432,9 @@ export default function TunnelShell() {
   const [dripBalance,    setDripBalance]    = useState<number|null>(null);
   const [dripStatus,     setDripStatus]     = useState("");
   const [showBuyPoints, setShowBuyPoints] = useState(false);
+  const [showRules, setShowRules] = useState(false);
   const { muted, toggleMute, startAmbient, stopAmbient, sfx } = useAudio();
+  React.useEffect(() => { startAmbient(); return () => { stopAmbient(); }; }, []); // start ambient on mount, stop on unmount
   const [tunnelCfg, setTunnelCfg] = useState(DEFAULT_TUNNEL_CONFIG);
 
     const [boardTheme, setBoardTheme] = useState<BoardTheme>("colony");
@@ -440,12 +443,13 @@ export default function TunnelShell() {
   const [layoutMode, setLayoutMode] = useState<"random"|"pick">("random");
   const [selectedLayout, setSelectedLayout] = useState<number|null>(null);
   const [layoutsExplored, setLayoutsExplored] = useState(0);
-  const [layoutChampions, setLayoutChampions] = useState<Array<{layoutIndex:number;layoutName:string;playerId:string;playerName:string;score:number}>>([]);
+  const [layoutChampions, setLayoutChampions] = useState<{layoutIndex:number;layoutName:string;topScores:{rank:number;playerId:string;playerName:string;score:number}[];fastestClears:{rank:number;playerId:string;playerName:string;clearTimeMs:number}[]}[]>([]);
 const [isPlaying, setIsPlaying] = useState(false);
 const [timeLeft, setTimeLeft] = useState(DEFAULT_TUNNEL_CONFIG.tunnelRunSeconds);
 const [score, setScore] = useState(0);
 const [runMessage, setRunMessage] = useState("");
 const [didWinRun, setDidWinRun] = useState(false);
+  const [lastRunResult, setLastRunResult] = React.useState<{layoutName:string;layoutNum:number;score:number;clearTimeMs:number|null;wasFullClear:boolean}|null>(null);
 const [runStartedAt, setRunStartedAt] = useState<number | null>(null);
 const [runCrystalTarget, setRunCrystalTarget] = useState(0);
   const [playerPos, setPlayerPos] = useState<Cell>(START_CELL);
@@ -521,8 +525,8 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
 
       if (!r.ok || !j?.ok) return;
 
-      setTopScoreRows(Array.isArray(j.topScore) ? j.topScore : []);
-      setFastestClearRows(Array.isArray(j.fastestClear) ? j.fastestClear : []);
+      // topScore global panel removed
+      // fastestClear global panel removed
       setPersonalStats(j.personalStats || null);
       setLayoutsExplored(Number(j.layoutsExplored || 0));
       setLayoutChampions(Array.isArray(j.layoutChampions) ? j.layoutChampions : []);
@@ -898,6 +902,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     setRunMessage("");
     setDidWinRun(false);
     setRunStartedAt(Date.now());
+    setLastRunResult(null);
     lastHitRef.current = 0;
   }
 
@@ -966,6 +971,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
         const finishRun = async () => {
       setIsPlaying(false);
       sfx.lose();
+    setLastRunResult({ layoutName: LAYOUT_NAMES[layoutIndex]||("#"+(layoutIndex+1)), layoutNum: layoutIndex+1, score, clearTimeMs: null, wasFullClear: false });
 
             const crystalsCollected = Math.max(0, runCrystalTarget - crystals.length);
       await recordTunnelRun({
@@ -1018,6 +1024,8 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
       setIsPlaying(false);
       setDidWinRun(true);
       sfx.win();
+    const _clearMs = runStartedAt ? Math.max(0, Date.now() - runStartedAt) : null;
+    setLastRunResult({ layoutName: LAYOUT_NAMES[layoutIndex]||("#"+(layoutIndex+1)), layoutNum: layoutIndex+1, score, clearTimeMs: _clearMs, wasFullClear: true });
 
             await recordTunnelRun({
         score,
@@ -1129,6 +1137,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     setRunMessage("Spider hit! -3 seconds");
     setHitFlash(true);
     setHitShake(true);
+    sfx.spiderHit();
 
     window.setTimeout(() => {
       setHitFlash(false);
@@ -1339,7 +1348,8 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               borderBottom:"2px solid "+themeMap[boardTheme].accent+"66",
               boxShadow:"0 4px 20px rgba(0,0,0,0.5)",
             }}>
-              <span style={{color:timeLeft<=10?"#ff4444":themeMap[boardTheme].accent,fontWeight:900,fontSize:18,letterSpacing:1}}>⏱ {timeLeft}s</span>
+              <span style={{color:"rgba(255,255,255,0.5)",fontWeight:700,fontSize:13,maxWidth:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{LAYOUT_NAMES[layoutIndex]||"#"+(layoutIndex+1)}</span>
+          <span style={{color:timeLeft<=10?"#ff4444":themeMap[boardTheme].accent,fontWeight:900,fontSize:18,letterSpacing:1}}>⏱ {timeLeft}s</span>
               <span style={{color:themeMap[boardTheme].crystal,fontWeight:700,fontSize:16}}>💎 {score}</span>
               <span style={{color:"#ff8c00",fontWeight:700,fontSize:16}}>💥 {wallBreaksLeft}</span>
               <span style={{color:"rgba(255,255,255,0.6)",fontWeight:700,fontSize:14}}>💎 {crystals.length} left</span>
@@ -1365,8 +1375,8 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
 
           <nav className="tabs" aria-label="Main" style={{ position:"relative", zIndex:1 }}>
             <Link href="/tunnel"     className="tab tab-active">🐜 Ant Tunnel</Link>
-            <Link href="/hatch"      className="tab">🥚 Queen&apos;s Egg Hatch</Link>
-            <Link href="/expedition" className="tab">⚔️ The Raid</Link>
+            <Link href="/faction-wars"      className="tab">⚔️ Faction Wars</Link>
+            <Link href="/the-raid" className="tab">⚔️ The Raid</Link>
             <Link href="/shuffle"    className="tab">🃏 Shuffle</Link>
           </nav>
         </header>
@@ -1387,7 +1397,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               </p>
 
               <SharedEconomyPanel
-                playerId={identityDisplay}
+                playerId={effectivePlayerId}
                 balance={balance}
                 totalPlaysLeft={totalEarnRoom}
                 dailyPlaysLeft={remainingDaily}
@@ -1530,15 +1540,14 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                   Move with purpose. Break what stands in your way. In the dark, hesitation is defeat.
                 </div>
 
-                <Link href="/tunnel-rules" style={tunnelRulesLinkStyle}>
-                  How to Play + Official Rules
-                </Link>
+            <Link href="/tunnel-rules" style={tunnelRulesLinkStyle}>How to Play</Link>
               </div>
-              {discordUserId && (
-                <div style={{fontSize:11,opacity:0.6,marginTop:4}}>
-                  ID: {identityDisplay}
-                </div>
-              )}
+            {discordUserId && (
+              <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", fontSize:11, opacity:0.6, marginTop:4}}>
+                <span>ID: {identityDisplay}</span>
+                <button onClick={()=>setShowRules(true)} style={{ fontSize:11, textDecoration:"underline", opacity:0.8, background:"none", border:"none", color:"inherit", cursor:"pointer", padding:0 }}>Official Rules</button>
+              </div>
+            )}
               <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:14,marginTop:8}}>
             {(["colony","neon","mythic","lava","ice","golden","shadow","amber","toxic","void"] as BoardTheme[]).map(key => {
               const d = DIFFICULTY[key]; const th = themeMap[key]; const active = boardTheme === key;
@@ -1571,6 +1580,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               <div style={boardHeaderStyle}>
                 <div>
                   <div style={{ fontSize: 20, fontWeight: 900 }}>{theme.name}</div>
+            <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,0.55)",marginBottom:2}}>🗺️ {LAYOUT_NAMES[layoutIndex]||"Layout #"+(layoutIndex+1)}</div>
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
               <span style={{background:themeMap[boardTheme].accent+"22",border:"1px solid "+themeMap[boardTheme].accent+"66",color:themeMap[boardTheme].accent,borderRadius:12,padding:"2px 10px",fontSize:11,fontWeight:700}}>
                 {DIFFICULTY[boardTheme].emoji} {DIFFICULTY[boardTheme].label}
@@ -1934,63 +1944,71 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
             )}
           </div>
 
+    {!isPlaying && lastRunResult && (
+      <div style={{margin:"12px 0",padding:"14px 16px",borderRadius:14,border:lastRunResult.wasFullClear?"1px solid rgba(250,204,21,0.4)":"1px solid rgba(255,255,255,0.1)",background:lastRunResult.wasFullClear?"rgba(250,204,21,0.08)":"rgba(255,255,255,0.04)"}}>
+        <div style={{fontSize:11,fontWeight:800,opacity:0.5,letterSpacing:"0.06em",marginBottom:8}}>{lastRunResult.wasFullClear?"💎 CRYSTAL SWEEP COMPLETE":"⏱ RUN COMPLETE"}</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:10,alignItems:"center"}}>
+          <div style={{fontSize:13,fontWeight:900,color:"#fde68a"}}>🗺️ #{lastRunResult.layoutNum} {lastRunResult.layoutName}</div>
+          <div style={{fontSize:13,fontWeight:700,color:"#93c5fd"}}>🎯 {lastRunResult.score.toLocaleString()} pts</div>
+          {lastRunResult.clearTimeMs!==null && <div style={{fontSize:13,fontWeight:700,color:"#fbbf24"}}>⚡ {formatMs(lastRunResult.clearTimeMs)}</div>}
+          {lastRunResult.wasFullClear && personalStats?.bestClearTimeMs && lastRunResult.clearTimeMs!==null && lastRunResult.clearTimeMs<=personalStats.bestClearTimeMs && <div style={{fontSize:11,fontWeight:800,color:"#fde68a",background:"rgba(250,204,21,0.15)",border:"1px solid rgba(250,204,21,0.3)",borderRadius:8,padding:"2px 8px"}}>🏆 PB!</div>}
+        </div>
+      </div>
+    )}
           <div style={tunnelLeaderboardWrapStyle}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
-              <div><div style={{fontSize:20,fontWeight:900}}>🏆 Tunnel Leaderboards</div><div style={{fontSize:12,opacity:0.55,marginTop:2}}>Top scores, fastest clears &amp; champions across all 30 layouts</div></div>
+              <div><div style={{fontSize:20,fontWeight:900}}>🏆 Tunnel Leaderboards</div><div style={{fontSize:12,opacity:0.55,marginTop:2}}>Top 3 scores &amp; fastest clears per layout — 31 maps total</div></div>
               <button onClick={()=>void loadTunnelLeaderboard()} style={{padding:"6px 12px",borderRadius:20,border:"1px solid rgba(255,255,255,0.15)",background:"rgba(255,255,255,0.06)",cursor:"pointer",fontSize:12,fontWeight:700,color:"rgba(255,255,255,0.7)"}}>↻ Refresh</button>
             </div>
-            <div style={{...tunnelLeaderboardGridStyle,...(isMobileView?tunnelLeaderboardGridMobileStyle:null)}}>
-              <div style={leaderboardCardBlueStyle}>
-                <div style={leaderboardCardHeaderStyle}>
-                  <div><div style={{...leaderboardTitleStyle,color:"#60a5fa"}}>🏆 Top Score</div><div style={leaderboardSubtitleStyle}>Best single-run score across all layouts. Any layout counts.</div></div>
-                  <div style={leaderboardBadgeBlueStyle}>TOP 5</div>
-                </div>
-                <div style={leaderboardScrollStyle}>
-                  {leaderboardLoading?(<div style={leaderboardEmptyStyle}>Loading...</div>):topScoreRows.length===0?(<div style={leaderboardEmptyStyle}>No scores yet!</div>):
-                    topScoreRows.map(row=>{const parts=String(row.playerId||'').split('|');return(
-                      <div key={"s"+row.rank} style={leaderboardRowStyle(row.rank,"#60a5fa")}>
-                        <div style={leaderboardRankStyle(row.rank)}>{row.rank===1?"🥇":row.rank===2?"🥈":row.rank===3?"🥉":"#"+row.rank}</div>
-                        <div style={{flex:1,minWidth:0}}><div style={leaderboardNameStyle}>{row.playerName||row.playerId}</div>{parts[2]&&<div style={{fontSize:10,opacity:0.55,marginTop:1}}>on {parts[2]}</div>}</div>
-                        <div style={{...leaderboardValueStyle,color:"#93c5fd"}}>{Number(row.score||0).toLocaleString()}</div>
-                      </div>);})
-                  }
-                </div>
-              </div>
-              <div style={leaderboardCardGoldStyle}>
-                <div style={leaderboardCardHeaderStyle}>
-                  <div><div style={{...leaderboardTitleStyle,color:"#facc15"}}>⚡ Fastest Clear</div><div style={leaderboardSubtitleStyle}>Fastest time collecting all 💎. Layout shown — beat them on the same map!</div></div>
-                  <div style={leaderboardBadgeGoldStyle}>TOP 5</div>
-                </div>
-                <div style={leaderboardScrollStyle}>
-                  {leaderboardLoading?(<div style={leaderboardEmptyStyle}>Loading...</div>):fastestClearRows.length===0?(<div style={leaderboardEmptyStyle}>Collect all 💎 to set a record!</div>):
-                    fastestClearRows.map(row=>{const parts=String(row.playerId||'').split('|');return(
-                      <div key={"f"+row.rank} style={leaderboardRowStyle(row.rank,"#facc15")}>
-                        <div style={leaderboardRankStyle(row.rank)}>{row.rank===1?"🥇":row.rank===2?"🥈":row.rank===3?"🥉":"#"+row.rank}</div>
-                        <div style={{flex:1,minWidth:0}}><div style={leaderboardNameStyle}>{row.playerName||row.playerId}</div>{parts[2]&&<div style={{fontSize:10,opacity:0.55,marginTop:1}}>on {parts[2]}</div>}</div>
-                        <div style={{...leaderboardValueStyle,color:"#fde68a"}}>{formatMs(row.clearTimeMs)}</div>
-                      </div>);})
-                  }
-                </div>
-              </div>
+            <div style={{marginTop:14}}>
+      <div style={{fontSize:13,fontWeight:800,opacity:0.6,marginBottom:10,letterSpacing:"0.06em"}}>🗺️ LAYOUT LEADERBOARDS — 31 MAPS</div>
+      <div style={{maxHeight:isMobileView?480:520,overflowY:"auto",paddingRight:4,scrollbarWidth:"thin"}}>
+      <div style={{display:"grid",gridTemplateColumns:isMobileView?"1fr":"repeat(2,1fr)",gap:10}}>
+        {layoutChampions.map((lc,idx)=>{
+          const hasScores=lc.topScores&&lc.topScores.length>0;
+          const hasClears=lc.fastestClears&&lc.fastestClears.length>0;
+          const layoutLabel=lc.layoutName||(lc.layoutIndex===30?"#31":"Layout "+(lc.layoutIndex+1));
+          return(
+          <div key={idx} style={{borderRadius:12,border:"1px solid rgba(255,255,255,0.08)",background:"rgba(0,0,0,0.35)",overflow:"hidden"}}>
+            <div style={{padding:"8px 12px",background:"rgba(255,255,255,0.04)",borderBottom:"1px solid rgba(255,255,255,0.07)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontSize:12,fontWeight:900,color:"#fde68a"}}>#{lc.layoutIndex+1} {layoutLabel}</span>
+              <span style={{fontSize:10,opacity:0.4}}>Top 3</span>
             </div>
-            <div style={{...leaderboardCardRedStyle,marginTop:14,border:"1px solid rgba(250,204,21,0.25)",background:"linear-gradient(135deg,rgba(250,204,21,0.07),rgba(9,12,22,0.95))"}}>
-              <div style={leaderboardCardHeaderStyle}>
-                <div><div style={{...leaderboardTitleStyle,color:"#fde68a"}}>🗺️ Layout Champions</div><div style={leaderboardSubtitleStyle}>The #1 score holder on each of the 30 layouts. Claim a throne — or steal one.</div></div>
-                <div style={{...leaderboardBadgeGoldStyle,background:"rgba(250,204,21,0.18)"}}>30 MAPS</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:0}}>
+              <div style={{padding:"8px 10px",borderRight:"1px solid rgba(255,255,255,0.05)"}}>
+                <div style={{fontSize:10,fontWeight:800,color:"#60a5fa",marginBottom:6,letterSpacing:"0.05em"}}>🏆 SCORES</div>
+                {!hasScores
+                  ?<div style={{fontSize:10,opacity:0.35,fontStyle:"italic"}}>Open</div>
+                  :lc.topScores.slice(0,3).map((e:any,i:number)=>(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:4,marginBottom:3}}>
+                      <span style={{fontSize:10,minWidth:16}}>{i===0?"🥇":i===1?"🥈":"🥉"}</span>
+                      <span style={{fontSize:10,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",opacity:0.8}}>{e.playerName||e.playerId||"guest"}</span>
+                      <span style={{fontSize:10,fontWeight:800,color:"#93c5fd"}}>{Number(e.score).toLocaleString()}</span>
+                    </div>
+                  ))
+                }
               </div>
-              <div style={{display:"grid",gridTemplateColumns:isMobileView?"1fr":"repeat(2,1fr)",gap:6,maxHeight:320,overflowY:"auto",paddingRight:4}}>
-                {layoutChampions.length===0?(<div style={{...leaderboardEmptyStyle,gridColumn:"1/-1"}}>No layout records yet!</div>):
-                  layoutChampions.map((champ,idx)=>{const isMine=champ.playerId&&(champ.playerId===effectivePlayerId||champ.playerName===playerName);const unclaimed=!champ.playerId||champ.score===0;return(
-                    <div key={idx} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:10,background:isMine?"rgba(250,204,21,0.12)":unclaimed?"rgba(255,255,255,0.02)":"rgba(255,255,255,0.04)",border:isMine?"1px solid rgba(250,204,21,0.4)":unclaimed?"1px dashed rgba(255,255,255,0.08)":"1px solid rgba(255,255,255,0.06)"}}>
-                      <div style={{fontSize:10,fontWeight:800,color:"rgba(255,255,255,0.35)",minWidth:20,textAlign:"center"}}>#{idx+1}</div>
-                      <div style={{flex:1,minWidth:0}}><div style={{fontSize:11,fontWeight:700,color:isMine?"#fde68a":"rgba(255,255,255,0.8)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{champ.layoutName}</div><div style={{fontSize:10,opacity:0.55,marginTop:1}}>{unclaimed?"🏆 Unclaimed":(isMine?"👑 You hold this!":champ.playerName||champ.playerId)}</div></div>
-                      {!unclaimed&&<div style={{fontSize:11,fontWeight:900,color:"#fde68a"}}>{champ.score.toLocaleString()}</div>}
-                      {unclaimed&&<div style={{fontSize:10,color:"rgba(250,204,21,0.5)"}}>Open</div>}
-                    </div>);})
+              <div style={{padding:"8px 10px"}}>
+                <div style={{fontSize:10,fontWeight:800,color:"#fbbf24",marginBottom:6,letterSpacing:"0.05em"}}>⚡ FASTEST</div>
+                {!hasClears
+                  ?<div style={{fontSize:10,opacity:0.35,fontStyle:"italic"}}>Open</div>
+                  :lc.fastestClears.slice(0,3).map((e:any,i:number)=>(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:4,marginBottom:3}}>
+                      <span style={{fontSize:10,minWidth:16}}>{i===0?"🥇":i===1?"🥈":"🥉"}</span>
+                      <span style={{fontSize:10,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",opacity:0.8}}>{e.playerName||e.playerId||"guest"}</span>
+                      <span style={{fontSize:10,fontWeight:800,color:"#fde68a"}}>{formatMs(e.clearTimeMs)}</span>
+                    </div>
+                  ))
                 }
               </div>
             </div>
-            <div style={{...leaderboardCardRedStyle,marginTop:14}}>
+          </div>
+          );
+        })}
+      </div>
+    </div>
+      </div>
+    <div style={{...leaderboardCardRedStyle,marginTop:14}}>
               <div style={leaderboardCardHeaderStyle}>
                 <div><div style={{...leaderboardTitleStyle,color:"#f87171"}}>🐜 Your Stats</div><div style={leaderboardSubtitleStyle}>Your personal progress. Only you can see this.</div></div>
                 <div style={leaderboardBadgeRedStyle}>YOU</div>
@@ -2019,6 +2037,28 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           </div>
         )}
       </main>
+      {showRules && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.8)", zIndex:3000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }} onClick={()=>setShowRules(false)}>
+          <div style={{ background:"#0f172a", border:"1px solid rgba(255,255,255,0.15)", borderRadius:16, padding:28, maxWidth:560, width:"100%", maxHeight:"85vh", overflowY:"auto" }} onClick={e=>e.stopPropagation()}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
+              <div style={{ fontWeight:900, fontSize:18 }}>📋 Official Rules</div>
+              <button onClick={()=>setShowRules(false)} style={{ background:"rgba(255,255,255,0.1)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:8, padding:"6px 14px", color:"white", cursor:"pointer", fontSize:13 }}>✕ Close</button>
+            </div>
+            <div style={{ fontSize:13, lineHeight:1.7, display:"flex", flexDirection:"column", gap:12, opacity:0.9 }}>
+              <p><b>Free-to-play.</b> No purchase necessary to play. Void where prohibited.</p>
+              <p><b>Game currency:</b> REBEL Points are an in-app promotional points system. No guaranteed cash value, not redeemable for cash.</p>
+              <p><b>Optional purchase (APE):</b> You may optionally buy REBEL Points using APE to support the project. <b>All purchases are final</b> (no refunds). Gas fees may apply.</p>
+              <p><b>Prizes:</b> Crates may award REBEL Points and/or digital collectibles and/or merch (when available). Availability may vary by location.</p>
+              <p><b>Daily limits:</b> Daily claim and play limits apply to ensure fair access. Daily plays reset every 24 hours. Purchased bonus plays do not expire.</p>
+              <p><b>Fair play:</b> Multi-accounting, bots, exploits, or abuse may result in disqualification, prize forfeiture, or account blocking.</p>
+              <p><b>Odds:</b> Prize odds and point values may change over time based on live configuration and promotions.</p>
+              <p><b>Taxes:</b> You are responsible for any taxes associated with prizes, if applicable.</p>
+              <p style={{ opacity:0.7 }}>By playing, you agree to these rules and acknowledge this is an entertainment experience with promotional rewards.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <BuyPointsModal
         open={showBuyPoints}
         onClose={() => setShowBuyPoints(false)}
