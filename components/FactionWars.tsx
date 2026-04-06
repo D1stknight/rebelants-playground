@@ -676,7 +676,32 @@ export default function FactionWars() {
   useEffect(() => {
     const h=()=>loadLB(); window.addEventListener("ra:leaderboards-refresh",h); return ()=>window.removeEventListener("ra:leaderboards-refresh",h);
   }, [loadLB]);
-  useEffect(() => { sfx.startTheme(); return () => { stopMusic(); }; }, []);
+  useEffect(() => {
+    // Try to play immediately (works when navigating via tab click — user already interacted)
+    // Falls back to waiting for first interaction (works on direct URL load)
+    let started = false;
+    const tryStart = () => {
+      if (started) return;
+      started = true;
+      sfx.startTheme();
+      document.removeEventListener('click', tryStart);
+      document.removeEventListener('keydown', tryStart);
+      document.removeEventListener('touchstart', tryStart);
+    };
+    // Attempt immediate play — browser allows this if a user gesture already occurred
+    try { sfx.startTheme(); started = true; } catch (_) {}
+    if (!started) {
+      document.addEventListener('click', tryStart);
+      document.addEventListener('keydown', tryStart);
+      document.addEventListener('touchstart', tryStart);
+    }
+    return () => {
+      stopMusic();
+      document.removeEventListener('click', tryStart);
+      document.removeEventListener('keydown', tryStart);
+      document.removeEventListener('touchstart', tryStart);
+    };
+  }, []);
 
   const toggleFaction = (fid: FactionId) => {
     if (phase !== "idle") return;
@@ -1065,7 +1090,7 @@ export default function FactionWars() {
           </div>
           <nav style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
             {([["tunnel","🐜 Ant Tunnel"],["hatch","⚔️ Faction Wars"],["expedition","⚔️ The Raid"],["shuffle","🃏 Shuffle"]] as [string,string][]).map(([href,label])=>(
-              <Link key={href} href={`/${href}`} style={{ padding:"8px 14px", borderRadius:20, textDecoration:"none", fontSize:13, fontWeight:700, background:href==="hatch"?"rgba(251,191,36,0.15)":"rgba(255,255,255,0.07)", border:`1px solid ${href==="hatch"?"rgba(251,191,36,0.4)":"rgba(255,255,255,0.12)"}`, color:href==="hatch"?"#fbbf24":"rgba(255,255,255,0.8)" }}>{label}</Link>
+              <Link key={href} href={`/${href}`} onClick={href === 'faction-wars' ? () => { setTimeout(() => sfx.startTheme(), 100); } : undefined} style={{ padding:"8px 14px", borderRadius:20, textDecoration:"none", fontSize:13, fontWeight:700, background:href==="hatch"?"rgba(251,191,36,0.15)":"rgba(255,255,255,0.07)", border:`1px solid ${href==="hatch"?"rgba(251,191,36,0.4)":"rgba(255,255,255,0.12)"}`, color:href==="hatch"?"#fbbf24":"rgba(255,255,255,0.8)" }}>{label}</Link>
             ))}
           </nav>
         </div>
