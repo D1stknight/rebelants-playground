@@ -996,8 +996,8 @@ export default function Raid() {
         </div>
         <nav className="tabs" aria-label="Main">
           <Link href="/tunnel"     className="tab">🐜 Ant Tunnel</Link>
-          <Link href="/hatch"      className="tab">⚔️ Faction Wars</Link>
-          <Link href="/expedition" className="tab tab-active">⚔️ The Raid</Link>
+          <Link href="/faction-wars"      className="tab">⚔️ Faction Wars</Link>
+          <Link href="/the-raid" className="tab tab-active">⚔️ The Raid</Link>
           <Link href="/shuffle"    className="tab">🃏 Shuffle</Link>
         </nav>
       </header>
