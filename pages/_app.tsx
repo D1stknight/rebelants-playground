@@ -38,7 +38,7 @@ export default function App({ Component, pageProps }: AppProps) {
         />
         <meta
           property="og:image"
-          content="https://play.rebelants.io/social-preview.png"
+          content="https://play.rebelants.io/social-preview.png?v=2"
         />
         <meta property="og:url" content="https://play.rebelants.io" />
         <meta property="og:type" content="website" />
@@ -51,7 +51,7 @@ export default function App({ Component, pageProps }: AppProps) {
         />
         <meta
           name="twitter:image"
-          content="https://play.rebelants.io/social-preview.png"
+          content="https://play.rebelants.io/social-preview.png?v=2"
         />
       </Head>
 
