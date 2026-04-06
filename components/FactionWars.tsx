@@ -677,8 +677,6 @@ export default function FactionWars() {
     const h=()=>loadLB(); window.addEventListener("ra:leaderboards-refresh",h); return ()=>window.removeEventListener("ra:leaderboards-refresh",h);
   }, [loadLB]);
   useEffect(() => {
-    // Try to play immediately (works when navigating via tab click — user already interacted)
-    // Falls back to waiting for first interaction (works on direct URL load)
     let started = false;
     const tryStart = () => {
       if (started) return;
@@ -688,9 +686,16 @@ export default function FactionWars() {
       document.removeEventListener('keydown', tryStart);
       document.removeEventListener('touchstart', tryStart);
     };
-    // Attempt immediate play — browser allows this if a user gesture already occurred
-    try { sfx.startTheme(); started = true; } catch (_) {}
-    if (!started) {
+    // startTheme returns void but internally calls play() — attempt it and
+    // check if audio context is already unlocked via a short silent test
+    const ac = new (window.AudioContext || (window as any).webkitAudioContext)();
+    if (ac.state === 'running') {
+      // Audio already unlocked (e.g. navigated from another game) — play immediately
+      ac.close();
+      tryStart();
+    } else {
+      // Audio locked (direct URL load) — wait for first interaction
+      ac.close();
       document.addEventListener('click', tryStart);
       document.addEventListener('keydown', tryStart);
       document.addEventListener('touchstart', tryStart);
