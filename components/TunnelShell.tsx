@@ -1375,8 +1375,8 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
 
           <nav className="tabs" aria-label="Main" style={{ position:"relative", zIndex:1 }}>
             <Link href="/tunnel"     className="tab tab-active">🐜 Ant Tunnel</Link>
-            <Link href="/hatch"      className="tab">⚔️ Faction Wars</Link>
-            <Link href="/expedition" className="tab">⚔️ The Raid</Link>
+            <Link href="/faction-wars"      className="tab">⚔️ Faction Wars</Link>
+            <Link href="/the-raid" className="tab">⚔️ The Raid</Link>
             <Link href="/shuffle"    className="tab">🃏 Shuffle</Link>
           </nav>
         </header>
