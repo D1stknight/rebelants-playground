@@ -1291,49 +1291,61 @@ String(c.status).toUpperCase()==="PENDING"
   {/* ── Prize Pools ───────────────────────────────────────────── */}
   <div style={{ marginTop: 14, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,.12)" }}>
     <div style={{ fontWeight: 900, marginBottom: 4 }}>Prize Pools</div>
-    <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 12 }}>Configure what each crate rarity can award. If no special prize is set, it falls back to points automatically.</div>
-
-    {/* NONE */}
-    <div style={{ marginBottom: 12, padding: 12, borderRadius: 12, background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.07)" }}>
-      <div style={{ fontWeight: 800, fontSize: 12, color: "rgba(255,255,255,.45)", marginBottom: 4 }}>⭕ NONE — No crate</div>
-      <div style={{ fontSize: 12, opacity: 0.45 }}>Player wins nothing. No settings needed.</div>
+    <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 12 }}>
+      Configure what each crate rarity awards. If nothing is set in a pool, it automatically falls back to points (using the Rewards row above). You never need to touch JSON.
     </div>
 
-    {/* COMMON */}
+    {/* ── NONE ── */}
+    <div style={{ marginBottom: 12, padding: 12, borderRadius: 12, background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.07)" }}>
+      <div style={{ fontWeight: 800, fontSize: 12, color: "rgba(255,255,255,.45)", marginBottom: 6 }}>⭕ NONE — No crate</div>
+      <div style={{ fontSize: 12, opacity: 0.45 }}>Player wins nothing this round. No settings needed here.</div>
+    </div>
+
+    {/* ── COMMON ── */}
     <div style={{ marginBottom: 12, padding: 12, borderRadius: 12, background: "rgba(52,211,153,.04)", border: "1px solid rgba(52,211,153,.2)" }}>
-      <div style={{ fontWeight: 800, fontSize: 12, color: "#34d399", marginBottom: 10 }}>✅ COMMON CRATE — Points only</div>
+      <div style={{ fontWeight: 800, fontSize: 12, color: "#34d399", marginBottom: 6 }}>✅ COMMON CRATE — Points only</div>
+      <div style={{ fontSize: 12, opacity: 0.55, marginBottom: 10 }}>Common crate always awards points. Set how many REBEL points the player receives when they win a common crate.</div>
       <label style={{ fontSize: 12, opacity: 0.9 }}>Points awarded
         <input type="number" min="0"
           value={(cfg as any).prizePools?.common?.[0]?.points ?? (cfg as any).rewards?.common ?? 50}
           onChange={e => { const pts = Math.max(0, Number(e.target.value||"0")); setCfg((c:any) => ({ ...c, prizePools: { ...(c.prizePools||{}), common: [{ id:"c-pts", type:"points", label:`${pts} ${c.currency||"REBEL"}`, amount:pts, points:pts, weight:100 }] } })); }}
-          style={{ width:160, marginTop:6, padding:"9px 11px", borderRadius:10, border:"1px solid rgba(255,255,255,.18)", background:"rgba(0,0,0,.25)", color:"white", fontSize:12 }} />
+          style={{ width:160, marginTop:6, display:"block", padding:"9px 11px", borderRadius:10, border:"1px solid rgba(255,255,255,.18)", background:"rgba(0,0,0,.25)", color:"white", fontSize:12 }} />
       </label>
     </div>
 
-    {/* RARE */}
+    {/* ── RARE ── */}
     <div style={{ marginBottom: 12, padding: 12, borderRadius: 12, background: "rgba(96,165,250,.04)", border: "1px solid rgba(96,165,250,.2)" }}>
       <div style={{ fontWeight: 800, fontSize: 12, color: "#60a5fa", marginBottom: 6 }}>⚔️ RARE CRATE — Merch prizes</div>
-      <div style={{ fontSize: 11, opacity: 0.55, marginBottom: 10 }}>Add merch items. If empty, rare crate awards points instead.</div>
+      <div style={{ fontSize: 12, opacity: 0.55, marginBottom: 4 }}>Add physical merch items (T-shirts, hoodies, hats, etc.) that players can win with a rare crate.</div>
+      <div style={{ fontSize: 12, opacity: 0.55, marginBottom: 4 }}>💡 <b style={{ color: "rgba(255,255,255,.7)" }}>Label</b> = what the player sees when they win (e.g. "Rebel Ants T-Shirt")</div>
+      <div style={{ fontSize: 12, opacity: 0.55, marginBottom: 4 }}>💡 <b style={{ color: "rgba(255,255,255,.7)" }}>SKU</b> = your internal code for this item so you know what to ship. Make it short, no spaces, all caps (e.g. TSHIRT, HOODIE, HAT). This shows in the admin claim record.</div>
+      <div style={{ fontSize: 12, opacity: 0.55, marginBottom: 10 }}>💡 <b style={{ color: "rgba(255,255,255,.7)" }}>Weight</b> = how likely this item is compared to others. Higher = more likely. If you only have one item, just leave it as 1.</div>
+      <div style={{ fontSize: 12, color: "#60a5fa", opacity: 0.7, marginBottom: 10 }}>⚠️ If no merch items are added here, rare crate winners just get points instead.</div>
       {((cfg as any).prizePools?.rare?.filter((p:any) => String(p?.type||"").toUpperCase() === "MERCH") || []).map((item:any, idx:number) => (
-        <div key={idx} style={{ display:"grid", gridTemplateColumns:"1fr 1fr auto auto", gap:8, marginBottom:8, alignItems:"end" }}>
-          <label style={{ fontSize:11, opacity:0.8 }}>Label<input value={item.label||""} onChange={e => { const pool=[...((cfg as any).prizePools?.rare||[])]; const ni=pool.indexOf(pool.filter((p:any)=>String(p?.type||"").toUpperCase()==="MERCH")[idx]); if(ni>=0){pool[ni]={...pool[ni],label:e.target.value};} setCfg((c:any)=>({...c,prizePools:{...(c.prizePools||{}),rare:pool}})); }} style={{ width:"100%",marginTop:4,padding:"9px 11px",borderRadius:10,border:"1px solid rgba(255,255,255,.18)",background:"rgba(0,0,0,.25)",color:"white",fontSize:12 }} /></label>
-          <label style={{ fontSize:11, opacity:0.8 }}>SKU<input value={item.sku||""} onChange={e => { const pool=[...((cfg as any).prizePools?.rare||[])]; const ni=pool.indexOf(pool.filter((p:any)=>String(p?.type||"").toUpperCase()==="MERCH")[idx]); if(ni>=0){pool[ni]={...pool[ni],sku:e.target.value};} setCfg((c:any)=>({...c,prizePools:{...(c.prizePools||{}),rare:pool}})); }} style={{ width:"100%",marginTop:4,padding:"9px 11px",borderRadius:10,border:"1px solid rgba(255,255,255,.18)",background:"rgba(0,0,0,.25)",color:"white",fontSize:12 }} /></label>
-          <label style={{ fontSize:11, opacity:0.8 }}>Weight<input type="number" min="1" value={item.weight||1} onChange={e => { const pool=[...((cfg as any).prizePools?.rare||[])]; const ni=pool.indexOf(pool.filter((p:any)=>String(p?.type||"").toUpperCase()==="MERCH")[idx]); if(ni>=0){pool[ni]={...pool[ni],weight:Number(e.target.value||1)};} setCfg((c:any)=>({...c,prizePools:{...(c.prizePools||{}),rare:pool}})); }} style={{ width:70,marginTop:4,padding:"9px 11px",borderRadius:10,border:"1px solid rgba(255,255,255,.18)",background:"rgba(0,0,0,.25)",color:"white",fontSize:12 }} /></label>
-          <button onClick={() => { const pool=((cfg as any).prizePools?.rare||[]).filter((_:any,i:number)=>i!==((cfg as any).prizePools?.rare||[]).indexOf(((cfg as any).prizePools?.rare||[]).filter((p:any)=>String(p?.type||"").toUpperCase()==="MERCH")[idx])); setCfg((c:any)=>({...c,prizePools:{...(c.prizePools||{}),rare:pool}})); }} style={{ padding:"6px 10px",borderRadius:8,border:"1px solid rgba(248,113,113,.4)",background:"rgba(248,113,113,.1)",color:"#f87171",cursor:"pointer",fontSize:12,marginTop:16 }}>✕</button>
+        <div key={idx} style={{ display:"grid", gridTemplateColumns:"1fr 1fr auto auto", gap:8, marginBottom:8, alignItems:"end", padding:"10px 12px", borderRadius:10, background:"rgba(255,255,255,.04)", border:"1px solid rgba(255,255,255,.08)" }}>
+          <label style={{ fontSize:11, opacity:0.8 }}>Label (shown to player)<input value={item.label||""} onChange={e => { const pool=[...((cfg as any).prizePools?.rare||[])]; const ni=pool.indexOf(pool.filter((p:any)=>String(p?.type||"").toUpperCase()==="MERCH")[idx]); if(ni>=0){pool[ni]={...pool[ni],label:e.target.value};} setCfg((c:any)=>({...c,prizePools:{...(c.prizePools||{}),rare:pool}})); }} style={{ width:"100%",marginTop:4,padding:"9px 11px",borderRadius:10,border:"1px solid rgba(255,255,255,.18)",background:"rgba(0,0,0,.25)",color:"white",fontSize:12,display:"block" }} /></label>
+          <label style={{ fontSize:11, opacity:0.8 }}>SKU (your internal code)<input value={item.sku||""} placeholder="e.g. TSHIRT" onChange={e => { const pool=[...((cfg as any).prizePools?.rare||[])]; const ni=pool.indexOf(pool.filter((p:any)=>String(p?.type||"").toUpperCase()==="MERCH")[idx]); if(ni>=0){pool[ni]={...pool[ni],sku:e.target.value};} setCfg((c:any)=>({...c,prizePools:{...(c.prizePools||{}),rare:pool}})); }} style={{ width:"100%",marginTop:4,padding:"9px 11px",borderRadius:10,border:"1px solid rgba(255,255,255,.18)",background:"rgba(0,0,0,.25)",color:"white",fontSize:12,display:"block" }} /></label>
+          <label style={{ fontSize:11, opacity:0.8 }}>Weight<input type="number" min="1" value={item.weight||1} onChange={e => { const pool=[...((cfg as any).prizePools?.rare||[])]; const ni=pool.indexOf(pool.filter((p:any)=>String(p?.type||"").toUpperCase()==="MERCH")[idx]); if(ni>=0){pool[ni]={...pool[ni],weight:Number(e.target.value||1)};} setCfg((c:any)=>({...c,prizePools:{...(c.prizePools||{}),rare:pool}})); }} style={{ width:70,marginTop:4,padding:"9px 11px",borderRadius:10,border:"1px solid rgba(255,255,255,.18)",background:"rgba(0,0,0,.25)",color:"white",fontSize:12,display:"block" }} /></label>
+          <button onClick={() => { const pool=((cfg as any).prizePools?.rare||[]).filter((_:any,i:number)=>i!==((cfg as any).prizePools?.rare||[]).indexOf(((cfg as any).prizePools?.rare||[]).filter((p:any)=>String(p?.type||"").toUpperCase()==="MERCH")[idx])); setCfg((c:any)=>({...c,prizePools:{...(c.prizePools||{}),rare:pool}})); }} style={{ padding:"6px 10px",borderRadius:8,border:"1px solid rgba(248,113,113,.4)",background:"rgba(248,113,113,.1)",color:"#f87171",cursor:"pointer",fontSize:12,marginTop:16 }}>✕ Remove</button>
         </div>
       ))}
       <button onClick={() => { const pool=[...((cfg as any).prizePools?.rare||[])]; pool.push({ id:`merch-${Date.now()}`, type:"merch", label:"New Merch Prize", sku:"SKU", qty:1, weight:5 }); setCfg((c:any)=>({...c,prizePools:{...(c.prizePools||{}),rare:pool}})); }} style={{ padding:"7px 14px",borderRadius:8,border:"1px solid rgba(96,165,250,.4)",background:"rgba(96,165,250,.1)",color:"#93c5fd",cursor:"pointer",fontSize:12,marginTop:4 }}>+ Add Merch Prize</button>
     </div>
 
-    {/* ULTRA */}
+    {/* ── ULTRA ── */}
     <div style={{ marginBottom: 12, padding: 12, borderRadius: 12, background: "rgba(251,191,36,.04)", border: "1px solid rgba(251,191,36,.2)" }}>
       <div style={{ fontWeight: 800, fontSize: 12, color: "#fbbf24", marginBottom: 6 }}>🏆 ULTRA CRATE — NFT prizes</div>
-      <div style={{ fontSize: 11, opacity: 0.55, marginBottom: 10 }}>Add NFT prize entries. If empty, ultra crate awards points instead.</div>
+      <div style={{ fontSize: 12, opacity: 0.55, marginBottom: 4 }}>Add NFT prize entries for ultra crate winners.</div>
+      <div style={{ fontSize: 12, opacity: 0.55, marginBottom: 4 }}>💡 <b style={{ color: "rgba(255,255,255,.7)" }}>Label</b> = what the player sees when they win (e.g. "Rebel Ants Genesis #935")</div>
+      <div style={{ fontSize: 12, opacity: 0.55, marginBottom: 4 }}>💡 <b style={{ color: "rgba(255,255,255,.7)" }}>Weight</b> = how likely this NFT entry is. Usually just leave it as 1.</div>
+      <div style={{ fontSize: 12, opacity: 0.55, marginBottom: 4 }}>⚠️ Adding an entry here is only <b style={{ color:"rgba(255,255,255,.7)" }}>Step 1</b>. You also need to add the actual token in the <b style={{ color:"rgba(255,255,255,.7)" }}>Ultra NFT Inventory</b> section below — that's where you enter the contract address and token ID. Both are required.</div>
+      <div style={{ fontSize: 12, opacity: 0.55, marginBottom: 10 }}>✅ When a player wins and enters their wallet, the claim shows up in admin → Claims for you to send. The NFT is then removed from inventory so it can't be won twice.</div>
+      <div style={{ fontSize: 12, color: "#fbbf24", opacity: 0.7, marginBottom: 10 }}>⚠️ If no NFT entries are added here, ultra crate winners just get points instead.</div>
       {((cfg as any).prizePools?.ultra?.filter((p:any) => String(p?.type||"").toUpperCase() === "NFT") || []).map((item:any, idx:number) => (
-        <div key={idx} style={{ display:"grid", gridTemplateColumns:"1fr auto auto", gap:8, marginBottom:8, alignItems:"end" }}>
-          <label style={{ fontSize:11, opacity:0.8 }}>Label<input value={item.label||""} onChange={e => { const pool=[...((cfg as any).prizePools?.ultra||[])]; const ni=pool.indexOf(pool.filter((p:any)=>String(p?.type||"").toUpperCase()==="NFT")[idx]); if(ni>=0){pool[ni]={...pool[ni],label:e.target.value};} setCfg((c:any)=>({...c,prizePools:{...(c.prizePools||{}),ultra:pool}})); }} style={{ width:"100%",marginTop:4,padding:"9px 11px",borderRadius:10,border:"1px solid rgba(255,255,255,.18)",background:"rgba(0,0,0,.25)",color:"white",fontSize:12 }} /></label>
-          <label style={{ fontSize:11, opacity:0.8 }}>Weight<input type="number" min="1" value={item.weight||1} onChange={e => { const pool=[...((cfg as any).prizePools?.ultra||[])]; const ni=pool.indexOf(pool.filter((p:any)=>String(p?.type||"").toUpperCase()==="NFT")[idx]); if(ni>=0){pool[ni]={...pool[ni],weight:Number(e.target.value||1)};} setCfg((c:any)=>({...c,prizePools:{...(c.prizePools||{}),ultra:pool}})); }} style={{ width:70,marginTop:4,padding:"9px 11px",borderRadius:10,border:"1px solid rgba(255,255,255,.18)",background:"rgba(0,0,0,.25)",color:"white",fontSize:12 }} /></label>
-          <button onClick={() => { const pool=((cfg as any).prizePools?.ultra||[]).filter((_:any,i:number)=>i!==((cfg as any).prizePools?.ultra||[]).indexOf(((cfg as any).prizePools?.ultra||[]).filter((p:any)=>String(p?.type||"").toUpperCase()==="NFT")[idx])); setCfg((c:any)=>({...c,prizePools:{...(c.prizePools||{}),ultra:pool}})); }} style={{ padding:"6px 10px",borderRadius:8,border:"1px solid rgba(248,113,113,.4)",background:"rgba(248,113,113,.1)",color:"#f87171",cursor:"pointer",fontSize:12,marginTop:16 }}>✕</button>
+        <div key={idx} style={{ display:"grid", gridTemplateColumns:"1fr auto auto", gap:8, marginBottom:8, alignItems:"end", padding:"10px 12px", borderRadius:10, background:"rgba(255,255,255,.04)", border:"1px solid rgba(255,255,255,.08)" }}>
+          <label style={{ fontSize:11, opacity:0.8 }}>Label (shown to player, e.g. "Rebel Ants Genesis #935")<input value={item.label||""} onChange={e => { const pool=[...((cfg as any).prizePools?.ultra||[])]; const ni=pool.indexOf(pool.filter((p:any)=>String(p?.type||"").toUpperCase()==="NFT")[idx]); if(ni>=0){pool[ni]={...pool[ni],label:e.target.value};} setCfg((c:any)=>({...c,prizePools:{...(c.prizePools||{}),ultra:pool}})); }} style={{ width:"100%",marginTop:4,padding:"9px 11px",borderRadius:10,border:"1px solid rgba(255,255,255,.18)",background:"rgba(0,0,0,.25)",color:"white",fontSize:12,display:"block" }} /></label>
+          <label style={{ fontSize:11, opacity:0.8 }}>Weight<input type="number" min="1" value={item.weight||1} onChange={e => { const pool=[...((cfg as any).prizePools?.ultra||[])]; const ni=pool.indexOf(pool.filter((p:any)=>String(p?.type||"").toUpperCase()==="NFT")[idx]); if(ni>=0){pool[ni]={...pool[ni],weight:Number(e.target.value||1)};} setCfg((c:any)=>({...c,prizePools:{...(c.prizePools||{}),ultra:pool}})); }} style={{ width:70,marginTop:4,padding:"9px 11px",borderRadius:10,border:"1px solid rgba(255,255,255,.18)",background:"rgba(0,0,0,.25)",color:"white",fontSize:12,display:"block" }} /></label>
+          <button onClick={() => { const pool=((cfg as any).prizePools?.ultra||[]).filter((_:any,i:number)=>i!==((cfg as any).prizePools?.ultra||[]).indexOf(((cfg as any).prizePools?.ultra||[]).filter((p:any)=>String(p?.type||"").toUpperCase()==="NFT")[idx])); setCfg((c:any)=>({...c,prizePools:{...(c.prizePools||{}),ultra:pool}})); }} style={{ padding:"6px 10px",borderRadius:8,border:"1px solid rgba(248,113,113,.4)",background:"rgba(248,113,113,.1)",color:"#f87171",cursor:"pointer",fontSize:12,marginTop:16 }}>✕ Remove</button>
         </div>
       ))}
       <button onClick={() => { const pool=[...((cfg as any).prizePools?.ultra||[])]; pool.push({ id:`nft-${Date.now()}`, type:"nft", label:"NFT Prize", weight:1 }); setCfg((c:any)=>({...c,prizePools:{...(c.prizePools||{}),ultra:pool}})); }} style={{ padding:"7px 14px",borderRadius:8,border:"1px solid rgba(251,191,36,.4)",background:"rgba(251,191,36,.1)",color:"#fde68a",cursor:"pointer",fontSize:12,marginTop:4 }}>+ Add NFT Prize</button>
