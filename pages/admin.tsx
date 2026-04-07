@@ -1356,100 +1356,64 @@ String(c.status).toUpperCase()==="PENDING"
     <button className="btn" onClick={loadConfig} style={{ padding: "10px 12px" }}>Load Current</button>
     <button className="btn" onClick={saveConfig} style={{ padding: "10px 12px" }}>Save</button>
   </div>
-          {/* Prize Inventory Dashboard */}
-      <div
-        style={{
-          marginTop: 14,
-          padding: 14,
-          border: "1px solid rgba(255,255,255,.14)",
-          borderRadius: 14,
-          background: "rgba(15,23,42,.55)",
-        }}
-      >
-        <div style={{ fontWeight: 900, marginBottom: 10 }}>Prize Inventory Dashboard</div>
+  {/* Prize Inventory Dashboard */}
+  <div style={{ marginTop: 14, padding: 14, border: "1px solid rgba(255,255,255,.14)", borderRadius: 14, background: "rgba(15,23,42,.55)" }}>
+    <div style={{ fontWeight: 900, marginBottom: 6, fontSize: 16 }}>📦 Merch Stock</div>
+    <div style={{ fontSize: 12, opacity: 0.6, marginBottom: 14 }}>
+      This tracks how many of each merch item you physically have ready to ship. The SKU must exactly match what you entered in the Rare Prize Pool above — that's how the system connects the prize to your stock.
+    </div>
 
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-          <button className="btn" onClick={invDashLoad} disabled={invDashBusy} style={{ padding: "10px 12px" }}>
-            Load Inventory
-          </button>
-          <button className="btn" onClick={invDashSave} disabled={invDashBusy} style={{ padding: "10px 12px" }}>
-            Save Inventory
-          </button>
-
-          <span style={{ fontSize: 12, opacity: 0.85 }}>
-            Merch key: <b>ra:inv:merch_v1</b> • APE key: <b>ra:inv:ape_v1</b>
-          </span>
+    {/* ── Merch rows ── */}
+    {(() => {
+      let items: any[] = [];
+      try { items = JSON.parse(invMerchJson || "[]"); } catch {}
+      if (!Array.isArray(items)) items = [];
+      return items.map((item:any, idx:number) => (
+        <div key={idx} style={{ display:"grid", gridTemplateColumns:"1fr 1fr auto auto", gap:8, marginBottom:8, alignItems:"end", padding:"10px 12px", borderRadius:10, background:"rgba(255,255,255,.04)", border:"1px solid rgba(255,255,255,.08)" }}>
+          <label style={{ fontSize:11, opacity:0.8 }}>SKU — must match Rare Pool above (e.g. TSHIRT)
+            <input value={item.sku||""} onChange={e => {
+              const next=[...items]; next[idx]={...next[idx],sku:e.target.value};
+              setInvMerchJson(JSON.stringify(next,null,2));
+            }} style={{ width:"100%",marginTop:4,display:"block",padding:"9px 11px",borderRadius:10,border:"1px solid rgba(255,255,255,.18)",background:"rgba(0,0,0,.25)",color:"white",fontSize:12 }} />
+          </label>
+          <label style={{ fontSize:11, opacity:0.8 }}>Label (for your reference only)
+            <input value={item.label||""} onChange={e => {
+              const next=[...items]; next[idx]={...next[idx],label:e.target.value};
+              setInvMerchJson(JSON.stringify(next,null,2));
+            }} style={{ width:"100%",marginTop:4,display:"block",padding:"9px 11px",borderRadius:10,border:"1px solid rgba(255,255,255,.18)",background:"rgba(0,0,0,.25)",color:"white",fontSize:12 }} />
+          </label>
+          <label style={{ fontSize:11, opacity:0.8 }}>On Hand (qty you have to ship)
+            <input type="number" min="0" value={item.onHand??0} onChange={e => {
+              const next=[...items]; next[idx]={...next[idx],onHand:Math.max(0,Number(e.target.value||0))};
+              setInvMerchJson(JSON.stringify(next,null,2));
+            }} style={{ width:80,marginTop:4,display:"block",padding:"9px 11px",borderRadius:10,border:"1px solid rgba(255,255,255,.18)",background:"rgba(0,0,0,.25)",color:"white",fontSize:12 }} />
+          </label>
+          <button onClick={() => {
+            const next=items.filter((_:any,i:number)=>i!==idx);
+            setInvMerchJson(JSON.stringify(next,null,2));
+          }} style={{ padding:"6px 10px",borderRadius:8,border:"1px solid rgba(248,113,113,.4)",background:"rgba(248,113,113,.1)",color:"#f87171",cursor:"pointer",fontSize:12,marginTop:20 }}>✕ Remove</button>
         </div>
+      ));
+    })()}
 
-        <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <div>
-            <div style={{ fontWeight: 900, marginBottom: 8, fontSize: 12, opacity: 0.95 }}>Merch Inventory (JSON)</div>
-            <textarea
-              value={invMerchJson}
-              onChange={(e) => setInvMerchJson(e.target.value)}
-              style={{
-                width: "100%",
-                minHeight: 170,
-                padding: "10px 12px",
-                borderRadius: 12,
-                border: "1px solid rgba(255,255,255,.18)",
-                background: "rgba(0,0,0,.25)",
-                color: "white",
-                fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-                fontSize: 12,
-              }}
-            />
-            <div style={{ marginTop: 6, fontSize: 12, opacity: 0.8 }}>
-              Format: <code>[{"{"}"sku":"HOODIE","label":"Rebel Ants Hoodie","onHand":10{"}"}]</code>
-            </div>
-          </div>
+    <div style={{ display:"flex", gap:12, alignItems:"center", marginTop:8, flexWrap:"wrap" }}>
+      <button onClick={() => {
+        let items:any[]=[]; try{items=JSON.parse(invMerchJson||"[]");}catch{}
+        if(!Array.isArray(items))items=[];
+        items.push({ sku:"SKU", label:"New Merch Item", onHand:0 });
+        setInvMerchJson(JSON.stringify(items,null,2));
+      }} style={{ padding:"7px 14px",borderRadius:8,border:"1px solid rgba(96,165,250,.4)",background:"rgba(96,165,250,.1)",color:"#93c5fd",cursor:"pointer",fontSize:12 }}>+ Add Merch Item</button>
+      <span style={{ fontSize:11, opacity:0.5 }}>
+        {(() => { try{ const a=JSON.parse(invMerchJson||"[]"); return Array.isArray(a) ? `${a.length} SKUs · ${a.reduce((s:number,x:any)=>s+(Number(x.onHand)||0),0)} total on-hand` : "0 SKUs"; }catch{return "0 SKUs";} })()}
+      </span>
+    </div>
 
-          <div>
-            <div style={{ fontWeight: 900, marginBottom: 8, fontSize: 12, opacity: 0.95 }}>APE Budget (JSON)</div>
-            <textarea
-              value={invApeJson}
-              onChange={(e) => setInvApeJson(e.target.value)}
-              style={{
-                width: "100%",
-                minHeight: 170,
-                padding: "10px 12px",
-                borderRadius: 12,
-                border: "1px solid rgba(255,255,255,.18)",
-                background: "rgba(0,0,0,.25)",
-                color: "white",
-                fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-                fontSize: 12,
-              }}
-            />
-            <div style={{ marginTop: 6, fontSize: 12, opacity: 0.8 }}>
-              Format: <code>{"{"}"dailyMaxApe":1,"usedTodayApe":0,"note":"optional"{"}"}</code>
-            </div>
-          </div>
-        </div>
-
-        <div style={{ marginTop: 10, fontSize: 12, opacity: 0.9 }}>
-          Summary:{" "}
-          <b>
-            {typeof invDash?.summary?.merchSkus === "number" ? invDash.summary.merchSkus : "—"}
-          </b>{" "}
-          SKUs •{" "}
-          <b>
-            {typeof invDash?.summary?.merchOnHand === "number" ? invDash.summary.merchOnHand : "—"}
-          </b>{" "}
-          total on-hand
-        </div>
-      </div>
-
-      {/* Inventory */}
-      <div
-        style={{
-          marginTop: 14,
-          padding: 14,
-          border: "1px solid rgba(255,255,255,.14)",
-          borderRadius: 14,
-          background: "rgba(15,23,42,.55)",
-        }}
-      >
+    <div style={{ marginTop: 14, display:"flex", gap:10, flexWrap:"wrap", alignItems:"center" }}>
+      <button className="btn" onClick={invDashLoad} disabled={invDashBusy} style={{ padding:"10px 12px" }}>Load Inventory</button>
+      <button className="btn" onClick={invDashSave} disabled={invDashBusy} style={{ padding:"10px 12px" }}>Save Inventory</button>
+      <span style={{ fontSize:11, opacity:0.4 }}>Always click Save Inventory after making changes.</span>
+    </div>
+  </div>
         <div style={{ fontWeight: 900, marginBottom: 10 }}>Ultra NFT Inventory</div>
 
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
