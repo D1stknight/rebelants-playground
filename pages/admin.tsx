@@ -1081,7 +1081,7 @@ String(c.status).toUpperCase()==="PENDING"
   </div>
 </div>
   {/* Config */}
-  <div style={{ padding: 14, border: "1px solid rgba(255,255,255,.14)", borderRadius: 14, background: "rgba(15,23,42,.55)" }}>
+  <div style={{ padding: 14, border: "1px solid rgba(255,255,255,.14)", borderRadius: 14, background: "rgba(15,23,42,.55)", gridColumn: "1/-1" }}>
     <div style={{ fontWeight: 900, marginBottom: 14, fontSize: 16 }}>⚙️ Game Settings</div>
     <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 14, padding: 12, borderRadius: 12, background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.08)" }}>
       <label style={{ fontSize: 12, opacity: 0.9, gridColumn: "1/-1" }}><span style={{ fontWeight: 800, fontSize: 11, color: "rgba(255,255,255,.45)", letterSpacing: "0.05em" }}>🌐 SHARED ECONOMY</span></label>
@@ -1122,6 +1122,16 @@ String(c.status).toUpperCase()==="PENDING"
     </div>
   </div>
   </div>
+
+<div style={{ marginTop: 14, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,.12)" }}>
+  <div style={{ fontWeight: 900, marginBottom: 10 }}>Rewards (points per rarity)</div>
+  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10 }}>
+    <label style={{ fontSize: 12, opacity: 0.9 }}>Reward none<input value={cfg.rewards?.none ?? 0} onChange={e => setCfg((c:any) => ({ ...c, rewards: { ...c.rewards, none: safeNum(e.target.value, 0) } }))} type="number" min="0" style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+    <label style={{ fontSize: 12, opacity: 0.9 }}>Reward common<input value={cfg.rewards?.common ?? 50} onChange={e => setCfg((c:any) => ({ ...c, rewards: { ...c.rewards, common: safeNum(e.target.value, 0) } }))} type="number" min="0" style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+    <label style={{ fontSize: 12, opacity: 0.9 }}>Reward rare<input value={cfg.rewards?.rare ?? 100} onChange={e => setCfg((c:any) => ({ ...c, rewards: { ...c.rewards, rare: safeNum(e.target.value, 0) } }))} type="number" min="0" style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+    <label style={{ fontSize: 12, opacity: 0.9 }}>Reward ultra<input value={cfg.rewards?.ultra ?? 300} onChange={e => setCfg((c:any) => ({ ...c, rewards: { ...c.rewards, ultra: safeNum(e.target.value, 0) } }))} type="number" min="0" style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+  </div>
+</div>
 
 <div style={{ marginTop: 14, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,.12)" }}>
   <div style={{ fontWeight: 900, marginBottom: 10 }}>Pro Odds</div>
