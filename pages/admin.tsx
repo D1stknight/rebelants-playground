@@ -1359,9 +1359,13 @@ String(c.status).toUpperCase()==="PENDING"
   {/* Prize Inventory Dashboard */}
   <div style={{ marginTop:14, padding:14, border:"1px solid rgba(255,255,255,.14)", borderRadius:14, background:"rgba(15,23,42,.55)" }}>
     <div style={{ fontWeight:900, marginBottom:6, fontSize:16 }}>📦 Merch Stock</div>
-    <div style={{ fontSize:12, opacity:0.6, marginBottom:14 }}>
-      This tracks how many of each merch item you physically have ready to ship.
-      The SKU must exactly match what you set in the Rare Prize Pool above.
+    <div style={{ fontSize:12, opacity:0.65, marginBottom:14, lineHeight:1.6 }}>
+      <div style={{ marginBottom:8 }}>This is your physical merch stock tracker. You need to fill this out <b style={{ color:"rgba(255,255,255,.85)" }}>even if you only have one item</b> — it works the same whether you have 1 item or 10.</div>
+      <div style={{ marginBottom:6 }}>💡 <b style={{ color:"rgba(255,255,255,.8)" }}>How it connects to Prize Pools:</b> Think of it as two separate steps:</div>
+      <div style={{ marginBottom:4, paddingLeft:12 }}>1️⃣ <b style={{ color:"rgba(255,255,255,.75)" }}>Rare Prize Pool above</b> = defines WHAT can be won (the prize name, SKU code, and how likely it is)</div>
+      <div style={{ marginBottom:8, paddingLeft:12 }}>2️⃣ <b style={{ color:"rgba(255,255,255,.75)" }}>Merch Stock here</b> = tracks HOW MANY you physically have to ship. The SKU must exactly match what you entered above.</div>
+      <div style={{ marginBottom:6 }}>💡 <b style={{ color:"rgba(255,255,255,.8)" }}>Example:</b> If you set SKU = <span style={{ fontFamily:"monospace", background:"rgba(255,255,255,.08)", padding:"1px 6px", borderRadius:4 }}>HOODIE</span> in the Rare Pool, you must also add SKU = <span style={{ fontFamily:"monospace", background:"rgba(255,255,255,.08)", padding:"1px 6px", borderRadius:4 }}>HOODIE</span> here with how many hoodies you have in stock.</div>
+      <div style={{ color:"#fbbf24", fontSize:11 }}>⚠️ After adding or changing items here, always click <b>Save Inventory</b> below. This is a separate save from the main Save button above.</div>
     </div>
 
     {(() => {
