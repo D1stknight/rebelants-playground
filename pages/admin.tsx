@@ -1288,108 +1288,62 @@ String(c.status).toUpperCase()==="PENDING"
   </button>
 </div>
           
-{/* Prize Pools (JSON) */}
-<div style={{ marginTop: 12 }}>
-  <div style={{ fontWeight: 900, marginBottom: 8 }}>Prize Pools (JSON)</div>
-  <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 10 }}>
-    These define what CAN be awarded for each rarity. If a pool is empty, it will fall back to points (if configured).
+  {/* ── Prize Pools ───────────────────────────────────────────── */}
+  <div style={{ marginTop: 14, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,.12)" }}>
+    <div style={{ fontWeight: 900, marginBottom: 4 }}>Prize Pools</div>
+    <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 12 }}>Configure what each crate rarity can award. If no special prize is set, it falls back to points automatically.</div>
+
+    {/* NONE */}
+    <div style={{ marginBottom: 12, padding: 12, borderRadius: 12, background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.07)" }}>
+      <div style={{ fontWeight: 800, fontSize: 12, color: "rgba(255,255,255,.45)", marginBottom: 4 }}>⭕ NONE — No crate</div>
+      <div style={{ fontSize: 12, opacity: 0.45 }}>Player wins nothing. No settings needed.</div>
+    </div>
+
+    {/* COMMON */}
+    <div style={{ marginBottom: 12, padding: 12, borderRadius: 12, background: "rgba(52,211,153,.04)", border: "1px solid rgba(52,211,153,.2)" }}>
+      <div style={{ fontWeight: 800, fontSize: 12, color: "#34d399", marginBottom: 10 }}>✅ COMMON CRATE — Points only</div>
+      <label style={{ fontSize: 12, opacity: 0.9 }}>Points awarded
+        <input type="number" min="0"
+          value={(cfg as any).prizePools?.common?.[0]?.points ?? (cfg as any).rewards?.common ?? 50}
+          onChange={e => { const pts = Math.max(0, Number(e.target.value||"0")); setCfg((c:any) => ({ ...c, prizePools: { ...(c.prizePools||{}), common: [{ id:"c-pts", type:"points", label:`${pts} ${c.currency||"REBEL"}`, amount:pts, points:pts, weight:100 }] } })); }}
+          style={{ width:160, marginTop:6, padding:"9px 11px", borderRadius:10, border:"1px solid rgba(255,255,255,.18)", background:"rgba(0,0,0,.25)", color:"white", fontSize:12 }} />
+      </label>
+    </div>
+
+    {/* RARE */}
+    <div style={{ marginBottom: 12, padding: 12, borderRadius: 12, background: "rgba(96,165,250,.04)", border: "1px solid rgba(96,165,250,.2)" }}>
+      <div style={{ fontWeight: 800, fontSize: 12, color: "#60a5fa", marginBottom: 6 }}>⚔️ RARE CRATE — Merch prizes</div>
+      <div style={{ fontSize: 11, opacity: 0.55, marginBottom: 10 }}>Add merch items. If empty, rare crate awards points instead.</div>
+      {((cfg as any).prizePools?.rare?.filter((p:any) => String(p?.type||"").toUpperCase() === "MERCH") || []).map((item:any, idx:number) => (
+        <div key={idx} style={{ display:"grid", gridTemplateColumns:"1fr 1fr auto auto", gap:8, marginBottom:8, alignItems:"end" }}>
+          <label style={{ fontSize:11, opacity:0.8 }}>Label<input value={item.label||""} onChange={e => { const pool=[...((cfg as any).prizePools?.rare||[])]; const ni=pool.indexOf(pool.filter((p:any)=>String(p?.type||"").toUpperCase()==="MERCH")[idx]); if(ni>=0){pool[ni]={...pool[ni],label:e.target.value};} setCfg((c:any)=>({...c,prizePools:{...(c.prizePools||{}),rare:pool}})); }} style={{ width:"100%",marginTop:4,padding:"9px 11px",borderRadius:10,border:"1px solid rgba(255,255,255,.18)",background:"rgba(0,0,0,.25)",color:"white",fontSize:12 }} /></label>
+          <label style={{ fontSize:11, opacity:0.8 }}>SKU<input value={item.sku||""} onChange={e => { const pool=[...((cfg as any).prizePools?.rare||[])]; const ni=pool.indexOf(pool.filter((p:any)=>String(p?.type||"").toUpperCase()==="MERCH")[idx]); if(ni>=0){pool[ni]={...pool[ni],sku:e.target.value};} setCfg((c:any)=>({...c,prizePools:{...(c.prizePools||{}),rare:pool}})); }} style={{ width:"100%",marginTop:4,padding:"9px 11px",borderRadius:10,border:"1px solid rgba(255,255,255,.18)",background:"rgba(0,0,0,.25)",color:"white",fontSize:12 }} /></label>
+          <label style={{ fontSize:11, opacity:0.8 }}>Weight<input type="number" min="1" value={item.weight||1} onChange={e => { const pool=[...((cfg as any).prizePools?.rare||[])]; const ni=pool.indexOf(pool.filter((p:any)=>String(p?.type||"").toUpperCase()==="MERCH")[idx]); if(ni>=0){pool[ni]={...pool[ni],weight:Number(e.target.value||1)};} setCfg((c:any)=>({...c,prizePools:{...(c.prizePools||{}),rare:pool}})); }} style={{ width:70,marginTop:4,padding:"9px 11px",borderRadius:10,border:"1px solid rgba(255,255,255,.18)",background:"rgba(0,0,0,.25)",color:"white",fontSize:12 }} /></label>
+          <button onClick={() => { const pool=((cfg as any).prizePools?.rare||[]).filter((_:any,i:number)=>i!==((cfg as any).prizePools?.rare||[]).indexOf(((cfg as any).prizePools?.rare||[]).filter((p:any)=>String(p?.type||"").toUpperCase()==="MERCH")[idx])); setCfg((c:any)=>({...c,prizePools:{...(c.prizePools||{}),rare:pool}})); }} style={{ padding:"6px 10px",borderRadius:8,border:"1px solid rgba(248,113,113,.4)",background:"rgba(248,113,113,.1)",color:"#f87171",cursor:"pointer",fontSize:12,marginTop:16 }}>✕</button>
+        </div>
+      ))}
+      <button onClick={() => { const pool=[...((cfg as any).prizePools?.rare||[])]; pool.push({ id:`merch-${Date.now()}`, type:"merch", label:"New Merch Prize", sku:"SKU", qty:1, weight:5 }); setCfg((c:any)=>({...c,prizePools:{...(c.prizePools||{}),rare:pool}})); }} style={{ padding:"7px 14px",borderRadius:8,border:"1px solid rgba(96,165,250,.4)",background:"rgba(96,165,250,.1)",color:"#93c5fd",cursor:"pointer",fontSize:12,marginTop:4 }}>+ Add Merch Prize</button>
+    </div>
+
+    {/* ULTRA */}
+    <div style={{ marginBottom: 12, padding: 12, borderRadius: 12, background: "rgba(251,191,36,.04)", border: "1px solid rgba(251,191,36,.2)" }}>
+      <div style={{ fontWeight: 800, fontSize: 12, color: "#fbbf24", marginBottom: 6 }}>🏆 ULTRA CRATE — NFT prizes</div>
+      <div style={{ fontSize: 11, opacity: 0.55, marginBottom: 10 }}>Add NFT prize entries. If empty, ultra crate awards points instead.</div>
+      {((cfg as any).prizePools?.ultra?.filter((p:any) => String(p?.type||"").toUpperCase() === "NFT") || []).map((item:any, idx:number) => (
+        <div key={idx} style={{ display:"grid", gridTemplateColumns:"1fr auto auto", gap:8, marginBottom:8, alignItems:"end" }}>
+          <label style={{ fontSize:11, opacity:0.8 }}>Label<input value={item.label||""} onChange={e => { const pool=[...((cfg as any).prizePools?.ultra||[])]; const ni=pool.indexOf(pool.filter((p:any)=>String(p?.type||"").toUpperCase()==="NFT")[idx]); if(ni>=0){pool[ni]={...pool[ni],label:e.target.value};} setCfg((c:any)=>({...c,prizePools:{...(c.prizePools||{}),ultra:pool}})); }} style={{ width:"100%",marginTop:4,padding:"9px 11px",borderRadius:10,border:"1px solid rgba(255,255,255,.18)",background:"rgba(0,0,0,.25)",color:"white",fontSize:12 }} /></label>
+          <label style={{ fontSize:11, opacity:0.8 }}>Weight<input type="number" min="1" value={item.weight||1} onChange={e => { const pool=[...((cfg as any).prizePools?.ultra||[])]; const ni=pool.indexOf(pool.filter((p:any)=>String(p?.type||"").toUpperCase()==="NFT")[idx]); if(ni>=0){pool[ni]={...pool[ni],weight:Number(e.target.value||1)};} setCfg((c:any)=>({...c,prizePools:{...(c.prizePools||{}),ultra:pool}})); }} style={{ width:70,marginTop:4,padding:"9px 11px",borderRadius:10,border:"1px solid rgba(255,255,255,.18)",background:"rgba(0,0,0,.25)",color:"white",fontSize:12 }} /></label>
+          <button onClick={() => { const pool=((cfg as any).prizePools?.ultra||[]).filter((_:any,i:number)=>i!==((cfg as any).prizePools?.ultra||[]).indexOf(((cfg as any).prizePools?.ultra||[]).filter((p:any)=>String(p?.type||"").toUpperCase()==="NFT")[idx])); setCfg((c:any)=>({...c,prizePools:{...(c.prizePools||{}),ultra:pool}})); }} style={{ padding:"6px 10px",borderRadius:8,border:"1px solid rgba(248,113,113,.4)",background:"rgba(248,113,113,.1)",color:"#f87171",cursor:"pointer",fontSize:12,marginTop:16 }}>✕</button>
+        </div>
+      ))}
+      <button onClick={() => { const pool=[...((cfg as any).prizePools?.ultra||[])]; pool.push({ id:`nft-${Date.now()}`, type:"nft", label:"NFT Prize", weight:1 }); setCfg((c:any)=>({...c,prizePools:{...(c.prizePools||{}),ultra:pool}})); }} style={{ padding:"7px 14px",borderRadius:8,border:"1px solid rgba(251,191,36,.4)",background:"rgba(251,191,36,.1)",color:"#fde68a",cursor:"pointer",fontSize:12,marginTop:4 }}>+ Add NFT Prize</button>
+    </div>
   </div>
 
-  {(["none", "common", "rare", "ultra"] as const).map((k) => {
-    const currency = String((cfg as any)?.currency || "REBEL");
-
-    const sample =
-      k === "none"
-        ? `[{ "type":"NONE", "label":"Nothing this time", "points":0 }]`
-        : k === "common"
-        ? `[{ "type":"POINTS", "label":"50 ${currency}", "points":50 }]`
-        : k === "rare"
-        ? `[
-  { "type":"MERCH", "label":"Sticker Pack", "sku":"STICKERS", "qty":1, "weight":5 },
-  { "type":"MERCH", "label":"Rebel Ants Hat", "sku":"HAT", "qty":1, "weight":1 }
-]`
-        : `[{ "type":"NFT", "label":"Ultra NFT Prize", "weight":1 }]`;
-
-    return (
-      <label key={k} style={{ display: "block", marginBottom: 10, fontSize: 12, opacity: 0.95 }}>
-        Pool: <b>{k}</b>
-
-        <textarea
-          value={JSON.stringify((cfg as any).prizePools?.[k] ?? [], null, 2)}
-          onChange={(e) => {
-            try {
-              const nextArr = JSON.parse(e.target.value || "[]");
-              setCfg((c: any) => ({
-                ...c,
-                prizePools: {
-                  ...(c.prizePools || { none: [], common: [], rare: [], ultra: [] }),
-                  [k]: Array.isArray(nextArr) ? nextArr : [],
-                },
-              }));
-            } catch {
-              // ignore parse errors while typing
-            }
-          }}
-          style={{
-            width: "100%",
-            minHeight: 110,
-            marginTop: 6,
-            padding: "10px 12px",
-            borderRadius: 12,
-            border: "1px solid rgba(255,255,255,.18)",
-            background: "rgba(0,0,0,.25)",
-            color: "white",
-            fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-            fontSize: 12,
-          }}
-        />
-
-                {/* ✅ sample format so you never forget */}
-        <div style={{ marginTop: 6, fontSize: 12, opacity: 0.8, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <div>
-            Format example:{" "}
-            <code style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
-              {sample}
-            </code>
-          </div>
-
-          <button
-            className="btn"
-            type="button"
-            onClick={() => {
-              try {
-                const nextArr = JSON.parse(String(sample || "[]"));
-                setCfg((c: any) => ({
-                  ...c,
-                  prizePools: {
-                    ...(c.prizePools || { none: [], common: [], rare: [], ultra: [] }),
-                    [k]: Array.isArray(nextArr) ? nextArr : [],
-                  },
-                }));
-              } catch {
-                // ignore
-              }
-            }}
-            style={{ padding: "6px 10px", fontSize: 12 }}
-            title="Restores the example JSON into this pool (you can edit after)"
-          >
-            Restore Example
-          </button>
-        </div>
-      </label>
-    );
-  })}
-</div>
-
-<div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
-  <button className="btn" onClick={loadConfig} style={{ padding: "10px 12px" }}>
-    Load Current
-  </button>
-  <button className="btn" onClick={saveConfig} style={{ padding: "10px 12px" }}>
-    Save
-  </button>
-</div>
-
+  <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
+    <button className="btn" onClick={loadConfig} style={{ padding: "10px 12px" }}>Load Current</button>
+    <button className="btn" onClick={saveConfig} style={{ padding: "10px 12px" }}>Save</button>
+  </div>
           {/* Prize Inventory Dashboard */}
       <div
         style={{
