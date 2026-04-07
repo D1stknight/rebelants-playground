@@ -404,11 +404,18 @@ function LaunchAnimation() {
 
 // ── Result Modal ──────────────────────────────────────────────────────────────
 
-function RaidResultModal({ slots, rarity, prize, onClose, ultraCarriers, ultraRatio, rareCarriers, rareRatio, commonSurvivors }: {
+function RaidResultModal({ slots, rarity, prize, onClose, ultraCarriers, ultraRatio, rareCarriers, rareRatio, commonSurvivors,
+  prizeObj, prizeNeedShipping, prizeShipMsg, prizeShipBusy, prizeClaimId, prizeShipForm, setPrizeShipForm, setPrizeShipMsg, setPrizeShipBusy, setPrizeClaimId, setPrizeNeedShipping, effectivePlayerId: eid
+}: {
   slots: AntSlot[]; rarity: Rarity; prize: Prize | null; onClose: () => void;
   ultraCarriers: number; ultraRatio: number;
   rareCarriers: number; rareRatio: number;
   commonSurvivors: number;
+  prizeObj: any; prizeNeedShipping: boolean; prizeShipMsg: string; prizeShipBusy: boolean;
+  prizeClaimId: string|undefined; prizeShipForm: any;
+  setPrizeShipForm: (v:any)=>void; setPrizeShipMsg: (v:string)=>void;
+  setPrizeShipBusy: (v:boolean)=>void; setPrizeClaimId: (v:string|undefined)=>void;
+  setPrizeNeedShipping: (v:boolean)=>void; effectivePlayerId: string;
 }) {
   const survivors = slots.filter(s => s.survived).length;
   const carriers  = slots.filter(s => s.role === "carrier" && s.survived).length;
@@ -513,10 +520,74 @@ function RaidResultModal({ slots, rarity, prize, onClose, ultraCarriers, ultraRa
           <div style={{ marginTop: 4, opacity: 0.7 }}>💡 Guards placed next to Carriers give +25% survival to that Carrier</div>
         </div>
 
-        <button className="btn" onClick={onClose}
-          style={{ width: "100%", padding: 14, fontSize: 14, fontWeight: 900, background: `linear-gradient(135deg, ${titleColor}22, rgba(15,23,42,.8))`, border: `1px solid ${titleColor}55`, color: titleColor }}>
-          {isWin ? "🐜 Claim Loot & Return to Base" : "🐜 Return to Base"}
-        </button>
+        {/* ── NFT: wallet input (Shuffle pattern) ── */}
+          {isWin && prizeObj?.type === "nft" && !loadProfile()?.walletAddress && (
+            <div style={{ marginTop: 12, textAlign: "left" }}>
+              <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 8 }}>✅ Enter the wallet you want this NFT sent to (we'll remember it for next time).</div>
+              <input
+                defaultValue={loadProfile()?.walletAddress || ""}
+                onChange={(e) => { const next=String(e.target.value||"").trim(); const p=loadProfile(); saveProfile({...p,walletAddress:next}); }}
+                placeholder="0x… wallet address"
+                style={{ width:"100%", padding:"10px 12px", borderRadius:10, border:"1px solid rgba(255,255,255,.18)", background:"rgba(0,0,0,.25)", color:"white" }}
+              />
+              <div style={{ fontSize: 11, opacity: 0.5, marginTop: 6 }}>After you continue, your claim will show up in Admin → Claims.</div>
+            </div>
+          )}
+          {isWin && prizeObj?.type === "nft" && loadProfile()?.walletAddress && (
+            <div style={{ marginTop: 10, fontSize: 12, opacity: 0.7 }}>
+              ✅ NFT will be sent to: <b style={{ color: titleColor }}>{loadProfile()?.walletAddress}</b>
+            </div>
+          )}
+
+          {/* ── Merch: shipping form (Shuffle pattern) ── */}
+          {prizeNeedShipping && prizeClaimId && (
+            <div style={{ marginTop: 12, textAlign: "left" }}>
+              <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 8 }}>✅ This merch prize needs shipping info to fulfill.</div>
+              <div style={{ display: "grid", gap: 8 }}>
+                {["name","email","phone","address1","address2","city","state","zip","country"].map(field => (
+                  <input key={field} value={(prizeShipForm as any)[field]||""} onChange={e=>setPrizeShipForm((f:any)=>({...f,[field]:e.target.value}))} placeholder={field==="address1"?"Address Line 1":field==="address2"?"Address Line 2 (optional)":field.charAt(0).toUpperCase()+field.slice(1)} style={{ padding:"10px 12px", borderRadius:10, border:"1px solid rgba(255,255,255,.18)", background:"rgba(0,0,0,.25)", color:"white" }} />
+                ))}
+              </div>
+              {prizeShipMsg && <div style={{ marginTop: 8, fontSize: 12, color: prizeShipMsg.includes("✅")?"#22c55e":"#f87171" }}>{prizeShipMsg}</div>}
+            </div>
+          )}
+          {prizeShipMsg && !prizeNeedShipping && <div style={{ marginTop: 8, fontSize: 12, color: "#f87171" }}>{prizeShipMsg}</div>}
+
+          <button className="btn" disabled={prizeShipBusy}
+            onClick={async () => {
+              const _pid = String(eid||"guest").trim().slice(0,64)||"guest";
+              // ── NFT: create claim with wallet ──
+              if (prizeObj?.type === "nft") {
+                const _w = loadProfile()?.walletAddress || "";
+                if (!_w) { alert("Please enter a wallet address first."); return; }
+                try {
+                  const _cr = await fetch("/api/claims/create", {
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ playerId: _pid, wallet: _w, prize: prizeObj, game: "expedition", rarity }),
+                  });
+                  const _cj = await _cr.json().catch(() => null);
+                  if (!_cr.ok || !_cj?.ok) { alert("Claim failed. Please try again."); return; }
+                } catch { alert("Claim failed. Please try again."); return; }
+              }
+              // ── Merch: submit shipping if needed ──
+              if (prizeNeedShipping && prizeClaimId) {
+                setPrizeShipBusy(true);
+                try {
+                  const _sr = await fetch("/api/prizes/shipping", {
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ claimId: prizeClaimId, playerId: _pid, shipping: prizeShipForm }),
+                  });
+                  const _sj = await _sr.json().catch(() => null);
+                  if (!_sr.ok || !_sj?.ok) { setPrizeShipMsg(_sj?.error || "Shipping save failed"); setPrizeShipBusy(false); return; }
+                  setPrizeShipMsg("✅ Shipping saved!");
+                } catch { setPrizeShipMsg("Shipping save failed"); setPrizeShipBusy(false); return; }
+                setPrizeShipBusy(false);
+              }
+              onClose();
+            }}
+            style={{ width:"100%", padding:14, fontSize:14, fontWeight:900, background:`linear-gradient(135deg, ${titleColor}22, rgba(15,23,42,.8))`, border:`1px solid ${titleColor}55`, color:titleColor, opacity:prizeShipBusy?0.6:1, cursor:prizeShipBusy?"default":"pointer", marginTop:4 }}>
+            {prizeShipBusy ? "Saving…" : isWin ? "🐜 Claim Loot & Return to Base" : "🐜 Return to Base"}
+          </button>
       </div>
       <style>{`@keyframes pmSpark{0%{transform:scale(0.3);opacity:0}20%{opacity:1}55%{transform:scale(1.15);opacity:.9}85%{transform:scale(0.6);opacity:.6}100%{transform:scale(0.2);opacity:0}}`}</style>
     </div>
@@ -867,6 +938,12 @@ export default function Raid() {
   const [prize, setPrize]                 = useState<Prize|null>(null);
   const [showResult, setShowResult]       = useState(false);
   const [showBuyPoints, setShowBuyPoints] = useState(false);
+  const [prizeObj, setPrizeObj] = useState<any>(null);
+  const [prizeNeedShipping, setPrizeNeedShipping] = useState(false);
+  const [prizeShipMsg, setPrizeShipMsg] = useState("");
+  const [prizeShipBusy, setPrizeShipBusy] = useState(false);
+  const [prizeClaimId, setPrizeClaimId] = useState<string|undefined>(undefined);
+  const [prizeShipForm, setPrizeShipForm] = useState({ name:"", email:"", phone:"", address1:"", address2:"", city:"", state:"", zip:"", country:"" });
 
   const cfg        = pointsConfig as any;
   const cost       = Number(cfg?.raidCost ?? 600);
@@ -941,13 +1018,37 @@ export default function Raid() {
     const prof  = loadProfile();
     const pid   = String(effectivePlayerId||getEffectivePlayerId(prof)||prof?.id||"guest").trim().slice(0,64)||"guest";
     const pname = (prof?.discordName||playerName||prof?.name||"guest").trim()||"guest";
-    const { rarity: r, prize: pz } = calcPrize(battleSlots, cfg);
+  // ── Determine rarity locally (survivor/carrier counts) ──
+  const { rarity: r_temp } = calcPrize(battleSlots, cfg);
 
-    if (pz.type==="points"&&(pz as any).points>0) { await earn((pz as any).points); await refresh(); }
+  // ── Roll actual prize via server (Shuffle pattern — routes through NFT inventory) ──
+  const _rollR = await fetch(`/api/prizes/roll?force=${r_temp}`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId: pid, rarity: r_temp, game: "expedition" }),
+  }).catch(() => null);
+  const _rollJ = _rollR ? await _rollR.json().catch(() => null) : null;
+  const r = r_temp as Rarity;
+  const pz: Prize = (_rollR?.ok && _rollJ?.ok && _rollJ?.prize) ? _rollJ.prize as Prize : calcPrize(battleSlots, cfg).prize;
+  const fullPrizeObj = (_rollR?.ok && _rollJ?.ok && _rollJ?.prize) ? _rollJ.prize : null;
 
-    const survivors     = battleSlots.filter(s=>s.survived).length;
-    const pointsAwarded = pz.type==="points" ? (pz as any).points : 0;
+  // ── Merch: create claim immediately (Shuffle pattern) ──
+  setPrizeNeedShipping(false); setPrizeShipMsg(""); setPrizeClaimId(undefined);
+  if (String(pz?.type||"").toLowerCase() === "merch") {
+    const _claimId = `${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+    const _cr = await fetch("/api/prizes/claim", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ claimId: _claimId, playerId: pid, prize: pz, wallet: null, shipping: null, game: "expedition", rarity: r }),
+    }).catch(() => null);
+    const _cj = _cr ? await _cr.json().catch(() => null) : null;
+    if (_cr?.ok && _cj?.ok) { setPrizeClaimId(_claimId); setPrizeNeedShipping(!!_cj.needShipping); }
+    else { setPrizeShipMsg(_cj?.error || "Merch claim failed"); }
+  }
+  setPrizeObj(fullPrizeObj);
 
+  if (pz.type==="points"&&(pz as any).points>0) { await earn((pz as any).points); await refresh(); }
+
+  const survivors = battleSlots.filter(s=>s.survived).length;
+  const pointsAwarded = pz.type==="points" ? (pz as any).points : 0;
     addWin({ id:`${Date.now()}-${Math.random().toString(36).slice(2,7)}`, ts:Date.now(), game:"expedition", playerId:pid, playerName:pname, rarity:r, pointsAwarded });
 
     await fetch("/api/wins/add",{
@@ -965,6 +1066,8 @@ export default function Raid() {
     setShowResult(false); setPhase("idle");
     setSlots([]); setRevealedCount(0);
     setRarity("none"); setPrize(null);
+  setPrizeObj(null); setPrizeNeedShipping(false); setPrizeShipMsg(""); setPrizeShipBusy(false); setPrizeClaimId(undefined);
+  setPrizeShipForm({ name:"",email:"",phone:"",address1:"",address2:"",city:"",state:"",zip:"",country:"" });
     setSquad([...DEFAULT_SQUAD]);
     if(typeof window!=="undefined"){try{const v=localStorage.getItem(LAST_SQUAD_KEY);setLastSquad(v?JSON.parse(v):null);}catch{}}
     if (typeof window !== "undefined") { try { const v = localStorage.getItem("ra:raid:lastSquad"); setLastSquad(v ? JSON.parse(v) : null); } catch {} }
@@ -1113,10 +1216,16 @@ export default function Raid() {
 
         {showResult && slots.length>0 && (
           <RaidResultModal
-            slots={slots} rarity={rarity} prize={prize} onClose={resetRaid}
-            ultraCarriers={ultraCarriersThreshold} ultraRatio={ultraRatioThreshold}
-            rareCarriers={rareCarriersThreshold} rareRatio={rareRatioThreshold}
-            commonSurvivors={commonSurvivorsThreshold}
+          slots={slots} rarity={rarity} prize={prize} onClose={resetRaid}
+          ultraCarriers={ultraCarriersThreshold} ultraRatio={ultraRatioThreshold}
+          rareCarriers={rareCarriersThreshold} rareRatio={rareRatioThreshold}
+          commonSurvivors={commonSurvivorsThreshold}
+          prizeObj={prizeObj} prizeNeedShipping={prizeNeedShipping}
+          prizeShipMsg={prizeShipMsg} prizeShipBusy={prizeShipBusy}
+          prizeClaimId={prizeClaimId} prizeShipForm={prizeShipForm}
+          setPrizeShipForm={setPrizeShipForm} setPrizeShipMsg={setPrizeShipMsg}
+          setPrizeShipBusy={setPrizeShipBusy} setPrizeClaimId={setPrizeClaimId}
+          setPrizeNeedShipping={setPrizeNeedShipping} effectivePlayerId={effectivePlayerId}
           />
         )}
 
