@@ -1288,192 +1288,118 @@ String(c.status).toUpperCase()==="PENDING"
   </button>
 </div>
           
-{/* Prize Pools (JSON) */}
-<div style={{ marginTop: 12 }}>
-  <div style={{ fontWeight: 900, marginBottom: 8 }}>Prize Pools (JSON)</div>
-  <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 10 }}>
-    These define what CAN be awarded for each rarity. If a pool is empty, it will fall back to points (if configured).
+  {/* ── Prize Pools ───────────────────────────────────────────── */}
+  <div style={{ marginTop: 14, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,.12)" }}>
+    <div style={{ fontWeight: 900, marginBottom: 4 }}>Prize Pools</div>
+    <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 12 }}>
+      Configure what each crate rarity awards. If nothing is set in a pool, it automatically falls back to points (using the Rewards row above). You never need to touch JSON.
+    </div>
+
+    {/* ── NONE ── */}
+    <div style={{ marginBottom: 12, padding: 12, borderRadius: 12, background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.07)" }}>
+      <div style={{ fontWeight: 800, fontSize: 12, color: "rgba(255,255,255,.45)", marginBottom: 6 }}>⭕ NONE — No crate</div>
+      <div style={{ fontSize: 12, opacity: 0.45 }}>Player wins nothing this round. No settings needed here.</div>
+    </div>
+
+    {/* ── COMMON ── */}
+    <div style={{ marginBottom: 12, padding: 12, borderRadius: 12, background: "rgba(52,211,153,.04)", border: "1px solid rgba(52,211,153,.2)" }}>
+      <div style={{ fontWeight: 800, fontSize: 12, color: "#34d399", marginBottom: 6 }}>✅ COMMON CRATE — Points only</div>
+      <div style={{ fontSize: 12, opacity: 0.55, marginBottom: 10 }}>Common crate always awards points. Set how many REBEL points the player receives when they win a common crate.</div>
+      <label style={{ fontSize: 12, opacity: 0.9 }}>Points awarded
+        <input type="number" min="0"
+          value={(cfg as any).prizePools?.common?.[0]?.points ?? (cfg as any).rewards?.common ?? 50}
+          onChange={e => { const pts = Math.max(0, Number(e.target.value||"0")); setCfg((c:any) => ({ ...c, prizePools: { ...(c.prizePools||{}), common: [{ id:"c-pts", type:"points", label:`${pts} ${c.currency||"REBEL"}`, amount:pts, points:pts, weight:100 }] } })); }}
+          style={{ width:160, marginTop:6, display:"block", padding:"9px 11px", borderRadius:10, border:"1px solid rgba(255,255,255,.18)", background:"rgba(0,0,0,.25)", color:"white", fontSize:12 }} />
+      </label>
+    </div>
+
+    {/* ── RARE ── */}
+    <div style={{ marginBottom: 12, padding: 12, borderRadius: 12, background: "rgba(96,165,250,.04)", border: "1px solid rgba(96,165,250,.2)" }}>
+      <div style={{ fontWeight: 800, fontSize: 12, color: "#60a5fa", marginBottom: 6 }}>⚔️ RARE CRATE — Merch prizes</div>
+      <div style={{ fontSize: 12, opacity: 0.55, marginBottom: 4 }}>Add physical merch items (T-shirts, hoodies, hats, etc.) that players can win with a rare crate.</div>
+      <div style={{ fontSize: 12, opacity: 0.55, marginBottom: 4 }}>💡 <b style={{ color: "rgba(255,255,255,.7)" }}>Label</b> = what the player sees when they win (e.g. "Rebel Ants T-Shirt")</div>
+      <div style={{ fontSize: 12, opacity: 0.55, marginBottom: 4 }}>💡 <b style={{ color: "rgba(255,255,255,.7)" }}>SKU</b> = your internal code for this item so you know what to ship. Make it short, no spaces, all caps (e.g. TSHIRT, HOODIE, HAT). This shows in the admin claim record.</div>
+      <div style={{ fontSize: 12, opacity: 0.55, marginBottom: 10 }}>💡 <b style={{ color: "rgba(255,255,255,.7)" }}>Weight</b> = how likely this item is compared to others. Higher = more likely. If you only have one item, just leave it as 1.</div>
+      <div style={{ fontSize: 12, color: "#60a5fa", opacity: 0.7, marginBottom: 10 }}>⚠️ If no merch items are added here, rare crate winners just get points instead.</div>
+      {((cfg as any).prizePools?.rare?.filter((p:any) => String(p?.type||"").toUpperCase() === "MERCH") || []).map((item:any, idx:number) => (
+        <div key={idx} style={{ display:"grid", gridTemplateColumns:"1fr 1fr auto auto", gap:8, marginBottom:8, alignItems:"end", padding:"10px 12px", borderRadius:10, background:"rgba(255,255,255,.04)", border:"1px solid rgba(255,255,255,.08)" }}>
+          <label style={{ fontSize:11, opacity:0.8 }}>Label (shown to player)<input value={item.label||""} onChange={e => { const pool=[...((cfg as any).prizePools?.rare||[])]; const ni=pool.indexOf(pool.filter((p:any)=>String(p?.type||"").toUpperCase()==="MERCH")[idx]); if(ni>=0){pool[ni]={...pool[ni],label:e.target.value};} setCfg((c:any)=>({...c,prizePools:{...(c.prizePools||{}),rare:pool}})); }} style={{ width:"100%",marginTop:4,padding:"9px 11px",borderRadius:10,border:"1px solid rgba(255,255,255,.18)",background:"rgba(0,0,0,.25)",color:"white",fontSize:12,display:"block" }} /></label>
+          <label style={{ fontSize:11, opacity:0.8 }}>SKU (your internal code)<input value={item.sku||""} placeholder="e.g. TSHIRT" onChange={e => { const pool=[...((cfg as any).prizePools?.rare||[])]; const ni=pool.indexOf(pool.filter((p:any)=>String(p?.type||"").toUpperCase()==="MERCH")[idx]); if(ni>=0){pool[ni]={...pool[ni],sku:e.target.value};} setCfg((c:any)=>({...c,prizePools:{...(c.prizePools||{}),rare:pool}})); }} style={{ width:"100%",marginTop:4,padding:"9px 11px",borderRadius:10,border:"1px solid rgba(255,255,255,.18)",background:"rgba(0,0,0,.25)",color:"white",fontSize:12,display:"block" }} /></label>
+          <label style={{ fontSize:11, opacity:0.8 }}>Weight<input type="number" min="1" value={item.weight||1} onChange={e => { const pool=[...((cfg as any).prizePools?.rare||[])]; const ni=pool.indexOf(pool.filter((p:any)=>String(p?.type||"").toUpperCase()==="MERCH")[idx]); if(ni>=0){pool[ni]={...pool[ni],weight:Number(e.target.value||1)};} setCfg((c:any)=>({...c,prizePools:{...(c.prizePools||{}),rare:pool}})); }} style={{ width:70,marginTop:4,padding:"9px 11px",borderRadius:10,border:"1px solid rgba(255,255,255,.18)",background:"rgba(0,0,0,.25)",color:"white",fontSize:12,display:"block" }} /></label>
+          <button onClick={() => { const pool=((cfg as any).prizePools?.rare||[]).filter((_:any,i:number)=>i!==((cfg as any).prizePools?.rare||[]).indexOf(((cfg as any).prizePools?.rare||[]).filter((p:any)=>String(p?.type||"").toUpperCase()==="MERCH")[idx])); setCfg((c:any)=>({...c,prizePools:{...(c.prizePools||{}),rare:pool}})); }} style={{ padding:"6px 10px",borderRadius:8,border:"1px solid rgba(248,113,113,.4)",background:"rgba(248,113,113,.1)",color:"#f87171",cursor:"pointer",fontSize:12,marginTop:16 }}>✕ Remove</button>
+        </div>
+      ))}
+      <button onClick={() => { const pool=[...((cfg as any).prizePools?.rare||[])]; pool.push({ id:`merch-${Date.now()}`, type:"merch", label:"New Merch Prize", sku:"SKU", qty:1, weight:5 }); setCfg((c:any)=>({...c,prizePools:{...(c.prizePools||{}),rare:pool}})); }} style={{ padding:"7px 14px",borderRadius:8,border:"1px solid rgba(96,165,250,.4)",background:"rgba(96,165,250,.1)",color:"#93c5fd",cursor:"pointer",fontSize:12,marginTop:4 }}>+ Add Merch Prize</button>
+    </div>
+
+    {/* ── ULTRA ── */}
+    <div style={{ marginBottom: 12, padding: 12, borderRadius: 12, background: "rgba(251,191,36,.04)", border: "1px solid rgba(251,191,36,.2)" }}>
+      <div style={{ fontWeight: 800, fontSize: 12, color: "#fbbf24", marginBottom: 6 }}>🏆 ULTRA CRATE — NFT prizes</div>
+      <div style={{ fontSize: 12, opacity: 0.55, marginBottom: 4 }}>Add NFT prize entries for ultra crate winners.</div>
+      <div style={{ fontSize: 12, opacity: 0.55, marginBottom: 4 }}>💡 <b style={{ color: "rgba(255,255,255,.7)" }}>Label</b> = what the player sees when they win (e.g. "Rebel Ants Genesis #935")</div>
+      <div style={{ fontSize: 12, opacity: 0.55, marginBottom: 4 }}>💡 <b style={{ color: "rgba(255,255,255,.7)" }}>Weight</b> = how likely this NFT entry is. Usually just leave it as 1.</div>
+      <div style={{ fontSize: 12, opacity: 0.55, marginBottom: 4 }}>⚠️ Adding an entry here is only <b style={{ color:"rgba(255,255,255,.7)" }}>Step 1</b>. You also need to add the actual token in the <b style={{ color:"rgba(255,255,255,.7)" }}>Ultra NFT Inventory</b> section below — that's where you enter the contract address and token ID. Both are required.</div>
+      <div style={{ fontSize: 12, opacity: 0.55, marginBottom: 10 }}>✅ When a player wins and enters their wallet, the claim shows up in admin → Claims for you to send. The NFT is then removed from inventory so it can't be won twice.</div>
+      <div style={{ fontSize: 12, color: "#fbbf24", opacity: 0.7, marginBottom: 10 }}>⚠️ If no NFT entries are added here, ultra crate winners just get points instead.</div>
+      {((cfg as any).prizePools?.ultra?.filter((p:any) => String(p?.type||"").toUpperCase() === "NFT") || []).map((item:any, idx:number) => (
+        <div key={idx} style={{ display:"grid", gridTemplateColumns:"1fr auto auto", gap:8, marginBottom:8, alignItems:"end", padding:"10px 12px", borderRadius:10, background:"rgba(255,255,255,.04)", border:"1px solid rgba(255,255,255,.08)" }}>
+          <label style={{ fontSize:11, opacity:0.8 }}>Label (shown to player, e.g. "Rebel Ants Genesis #935")<input value={item.label||""} onChange={e => { const pool=[...((cfg as any).prizePools?.ultra||[])]; const ni=pool.indexOf(pool.filter((p:any)=>String(p?.type||"").toUpperCase()==="NFT")[idx]); if(ni>=0){pool[ni]={...pool[ni],label:e.target.value};} setCfg((c:any)=>({...c,prizePools:{...(c.prizePools||{}),ultra:pool}})); }} style={{ width:"100%",marginTop:4,padding:"9px 11px",borderRadius:10,border:"1px solid rgba(255,255,255,.18)",background:"rgba(0,0,0,.25)",color:"white",fontSize:12,display:"block" }} /></label>
+          <label style={{ fontSize:11, opacity:0.8 }}>Weight<input type="number" min="1" value={item.weight||1} onChange={e => { const pool=[...((cfg as any).prizePools?.ultra||[])]; const ni=pool.indexOf(pool.filter((p:any)=>String(p?.type||"").toUpperCase()==="NFT")[idx]); if(ni>=0){pool[ni]={...pool[ni],weight:Number(e.target.value||1)};} setCfg((c:any)=>({...c,prizePools:{...(c.prizePools||{}),ultra:pool}})); }} style={{ width:70,marginTop:4,padding:"9px 11px",borderRadius:10,border:"1px solid rgba(255,255,255,.18)",background:"rgba(0,0,0,.25)",color:"white",fontSize:12,display:"block" }} /></label>
+          <button onClick={() => { const pool=((cfg as any).prizePools?.ultra||[]).filter((_:any,i:number)=>i!==((cfg as any).prizePools?.ultra||[]).indexOf(((cfg as any).prizePools?.ultra||[]).filter((p:any)=>String(p?.type||"").toUpperCase()==="NFT")[idx])); setCfg((c:any)=>({...c,prizePools:{...(c.prizePools||{}),ultra:pool}})); }} style={{ padding:"6px 10px",borderRadius:8,border:"1px solid rgba(248,113,113,.4)",background:"rgba(248,113,113,.1)",color:"#f87171",cursor:"pointer",fontSize:12,marginTop:16 }}>✕ Remove</button>
+        </div>
+      ))}
+      <button onClick={() => { const pool=[...((cfg as any).prizePools?.ultra||[])]; pool.push({ id:`nft-${Date.now()}`, type:"nft", label:"NFT Prize", weight:1 }); setCfg((c:any)=>({...c,prizePools:{...(c.prizePools||{}),ultra:pool}})); }} style={{ padding:"7px 14px",borderRadius:8,border:"1px solid rgba(251,191,36,.4)",background:"rgba(251,191,36,.1)",color:"#fde68a",cursor:"pointer",fontSize:12,marginTop:4 }}>+ Add NFT Prize</button>
+    </div>
   </div>
 
-  {(["none", "common", "rare", "ultra"] as const).map((k) => {
-    const currency = String((cfg as any)?.currency || "REBEL");
+  <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
+    <button className="btn" onClick={loadConfig} style={{ padding: "10px 12px" }}>Load Current</button>
+    <button className="btn" onClick={saveConfig} style={{ padding: "10px 12px" }}>Save</button>
+  </div>
+  {/* Prize Inventory Dashboard */}
+  <div style={{ marginTop:14, padding:14, border:"1px solid rgba(255,255,255,.14)", borderRadius:14, background:"rgba(15,23,42,.55)" }}>
+    <div style={{ fontWeight:900, marginBottom:6, fontSize:16 }}>📦 Merch Stock</div>
+    <div style={{ fontSize:12, opacity:0.65, marginBottom:14, lineHeight:1.6 }}>
+      <div style={{ marginBottom:8 }}>This is your physical merch stock tracker. You need to fill this out <b style={{ color:"rgba(255,255,255,.85)" }}>even if you only have one item</b> — it works the same whether you have 1 item or 10.</div>
+      <div style={{ marginBottom:6 }}>💡 <b style={{ color:"rgba(255,255,255,.8)" }}>How it connects to Prize Pools:</b> Think of it as two separate steps:</div>
+      <div style={{ marginBottom:4, paddingLeft:12 }}>1️⃣ <b style={{ color:"rgba(255,255,255,.75)" }}>Rare Prize Pool above</b> = defines WHAT can be won (the prize name, SKU code, and how likely it is)</div>
+      <div style={{ marginBottom:8, paddingLeft:12 }}>2️⃣ <b style={{ color:"rgba(255,255,255,.75)" }}>Merch Stock here</b> = tracks HOW MANY you physically have to ship. The SKU must exactly match what you entered above.</div>
+      <div style={{ marginBottom:6 }}>💡 <b style={{ color:"rgba(255,255,255,.8)" }}>Example:</b> If you set SKU = <span style={{ fontFamily:"monospace", background:"rgba(255,255,255,.08)", padding:"1px 6px", borderRadius:4 }}>HOODIE</span> in the Rare Pool, you must also add SKU = <span style={{ fontFamily:"monospace", background:"rgba(255,255,255,.08)", padding:"1px 6px", borderRadius:4 }}>HOODIE</span> here with how many hoodies you have in stock.</div>
+      <div style={{ color:"#fbbf24", fontSize:11 }}>⚠️ After adding or changing items here, always click <b>Save Inventory</b> below. This is a separate save from the main Save button above.</div>
+    </div>
 
-    const sample =
-      k === "none"
-        ? `[{ "type":"NONE", "label":"Nothing this time", "points":0 }]`
-        : k === "common"
-        ? `[{ "type":"POINTS", "label":"50 ${currency}", "points":50 }]`
-        : k === "rare"
-        ? `[
-  { "type":"MERCH", "label":"Sticker Pack", "sku":"STICKERS", "qty":1, "weight":5 },
-  { "type":"MERCH", "label":"Rebel Ants Hat", "sku":"HAT", "qty":1, "weight":1 }
-]`
-        : `[{ "type":"NFT", "label":"Ultra NFT Prize", "weight":1 }]`;
-
-    return (
-      <label key={k} style={{ display: "block", marginBottom: 10, fontSize: 12, opacity: 0.95 }}>
-        Pool: <b>{k}</b>
-
-        <textarea
-          value={JSON.stringify((cfg as any).prizePools?.[k] ?? [], null, 2)}
-          onChange={(e) => {
-            try {
-              const nextArr = JSON.parse(e.target.value || "[]");
-              setCfg((c: any) => ({
-                ...c,
-                prizePools: {
-                  ...(c.prizePools || { none: [], common: [], rare: [], ultra: [] }),
-                  [k]: Array.isArray(nextArr) ? nextArr : [],
-                },
-              }));
-            } catch {
-              // ignore parse errors while typing
-            }
-          }}
-          style={{
-            width: "100%",
-            minHeight: 110,
-            marginTop: 6,
-            padding: "10px 12px",
-            borderRadius: 12,
-            border: "1px solid rgba(255,255,255,.18)",
-            background: "rgba(0,0,0,.25)",
-            color: "white",
-            fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-            fontSize: 12,
-          }}
-        />
-
-                {/* ✅ sample format so you never forget */}
-        <div style={{ marginTop: 6, fontSize: 12, opacity: 0.8, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <div>
-            Format example:{" "}
-            <code style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
-              {sample}
-            </code>
-          </div>
-
-          <button
-            className="btn"
-            type="button"
-            onClick={() => {
-              try {
-                const nextArr = JSON.parse(String(sample || "[]"));
-                setCfg((c: any) => ({
-                  ...c,
-                  prizePools: {
-                    ...(c.prizePools || { none: [], common: [], rare: [], ultra: [] }),
-                    [k]: Array.isArray(nextArr) ? nextArr : [],
-                  },
-                }));
-              } catch {
-                // ignore
-              }
-            }}
-            style={{ padding: "6px 10px", fontSize: 12 }}
-            title="Restores the example JSON into this pool (you can edit after)"
-          >
-            Restore Example
-          </button>
+    {(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const parseMerch = (): any[] => { try { const r = JSON.parse(invMerchJson||"[]"); return Array.isArray(r) ? r : []; } catch { return []; } };
+      return parseMerch().map((item, idx) => (
+        <div key={idx} style={{ display:"grid", gridTemplateColumns:"1fr 1fr auto auto", gap:8, marginBottom:8, alignItems:"end", padding:"10px 12px", borderRadius:10, background:"rgba(255,255,255,.04)", border:"1px solid rgba(255,255,255,.08)" }}>
+          <label style={{ fontSize:11, opacity:0.8 }}>SKU (must match Rare Pool above, e.g. TSHIRT)
+            <input value={item.sku||""} onChange={e => { const a = parseMerch(); a[idx]={...a[idx],sku:e.target.value}; setInvMerchJson(JSON.stringify(a,null,2)); }} style={{ width:"100%",marginTop:4,display:"block",padding:"9px 11px",borderRadius:10,border:"1px solid rgba(255,255,255,.18)",background:"rgba(0,0,0,.25)",color:"white",fontSize:12 }} />
+          </label>
+          <label style={{ fontSize:11, opacity:0.8 }}>Label (for your reference)
+            <input value={item.label||""} onChange={e => { const a = parseMerch(); a[idx]={...a[idx],label:e.target.value}; setInvMerchJson(JSON.stringify(a,null,2)); }} style={{ width:"100%",marginTop:4,display:"block",padding:"9px 11px",borderRadius:10,border:"1px solid rgba(255,255,255,.18)",background:"rgba(0,0,0,.25)",color:"white",fontSize:12 }} />
+          </label>
+          <label style={{ fontSize:11, opacity:0.8 }}>On Hand
+            <input type="number" min="0" value={item.onHand??0} onChange={e => { const a = parseMerch(); a[idx]={...a[idx],onHand:Math.max(0,Number(e.target.value||0))}; setInvMerchJson(JSON.stringify(a,null,2)); }} style={{ width:80,marginTop:4,display:"block",padding:"9px 11px",borderRadius:10,border:"1px solid rgba(255,255,255,.18)",background:"rgba(0,0,0,.25)",color:"white",fontSize:12 }} />
+          </label>
+          <button onClick={() => { const a = parseMerch(); setInvMerchJson(JSON.stringify(a.filter((_,i) => i!==idx),null,2)); }} style={{ padding:"6px 10px",borderRadius:8,border:"1px solid rgba(248,113,113,.4)",background:"rgba(248,113,113,.1)",color:"#f87171",cursor:"pointer",fontSize:12,marginTop:20 }}>✕ Remove</button>
         </div>
-      </label>
-    );
-  })}
-</div>
+      ));
+    })()}
 
-<div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
-  <button className="btn" onClick={loadConfig} style={{ padding: "10px 12px" }}>
-    Load Current
-  </button>
-  <button className="btn" onClick={saveConfig} style={{ padding: "10px 12px" }}>
-    Save
-  </button>
-</div>
+    <div style={{ display:"flex", gap:12, alignItems:"center", marginTop:8, flexWrap:"wrap" }}>
+      <button onClick={() => { const parseMerch2 = () => { try { const r=JSON.parse(invMerchJson||"[]"); return Array.isArray(r)?r:[]; } catch { return []; } }; const a=parseMerch2(); a.push({sku:"SKU",label:"New Merch Item",onHand:0}); setInvMerchJson(JSON.stringify(a,null,2)); }} style={{ padding:"7px 14px",borderRadius:8,border:"1px solid rgba(96,165,250,.4)",background:"rgba(96,165,250,.1)",color:"#93c5fd",cursor:"pointer",fontSize:12 }}>+ Add Merch Item</button>
+      <span style={{ fontSize:11, opacity:0.5 }}>
+        {(() => { try { const a = JSON.parse(invMerchJson||"[]"); if (!Array.isArray(a)) return "0 SKUs"; return a.length+" SKUs · "+a.reduce((s,x)=>s+(Number(x.onHand)||0),0)+" total on-hand"; } catch { return "0 SKUs"; } })()}
+      </span>
+    </div>
 
-          {/* Prize Inventory Dashboard */}
-      <div
-        style={{
-          marginTop: 14,
-          padding: 14,
-          border: "1px solid rgba(255,255,255,.14)",
-          borderRadius: 14,
-          background: "rgba(15,23,42,.55)",
-        }}
-      >
-        <div style={{ fontWeight: 900, marginBottom: 10 }}>Prize Inventory Dashboard</div>
-
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-          <button className="btn" onClick={invDashLoad} disabled={invDashBusy} style={{ padding: "10px 12px" }}>
-            Load Inventory
-          </button>
-          <button className="btn" onClick={invDashSave} disabled={invDashBusy} style={{ padding: "10px 12px" }}>
-            Save Inventory
-          </button>
-
-          <span style={{ fontSize: 12, opacity: 0.85 }}>
-            Merch key: <b>ra:inv:merch_v1</b> • APE key: <b>ra:inv:ape_v1</b>
-          </span>
-        </div>
-
-        <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <div>
-            <div style={{ fontWeight: 900, marginBottom: 8, fontSize: 12, opacity: 0.95 }}>Merch Inventory (JSON)</div>
-            <textarea
-              value={invMerchJson}
-              onChange={(e) => setInvMerchJson(e.target.value)}
-              style={{
-                width: "100%",
-                minHeight: 170,
-                padding: "10px 12px",
-                borderRadius: 12,
-                border: "1px solid rgba(255,255,255,.18)",
-                background: "rgba(0,0,0,.25)",
-                color: "white",
-                fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-                fontSize: 12,
-              }}
-            />
-            <div style={{ marginTop: 6, fontSize: 12, opacity: 0.8 }}>
-              Format: <code>[{"{"}"sku":"HOODIE","label":"Rebel Ants Hoodie","onHand":10{"}"}]</code>
-            </div>
-          </div>
-
-          <div>
-            <div style={{ fontWeight: 900, marginBottom: 8, fontSize: 12, opacity: 0.95 }}>APE Budget (JSON)</div>
-            <textarea
-              value={invApeJson}
-              onChange={(e) => setInvApeJson(e.target.value)}
-              style={{
-                width: "100%",
-                minHeight: 170,
-                padding: "10px 12px",
-                borderRadius: 12,
-                border: "1px solid rgba(255,255,255,.18)",
-                background: "rgba(0,0,0,.25)",
-                color: "white",
-                fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-                fontSize: 12,
-              }}
-            />
-            <div style={{ marginTop: 6, fontSize: 12, opacity: 0.8 }}>
-              Format: <code>{"{"}"dailyMaxApe":1,"usedTodayApe":0,"note":"optional"{"}"}</code>
-            </div>
-          </div>
-        </div>
-
-        <div style={{ marginTop: 10, fontSize: 12, opacity: 0.9 }}>
-          Summary:{" "}
-          <b>
-            {typeof invDash?.summary?.merchSkus === "number" ? invDash.summary.merchSkus : "—"}
-          </b>{" "}
-          SKUs •{" "}
-          <b>
-            {typeof invDash?.summary?.merchOnHand === "number" ? invDash.summary.merchOnHand : "—"}
-          </b>{" "}
-          total on-hand
-        </div>
-      </div>
-
+    <div style={{ marginTop:14, display:"flex", gap:10, flexWrap:"wrap", alignItems:"center" }}>
+      <button className="btn" onClick={invDashLoad} disabled={invDashBusy} style={{ padding:"10px 12px" }}>Load Inventory</button>
+      <button className="btn" onClick={invDashSave} disabled={invDashBusy} style={{ padding:"10px 12px" }}>Save Inventory</button>
+      <span style={{ fontSize:11, opacity:0.4 }}>Always click Save Inventory after making changes.</span>
+    </div>
+  </div>
       {/* Inventory */}
       <div
         style={{
