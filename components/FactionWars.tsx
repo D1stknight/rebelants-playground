@@ -642,6 +642,11 @@ export default function FactionWars() {
   const [prizeSub, setPrizeSub] = useState("");
   const [prizeClaimId, setPrizeClaimId] = useState<string|undefined>(undefined);
   const [prizeMerchShipping, setPrizeMerchShipping] = useState(false);
+  const [prizeObj, setPrizeObj] = useState<any>(null);
+  const [prizeNeedShipping, setPrizeNeedShipping] = useState(false);
+  const [prizeShipMsg, setPrizeShipMsg] = useState("");
+  const [prizeShipBusy, setPrizeShipBusy] = useState(false);
+  const [prizeShipForm, setPrizeShipForm] = useState({ name:"", email:"", phone:"", address1:"", address2:"", city:"", state:"", zip:"", country:"" });
   const [lb, setLb]                     = useState<FWLeaderboards>({ warlords:[], factions:[], streaks:[], rich:[], perfect:[] });
   const [battleAnim, setBattleAnim]     = useState<"idle"|"clash"|"win"|"lose">("idle");
   const [playerHp, setPlayerHp]         = useState(MAX_HP);
@@ -952,32 +957,52 @@ export default function FactionWars() {
     setFinalRarity(rarity);
     if (pts>0) { const er:any=await earn(pts).catch(()=>null); if(er?.ok)await refresh().catch(()=>{}); }
 
-    // Roll crate prize if won anything
-    if (rarity !== "none") {
-      try {
-        const rollR = await fetch(`/api/prizes/roll?force=${rarity}`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ playerId: String(effectivePlayerId||"guest"), rarity, game: "faction-wars" })
-        });
-        const rollJ = await rollR.json().catch(() => null);
-        if (rollR.ok && rollJ?.ok && rollJ?.prize) {
-          const p = rollJ.prize;
-          setPrizeLabel(p.label || (rarity === "ultra" ? "🏆 ULTRA CRATE" : rarity === "rare" ? "⚔️ RARE CRATE" : "✅ COMMON CRATE"));
-          setPrizeSub(p.type === "nft" ? "You won an NFT!" : p.type === "merch" ? "You won merch!" : `+${p.points || pts} REBEL`);
-          setPrizeClaimId(rollJ.claimId);
-          setPrizeMerchShipping(p.type === "merch");
-          setShowPrizeModal(true);
-        sfx.crateOpen();
-        setTimeout(() => sfx.crateReward(), 1000);
-        }
-      } catch {}
-    }
+          // ── Roll crate prize (exact Shuffle pattern) ──────────────────────
+          if (rarity !== "none") {
+            try {
+              const rollR = await fetch(`/api/prizes/roll?force=${rarity}`, {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ playerId: String(effectivePlayerId||"guest"), rarity, game: "faction-wars" })
+              });
+              const rollJ = await rollR.json().catch(() => null);
+              if (rollR.ok && rollJ?.ok && rollJ?.prize) {
+                const p = rollJ.prize;
+                setPrizeObj(p);
+                setPrizeLabel(p.label || (rarity === "ultra" ? "🏆 ULTRA CRATE" : rarity === "rare" ? "⚔️ RARE CRATE" : "✅ COMMON CRATE"));
+                setPrizeSub(p.type === "nft" ? "You won an NFT!" : p.type === "merch" ? "You won merch!" : `+${p.points || pts} REBEL`);
+                setPrizeNeedShipping(false);
+                setPrizeShipMsg("");
+
+                // ── Merch: create claim immediately, capture shipping in modal (Shuffle pattern) ──
+                if (String(p?.type||"").toLowerCase() === "merch") {
+                  const prof2 = loadProfile();
+                  const pid2 = String(effectivePlayerId||getEffectivePlayerId(prof2)||"guest").trim().slice(0,64)||"guest";
+                  const claimId2 = `${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+                  const cr = await fetch("/api/prizes/claim", {
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ claimId: claimId2, playerId: pid2, prize: p, wallet: null, shipping: null, game: "faction-wars", rarity }),
+                  });
+                  const cj = await cr.json().catch(() => null);
+                  if (cr.ok && cj?.ok) {
+                    setPrizeClaimId(claimId2);
+                    setPrizeNeedShipping(!!cj.needShipping);
+                  } else {
+                    setPrizeShipMsg(cj?.error || "Merch claim failed");
+                  }
+                }
+
+                setPrizeMerchShipping(p.type === "merch");
+                setShowPrizeModal(true);
+                sfx.crateOpen();
+                setTimeout(() => sfx.crateReward(), 1000);
+              }
+            } catch {}
+          }
     const prof=loadProfile(); const pid=String(effectivePlayerId||getEffectivePlayerId(prof)||"guest").trim().slice(0,64)||"guest"; const pname=(prof?.discordName||playerName||prof?.name||"guest").trim()||"guest";
     addWin({id:`${Date.now()}-${Math.random().toString(36).slice(2,7)}`,ts:Date.now(),game:"faction-wars",playerId:pid,playerName:pname,rarity,pointsAwarded:pts});
     await fetch("/api/faction-wars/record",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({playerId:pid,playerName:pname,rarity,pointsAwarded:pts,territoriesWon,team,perfect:territoriesWon===5})}).catch(()=>{});
     window.dispatchEvent(new Event("ra:leaderboards-refresh")); void loadLB();
     if (rarity==="ultra") sfx.ultra(); else if (rarity!=="none") sfx.win(); else sfx.lose();
-    if (rarity !== "none") setShowPrizeModal(true);
     setPhase("final_result"); setBusy(false);
   };
 
@@ -998,54 +1023,111 @@ export default function FactionWars() {
       <div style={{ position:"fixed", inset:0, background:"rgba(8,11,20,0.82)", zIndex:0, pointerEvents:"none" }} />
       <BuyPointsModal open={showBuyPoints} onClose={()=>setShowBuyPoints(false)} playerId={effectivePlayerId} onClaimed={()=>{setShowBuyPoints(false);void refresh();}} />
       {/* Crate Reveal Modal — exact Shuffle style */}
-      {showPrizeModal && (()=>{
-        const rar = finalRarity as string;
-        const crateTitle = rar==="ultra"?"🏆 ULTRA CRATE!":rar==="rare"?"⚔️ Rare Crate!":"✅ Crate Unlocked";
-        const subLine = rar==="ultra"?"5/5 territories — Legendary!":rar==="rare"?"3–4 territories — Strong campaign!":"1–2 territories — Soldiers hold!";
-        const sps = Array.from({length:24},(_,i)=>({
-          left: String(8+(i*4.1)%84)+'%',
-          top: String(10+(i*7.3)%62)+'%',
-          size: 10+((i*3)%14),
-          delay: (i*0.18)%3.2
-        }));
-        return (
-          <>
-            <style>{".fw-prize-modal{position:fixed;inset:0;display:grid;place-items:center;background:rgba(0,0,0,0.55);z-index:2147483647}.fw-prize-card{position:relative;min-width:320px;padding:28px 24px;border-radius:16px;text-align:center;background:rgba(10,18,40,0.97);border:2px solid rgba(148,163,184,0.2);box-shadow:0 24px 40px rgba(0,0,0,0.65);overflow:visible}.fw-sparkle-layer{position:absolute;inset:-8% -10%;pointer-events:none;z-index:0}.fw-pm-sparkle{position:absolute;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,0.95) 0%,rgba(255,255,255,0) 65%);filter:blur(0.3px) drop-shadow(0 0 12px rgba(255,255,255,0.65));opacity:0;animation:fwPmSpark 2.6s ease-in-out infinite}.fw-pm-sparkle.ultra{filter:blur(0.3px) drop-shadow(0 0 16px rgba(251,191,36,1))}.fw-pm-sparkle.rare{filter:blur(0.3px) drop-shadow(0 0 14px rgba(96,165,250,0.95))}.fw-pm-sparkle.common{filter:blur(0.3px) drop-shadow(0 0 14px rgba(52,211,153,0.85))}.fw-prize-art{display:block;width:200px;max-width:70vw;height:auto;margin:0 auto 16px;position:relative;z-index:1}.fw-prize-aura{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:220px;height:220px;border-radius:50%;pointer-events:none;z-index:0;filter:blur(45px)}.fw-prize-aura[data-rarity='ultra']{background:radial-gradient(circle,rgba(251,191,36,0.5),transparent 70%)}.fw-prize-aura[data-rarity='rare']{background:radial-gradient(circle,rgba(96,165,250,0.45),transparent 70%)}.fw-prize-aura[data-rarity='common']{background:radial-gradient(circle,rgba(52,211,153,0.4),transparent 70%)}@keyframes fwPmSpark{0%{transform:scale(0.4);opacity:0}20%{opacity:1}55%{transform:scale(1.1);opacity:0.9}85%{transform:scale(0.7);opacity:0.7}100%{transform:scale(0.3);opacity:0}}"}</style>
-            <div className="fw-prize-modal">
-              <div className="fw-prize-card">
-                {/* Sparkle layer */}
-                <div className="fw-sparkle-layer">
-                  {sps.map((sp,i)=>(
-                    <span key={i} className={"fw-pm-sparkle "+rar} style={{left:sp.left,top:sp.top,width:sp.size+"px",height:sp.size+"px",animationDelay:sp.delay+"s"}} />
-                  ))}
-                </div>
-                {/* Aura glow */}
-                <div className="fw-prize-aura" data-rarity={rar} />
-                {/* Title */}
-                <div style={{position:"relative",fontSize:20,fontWeight:900,color:rar==="ultra"?"#fbbf24":rar==="rare"?"#60a5fa":"#34d399",margin:"0 0 4px",zIndex:1}}>{crateTitle}</div>
-                <div style={{position:"relative",fontSize:12,opacity:0.55,marginBottom:12,zIndex:1}}>{subLine}</div>
-                {/* Chest image */}
-                <img className="fw-prize-art" src={"/crates/"+rar+".png"} alt={rar+" crate"} />
-                {/* Prize text */}
-                <div style={{position:"relative",zIndex:1,fontSize:15,fontWeight:700,marginBottom:4}}>
-                  You won: <b style={{color:rar==="ultra"?"#fbbf24":rar==="rare"?"#60a5fa":"#34d399"}}>{prizeSub}</b>
-                </div>
-                <div style={{position:"relative",zIndex:1,fontSize:11,opacity:0.35,marginBottom:18,fontFamily:"monospace"}}>
-                  {prizeClaimId ? "Claim ID: "+prizeClaimId : "Tap continue to play again."}
-                </div>
-                {prizeMerchShipping && prizeClaimId && (
-                  <div style={{position:"relative",zIndex:1,textAlign:"left",marginBottom:14,fontSize:12,opacity:0.75,background:"rgba(255,255,255,0.05)",borderRadius:10,padding:"10px 12px"}}>
-                    🎁 Merch won! Save your Claim ID and contact support to arrange shipping.
+          {/* ── Crate Prize Modal — matches Shuffle exactly ─────────────────── */}
+          {showPrizeModal && (() => {
+            const rar = finalRarity as string;
+            const crateTitle = rar==="ultra" ? "🏆 ULTRA CRATE!" : rar==="rare" ? "⚔️ Rare Crate!" : "✅ Crate Unlocked";
+            const subLine = rar==="ultra" ? "5/5 territories — Legendary!" : rar==="rare" ? "3–4 territories — Strong campaign!" : "1–2 territories — Soldiers hold!";
+            const sps = Array.from({length:24},(_,i)=>({ left:String(8+(i*4.1)%84)+'%', top:String(10+(i*7.3)%62)+'%', size:10+((i*3)%14), delay:(i*0.18)%3.2 }));
+            const titleColor = rar==="ultra" ? "#fbbf24" : rar==="rare" ? "#60a5fa" : "#34d399";
+            return (
+              <>
+                <style>{`.fw-prize-modal{position:fixed;inset:0;display:grid;place-items:center;background:rgba(0,0,0,0.6);z-index:2147483647}.fw-prize-card{position:relative;min-width:320px;max-width:420px;padding:28px 24px;border-radius:16px;text-align:center;background:rgba(10,18,40,0.97);border:2px solid rgba(148,163,184,0.2);box-shadow:0 24px 40px rgba(0,0,0,0.65);overflow:visible;max-height:90vh;overflow-y:auto}.fw-sparkle-layer{position:absolute;inset:-8% -10%;pointer-events:none;z-index:0}.fw-pm-sparkle{position:absolute;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,0.95) 0%,rgba(255,255,255,0) 65%);filter:blur(0.3px) drop-shadow(0 0 12px rgba(255,255,255,0.65));opacity:0;animation:fwPmSpark 2.6s ease-in-out infinite}.fw-prize-art{display:block;width:180px;max-width:70vw;height:auto;margin:0 auto 16px;position:relative;z-index:1}.fw-prize-aura{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:220px;height:220px;border-radius:50%;pointer-events:none;z-index:0;filter:blur(45px)}.fw-prize-aura[data-rarity='ultra']{background:radial-gradient(circle,rgba(251,191,36,0.5),transparent 70%)}.fw-prize-aura[data-rarity='rare']{background:radial-gradient(circle,rgba(96,165,250,0.45),transparent 70%)}.fw-prize-aura[data-rarity='common']{background:radial-gradient(circle,rgba(52,211,153,0.4),transparent 70%)}@keyframes fwPmSpark{0%{transform:scale(0.4);opacity:0}20%{opacity:1}55%{transform:scale(1.1);opacity:0.9}85%{transform:scale(0.7);opacity:0.7}100%{transform:scale(0.3);opacity:0}}`}</style>
+                <div className="fw-prize-modal">
+                  <div className="fw-prize-card">
+                    <div className="fw-sparkle-layer">{sps.map((sp,i)=>(<span key={i} className={"fw-pm-sparkle "+rar} style={{left:sp.left,top:sp.top,width:sp.size+"px",height:sp.size+"px",animationDelay:sp.delay+"s"}} />))}</div>
+                    <div className="fw-prize-aura" data-rarity={rar} />
+                    <div style={{position:"relative",fontSize:20,fontWeight:900,color:titleColor,margin:"0 0 4px",zIndex:1}}>{crateTitle}</div>
+                    <div style={{position:"relative",fontSize:12,opacity:0.55,marginBottom:12,zIndex:1}}>{subLine}</div>
+                    <img className="fw-prize-art" src={"/crates/"+rar+".png"} alt={rar+" crate"} />
+                    <div style={{position:"relative",zIndex:1,fontSize:15,fontWeight:700,marginBottom:4}}>
+                      You won: <b style={{color:titleColor}}>{prizeSub}</b>
+                    </div>
+
+                    {/* ── NFT: wallet input (exact Shuffle pattern) ── */}
+                    {rar === "ultra" && prizeObj?.type === "nft" && !loadProfile()?.walletAddress ? (
+                      <div style={{marginTop:10,textAlign:"left",position:"relative",zIndex:1}}>
+                        <div style={{fontSize:12,opacity:0.75,marginBottom:10}}>✅ Enter the wallet you want this NFT sent to (we'll remember it for next time).</div>
+                        <input
+                          defaultValue={loadProfile()?.walletAddress || ""}
+                          onChange={(e) => { const next=String(e.target.value||"").trim(); const p=loadProfile(); saveProfile({...p,walletAddress:next}); }}
+                          placeholder="0x… wallet address"
+                          style={{width:"100%",padding:"10px 12px",borderRadius:10,border:"1px solid rgba(255,255,255,.18)",background:"rgba(0,0,0,.25)",color:"white"}}
+                        />
+                        <div style={{fontSize:11,opacity:0.5,marginTop:8}}>After you continue, your claim will show up in Admin → Claims.</div>
+                      </div>
+                    ) : rar === "ultra" && prizeObj?.type === "nft" && loadProfile()?.walletAddress ? (
+                      <div style={{marginTop:10,fontSize:12,opacity:0.7,position:"relative",zIndex:1}}>
+                        ✅ NFT will be sent to: <b style={{color:titleColor}}>{loadProfile()?.walletAddress}</b>
+                        <div style={{fontSize:11,opacity:0.5,marginTop:4}}>After you continue, your claim will show up in Admin → Claims.</div>
+                      </div>
+                    ) : null}
+
+                    {/* ── Merch: shipping form (exact Shuffle pattern) ── */}
+                    {prizeNeedShipping && prizeClaimId && (
+                      <div style={{marginTop:10,textAlign:"left",position:"relative",zIndex:1}}>
+                        <div style={{fontSize:12,opacity:0.75,marginBottom:10}}>✅ This merch prize needs shipping info to fulfill.</div>
+                        <div style={{display:"grid",gap:8}}>
+                          {["name","email","phone","address1","address2","city","state","zip","country"].map(field => (
+                            <input key={field} value={(prizeShipForm as any)[field]||""} onChange={e=>setPrizeShipForm(f=>({...f,[field]:e.target.value}))} placeholder={field==="address1"?"Address Line 1":field==="address2"?"Address Line 2 (optional)":field.charAt(0).toUpperCase()+field.slice(1)} style={{padding:"10px 12px",borderRadius:10,border:"1px solid rgba(255,255,255,.18)",background:"rgba(0,0,0,.25)",color:"white"}} />
+                          ))}
+                        </div>
+                        {prizeShipMsg && <div style={{marginTop:8,fontSize:12,color:prizeShipMsg.includes("✅")?"#22c55e":"#f87171"}}>{prizeShipMsg}</div>}
+                      </div>
+                    )}
+                    {prizeMerchShipping && !prizeNeedShipping && prizeClaimId && (
+                      <div style={{position:"relative",zIndex:1,marginTop:10,fontSize:12,opacity:0.75,background:"rgba(255,255,255,0.05)",borderRadius:10,padding:"10px 12px"}}>
+                        🎁 Merch won! Claim ID: <b style={{fontFamily:"monospace"}}>{prizeClaimId}</b>. Your shipping info will be requested by support.
+                      </div>
+                    )}
+
+                    {prizeShipMsg && !prizeNeedShipping && <div style={{position:"relative",zIndex:1,marginTop:8,fontSize:12,color:"#f87171"}}>{prizeShipMsg}</div>}
+
+                    <button
+                      disabled={prizeShipBusy}
+                      onClick={async () => {
+                        const prof3 = loadProfile();
+                        const pid3 = String(effectivePlayerId||getEffectivePlayerId(prof3)||"guest").trim().slice(0,64)||"guest";
+                        // ── NFT: create claim with wallet ──
+                        if (prizeObj?.type === "nft") {
+                          const wallet3 = prof3?.walletAddress || "";
+                          if (!wallet3) { alert("Please enter a wallet address first."); return; }
+                          try {
+                            const cr = await fetch("/api/claims/create", {
+                              method: "POST", headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ playerId: pid3, wallet: wallet3, prize: prizeObj, game: "faction-wars", rarity: finalRarity }),
+                            });
+                            const cj = await cr.json().catch(() => null);
+                            if (!cr.ok || !cj?.ok) { alert("Claim failed. Please try again."); return; }
+                          } catch { alert("Claim failed. Please try again."); return; }
+                        }
+                        // ── Merch: submit shipping if needed ──
+                        if (prizeNeedShipping && prizeClaimId) {
+                          setPrizeShipBusy(true);
+                          try {
+                            const sr = await fetch("/api/prizes/shipping", {
+                              method: "POST", headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ claimId: prizeClaimId, playerId: pid3, shipping: prizeShipForm }),
+                            });
+                            const sj = await sr.json().catch(() => null);
+                            if (!sr.ok || !sj?.ok) { setPrizeShipMsg(sj?.error || "Shipping save failed"); setPrizeShipBusy(false); return; }
+                            setPrizeShipMsg("✅ Shipping saved!");
+                          } catch { setPrizeShipMsg("Shipping save failed"); setPrizeShipBusy(false); return; }
+                          setPrizeShipBusy(false);
+                        }
+                        // Reset and close
+                        setShowPrizeModal(false);
+                        setPrizeObj(null); setPrizeNeedShipping(false); setPrizeShipMsg(""); setPrizeClaimId(undefined); setPrizeMerchShipping(false);
+                        setPrizeShipForm({ name:"",email:"",phone:"",address1:"",address2:"",city:"",state:"",zip:"",country:"" });
+                      }}
+                      style={{position:"relative",zIndex:1,marginTop:16,padding:"12px 40px",borderRadius:12,border:"none",cursor:prizeShipBusy?"default":"pointer",background:rar==="ultra"?"linear-gradient(135deg,#fbbf24,#f59e0b)":rar==="rare"?"linear-gradient(135deg,#60a5fa,#3b82f6)":"linear-gradient(135deg,#34d399,#059669)",color:"#000",fontWeight:900,fontSize:15,opacity:prizeShipBusy?0.6:1}}>
+                      {prizeShipBusy ? "Saving…" : rar==="ultra" ? "⚔️ Legendary!" : "Continue"}
+                    </button>
                   </div>
-                )}
-                <button onClick={()=>setShowPrizeModal(false)} style={{position:"relative",zIndex:1,padding:"12px 40px",borderRadius:12,border:"none",cursor:"pointer",background:rar==="ultra"?"linear-gradient(135deg,#fbbf24,#f59e0b)":rar==="rare"?"linear-gradient(135deg,#60a5fa,#3b82f6)":"linear-gradient(135deg,#34d399,#059669)",color:"#000",fontWeight:900,fontSize:15,letterSpacing:"0.03em",boxShadow:"0 4px 20px rgba(0,0,0,0.4)"}}>
-                  {rar==="ultra"?"⚔️ Legendary!":"Continue"}
-                </button>
-              </div>
-            </div>
-          </>
-        );
-      })()}
+                </div>
+              </>
+            );
+          })()}
 
       {/* Official Rules Modal */}
       {showRules && (
