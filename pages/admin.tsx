@@ -1364,47 +1364,41 @@ String(c.status).toUpperCase()==="PENDING"
     </div>
 
     {/* ── Merch rows ── */}
-    {(() => {
-      let items: any[] = [];
-      try { items = JSON.parse(invMerchJson || "[]"); } catch {}
-      if (!Array.isArray(items)) items = [];
-      return items.map((item:any, idx:number) => (
+    {(invMerchJson ? ((): any[] => { try { return JSON.parse(invMerchJson); } catch { return []; } })() : []).map((item: any, idx: number) => (
         <div key={idx} style={{ display:"grid", gridTemplateColumns:"1fr 1fr auto auto", gap:8, marginBottom:8, alignItems:"end", padding:"10px 12px", borderRadius:10, background:"rgba(255,255,255,.04)", border:"1px solid rgba(255,255,255,.08)" }}>
           <label style={{ fontSize:11, opacity:0.8 }}>SKU — must match Rare Pool above (e.g. TSHIRT)
             <input value={item.sku||""} onChange={e => {
-              const next=[...items]; next[idx]={...next[idx],sku:e.target.value};
+              const next=((): any[] => { try { return JSON.parse(invMerchJson||"[]"); } catch { return []; } })(); next[idx]={...next[idx],sku:e.target.value};
               setInvMerchJson(JSON.stringify(next,null,2));
             }} style={{ width:"100%",marginTop:4,display:"block",padding:"9px 11px",borderRadius:10,border:"1px solid rgba(255,255,255,.18)",background:"rgba(0,0,0,.25)",color:"white",fontSize:12 }} />
           </label>
           <label style={{ fontSize:11, opacity:0.8 }}>Label (for your reference only)
             <input value={item.label||""} onChange={e => {
-              const next=[...items]; next[idx]={...next[idx],label:e.target.value};
+              const next=((): any[] => { try { return JSON.parse(invMerchJson||"[]"); } catch { return []; } })(); next[idx]={...next[idx],label:e.target.value};
               setInvMerchJson(JSON.stringify(next,null,2));
             }} style={{ width:"100%",marginTop:4,display:"block",padding:"9px 11px",borderRadius:10,border:"1px solid rgba(255,255,255,.18)",background:"rgba(0,0,0,.25)",color:"white",fontSize:12 }} />
           </label>
           <label style={{ fontSize:11, opacity:0.8 }}>On Hand (qty you have to ship)
             <input type="number" min="0" value={item.onHand??0} onChange={e => {
-              const next=[...items]; next[idx]={...next[idx],onHand:Math.max(0,Number(e.target.value||0))};
+              const next=((): any[] => { try { return JSON.parse(invMerchJson||"[]"); } catch { return []; } })(); next[idx]={...next[idx],onHand:Math.max(0,Number(e.target.value||0))};
               setInvMerchJson(JSON.stringify(next,null,2));
             }} style={{ width:80,marginTop:4,display:"block",padding:"9px 11px",borderRadius:10,border:"1px solid rgba(255,255,255,.18)",background:"rgba(0,0,0,.25)",color:"white",fontSize:12 }} />
           </label>
           <button onClick={() => {
-            const next=items.filter((_:any,i:number)=>i!==idx);
-            setInvMerchJson(JSON.stringify(next,null,2));
+            const _arr = ((): any[] => { try { return JSON.parse(invMerchJson||"[]"); } catch { return []; } })();
+            setInvMerchJson(JSON.stringify(_arr.filter((_r: any,i: number)=>i!==idx),null,2));
           }} style={{ padding:"6px 10px",borderRadius:8,border:"1px solid rgba(248,113,113,.4)",background:"rgba(248,113,113,.1)",color:"#f87171",cursor:"pointer",fontSize:12,marginTop:20 }}>✕ Remove</button>
         </div>
-      ));
-    })()}
+      ))}
 
     <div style={{ display:"flex", gap:12, alignItems:"center", marginTop:8, flexWrap:"wrap" }}>
       <button onClick={() => {
-        let items:any[]=[]; try{items=JSON.parse(invMerchJson||"[]");}catch{}
-        if(!Array.isArray(items))items=[];
-        items.push({ sku:"SKU", label:"New Merch Item", onHand:0 });
-        setInvMerchJson(JSON.stringify(items,null,2));
+        const _items=((): any[] => { try { return JSON.parse(invMerchJson||"[]"); } catch { return []; } })();
+        _items.push({ sku:"SKU", label:"New Merch Item", onHand:0 });
+        setInvMerchJson(JSON.stringify(_items,null,2));
       }} style={{ padding:"7px 14px",borderRadius:8,border:"1px solid rgba(96,165,250,.4)",background:"rgba(96,165,250,.1)",color:"#93c5fd",cursor:"pointer",fontSize:12 }}>+ Add Merch Item</button>
       <span style={{ fontSize:11, opacity:0.5 }}>
-        {(() => { try{ const a=JSON.parse(invMerchJson||"[]"); return Array.isArray(a) ? `${a.length} SKUs · ${a.reduce((s:number,x:any)=>s+(Number(x.onHand)||0),0)} total on-hand` : "0 SKUs"; }catch{return "0 SKUs";} })()}
+        {((): string => { try{ const a=JSON.parse(invMerchJson||"[]"); return Array.isArray(a) ? a.length+" SKUs · "+a.reduce((s,x)=>s+(Number(x.onHand)||0),0)+" total on-hand" : "0 SKUs"; }catch{return "0 SKUs";} })()}
       </span>
     </div>
 
