@@ -1174,7 +1174,7 @@ export default function FactionWars() {
         <div style={{ maxWidth:900, margin:"0 auto", padding:"16px 12px", overflowX:"hidden", width:"100%" }}>
           <div style={{ fontSize:26, fontWeight:900, marginBottom:12, display:"flex", alignItems:"center", gap:10 }}>
             <Link href="/" style={{ textDecoration:"none", color:"inherit" }}>Rebel Ants Playground</Link>
-            <button onClick={toggleMute} onTouchStart={e=>{e.preventDefault();toggleMute();}} title={muted?"Unmute":"Mute"} style={{ background:"rgba(0,0,0,0.4)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:20, padding:"8px 14px", cursor:"pointer", fontSize:16, color:"rgba(255,255,255,0.8)", lineHeight:1, minWidth:44, minHeight:44, touchAction:"manipulation" }}>{muted?"🔇":"🔊"}</button>
+            <button onPointerDown={e=>{e.preventDefault();toggleMute();}} title={muted?"Unmute":"Mute"} style={{ background:"rgba(0,0,0,0.4)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:20, padding:"8px 14px", cursor:"pointer", fontSize:16, color:"rgba(255,255,255,0.8)", lineHeight:1, minWidth:44, minHeight:44, touchAction:"manipulation" }}>{muted?"🔇":"🔊"}</button>
           </div>
           <nav style={{ display:"flex", gap:6, flexWrap:"wrap", fontSize:12 }}>
             {([["tunnel","🐜 Ant Tunnel"],["hatch","⚔️ Faction Wars"],["expedition","⚔️ The Raid"],["shuffle","🃏 Shuffle"]] as [string,string][]).map(([href,label])=>(
