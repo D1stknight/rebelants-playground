@@ -11,6 +11,13 @@ function useFWAudio() {
   const [muted, setMuted] = React.useState<boolean>(() => {
     try { return localStorage.getItem("ra:fw:muted") === "1"; } catch { return false; }
   });
+  const [isSmallScreen, setIsSmallScreen] = React.useState(false);
+  React.useEffect(() => {
+    const check = () => setIsSmallScreen(window.innerWidth < 640);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
   const mutedRef = React.useRef(muted);
   mutedRef.current = muted;
   const musicRef = React.useRef<HTMLAudioElement | null>(null);
@@ -366,7 +373,7 @@ function FWLeaderboardPanel({ lb }: { lb: FWLeaderboards }) {
       </div>
 
       {/* Top 4 in a 2x2 grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12, marginBottom: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isSmallScreen ? "1fr" : "1fr 1fr", gap: 12, marginBottom: 12 }}>
 
         {/* 🏆 Warlords */}
         <div style={cardStyle}>
