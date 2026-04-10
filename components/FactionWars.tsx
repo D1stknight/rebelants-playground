@@ -1569,9 +1569,14 @@ export default function FactionWars() {
                           <span style={{ fontSize:15, flexShrink:0 }}>{m.emoji}</span>
                           <span style={{ fontWeight:900, fontSize:11, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", flex:1, minWidth:0 }}>{m.label}</span>
                           <span style={{ fontSize:8, background:tc[m.type], color:"#000", borderRadius:3, padding:"1px 4px", fontWeight:900, flexShrink:0 }}>{m.type.toUpperCase()}</span>
-                          <span style={{ fontSize:12, fontWeight:900, color: isExhausted?"#666": isSel ? currentPlayerFD.color : "rgba(255,255,255,0.7)", flexShrink:0, minWidth:16, textAlign:"right" }}>
-                            {isExhausted ? "✗" : degradedPow}{!isExhausted && timesUsedM > 0 && <span style={{fontSize:8,color:"#f87171"}}>↓</span>}
-                          </span>
+                          <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:2, flexShrink:0 }}>
+                            <span style={{ fontSize:11, fontWeight:900, color: isExhausted?"#666": isSel ? currentPlayerFD.color : "rgba(255,255,255,0.7)", lineHeight:1 }}>
+                              {isExhausted ? "✗" : <>{degradedPow}<span style={{fontSize:8,opacity:0.45}}>/{m.power}</span>{timesUsedM > 0 && <span style={{fontSize:8,color:"#f87171"}}>↓</span>}</>}
+                            </span>
+                            <div style={{ width:28, height:3, borderRadius:2, background:"rgba(255,255,255,0.1)", overflow:"hidden" }}>
+                              <div style={{ height:"100%", borderRadius:2, background:tc[m.type], width:`${Math.round(degradedPow/m.power*100)}%`, transition:"width 0.3s" }} />
+                            </div>
+                          </div>
                         </div>
                         {/* Badges */}
                         {(m.oneTime || isExhausted) && (
