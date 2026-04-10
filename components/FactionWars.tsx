@@ -671,7 +671,7 @@ export default function FactionWars() {
   const [healBusy, setHealBusy]   = useState(false);
   const [healUsed, setHealUsed]     = useState(0);
   const [oneTimeUsed, setOneTimeUsed] = useState<string[]>([]);
-  const [showHowToPlay, setShowHowToPlay] = useState(true);
+  const [showHowToPlay, setShowHowToPlay] = useState(false);
   const { muted, toggleMute, startTheme, startMusic, startEpic, stopMusic, resetLowHp, sfx } = useFWAudio();
 
   const loadLB = useCallback(async () => {
@@ -754,6 +754,7 @@ export default function FactionWars() {
 
   const fightTerritory = async () => {
     if (!selectedMove || busy) return;
+    setShowHowToPlay(false); // auto-collapse once battle begins
     const playerFaction = team[currentFactionIdx] || team[0];
     const defender = defenders[currentTerritory];
     const tWon = results.filter(r=>r.won).length;
@@ -1485,7 +1486,7 @@ export default function FactionWars() {
                 {roundLog.length > 0 && (
                   <div style={{ background:"rgba(0,0,0,0.45)", borderRadius:10, padding:"8px 12px", marginBottom:12, maxHeight:96, overflowY:"auto" }}>
                     <div style={{ fontSize:9, opacity:0.35, marginBottom:5, letterSpacing:"0.06em", fontWeight:700 }}>ROUND HISTORY</div>
-                    {roundLog.slice(0,5).map((r,i)=>(
+                    {roundLog.slice(0,2).map((r,i)=>(
                       <div key={i} style={{ display:"flex", gap:10, fontSize:10, marginBottom:4, opacity:i===0?1:0.5, alignItems:"center" }}>
                         <span style={{ color:"#34d399", fontWeight:700, minWidth:70, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>⚔️ {r.playerMove}</span>
                         <span style={{ color:"#f87171", fontWeight:800 }}>-{r.enemyDmg} to you</span>
