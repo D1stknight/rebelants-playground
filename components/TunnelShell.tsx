@@ -2045,6 +2045,15 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           </div>
           </div>
         {/* landscape prompt removed — D-pad supports portrait */}
+        {/* Polished landscape-only overlay */}
+        {isMobileView && !isLandscape && isPlaying && (
+          <div style={{ position:"fixed", inset:0, zIndex:9000, background:"rgba(9,12,22,0.96)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:20, padding:32 }}>
+            <div style={{ fontSize:64, animation:"spin90 1.2s ease-in-out infinite alternate" }}>📱</div>
+            <div style={{ fontSize:22, fontWeight:900, color:"white", textAlign:"center", letterSpacing:"0.02em" }}>Rotate to play</div>
+            <div style={{ fontSize:14, color:"rgba(255,255,255,0.5)", textAlign:"center", maxWidth:260 }}>Ant Tunnel is best in landscape mode</div>
+            <div style={{ fontSize:36, opacity:0.3 }}>🐜</div>
+          </div>
+        )}
       </main>
       {showRules && (
         <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.8)", zIndex:3000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }} onClick={()=>setShowRules(false)}>
@@ -2210,6 +2219,10 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
   80% { transform: translate(3px, -1px); }
   100% { transform: translate(0, 0); }
 }
+        @keyframes spin90 {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(90deg); }
+        }
       `}</style>
     </>
   );
