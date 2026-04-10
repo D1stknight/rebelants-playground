@@ -475,6 +475,8 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
   const [isLandscape, setIsLandscape] = useState(true);
 
     const lastHitRef = useRef(0);
+  const dpadIntervalRef = useRef<ReturnType<typeof setInterval>|null>(null);
+  const dpadActionRef = useRef<(a:"up"|"down"|"left"|"right")=>void>(()=>{});
   const gameBoardTopRef = useRef<HTMLDivElement | null>(null);
   const boardScrollRef = useRef<HTMLDivElement | null>(null);
   const playerTileRef = useRef<HTMLDivElement | null>(null);
@@ -663,6 +665,17 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     });
   }
   
+
+  // D-pad hold-to-repeat helpers
+  function stopDpadRepeat() {
+    if (dpadIntervalRef.current !== null) { clearInterval(dpadIntervalRef.current); dpadIntervalRef.current = null; }
+  }
+  function startDpadRepeat(action: "up"|"down"|"left"|"right") {
+    stopDpadRepeat();
+    dpadActionRef.current(action);
+    dpadIntervalRef.current = setInterval(() => dpadActionRef.current(action), 80);
+  }
+
   function handleTunnelAction(action: "up" | "down" | "left" | "right" | "break") {
     if (!isPlaying) return;
 
@@ -1331,6 +1344,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     return () => window.clearTimeout(id);
   }, [countdown]);
 
+  dpadActionRef.current = handleTunnelAction;
   return (
     <>
           {countdown !== null && (
@@ -1930,13 +1944,13 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
             {/* D-pad */}
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:6, width:168, height:168 }}>
               <div />
-              <button type="button" onTouchStart={e=>{e.preventDefault();handleTunnelAction("up");}} onMouseDown={e=>{e.preventDefault();handleTunnelAction("up");}} style={{ display:"flex",alignItems:"center",justifyContent:"center",borderRadius:12,border:"2px solid rgba(255,255,255,0.3)",background:"rgba(255,255,255,0.12)",fontSize:28,cursor:"pointer",color:"white",WebkitTapHighlightColor:"transparent",touchAction:"none",outline:"none" }}>▲</button>
+              <button type="button" onTouchStart={e=>{e.preventDefault();startDpadRepeat("up");}} onTouchEnd={e=>{e.preventDefault();stopDpadRepeat();}} onTouchCancel={stopDpadRepeat} onMouseDown={e=>{e.preventDefault();startDpadRepeat("up");}} onMouseUp={stopDpadRepeat} onMouseLeave={stopDpadRepeat} style={{ display:"flex",alignItems:"center",justifyContent:"center",borderRadius:12,border:"2px solid rgba(255,255,255,0.3)",background:"rgba(255,255,255,0.12)",fontSize:28,cursor:"pointer",color:"white",WebkitTapHighlightColor:"transparent",touchAction:"none",outline:"none" }}>▲</button>
               <div />
-              <button type="button" onTouchStart={e=>{e.preventDefault();handleTunnelAction("left");}} onMouseDown={e=>{e.preventDefault();handleTunnelAction("left");}} style={{ display:"flex",alignItems:"center",justifyContent:"center",borderRadius:12,border:"2px solid rgba(255,255,255,0.3)",background:"rgba(255,255,255,0.12)",fontSize:28,cursor:"pointer",color:"white",WebkitTapHighlightColor:"transparent",touchAction:"none",outline:"none" }}>◀</button>
+              <button type="button" onTouchStart={e=>{e.preventDefault();startDpadRepeat("left");}} onTouchEnd={e=>{e.preventDefault();stopDpadRepeat();}} onTouchCancel={stopDpadRepeat} onMouseDown={e=>{e.preventDefault();startDpadRepeat("left");}} onMouseUp={stopDpadRepeat} onMouseLeave={stopDpadRepeat} style={{ display:"flex",alignItems:"center",justifyContent:"center",borderRadius:12,border:"2px solid rgba(255,255,255,0.3)",background:"rgba(255,255,255,0.12)",fontSize:28,cursor:"pointer",color:"white",WebkitTapHighlightColor:"transparent",touchAction:"none",outline:"none" }}>◀</button>
               <div style={{ borderRadius:12, background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.1)" }} />
-              <button type="button" onTouchStart={e=>{e.preventDefault();handleTunnelAction("right");}} onMouseDown={e=>{e.preventDefault();handleTunnelAction("right");}} style={{ display:"flex",alignItems:"center",justifyContent:"center",borderRadius:12,border:"2px solid rgba(255,255,255,0.3)",background:"rgba(255,255,255,0.12)",fontSize:28,cursor:"pointer",color:"white",WebkitTapHighlightColor:"transparent",touchAction:"none",outline:"none" }}>▶</button>
+              <button type="button" onTouchStart={e=>{e.preventDefault();startDpadRepeat("right");}} onTouchEnd={e=>{e.preventDefault();stopDpadRepeat();}} onTouchCancel={stopDpadRepeat} onMouseDown={e=>{e.preventDefault();startDpadRepeat("right");}} onMouseUp={stopDpadRepeat} onMouseLeave={stopDpadRepeat} style={{ display:"flex",alignItems:"center",justifyContent:"center",borderRadius:12,border:"2px solid rgba(255,255,255,0.3)",background:"rgba(255,255,255,0.12)",fontSize:28,cursor:"pointer",color:"white",WebkitTapHighlightColor:"transparent",touchAction:"none",outline:"none" }}>▶</button>
               <div />
-              <button type="button" onTouchStart={e=>{e.preventDefault();handleTunnelAction("down");}} onMouseDown={e=>{e.preventDefault();handleTunnelAction("down");}} style={{ display:"flex",alignItems:"center",justifyContent:"center",borderRadius:12,border:"2px solid rgba(255,255,255,0.3)",background:"rgba(255,255,255,0.12)",fontSize:28,cursor:"pointer",color:"white",WebkitTapHighlightColor:"transparent",touchAction:"none",outline:"none" }}>▼</button>
+              <button type="button" onTouchStart={e=>{e.preventDefault();startDpadRepeat("down");}} onTouchEnd={e=>{e.preventDefault();stopDpadRepeat();}} onTouchCancel={stopDpadRepeat} onMouseDown={e=>{e.preventDefault();startDpadRepeat("down");}} onMouseUp={stopDpadRepeat} onMouseLeave={stopDpadRepeat} style={{ display:"flex",alignItems:"center",justifyContent:"center",borderRadius:12,border:"2px solid rgba(255,255,255,0.3)",background:"rgba(255,255,255,0.12)",fontSize:28,cursor:"pointer",color:"white",WebkitTapHighlightColor:"transparent",touchAction:"none",outline:"none" }}>▼</button>
               <div />
             </div>
             {/* Break */}
