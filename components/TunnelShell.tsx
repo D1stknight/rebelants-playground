@@ -1665,6 +1665,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                     ...boardPreviewStyle,
                     ...(isMobileView ? boardPreviewMobileStyle : null),
                     ...(isPlaying && isMobileView ? boardPreviewMobileRunStyle : null),
+          ...(isPlaying && isMobileView && isLandscape ? { height: "calc(100svh - 80px)", minHeight: "calc(100svh - 80px)", maxHeight: "calc(100svh - 80px)" } : null),
                     background: theme.bg,
                     overflow: isPlaying && isMobileView ? "hidden" : undefined,
                     touchAction: isPlaying && isMobileView ? "none" : undefined,
@@ -1925,7 +1926,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
             </div>
 
         {isPlaying && isMobileView && (
-          <div style={{ position:"fixed", bottom:"max(16px, env(safe-area-inset-bottom))", left:"50%", transform:"translateX(-50%)", zIndex:500, display:"flex", flexDirection:"column", alignItems:"center", gap:8, userSelect:"none", WebkitUserSelect:"none", touchAction:"none" }}>
+          <div style={{ position:"fixed", ...(isLandscape ? { right:"max(12px,env(safe-area-inset-right))", top:"50%", transform:"translateY(-50%)" } : { bottom:"max(16px,env(safe-area-inset-bottom))", left:"50%", transform:"translateX(-50%)" }), zIndex:500, display:"flex", flexDirection:"column", alignItems:"center", gap:8, userSelect:"none", WebkitUserSelect:"none", touchAction:"none" }}>
             {/* D-pad */}
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:6, width:168, height:168 }}>
               <div />
@@ -2029,13 +2030,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
             </div>
           </div>
           </div>
-        {isPlaying && isMobileView && !isLandscape && (
-          <div style={mobileRotatePromptWrapStyle}>
-            <div style={mobileRotatePromptCardStyle}>
-              Rotate your phone to landscape for a better game experience
-            </div>
-          </div>
-        )}
+        {/* landscape prompt removed — D-pad supports portrait */}
       </main>
       {showRules && (
         <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.8)", zIndex:3000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }} onClick={()=>setShowRules(false)}>
