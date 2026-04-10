@@ -11,13 +11,6 @@ function useFWAudio() {
   const [muted, setMuted] = React.useState<boolean>(() => {
     try { return localStorage.getItem("ra:fw:muted") === "1"; } catch { return false; }
   });
-  const [isSmallScreen, setIsSmallScreen] = React.useState(false);
-  React.useEffect(() => {
-    const check = () => setIsSmallScreen(window.innerWidth < 640);
-    check();
-    window.addEventListener('resize', check);
-    return () => window.removeEventListener('resize', check);
-  }, []);
   const mutedRef = React.useRef(muted);
   mutedRef.current = muted;
   const musicRef = React.useRef<HTMLAudioElement | null>(null);
@@ -337,6 +330,13 @@ function TerritoryBadge({ index, result, isCurrent, defender }: { index: number;
 }
 
 function FWLeaderboardPanel({ lb }: { lb: FWLeaderboards }) {
+  const [isSmallScreen, setIsSmallScreen] = React.useState(false);
+  React.useEffect(() => {
+    const check = () => setIsSmallScreen(window.innerWidth < 640);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
   const shorten = (id: string) => id.startsWith("discord:") ? id.slice(8,16)+"…" : id.slice(0,10)+"…";
   const MAX = 50;
 
