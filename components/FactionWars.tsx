@@ -671,7 +671,7 @@ export default function FactionWars() {
   const [healBusy, setHealBusy]   = useState(false);
   const [healUsed, setHealUsed]     = useState(0);
   const [oneTimeUsed, setOneTimeUsed] = useState<string[]>([]);
-  const [showHowToPlay, setShowHowToPlay] = useState(true);
+  const [showHowToPlay, setShowHowToPlay] = useState(false);
   const { muted, toggleMute, startTheme, startMusic, startEpic, stopMusic, resetLowHp, sfx } = useFWAudio();
 
   const loadLB = useCallback(async () => {
@@ -754,6 +754,7 @@ export default function FactionWars() {
 
   const fightTerritory = async () => {
     if (!selectedMove || busy) return;
+    setShowHowToPlay(false); // auto-collapse once battle begins
     const playerFaction = team[currentFactionIdx] || team[0];
     const defender = defenders[currentTerritory];
     const tWon = results.filter(r=>r.won).length;
@@ -1032,7 +1033,7 @@ export default function FactionWars() {
             const titleColor = rar==="ultra" ? "#fbbf24" : rar==="rare" ? "#60a5fa" : "#34d399";
             return (
               <>
-                <style>{`.fw-prize-modal{position:fixed;inset:0;display:grid;place-items:center;background:rgba(0,0,0,0.6);z-index:2147483647}.fw-prize-card{position:relative;min-width:320px;max-width:420px;padding:28px 24px;border-radius:16px;text-align:center;background:rgba(10,18,40,0.97);border:2px solid rgba(148,163,184,0.2);box-shadow:0 24px 40px rgba(0,0,0,0.65);overflow:visible;max-height:90vh;overflow-y:auto}.fw-sparkle-layer{position:absolute;inset:-8% -10%;pointer-events:none;z-index:0}.fw-pm-sparkle{position:absolute;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,0.95) 0%,rgba(255,255,255,0) 65%);filter:blur(0.3px) drop-shadow(0 0 12px rgba(255,255,255,0.65));opacity:0;animation:fwPmSpark 2.6s ease-in-out infinite}.fw-prize-art{display:block;width:180px;max-width:70vw;height:auto;margin:0 auto 16px;position:relative;z-index:1}.fw-prize-aura{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:220px;height:220px;border-radius:50%;pointer-events:none;z-index:0;filter:blur(45px)}.fw-prize-aura[data-rarity='ultra']{background:radial-gradient(circle,rgba(251,191,36,0.5),transparent 70%)}.fw-prize-aura[data-rarity='rare']{background:radial-gradient(circle,rgba(96,165,250,0.45),transparent 70%)}.fw-prize-aura[data-rarity='common']{background:radial-gradient(circle,rgba(52,211,153,0.4),transparent 70%)}@keyframes fwPmSpark{0%{transform:scale(0.4);opacity:0}20%{opacity:1}55%{transform:scale(1.1);opacity:0.9}85%{transform:scale(0.7);opacity:0.7}100%{transform:scale(0.3);opacity:0}}`}</style>
+                <style>{`.fw-prize-modal{position:fixed;inset:0;display:grid;place-items:center;background:rgba(0,0,0,0.6);z-index:2147483647;padding:16px}.fw-prize-card{position:relative;min-width:300px;max-width:420px;width:90vw;padding:20px 20px;border-radius:16px;text-align:center;background:rgba(10,18,40,0.97);border:2px solid rgba(148,163,184,0.2);box-shadow:0 24px 40px rgba(0,0,0,0.65);overflow:visible}.fw-sparkle-layer{position:absolute;inset:-8% -10%;pointer-events:none;z-index:0}.fw-pm-sparkle{position:absolute;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,0.95) 0%,rgba(255,255,255,0) 65%);filter:blur(0.3px) drop-shadow(0 0 12px rgba(255,255,255,0.65));opacity:0;animation:fwPmSpark 2.6s ease-in-out infinite}.fw-prize-art{display:block;width:130px;max-width:55vw;height:auto;margin:0 auto 12px;position:relative;z-index:1}.fw-prize-aura{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:220px;height:220px;border-radius:50%;pointer-events:none;z-index:0;filter:blur(45px)}.fw-prize-aura[data-rarity='ultra']{background:radial-gradient(circle,rgba(251,191,36,0.5),transparent 70%)}.fw-prize-aura[data-rarity='rare']{background:radial-gradient(circle,rgba(96,165,250,0.45),transparent 70%)}.fw-prize-aura[data-rarity='common']{background:radial-gradient(circle,rgba(52,211,153,0.4),transparent 70%)}@keyframes fwPmSpark{0%{transform:scale(0.4);opacity:0}20%{opacity:1}55%{transform:scale(1.1);opacity:0.9}85%{transform:scale(0.7);opacity:0.7}100%{transform:scale(0.3);opacity:0}}`}</style>
                 <div className="fw-prize-modal">
                   <div className="fw-prize-card">
                     <div className="fw-sparkle-layer">{sps.map((sp,i)=>(<span key={i} className={"fw-pm-sparkle "+rar} style={{left:sp.left,top:sp.top,width:sp.size+"px",height:sp.size+"px",animationDelay:sp.delay+"s"}} />))}</div>
@@ -1362,6 +1363,63 @@ export default function FactionWars() {
 
               <div style={{ position:"relative", zIndex:1, padding:"24px 20px 20px" }}>
 
+                {/* Characters — big portraits */}
+                <div style={{ display:"grid", gridTemplateColumns:"1fr auto 1fr", gap:12, alignItems:"center", marginBottom:14 }}>
+                  {/* Player */}
+                  <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:6 }}>
+                    <div style={{ position:"relative", width:120, height:140, borderRadius:14, overflow:"hidden",
+                      border:`3px solid ${currentPlayerFD.borderColor}`,
+                      boxShadow: battleAnim==="win" ? `0 0 40px ${currentPlayerFD.color}99` : `0 0 14px ${currentPlayerFD.color}44`,
+                      transform: battleAnim==="clash"?"scale(1.1) translateX(14px) rotate(-3deg)":battleAnim==="win"?"scale(1.06)":battleAnim==="lose"?"scale(0.9) rotate(4deg)":"scale(1)",
+                      filter: battleAnim==="lose"?"grayscale(0.7) brightness(0.55)":playerHp<25?"brightness(0.8)":"none",
+                      transition:"all 0.35s cubic-bezier(0.34,1.56,0.64,1)" }}>
+                      <img src={factionImgPath(currentPlayerFD.id,"char")} alt={currentPlayerFD.name}
+                        style={{ width:"100%", height:"100%", objectFit:"cover", objectPosition:"top" }}
+                        onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
+                      <div style={{ position:"absolute", bottom:4, right:4, width:26, height:26, borderRadius:5, overflow:"hidden", background:"rgba(0,0,0,0.75)", border:`1px solid ${currentPlayerFD.borderColor}` }}>
+                        <img src={factionImgPath(currentPlayerFD.id,"symbol")} alt="" style={{ width:"100%", height:"100%", objectFit:"contain", padding:2 }} />
+                      </div>
+                      {playerHp < 25 && <div style={{ position:"absolute", inset:0, border:"3px solid #f87171", borderRadius:12, pointerEvents:"none", boxShadow:"inset 0 0 20px rgba(248,113,113,0.4)" }} />}
+                    </div>
+                    <div style={{ textAlign:"center" }}>
+                      <div style={{ fontWeight:900, fontSize:12, color:currentPlayerFD.color }}>{currentPlayerFD.name.toUpperCase()}</div>
+                      <div style={{ fontSize:9, opacity:0.45 }}>Warrior {currentFactionIdx+1}/{TEAM_SIZE}</div>
+                    </div>
+                  </div>
+
+                  {/* Center VS */}
+                  <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4, minWidth:52 }}>
+                    <div style={{ fontSize:battleAnim==="clash"?44:26, fontWeight:900, transition:"all 0.2s",
+                      textShadow:battleAnim==="clash"?"0 0 30px #fbbf24":battleAnim==="win"?"0 0 20px #34d399":battleAnim==="lose"?"0 0 20px #f87171":"none",
+                      transform:battleAnim==="clash"?"scale(1.3)":"scale(1)" }}>
+                      {battleAnim==="clash"?"💥":battleAnim==="win"?"✅":battleAnim==="lose"?"💀":"⚔️"}
+                    </div>
+                    <div style={{ fontSize:9, fontWeight:900, opacity:0.35, letterSpacing:"0.12em" }}>VS</div>
+                  </div>
+
+                  {/* Defender */}
+                  <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:6 }}>
+                    <div style={{ position:"relative", width:120, height:140, borderRadius:14, overflow:"hidden",
+                      border:`3px solid ${currentDefenderFD.borderColor}`,
+                      boxShadow: battleAnim==="lose" ? `0 0 40px ${currentDefenderFD.color}99` : `0 0 14px ${currentDefenderFD.color}33`,
+                      transform: battleAnim==="clash"?"scale(1.1) translateX(-14px) rotate(3deg)":battleAnim==="lose"?"scale(1.06)":battleAnim==="win"?"scale(0.9) rotate(-4deg)":"scale(1)",
+                      filter: battleAnim==="win"?"grayscale(0.7) brightness(0.55)":enemyHp<25?"brightness(0.8)":"none",
+                      transition:"all 0.35s cubic-bezier(0.34,1.56,0.64,1)" }}>
+                      <img src={factionImgPath(currentDefenderFD.id,"char")} alt={currentDefenderFD.name}
+                        style={{ width:"100%", height:"100%", objectFit:"cover", objectPosition:"top" }}
+                        onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
+                      <div style={{ position:"absolute", bottom:4, left:4, width:26, height:26, borderRadius:5, overflow:"hidden", background:"rgba(0,0,0,0.75)", border:`1px solid ${currentDefenderFD.borderColor}` }}>
+                        <img src={factionImgPath(currentDefenderFD.id,"symbol")} alt="" style={{ width:"100%", height:"100%", objectFit:"contain", padding:2 }} />
+                      </div>
+                      {enemyHp < 25 && <div style={{ position:"absolute", inset:0, border:"3px solid #f87171", borderRadius:12, pointerEvents:"none", boxShadow:"inset 0 0 20px rgba(248,113,113,0.4)" }} />}
+                    </div>
+                    <div style={{ textAlign:"center" }}>
+                      <div style={{ fontWeight:900, fontSize:12, color:currentDefenderFD.color }}>{currentDefenderFD.name.toUpperCase()}</div>
+                      <div style={{ fontSize:9, opacity:0.45 }}>Territory Defender</div>
+                    </div>
+                  </div>
+                </div>
+
                 {/* ── HP BARS ── MK Style ───────────────────────── */}
                 <div style={{ marginBottom:14 }}>
                   {/* Player HP bar */}
@@ -1424,68 +1482,11 @@ export default function FactionWars() {
                   <span style={{ fontSize:10, opacity:0.4, marginLeft:8 }}>— first to 0 HP loses the territory</span>
                 </div>
 
-                {/* Characters — big portraits */}
-                <div style={{ display:"grid", gridTemplateColumns:"1fr auto 1fr", gap:12, alignItems:"center", marginBottom:14 }}>
-                  {/* Player */}
-                  <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:6 }}>
-                    <div style={{ position:"relative", width:120, height:140, borderRadius:14, overflow:"hidden",
-                      border:`3px solid ${currentPlayerFD.borderColor}`,
-                      boxShadow: battleAnim==="win" ? `0 0 40px ${currentPlayerFD.color}99` : `0 0 14px ${currentPlayerFD.color}44`,
-                      transform: battleAnim==="clash"?"scale(1.1) translateX(14px) rotate(-3deg)":battleAnim==="win"?"scale(1.06)":battleAnim==="lose"?"scale(0.9) rotate(4deg)":"scale(1)",
-                      filter: battleAnim==="lose"?"grayscale(0.7) brightness(0.55)":playerHp<25?"brightness(0.8)":"none",
-                      transition:"all 0.35s cubic-bezier(0.34,1.56,0.64,1)" }}>
-                      <img src={factionImgPath(currentPlayerFD.id,"char")} alt={currentPlayerFD.name}
-                        style={{ width:"100%", height:"100%", objectFit:"cover", objectPosition:"top" }}
-                        onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
-                      <div style={{ position:"absolute", bottom:4, right:4, width:26, height:26, borderRadius:5, overflow:"hidden", background:"rgba(0,0,0,0.75)", border:`1px solid ${currentPlayerFD.borderColor}` }}>
-                        <img src={factionImgPath(currentPlayerFD.id,"symbol")} alt="" style={{ width:"100%", height:"100%", objectFit:"contain", padding:2 }} />
-                      </div>
-                      {playerHp < 25 && <div style={{ position:"absolute", inset:0, border:"3px solid #f87171", borderRadius:12, pointerEvents:"none", boxShadow:"inset 0 0 20px rgba(248,113,113,0.4)" }} />}
-                    </div>
-                    <div style={{ textAlign:"center" }}>
-                      <div style={{ fontWeight:900, fontSize:12, color:currentPlayerFD.color }}>{currentPlayerFD.name.toUpperCase()}</div>
-                      <div style={{ fontSize:9, opacity:0.45 }}>Warrior {currentFactionIdx+1}/{TEAM_SIZE}</div>
-                    </div>
-                  </div>
-
-                  {/* Center VS */}
-                  <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4, minWidth:52 }}>
-                    <div style={{ fontSize:battleAnim==="clash"?44:26, fontWeight:900, transition:"all 0.2s",
-                      textShadow:battleAnim==="clash"?"0 0 30px #fbbf24":battleAnim==="win"?"0 0 20px #34d399":battleAnim==="lose"?"0 0 20px #f87171":"none",
-                      transform:battleAnim==="clash"?"scale(1.3)":"scale(1)" }}>
-                      {battleAnim==="clash"?"💥":battleAnim==="win"?"✅":battleAnim==="lose"?"💀":"⚔️"}
-                    </div>
-                    <div style={{ fontSize:9, fontWeight:900, opacity:0.35, letterSpacing:"0.12em" }}>VS</div>
-                  </div>
-
-                  {/* Defender */}
-                  <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:6 }}>
-                    <div style={{ position:"relative", width:120, height:140, borderRadius:14, overflow:"hidden",
-                      border:`3px solid ${currentDefenderFD.borderColor}`,
-                      boxShadow: battleAnim==="lose" ? `0 0 40px ${currentDefenderFD.color}99` : `0 0 14px ${currentDefenderFD.color}33`,
-                      transform: battleAnim==="clash"?"scale(1.1) translateX(-14px) rotate(3deg)":battleAnim==="lose"?"scale(1.06)":battleAnim==="win"?"scale(0.9) rotate(-4deg)":"scale(1)",
-                      filter: battleAnim==="win"?"grayscale(0.7) brightness(0.55)":enemyHp<25?"brightness(0.8)":"none",
-                      transition:"all 0.35s cubic-bezier(0.34,1.56,0.64,1)" }}>
-                      <img src={factionImgPath(currentDefenderFD.id,"char")} alt={currentDefenderFD.name}
-                        style={{ width:"100%", height:"100%", objectFit:"cover", objectPosition:"top" }}
-                        onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
-                      <div style={{ position:"absolute", bottom:4, left:4, width:26, height:26, borderRadius:5, overflow:"hidden", background:"rgba(0,0,0,0.75)", border:`1px solid ${currentDefenderFD.borderColor}` }}>
-                        <img src={factionImgPath(currentDefenderFD.id,"symbol")} alt="" style={{ width:"100%", height:"100%", objectFit:"contain", padding:2 }} />
-                      </div>
-                      {enemyHp < 25 && <div style={{ position:"absolute", inset:0, border:"3px solid #f87171", borderRadius:12, pointerEvents:"none", boxShadow:"inset 0 0 20px rgba(248,113,113,0.4)" }} />}
-                    </div>
-                    <div style={{ textAlign:"center" }}>
-                      <div style={{ fontWeight:900, fontSize:12, color:currentDefenderFD.color }}>{currentDefenderFD.name.toUpperCase()}</div>
-                      <div style={{ fontSize:9, opacity:0.45 }}>Territory Defender</div>
-                    </div>
-                  </div>
-                </div>
-
                 {/* Round log */}
                 {roundLog.length > 0 && (
                   <div style={{ background:"rgba(0,0,0,0.45)", borderRadius:10, padding:"8px 12px", marginBottom:12, maxHeight:96, overflowY:"auto" }}>
                     <div style={{ fontSize:9, opacity:0.35, marginBottom:5, letterSpacing:"0.06em", fontWeight:700 }}>ROUND HISTORY</div>
-                    {roundLog.slice(0,5).map((r,i)=>(
+                    {roundLog.slice(0,2).map((r,i)=>(
                       <div key={i} style={{ display:"flex", gap:10, fontSize:10, marginBottom:4, opacity:i===0?1:0.5, alignItems:"center" }}>
                         <span style={{ color:"#34d399", fontWeight:700, minWidth:70, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>⚔️ {r.playerMove}</span>
                         <span style={{ color:"#f87171", fontWeight:800 }}>-{r.enemyDmg} to you</span>
@@ -1548,52 +1549,50 @@ export default function FactionWars() {
                   <div style={{ fontSize:12, fontWeight:800, marginBottom:10, opacity:0.7, letterSpacing:"0.04em" }}>
                     ⚔️ CHOOSE {currentPlayerFD.name.toUpperCase()}'S MOVE
                   </div>
-                  <div style={{ display:"flex", gap:8, flexDirection:"column" }}>
-                    {currentPlayerFD.moves.map(m=>{
-                      const tc: Record<string,string> = { attack:"#f87171", defend:"#34d399", magic:"#c084fc", trick:"#fbbf24" };
-                      const isSel = selectedMove?.id===m.id;
-                      const timesUsedM = usedMoves[m.id] || 0;
-                      const degradedPow = Math.max(1, m.power - timesUsedM);
-                      const isExhausted = (m.oneTime && oneTimeUsed.includes(m.id)) || (berserkerActive && m.type === "defend");
-                      return (
-                        <button key={m.id} onClick={()=>!busy&&!isExhausted&&setSelectedMove(m)} disabled={busy||isExhausted}
-                          style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 14px", borderRadius:12,
-                            border:`2px solid ${isExhausted?"rgba(255,255,255,0.04)":isSel ? currentPlayerFD.borderColor : "rgba(255,255,255,0.08)"}`,
-                            background: isExhausted ? "rgba(0,0,0,0.2)" : isSel ? currentPlayerFD.bgColor : "rgba(255,255,255,0.03)",
-                            cursor: busy||isExhausted?"not-allowed":"pointer", textAlign:"left", opacity: isExhausted ? 0.4 : 1,
-                            boxShadow: isSel ? `0 0 16px ${currentPlayerFD.color}44` : "none",
-                            transform: isSel ? "scale(1.01)" : "scale(1)", transition:"all 0.18s" }}>
-                          {/* Move symbol */}
-                          <div style={{ width:40, height:40, borderRadius:10, background: isSel?"rgba(0,0,0,0.4)":"rgba(0,0,0,0.3)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0, border:`1px solid ${tc[m.type]}44` }}>
-                            {m.emoji}
-                          </div>
-                          {/* Move info */}
-                          <div style={{ flex:1, minWidth:0 }}>
-                            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:3 }}>
-                              <span style={{ fontWeight:900, fontSize:14 }}>{m.label}</span>
-                              <span style={{ fontSize:9, background:tc[m.type], color:"#000", borderRadius:4, padding:"1px 6px", fontWeight:900 }}>{m.type.toUpperCase()}</span>
-                              {m.oneTime && !isExhausted && <span style={{ fontSize:9, background:"rgba(251,191,36,0.2)", color:"#fbbf24", borderRadius:4, padding:"1px 6px", fontWeight:900, border:"1px solid rgba(251,191,36,0.3)" }}>1× ONLY</span>}
-                              {isExhausted && !berserkerActive && <span style={{ fontSize:9, background:"rgba(255,255,255,0.1)", color:"#666", borderRadius:4, padding:"1px 6px", fontWeight:900 }}>USED</span>}
-                              {isExhausted && berserkerActive && m.type==="defend" && <span style={{ fontSize:9, background:"rgba(251,100,36,0.25)", color:"#f87171", borderRadius:4, padding:"1px 6px", fontWeight:900 }}>🔥BERSERK</span>}
-                            </div>
-                            <div style={{ fontSize:11, opacity:0.6 }}>
-                              {m.id === "plunder" ? `Win this territory → earn +${fwPlunderBonus} bonus REBEL` : m.desc}
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+                  {currentPlayerFD.moves.map(m=>{
+                    const tc: Record<string,string> = { attack:"#f87171", defend:"#34d399", magic:"#c084fc", trick:"#fbbf24" };
+                    const isSel = selectedMove?.id===m.id;
+                    const timesUsedM = usedMoves[m.id] || 0;
+                    const degradedPow = Math.max(1, m.power - timesUsedM);
+                    const isExhausted = (m.oneTime && oneTimeUsed.includes(m.id)) || (berserkerActive && m.type === "defend");
+                    return (
+                      <button key={m.id} onClick={()=>!busy&&!isExhausted&&setSelectedMove(m)} disabled={busy||isExhausted}
+                        style={{ display:"flex", flexDirection:"column", gap:4, padding:"10px 10px", borderRadius:10, textAlign:"left",
+                          border:`2px solid ${isExhausted?"rgba(255,255,255,0.04)":isSel ? currentPlayerFD.borderColor : "rgba(255,255,255,0.08)"}`,
+                          background: isExhausted ? "rgba(0,0,0,0.2)" : isSel ? currentPlayerFD.bgColor : "rgba(255,255,255,0.03)",
+                          cursor: busy||isExhausted?"not-allowed":"pointer", opacity: isExhausted ? 0.4 : 1,
+                          boxShadow: isSel ? `0 0 16px ${currentPlayerFD.color}44` : "none",
+                          transform: isSel ? "scale(1.01)" : "scale(1)", transition:"all 0.18s" }}>
+                        {/* Top row: emoji + name + type + power */}
+                        <div style={{ display:"flex", alignItems:"center", gap:5, minWidth:0 }}>
+                          <span style={{ fontSize:15, flexShrink:0 }}>{m.emoji}</span>
+                          <span style={{ fontWeight:900, fontSize:11, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", flex:1, minWidth:0 }}>{m.label}</span>
+                          <span style={{ fontSize:8, background:tc[m.type], color:"#000", borderRadius:3, padding:"1px 4px", fontWeight:900, flexShrink:0 }}>{m.type.toUpperCase()}</span>
+                          <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:2, flexShrink:0 }}>
+                            <span style={{ fontSize:11, fontWeight:900, color: isExhausted?"#666": isSel ? currentPlayerFD.color : "rgba(255,255,255,0.7)", lineHeight:1 }}>
+                              {isExhausted ? "✗" : <>{degradedPow}<span style={{fontSize:8,opacity:0.45}}>/{m.power}</span>{timesUsedM > 0 && <span style={{fontSize:8,color:"#f87171"}}>↓</span>}</>}
+                            </span>
+                            <div style={{ width:28, height:3, borderRadius:2, background:"rgba(255,255,255,0.1)", overflow:"hidden" }}>
+                              <div style={{ height:"100%", borderRadius:2, background:tc[m.type], width:`${Math.round(degradedPow/m.power*100)}%`, transition:"width 0.3s" }} />
                             </div>
                           </div>
-                          {/* Power meter */}
-                          <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:3, flexShrink:0, minWidth:44 }}>
-                            <div style={{ fontSize:13, fontWeight:900, color: isExhausted?"#666": isSel ? currentPlayerFD.color : "rgba(255,255,255,0.6)" }}>
-                              {isExhausted ? "✗" : degradedPow}
-                              {!isExhausted && timesUsedM > 0 && <span style={{fontSize:9,color:"#f87171",marginLeft:2}}>↓{timesUsedM}</span>}
-                            </div>
-                            <div style={{ width:36, height:4, borderRadius:2, background:"rgba(255,255,255,0.1)", overflow:"hidden" }}>
-                              <div style={{ height:"100%", borderRadius:2, background:tc[m.type], width:`${m.power*10}%`, transition:"width 0.3s" }} />
-                            </div>
-                            <div style={{ fontSize:8, opacity:0.4 }}>PWR</div>
+                        </div>
+                        {/* Badges */}
+                        {(m.oneTime || isExhausted) && (
+                          <div style={{ display:"flex", gap:3 }}>
+                            {m.oneTime && !isExhausted && <span style={{ fontSize:8, background:"rgba(251,191,36,0.2)", color:"#fbbf24", borderRadius:3, padding:"1px 4px", fontWeight:900, border:"1px solid rgba(251,191,36,0.3)" }}>1× ONLY</span>}
+                            {isExhausted && !berserkerActive && <span style={{ fontSize:8, background:"rgba(255,255,255,0.1)", color:"#666", borderRadius:3, padding:"1px 4px", fontWeight:900 }}>USED</span>}
+                            {isExhausted && berserkerActive && m.type==="defend" && <span style={{ fontSize:8, background:"rgba(251,100,36,0.25)", color:"#f87171", borderRadius:3, padding:"1px 4px", fontWeight:900 }}>🔥BERSERK</span>}
                           </div>
-                        </button>
-                      );
-                    })}
+                        )}
+                        {/* Description */}
+                        <div style={{ fontSize:10, opacity:0.55, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                          {m.id === "plunder" ? `+${fwPlunderBonus} REBEL if win` : m.desc}
+                        </div>
+                      </button>
+                    );
+                  })}
                   </div>
 
                   <button onClick={fightTerritory} disabled={!selectedMove||busy}
@@ -1691,6 +1690,10 @@ export default function FactionWars() {
             <FWLeaderboardPanel lb={lb} />
           </div>
         )}
+      {/* Copyright */}
+      <div style={{ textAlign:"center", padding:"10px 0 6px", fontSize:10, opacity:0.28, color:"white", letterSpacing:"0.05em", userSelect:"none", pointerEvents:"none" }}>
+        © 2026 Rebel Ants LLC · Developed by Miguel Concepcion
+      </div>
       </div>
     </div>
   );

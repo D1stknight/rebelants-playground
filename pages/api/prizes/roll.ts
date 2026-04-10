@@ -101,42 +101,44 @@ const rarity =
 
     // ---------- RARE ----------
   if (rarity === "rare") {
-  // cfg.rareMerchChance must be decimal 0..1
-  const merchChanceRaw = Number(cfg?.rareMerchChance ?? 0.01);
-  const merchChance = Math.max(0, Math.min(1, merchChanceRaw));
+    // Check if there are any merch items configured in the prize pool
+    const rarePools: any[] = Array.isArray(cfg?.prizePools?.rare) ? cfg.prizePools.rare : [];
+    const merchItems = rarePools.filter(
+      (p: any) => String(p?.type || "").toUpperCase() === "MERCH" && p?.sku
+    );
 
-  // ✅ hard guarantee for testing
-  if (merchChance >= 1) {
+    // Only attempt a merch roll if merch items are actually configured
+    if (merchItems.length > 0) {
+      // Pick a weighted random merch item
+      const totalWeight = merchItems.reduce((s: number, p: any) => s + (Number(p?.weight) || 1), 0);
+      let rng = Math.random() * totalWeight;
+      let picked = merchItems[0];
+      for (const item of merchItems) {
+        rng -= Number(item?.weight) || 1;
+        if (rng <= 0) { picked = item; break; }
+      }
+      return res.status(200).json({
+        ok: true,
+        rarity,
+        prize: {
+          type: "merch",
+          label: picked.label || "Merch Prize",
+          meta: { sku: picked.sku, label: picked.label },
+        },
+      });
+    }
+
+    // No merch configured — fall back to points
+    const pts = Number(cfg?.rewards?.rare ?? 0);
     return res.status(200).json({
       ok: true,
       rarity,
-      prize: { type: "merch", label: "Merch Prize" },
-      debug: { merchChanceRaw, merchChance },
+      prize:
+        pts > 0
+          ? { type: "points", points: pts, label: `${pts} ${currency}` }
+          : { type: "none", label: "Nothing this time" },
     });
   }
-
-  const roll = Math.random();
-
-  if (roll < merchChance) {
-    return res.status(200).json({
-      ok: true,
-      rarity,
-      prize: { type: "merch", label: "Merch Prize" },
-      debug: { merchChanceRaw, merchChance, roll },
-    });
-  }
-
-  const pts = Number(cfg?.rewards?.rare ?? 0);
-  return res.status(200).json({
-    ok: true,
-    rarity,
-    prize:
-      pts > 0
-        ? { type: "points", points: pts, label: `${pts} ${currency}` }
-        : { type: "none", label: "Nothing this time" },
-    debug: { merchChanceRaw, merchChance, roll },
-  });
-}
 
 // ---------- ULTRA ----------
 if (rarity === "ultra") {

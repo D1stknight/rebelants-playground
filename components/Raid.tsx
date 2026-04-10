@@ -728,6 +728,10 @@ function RaidLeaderboardPanel({ lb }: { lb: RaidLeaderboards }) {
           <div style={{ padding: "4px 12px 8px", fontSize: 9, opacity: 0.35 }}>Latest raids on this game only</div>
         </div>
 
+      {/* Copyright */}
+      <div style={{ textAlign:"center", padding:"10px 0 6px", fontSize:10, opacity:0.28, color:"white", letterSpacing:"0.05em", userSelect:"none", pointerEvents:"none" }}>
+        © 2026 Rebel Ants LLC · Developed by Miguel Concepcion
+      </div>
       </div>
     </div>
   );
