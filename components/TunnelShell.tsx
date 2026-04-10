@@ -2393,8 +2393,9 @@ const boardPreviewMobileStyle: React.CSSProperties = {
 };
 
 const previewInnerMobileStyle: React.CSSProperties = {
-  minWidth: 920,
-  minHeight: 700,
+  minWidth: "100%",
+  width: "100%",
+  minHeight: 0,
 };
 
 const previewGridMobileStyle: React.CSSProperties = {
@@ -2403,9 +2404,9 @@ const previewGridMobileStyle: React.CSSProperties = {
 
 const boardPreviewMobileRunStyle: React.CSSProperties = {
   padding: 8,
-  height: "calc(100dvh - 140px)",
-  minHeight: "calc(100dvh - 140px)",
-  maxHeight: "calc(100dvh - 140px)",
+  height: "calc(100dvh - 360px)",
+  minHeight: "calc(100dvh - 360px)",
+  maxHeight: "calc(100dvh - 360px)",
   overflow: "hidden",
 };
 
