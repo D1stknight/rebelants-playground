@@ -330,6 +330,13 @@ function TerritoryBadge({ index, result, isCurrent, defender }: { index: number;
 }
 
 function FWLeaderboardPanel({ lb }: { lb: FWLeaderboards }) {
+  const [isSmallScreen, setIsSmallScreen] = React.useState(false);
+  React.useEffect(() => {
+    const check = () => setIsSmallScreen(window.innerWidth < 640);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
   const shorten = (id: string) => id.startsWith("discord:") ? id.slice(8,16)+"…" : id.slice(0,10)+"…";
   const MAX = 50;
 
@@ -366,7 +373,7 @@ function FWLeaderboardPanel({ lb }: { lb: FWLeaderboards }) {
       </div>
 
       {/* Top 4 in a 2x2 grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12, marginBottom: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isSmallScreen ? "1fr" : "1fr 1fr", gap: 12, marginBottom: 12 }}>
 
         {/* 🏆 Warlords */}
         <div style={cardStyle}>
