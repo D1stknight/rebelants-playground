@@ -1549,52 +1549,45 @@ export default function FactionWars() {
                   <div style={{ fontSize:12, fontWeight:800, marginBottom:10, opacity:0.7, letterSpacing:"0.04em" }}>
                     ⚔️ CHOOSE {currentPlayerFD.name.toUpperCase()}'S MOVE
                   </div>
-                  <div style={{ display:"flex", gap:8, flexDirection:"column" }}>
-                    {currentPlayerFD.moves.map(m=>{
-                      const tc: Record<string,string> = { attack:"#f87171", defend:"#34d399", magic:"#c084fc", trick:"#fbbf24" };
-                      const isSel = selectedMove?.id===m.id;
-                      const timesUsedM = usedMoves[m.id] || 0;
-                      const degradedPow = Math.max(1, m.power - timesUsedM);
-                      const isExhausted = (m.oneTime && oneTimeUsed.includes(m.id)) || (berserkerActive && m.type === "defend");
-                      return (
-                        <button key={m.id} onClick={()=>!busy&&!isExhausted&&setSelectedMove(m)} disabled={busy||isExhausted}
-                          style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 14px", borderRadius:12,
-                            border:`2px solid ${isExhausted?"rgba(255,255,255,0.04)":isSel ? currentPlayerFD.borderColor : "rgba(255,255,255,0.08)"}`,
-                            background: isExhausted ? "rgba(0,0,0,0.2)" : isSel ? currentPlayerFD.bgColor : "rgba(255,255,255,0.03)",
-                            cursor: busy||isExhausted?"not-allowed":"pointer", textAlign:"left", opacity: isExhausted ? 0.4 : 1,
-                            boxShadow: isSel ? `0 0 16px ${currentPlayerFD.color}44` : "none",
-                            transform: isSel ? "scale(1.01)" : "scale(1)", transition:"all 0.18s" }}>
-                          {/* Move symbol */}
-                          <div style={{ width:40, height:40, borderRadius:10, background: isSel?"rgba(0,0,0,0.4)":"rgba(0,0,0,0.3)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0, border:`1px solid ${tc[m.type]}44` }}>
-                            {m.emoji}
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+                  {currentPlayerFD.moves.map(m=>{
+                    const tc: Record<string,string> = { attack:"#f87171", defend:"#34d399", magic:"#c084fc", trick:"#fbbf24" };
+                    const isSel = selectedMove?.id===m.id;
+                    const timesUsedM = usedMoves[m.id] || 0;
+                    const degradedPow = Math.max(1, m.power - timesUsedM);
+                    const isExhausted = (m.oneTime && oneTimeUsed.includes(m.id)) || (berserkerActive && m.type === "defend");
+                    return (
+                      <button key={m.id} onClick={()=>!busy&&!isExhausted&&setSelectedMove(m)} disabled={busy||isExhausted}
+                        style={{ display:"flex", flexDirection:"column", gap:4, padding:"10px 10px", borderRadius:10, textAlign:"left",
+                          border:`2px solid ${isExhausted?"rgba(255,255,255,0.04)":isSel ? currentPlayerFD.borderColor : "rgba(255,255,255,0.08)"}`,
+                          background: isExhausted ? "rgba(0,0,0,0.2)" : isSel ? currentPlayerFD.bgColor : "rgba(255,255,255,0.03)",
+                          cursor: busy||isExhausted?"not-allowed":"pointer", opacity: isExhausted ? 0.4 : 1,
+                          boxShadow: isSel ? `0 0 16px ${currentPlayerFD.color}44` : "none",
+                          transform: isSel ? "scale(1.01)" : "scale(1)", transition:"all 0.18s" }}>
+                        {/* Top row: emoji + name + type + power */}
+                        <div style={{ display:"flex", alignItems:"center", gap:5, minWidth:0 }}>
+                          <span style={{ fontSize:15, flexShrink:0 }}>{m.emoji}</span>
+                          <span style={{ fontWeight:900, fontSize:11, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", flex:1, minWidth:0 }}>{m.label}</span>
+                          <span style={{ fontSize:8, background:tc[m.type], color:"#000", borderRadius:3, padding:"1px 4px", fontWeight:900, flexShrink:0 }}>{m.type.toUpperCase()}</span>
+                          <span style={{ fontSize:12, fontWeight:900, color: isExhausted?"#666": isSel ? currentPlayerFD.color : "rgba(255,255,255,0.7)", flexShrink:0, minWidth:16, textAlign:"right" }}>
+                            {isExhausted ? "✗" : degradedPow}{!isExhausted && timesUsedM > 0 && <span style={{fontSize:8,color:"#f87171"}}>↓</span>}
+                          </span>
+                        </div>
+                        {/* Badges */}
+                        {(m.oneTime || isExhausted) && (
+                          <div style={{ display:"flex", gap:3 }}>
+                            {m.oneTime && !isExhausted && <span style={{ fontSize:8, background:"rgba(251,191,36,0.2)", color:"#fbbf24", borderRadius:3, padding:"1px 4px", fontWeight:900, border:"1px solid rgba(251,191,36,0.3)" }}>1× ONLY</span>}
+                            {isExhausted && !berserkerActive && <span style={{ fontSize:8, background:"rgba(255,255,255,0.1)", color:"#666", borderRadius:3, padding:"1px 4px", fontWeight:900 }}>USED</span>}
+                            {isExhausted && berserkerActive && m.type==="defend" && <span style={{ fontSize:8, background:"rgba(251,100,36,0.25)", color:"#f87171", borderRadius:3, padding:"1px 4px", fontWeight:900 }}>🔥BERSERK</span>}
                           </div>
-                          {/* Move info */}
-                          <div style={{ flex:1, minWidth:0 }}>
-                            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:3 }}>
-                              <span style={{ fontWeight:900, fontSize:14 }}>{m.label}</span>
-                              <span style={{ fontSize:9, background:tc[m.type], color:"#000", borderRadius:4, padding:"1px 6px", fontWeight:900 }}>{m.type.toUpperCase()}</span>
-                              {m.oneTime && !isExhausted && <span style={{ fontSize:9, background:"rgba(251,191,36,0.2)", color:"#fbbf24", borderRadius:4, padding:"1px 6px", fontWeight:900, border:"1px solid rgba(251,191,36,0.3)" }}>1× ONLY</span>}
-                              {isExhausted && !berserkerActive && <span style={{ fontSize:9, background:"rgba(255,255,255,0.1)", color:"#666", borderRadius:4, padding:"1px 6px", fontWeight:900 }}>USED</span>}
-                              {isExhausted && berserkerActive && m.type==="defend" && <span style={{ fontSize:9, background:"rgba(251,100,36,0.25)", color:"#f87171", borderRadius:4, padding:"1px 6px", fontWeight:900 }}>🔥BERSERK</span>}
-                            </div>
-                            <div style={{ fontSize:11, opacity:0.6 }}>
-                              {m.id === "plunder" ? `Win this territory → earn +${fwPlunderBonus} bonus REBEL` : m.desc}
-                            </div>
-                          </div>
-                          {/* Power meter */}
-                          <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:3, flexShrink:0, minWidth:44 }}>
-                            <div style={{ fontSize:13, fontWeight:900, color: isExhausted?"#666": isSel ? currentPlayerFD.color : "rgba(255,255,255,0.6)" }}>
-                              {isExhausted ? "✗" : degradedPow}
-                              {!isExhausted && timesUsedM > 0 && <span style={{fontSize:9,color:"#f87171",marginLeft:2}}>↓{timesUsedM}</span>}
-                            </div>
-                            <div style={{ width:36, height:4, borderRadius:2, background:"rgba(255,255,255,0.1)", overflow:"hidden" }}>
-                              <div style={{ height:"100%", borderRadius:2, background:tc[m.type], width:`${m.power*10}%`, transition:"width 0.3s" }} />
-                            </div>
-                            <div style={{ fontSize:8, opacity:0.4 }}>PWR</div>
-                          </div>
-                        </button>
-                      );
-                    })}
+                        )}
+                        {/* Description */}
+                        <div style={{ fontSize:10, opacity:0.55, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                          {m.id === "plunder" ? `+${fwPlunderBonus} REBEL if win` : m.desc}
+                        </div>
+                      </button>
+                    );
+                  })}
                   </div>
 
                   <button onClick={fightTerritory} disabled={!selectedMove||busy}
