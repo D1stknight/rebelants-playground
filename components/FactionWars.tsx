@@ -366,7 +366,7 @@ function FWLeaderboardPanel({ lb }: { lb: FWLeaderboards }) {
       </div>
 
       {/* Top 4 in a 2x2 grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12, marginBottom: 12 }}>
 
         {/* 🏆 Warlords */}
         <div style={cardStyle}>
