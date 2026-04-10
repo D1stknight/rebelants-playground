@@ -40,7 +40,7 @@ function useFWAudio() {
     setMuted(m => {
       const next = !m;
       try { localStorage.setItem("ra:fw:muted", next ? "1" : "0"); } catch {}
-      if (musicRef.current) musicRef.current.volume = next ? 0 : 0.35;
+      if (musicRef.current) { if (next) { musicRef.current.volume = 0; musicRef.current.pause(); } else { musicRef.current.volume = 0.35; musicRef.current.play().catch(()=>{}); } }
       return next;
     });
   }, []);
