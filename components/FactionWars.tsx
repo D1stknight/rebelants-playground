@@ -1363,6 +1363,63 @@ export default function FactionWars() {
 
               <div style={{ position:"relative", zIndex:1, padding:"24px 20px 20px" }}>
 
+                {/* Characters — big portraits */}
+                <div style={{ display:"grid", gridTemplateColumns:"1fr auto 1fr", gap:12, alignItems:"center", marginBottom:14 }}>
+                  {/* Player */}
+                  <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:6 }}>
+                    <div style={{ position:"relative", width:120, height:140, borderRadius:14, overflow:"hidden",
+                      border:`3px solid ${currentPlayerFD.borderColor}`,
+                      boxShadow: battleAnim==="win" ? `0 0 40px ${currentPlayerFD.color}99` : `0 0 14px ${currentPlayerFD.color}44`,
+                      transform: battleAnim==="clash"?"scale(1.1) translateX(14px) rotate(-3deg)":battleAnim==="win"?"scale(1.06)":battleAnim==="lose"?"scale(0.9) rotate(4deg)":"scale(1)",
+                      filter: battleAnim==="lose"?"grayscale(0.7) brightness(0.55)":playerHp<25?"brightness(0.8)":"none",
+                      transition:"all 0.35s cubic-bezier(0.34,1.56,0.64,1)" }}>
+                      <img src={factionImgPath(currentPlayerFD.id,"char")} alt={currentPlayerFD.name}
+                        style={{ width:"100%", height:"100%", objectFit:"cover", objectPosition:"top" }}
+                        onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
+                      <div style={{ position:"absolute", bottom:4, right:4, width:26, height:26, borderRadius:5, overflow:"hidden", background:"rgba(0,0,0,0.75)", border:`1px solid ${currentPlayerFD.borderColor}` }}>
+                        <img src={factionImgPath(currentPlayerFD.id,"symbol")} alt="" style={{ width:"100%", height:"100%", objectFit:"contain", padding:2 }} />
+                      </div>
+                      {playerHp < 25 && <div style={{ position:"absolute", inset:0, border:"3px solid #f87171", borderRadius:12, pointerEvents:"none", boxShadow:"inset 0 0 20px rgba(248,113,113,0.4)" }} />}
+                    </div>
+                    <div style={{ textAlign:"center" }}>
+                      <div style={{ fontWeight:900, fontSize:12, color:currentPlayerFD.color }}>{currentPlayerFD.name.toUpperCase()}</div>
+                      <div style={{ fontSize:9, opacity:0.45 }}>Warrior {currentFactionIdx+1}/{TEAM_SIZE}</div>
+                    </div>
+                  </div>
+
+                  {/* Center VS */}
+                  <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4, minWidth:52 }}>
+                    <div style={{ fontSize:battleAnim==="clash"?44:26, fontWeight:900, transition:"all 0.2s",
+                      textShadow:battleAnim==="clash"?"0 0 30px #fbbf24":battleAnim==="win"?"0 0 20px #34d399":battleAnim==="lose"?"0 0 20px #f87171":"none",
+                      transform:battleAnim==="clash"?"scale(1.3)":"scale(1)" }}>
+                      {battleAnim==="clash"?"💥":battleAnim==="win"?"✅":battleAnim==="lose"?"💀":"⚔️"}
+                    </div>
+                    <div style={{ fontSize:9, fontWeight:900, opacity:0.35, letterSpacing:"0.12em" }}>VS</div>
+                  </div>
+
+                  {/* Defender */}
+                  <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:6 }}>
+                    <div style={{ position:"relative", width:120, height:140, borderRadius:14, overflow:"hidden",
+                      border:`3px solid ${currentDefenderFD.borderColor}`,
+                      boxShadow: battleAnim==="lose" ? `0 0 40px ${currentDefenderFD.color}99` : `0 0 14px ${currentDefenderFD.color}33`,
+                      transform: battleAnim==="clash"?"scale(1.1) translateX(-14px) rotate(3deg)":battleAnim==="lose"?"scale(1.06)":battleAnim==="win"?"scale(0.9) rotate(-4deg)":"scale(1)",
+                      filter: battleAnim==="win"?"grayscale(0.7) brightness(0.55)":enemyHp<25?"brightness(0.8)":"none",
+                      transition:"all 0.35s cubic-bezier(0.34,1.56,0.64,1)" }}>
+                      <img src={factionImgPath(currentDefenderFD.id,"char")} alt={currentDefenderFD.name}
+                        style={{ width:"100%", height:"100%", objectFit:"cover", objectPosition:"top" }}
+                        onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
+                      <div style={{ position:"absolute", bottom:4, left:4, width:26, height:26, borderRadius:5, overflow:"hidden", background:"rgba(0,0,0,0.75)", border:`1px solid ${currentDefenderFD.borderColor}` }}>
+                        <img src={factionImgPath(currentDefenderFD.id,"symbol")} alt="" style={{ width:"100%", height:"100%", objectFit:"contain", padding:2 }} />
+                      </div>
+                      {enemyHp < 25 && <div style={{ position:"absolute", inset:0, border:"3px solid #f87171", borderRadius:12, pointerEvents:"none", boxShadow:"inset 0 0 20px rgba(248,113,113,0.4)" }} />}
+                    </div>
+                    <div style={{ textAlign:"center" }}>
+                      <div style={{ fontWeight:900, fontSize:12, color:currentDefenderFD.color }}>{currentDefenderFD.name.toUpperCase()}</div>
+                      <div style={{ fontSize:9, opacity:0.45 }}>Territory Defender</div>
+                    </div>
+                  </div>
+                </div>
+
                 {/* ── HP BARS ── MK Style ───────────────────────── */}
                 <div style={{ marginBottom:14 }}>
                   {/* Player HP bar */}
@@ -1423,63 +1480,6 @@ export default function FactionWars() {
                     ⚔️ ROUND {currentRound + 1}
                   </span>
                   <span style={{ fontSize:10, opacity:0.4, marginLeft:8 }}>— first to 0 HP loses the territory</span>
-                </div>
-
-                {/* Characters — big portraits */}
-                <div style={{ display:"grid", gridTemplateColumns:"1fr auto 1fr", gap:12, alignItems:"center", marginBottom:14 }}>
-                  {/* Player */}
-                  <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:6 }}>
-                    <div style={{ position:"relative", width:120, height:140, borderRadius:14, overflow:"hidden",
-                      border:`3px solid ${currentPlayerFD.borderColor}`,
-                      boxShadow: battleAnim==="win" ? `0 0 40px ${currentPlayerFD.color}99` : `0 0 14px ${currentPlayerFD.color}44`,
-                      transform: battleAnim==="clash"?"scale(1.1) translateX(14px) rotate(-3deg)":battleAnim==="win"?"scale(1.06)":battleAnim==="lose"?"scale(0.9) rotate(4deg)":"scale(1)",
-                      filter: battleAnim==="lose"?"grayscale(0.7) brightness(0.55)":playerHp<25?"brightness(0.8)":"none",
-                      transition:"all 0.35s cubic-bezier(0.34,1.56,0.64,1)" }}>
-                      <img src={factionImgPath(currentPlayerFD.id,"char")} alt={currentPlayerFD.name}
-                        style={{ width:"100%", height:"100%", objectFit:"cover", objectPosition:"top" }}
-                        onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
-                      <div style={{ position:"absolute", bottom:4, right:4, width:26, height:26, borderRadius:5, overflow:"hidden", background:"rgba(0,0,0,0.75)", border:`1px solid ${currentPlayerFD.borderColor}` }}>
-                        <img src={factionImgPath(currentPlayerFD.id,"symbol")} alt="" style={{ width:"100%", height:"100%", objectFit:"contain", padding:2 }} />
-                      </div>
-                      {playerHp < 25 && <div style={{ position:"absolute", inset:0, border:"3px solid #f87171", borderRadius:12, pointerEvents:"none", boxShadow:"inset 0 0 20px rgba(248,113,113,0.4)" }} />}
-                    </div>
-                    <div style={{ textAlign:"center" }}>
-                      <div style={{ fontWeight:900, fontSize:12, color:currentPlayerFD.color }}>{currentPlayerFD.name.toUpperCase()}</div>
-                      <div style={{ fontSize:9, opacity:0.45 }}>Warrior {currentFactionIdx+1}/{TEAM_SIZE}</div>
-                    </div>
-                  </div>
-
-                  {/* Center VS */}
-                  <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4, minWidth:52 }}>
-                    <div style={{ fontSize:battleAnim==="clash"?44:26, fontWeight:900, transition:"all 0.2s",
-                      textShadow:battleAnim==="clash"?"0 0 30px #fbbf24":battleAnim==="win"?"0 0 20px #34d399":battleAnim==="lose"?"0 0 20px #f87171":"none",
-                      transform:battleAnim==="clash"?"scale(1.3)":"scale(1)" }}>
-                      {battleAnim==="clash"?"💥":battleAnim==="win"?"✅":battleAnim==="lose"?"💀":"⚔️"}
-                    </div>
-                    <div style={{ fontSize:9, fontWeight:900, opacity:0.35, letterSpacing:"0.12em" }}>VS</div>
-                  </div>
-
-                  {/* Defender */}
-                  <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:6 }}>
-                    <div style={{ position:"relative", width:120, height:140, borderRadius:14, overflow:"hidden",
-                      border:`3px solid ${currentDefenderFD.borderColor}`,
-                      boxShadow: battleAnim==="lose" ? `0 0 40px ${currentDefenderFD.color}99` : `0 0 14px ${currentDefenderFD.color}33`,
-                      transform: battleAnim==="clash"?"scale(1.1) translateX(-14px) rotate(3deg)":battleAnim==="lose"?"scale(1.06)":battleAnim==="win"?"scale(0.9) rotate(-4deg)":"scale(1)",
-                      filter: battleAnim==="win"?"grayscale(0.7) brightness(0.55)":enemyHp<25?"brightness(0.8)":"none",
-                      transition:"all 0.35s cubic-bezier(0.34,1.56,0.64,1)" }}>
-                      <img src={factionImgPath(currentDefenderFD.id,"char")} alt={currentDefenderFD.name}
-                        style={{ width:"100%", height:"100%", objectFit:"cover", objectPosition:"top" }}
-                        onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
-                      <div style={{ position:"absolute", bottom:4, left:4, width:26, height:26, borderRadius:5, overflow:"hidden", background:"rgba(0,0,0,0.75)", border:`1px solid ${currentDefenderFD.borderColor}` }}>
-                        <img src={factionImgPath(currentDefenderFD.id,"symbol")} alt="" style={{ width:"100%", height:"100%", objectFit:"contain", padding:2 }} />
-                      </div>
-                      {enemyHp < 25 && <div style={{ position:"absolute", inset:0, border:"3px solid #f87171", borderRadius:12, pointerEvents:"none", boxShadow:"inset 0 0 20px rgba(248,113,113,0.4)" }} />}
-                    </div>
-                    <div style={{ textAlign:"center" }}>
-                      <div style={{ fontWeight:900, fontSize:12, color:currentDefenderFD.color }}>{currentDefenderFD.name.toUpperCase()}</div>
-                      <div style={{ fontSize:9, opacity:0.45 }}>Territory Defender</div>
-                    </div>
-                  </div>
                 </div>
 
                 {/* Round log */}
