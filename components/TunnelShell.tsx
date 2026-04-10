@@ -1672,13 +1672,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                 >
                                    <div style={previewGlowStyle(theme.accent)} />
 
-                  {isPlaying && isMobileView && !isLandscape && (
-                    <div style={mobileRotateOverlayStyle}>
-                      <div style={mobileRotateCardStyle}>
-                        Rotate your phone to landscape for a better game experience
-                      </div>
-                    </div>
-                  )}
+        {/* portrait supported via D-pad */}
 
                  {hitFlash && (
   <div
@@ -2116,16 +2110,13 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
         @media (max-width: 900px) {
           .mobileOnlyControls {
             position: fixed;
-            right: max(10px, env(safe-area-inset-right));
-            bottom: max(10px, env(safe-area-inset-bottom));
+            bottom: max(16px, env(safe-area-inset-bottom));
+            left: 50%;
+            transform: translateX(-50%);
             z-index: 120;
-            display: block;
-            padding: 4px;
-            border-radius: 999px;
-            background: rgba(2, 6, 23, 0.06);
-            backdrop-filter: blur(2px);
-            -webkit-backdrop-filter: blur(2px);
-            box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
           }
         }
 
