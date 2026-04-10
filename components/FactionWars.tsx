@@ -40,7 +40,7 @@ function useFWAudio() {
     setMuted(m => {
       const next = !m;
       try { localStorage.setItem("ra:fw:muted", next ? "1" : "0"); } catch {}
-      if (musicRef.current) musicRef.current.volume = next ? 0 : 0.35;
+      if (musicRef.current) { if (next) { musicRef.current.volume = 0; musicRef.current.pause(); } else { musicRef.current.volume = 0.35; musicRef.current.play().catch(()=>{}); } }
       return next;
     });
   }, []);
@@ -366,7 +366,7 @@ function FWLeaderboardPanel({ lb }: { lb: FWLeaderboards }) {
       </div>
 
       {/* Top 4 in a 2x2 grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12, marginBottom: 12 }}>
 
         {/* 🏆 Warlords */}
         <div style={cardStyle}>
@@ -1171,12 +1171,12 @@ export default function FactionWars() {
 
       {/* Header */}
       <div style={{ position:"relative", zIndex:1 }}>
-        <div style={{ maxWidth:900, margin:"0 auto", padding:"24px 20px" }}>
+        <div style={{ maxWidth:900, margin:"0 auto", padding:"16px 12px", overflowX:"hidden", width:"100%" }}>
           <div style={{ fontSize:26, fontWeight:900, marginBottom:12, display:"flex", alignItems:"center", gap:10 }}>
             <Link href="/" style={{ textDecoration:"none", color:"inherit" }}>Rebel Ants Playground</Link>
-            <button onClick={toggleMute} title={muted?"Unmute":"Mute"} style={{ background:"rgba(0,0,0,0.4)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:20, padding:"3px 10px", cursor:"pointer", fontSize:16, color:"rgba(255,255,255,0.8)", lineHeight:1 }}>{muted?"🔇":"🔊"}</button>
+            <button onPointerDown={e=>{e.preventDefault();toggleMute();}} title={muted?"Unmute":"Mute"} style={{ background:"rgba(0,0,0,0.4)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:20, padding:"8px 14px", cursor:"pointer", fontSize:16, color:"rgba(255,255,255,0.8)", lineHeight:1, minWidth:44, minHeight:44, touchAction:"manipulation" }}>{muted?"🔇":"🔊"}</button>
           </div>
-          <nav style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+          <nav style={{ display:"flex", gap:6, flexWrap:"wrap", fontSize:12 }}>
             {([["tunnel","🐜 Ant Tunnel"],["hatch","⚔️ Faction Wars"],["expedition","⚔️ The Raid"],["shuffle","🃏 Shuffle"]] as [string,string][]).map(([href,label])=>(
               <Link key={href} href={`/${href}`} onClick={href === 'faction-wars' ? () => { setTimeout(() => sfx.startTheme(), 100); } : undefined} style={{ padding:"8px 14px", borderRadius:20, textDecoration:"none", fontSize:13, fontWeight:700, background:href==="hatch"?"rgba(251,191,36,0.15)":"rgba(255,255,255,0.07)", border:`1px solid ${href==="hatch"?"rgba(251,191,36,0.4)":"rgba(255,255,255,0.12)"}`, color:href==="hatch"?"#fbbf24":"rgba(255,255,255,0.8)" }}>{label}</Link>
             ))}
@@ -1184,7 +1184,7 @@ export default function FactionWars() {
         </div>
       </div>
 
-      <div style={{ maxWidth:900, margin:"0 auto", padding:"20px 16px", position:"relative", zIndex:1 }}>
+      <div style={{ maxWidth:900, margin:"0 auto", padding:"16px 12px", overflowX:"hidden", width:"100%", position:"relative", zIndex:1 }}>
         {phase === "idle" && (
           <div>
             <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:16, padding:"24px 20px", marginBottom:18 }}>

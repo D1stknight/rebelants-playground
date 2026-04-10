@@ -475,6 +475,8 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
   const [isLandscape, setIsLandscape] = useState(true);
 
     const lastHitRef = useRef(0);
+  const dpadIntervalRef = useRef<ReturnType<typeof setInterval>|null>(null);
+  const dpadActionRef = useRef<(a:"up"|"down"|"left"|"right")=>void>(()=>{});
   const gameBoardTopRef = useRef<HTMLDivElement | null>(null);
   const boardScrollRef = useRef<HTMLDivElement | null>(null);
   const playerTileRef = useRef<HTMLDivElement | null>(null);
@@ -663,6 +665,17 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     });
   }
   
+
+  // D-pad hold-to-repeat helpers
+  function stopDpadRepeat() {
+    if (dpadIntervalRef.current !== null) { clearInterval(dpadIntervalRef.current); dpadIntervalRef.current = null; }
+  }
+  function startDpadRepeat(action: "up"|"down"|"left"|"right") {
+    stopDpadRepeat();
+    dpadActionRef.current(action);
+    dpadIntervalRef.current = setInterval(() => dpadActionRef.current(action), 80);
+  }
+
   function handleTunnelAction(action: "up" | "down" | "left" | "right" | "break") {
     if (!isPlaying) return;
 
@@ -1331,6 +1344,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     return () => window.clearTimeout(id);
   }, [countdown]);
 
+  dpadActionRef.current = handleTunnelAction;
   return (
     <>
           {countdown !== null && (
@@ -1665,6 +1679,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                     ...boardPreviewStyle,
                     ...(isMobileView ? boardPreviewMobileStyle : null),
                     ...(isPlaying && isMobileView ? boardPreviewMobileRunStyle : null),
+          ...(isPlaying && isMobileView && isLandscape ? { height: "calc(100svh - 80px)", minHeight: "calc(100svh - 80px)", maxHeight: "calc(100svh - 80px)" } : null),
                     background: theme.bg,
                     overflow: isPlaying && isMobileView ? "hidden" : undefined,
                     touchAction: isPlaying && isMobileView ? "none" : undefined,
@@ -1672,13 +1687,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                 >
                                    <div style={previewGlowStyle(theme.accent)} />
 
-                  {isPlaying && isMobileView && !isLandscape && (
-                    <div style={mobileRotateOverlayStyle}>
-                      <div style={mobileRotateCardStyle}>
-                        Rotate your phone to landscape for a better game experience
-                      </div>
-                    </div>
-                  )}
+        {/* portrait supported via D-pad */}
 
                  {hitFlash && (
   <div
@@ -1930,18 +1939,24 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               </div>
             </div>
 
-                                {isPlaying && isMobileView && (
-              <div className="mobileOnlyControls">
-                <button
-                  type="button"
-                  style={mobileBreakButtonStyle}
-                  onTouchStart={pressMobileBreak}
-                  onMouseDown={pressMobileBreak}
-                >
-                  Break
-                </button>
-              </div>
-            )}
+        {isPlaying && isMobileView && (
+          <div style={{ position:"fixed", ...(isLandscape ? { right:"max(12px,env(safe-area-inset-right))", top:"50%", transform:"translateY(-50%)" } : { bottom:"max(16px,env(safe-area-inset-bottom))", left:"50%", transform:"translateX(-50%)" }), zIndex:500, display:"flex", flexDirection:"column", alignItems:"center", gap:8, userSelect:"none", WebkitUserSelect:"none", touchAction:"none" }}>
+            {/* D-pad */}
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:6, width:168, height:168 }}>
+              <div />
+              <button type="button" onTouchStart={e=>{e.preventDefault();startDpadRepeat("up");}} onTouchEnd={e=>{e.preventDefault();stopDpadRepeat();}} onTouchCancel={stopDpadRepeat} onMouseDown={e=>{e.preventDefault();startDpadRepeat("up");}} onMouseUp={stopDpadRepeat} onMouseLeave={stopDpadRepeat} style={{ display:"flex",alignItems:"center",justifyContent:"center",borderRadius:12,border:"2px solid rgba(255,255,255,0.3)",background:"rgba(255,255,255,0.12)",fontSize:28,cursor:"pointer",color:"white",WebkitTapHighlightColor:"transparent",touchAction:"none",outline:"none" }}>▲</button>
+              <div />
+              <button type="button" onTouchStart={e=>{e.preventDefault();startDpadRepeat("left");}} onTouchEnd={e=>{e.preventDefault();stopDpadRepeat();}} onTouchCancel={stopDpadRepeat} onMouseDown={e=>{e.preventDefault();startDpadRepeat("left");}} onMouseUp={stopDpadRepeat} onMouseLeave={stopDpadRepeat} style={{ display:"flex",alignItems:"center",justifyContent:"center",borderRadius:12,border:"2px solid rgba(255,255,255,0.3)",background:"rgba(255,255,255,0.12)",fontSize:28,cursor:"pointer",color:"white",WebkitTapHighlightColor:"transparent",touchAction:"none",outline:"none" }}>◀</button>
+              <div style={{ borderRadius:12, background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.1)" }} />
+              <button type="button" onTouchStart={e=>{e.preventDefault();startDpadRepeat("right");}} onTouchEnd={e=>{e.preventDefault();stopDpadRepeat();}} onTouchCancel={stopDpadRepeat} onMouseDown={e=>{e.preventDefault();startDpadRepeat("right");}} onMouseUp={stopDpadRepeat} onMouseLeave={stopDpadRepeat} style={{ display:"flex",alignItems:"center",justifyContent:"center",borderRadius:12,border:"2px solid rgba(255,255,255,0.3)",background:"rgba(255,255,255,0.12)",fontSize:28,cursor:"pointer",color:"white",WebkitTapHighlightColor:"transparent",touchAction:"none",outline:"none" }}>▶</button>
+              <div />
+              <button type="button" onTouchStart={e=>{e.preventDefault();startDpadRepeat("down");}} onTouchEnd={e=>{e.preventDefault();stopDpadRepeat();}} onTouchCancel={stopDpadRepeat} onMouseDown={e=>{e.preventDefault();startDpadRepeat("down");}} onMouseUp={stopDpadRepeat} onMouseLeave={stopDpadRepeat} style={{ display:"flex",alignItems:"center",justifyContent:"center",borderRadius:12,border:"2px solid rgba(255,255,255,0.3)",background:"rgba(255,255,255,0.12)",fontSize:28,cursor:"pointer",color:"white",WebkitTapHighlightColor:"transparent",touchAction:"none",outline:"none" }}>▼</button>
+              <div />
+            </div>
+            {/* Break */}
+            <button type="button" onTouchStart={pressMobileBreak} onMouseDown={pressMobileBreak} style={mobileBreakButtonStyle}>Break</button>
+          </div>
+        )}
           </div>
 
     {!isPlaying && lastRunResult && (
@@ -2029,11 +2044,14 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
             </div>
           </div>
           </div>
-        {isPlaying && isMobileView && !isLandscape && (
-          <div style={mobileRotatePromptWrapStyle}>
-            <div style={mobileRotatePromptCardStyle}>
-              Rotate your phone to landscape for a better game experience
-            </div>
+        {/* landscape prompt removed — D-pad supports portrait */}
+        {/* Polished landscape-only overlay */}
+        {isMobileView && !isLandscape && isPlaying && (
+          <div style={{ position:"fixed", inset:0, zIndex:9000, background:"rgba(9,12,22,0.96)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:20, padding:32 }}>
+            <div style={{ fontSize:64, animation:"spin90 1.2s ease-in-out infinite alternate" }}>📱</div>
+            <div style={{ fontSize:22, fontWeight:900, color:"white", textAlign:"center", letterSpacing:"0.02em" }}>Rotate to play</div>
+            <div style={{ fontSize:14, color:"rgba(255,255,255,0.5)", textAlign:"center", maxWidth:260 }}>Ant Tunnel is best in landscape mode</div>
+            <div style={{ fontSize:36, opacity:0.3 }}>🐜</div>
           </div>
         )}
       </main>
@@ -2116,16 +2134,13 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
         @media (max-width: 900px) {
           .mobileOnlyControls {
             position: fixed;
-            right: max(10px, env(safe-area-inset-right));
-            bottom: max(10px, env(safe-area-inset-bottom));
+            bottom: max(16px, env(safe-area-inset-bottom));
+            left: 50%;
+            transform: translateX(-50%);
             z-index: 120;
-            display: block;
-            padding: 4px;
-            border-radius: 999px;
-            background: rgba(2, 6, 23, 0.06);
-            backdrop-filter: blur(2px);
-            -webkit-backdrop-filter: blur(2px);
-            box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
           }
         }
 
@@ -2204,6 +2219,10 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
   80% { transform: translate(3px, -1px); }
   100% { transform: translate(0, 0); }
 }
+        @keyframes spin90 {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(90deg); }
+        }
       `}</style>
     </>
   );
@@ -2402,8 +2421,9 @@ const boardPreviewMobileStyle: React.CSSProperties = {
 };
 
 const previewInnerMobileStyle: React.CSSProperties = {
-  minWidth: 920,
-  minHeight: 700,
+  minWidth: "100%",
+  width: "100%",
+  minHeight: 0,
 };
 
 const previewGridMobileStyle: React.CSSProperties = {
@@ -2412,9 +2432,9 @@ const previewGridMobileStyle: React.CSSProperties = {
 
 const boardPreviewMobileRunStyle: React.CSSProperties = {
   padding: 8,
-  height: "calc(100dvh - 140px)",
-  minHeight: "calc(100dvh - 140px)",
-  maxHeight: "calc(100dvh - 140px)",
+  height: "calc(100dvh - 360px)",
+  minHeight: "calc(100dvh - 360px)",
+  maxHeight: "calc(100dvh - 360px)",
   overflow: "hidden",
 };
 
