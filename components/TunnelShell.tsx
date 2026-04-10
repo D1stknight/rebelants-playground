@@ -1924,18 +1924,24 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               </div>
             </div>
 
-                                {isPlaying && isMobileView && (
-              <div className="mobileOnlyControls">
-                <button
-                  type="button"
-                  style={mobileBreakButtonStyle}
-                  onTouchStart={pressMobileBreak}
-                  onMouseDown={pressMobileBreak}
-                >
-                  Break
-                </button>
-              </div>
-            )}
+        {isPlaying && isMobileView && (
+          <div style={{ position:"fixed", bottom:"max(16px, env(safe-area-inset-bottom))", left:"50%", transform:"translateX(-50%)", zIndex:500, display:"flex", flexDirection:"column", alignItems:"center", gap:8, userSelect:"none", WebkitUserSelect:"none", touchAction:"none" }}>
+            {/* D-pad */}
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:6, width:168, height:168 }}>
+              <div />
+              <button type="button" onTouchStart={e=>{e.preventDefault();handleTunnelAction("up");}} onMouseDown={e=>{e.preventDefault();handleTunnelAction("up");}} style={{ display:"flex",alignItems:"center",justifyContent:"center",borderRadius:12,border:"2px solid rgba(255,255,255,0.3)",background:"rgba(255,255,255,0.12)",fontSize:28,cursor:"pointer",color:"white",WebkitTapHighlightColor:"transparent",touchAction:"none",outline:"none" }}>▲</button>
+              <div />
+              <button type="button" onTouchStart={e=>{e.preventDefault();handleTunnelAction("left");}} onMouseDown={e=>{e.preventDefault();handleTunnelAction("left");}} style={{ display:"flex",alignItems:"center",justifyContent:"center",borderRadius:12,border:"2px solid rgba(255,255,255,0.3)",background:"rgba(255,255,255,0.12)",fontSize:28,cursor:"pointer",color:"white",WebkitTapHighlightColor:"transparent",touchAction:"none",outline:"none" }}>◀</button>
+              <div style={{ borderRadius:12, background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.1)" }} />
+              <button type="button" onTouchStart={e=>{e.preventDefault();handleTunnelAction("right");}} onMouseDown={e=>{e.preventDefault();handleTunnelAction("right");}} style={{ display:"flex",alignItems:"center",justifyContent:"center",borderRadius:12,border:"2px solid rgba(255,255,255,0.3)",background:"rgba(255,255,255,0.12)",fontSize:28,cursor:"pointer",color:"white",WebkitTapHighlightColor:"transparent",touchAction:"none",outline:"none" }}>▶</button>
+              <div />
+              <button type="button" onTouchStart={e=>{e.preventDefault();handleTunnelAction("down");}} onMouseDown={e=>{e.preventDefault();handleTunnelAction("down");}} style={{ display:"flex",alignItems:"center",justifyContent:"center",borderRadius:12,border:"2px solid rgba(255,255,255,0.3)",background:"rgba(255,255,255,0.12)",fontSize:28,cursor:"pointer",color:"white",WebkitTapHighlightColor:"transparent",touchAction:"none",outline:"none" }}>▼</button>
+              <div />
+            </div>
+            {/* Break */}
+            <button type="button" onTouchStart={pressMobileBreak} onMouseDown={pressMobileBreak} style={mobileBreakButtonStyle}>Break</button>
+          </div>
+        )}
           </div>
 
     {!isPlaying && lastRunResult && (
