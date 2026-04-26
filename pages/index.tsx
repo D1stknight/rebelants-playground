@@ -463,44 +463,45 @@ export default function LandingPage() {
               </div>
 
               {/* Right — Actions */}
-              <div style={{ display:'flex', flexWrap:'wrap', gap:10, alignItems:'center' }}>
-                {/* Daily Claim */}
-                <button
-                  onPointerDown={e=>{e.preventDefault();handleClaimDaily();}}
-                  style={{ fontFamily:'inherit', padding:'10px 18px', fontSize:12, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background:'linear-gradient(135deg,#ef4444,#f97316)', border:'none', borderRadius:50, color:'white', cursor:'pointer', whiteSpace:'nowrap' }}
-                >
-                  {claimMsg || '⚡ CLAIM DAILY'}
-                </button>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:8, alignItems:'center' }}>
+
+                {/* Claim Daily + countdown grouped together */}
+                <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+                  <button
+                    onPointerDown={e=>{e.preventDefault();handleClaimDaily();}}
+                    style={{ fontFamily:'inherit', padding:'9px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background:'linear-gradient(135deg,#ef4444,#f97316)', border:'none', borderRadius:50, color:'white', cursor:'pointer', whiteSpace:'nowrap' }}
+                  >
+                    {claimMsg || '⚡ CLAIM DAILY'}
+                  </button>
+                  {effectiveId && effectiveId !== 'guest' && (
+                    <div style={{ fontFamily:'inherit', fontSize:9, letterSpacing:'0.1em', color: dailyClaimed && msUntilClaim > 0 ? 'rgba(255,255,255,0.35)' : '#34d399', textTransform:'uppercase', whiteSpace:'nowrap' }}>
+                      {dailyClaimed && msUntilClaim > 0
+                        ? `NEXT ${Math.floor(msUntilClaim/3600000)}h ${Math.floor((msUntilClaim%3600000)/60000)}m ${Math.floor((msUntilClaim%60000)/1000)}s`
+                        : '⚡ READY'}
+                    </div>
+                  )}
+                </div>
 
                 {/* Buy Points */}
                 <button
                   onPointerDown={e=>{e.preventDefault(); setShowBuyModal(true);}}
-                  style={{ fontFamily:'inherit', padding:'10px 18px', fontSize:12, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:50, color:'white', cursor:'pointer', whiteSpace:'nowrap' }}
+                  style={{ fontFamily:'inherit', padding:'9px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:50, color:'white', cursor:'pointer', whiteSpace:'nowrap' }}
                 >
                   💎 BUY POINTS
                 </button>
-
-                {/* Countdown */}
-                {effectiveId && effectiveId !== 'guest' && (
-                  <div style={{ fontFamily:'inherit', fontSize:10, letterSpacing:'0.12em', color: dailyClaimed && msUntilClaim > 0 ? 'rgba(255,255,255,0.4)' : '#34d399', textTransform:'uppercase', textAlign:'center', minWidth:120 }}>
-                    {dailyClaimed && msUntilClaim > 0
-                      ? `NEXT CLAIM ${Math.floor(msUntilClaim/3600000)}h ${Math.floor((msUntilClaim%3600000)/60000)}m ${Math.floor((msUntilClaim%60000)/1000)}s`
-                      : '⚡ READY TO CLAIM'}
-                  </div>
-                )}
 
                 {/* Discord */}
                 {discordLinked ? (
                   <button
                     onPointerDown={e=>{e.preventDefault();handleDisconnectDiscord();}}
-                    style={{ fontFamily:'inherit', padding:'10px 18px', fontSize:12, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background:'rgba(88,101,242,0.15)', border:'1px solid rgba(88,101,242,0.3)', borderRadius:50, color:'#a5b4fc', cursor:'pointer', whiteSpace:'nowrap' }}
+                    style={{ fontFamily:'inherit', padding:'9px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background:'rgba(88,101,242,0.15)', border:'1px solid rgba(88,101,242,0.3)', borderRadius:50, color:'#a5b4fc', cursor:'pointer', whiteSpace:'nowrap' }}
                   >
                     ✓ DISCORD
                   </button>
                 ) : (
                   <button
                     onPointerDown={e=>{e.preventDefault();handleConnectDiscord();}}
-                    style={{ fontFamily:'inherit', padding:'10px 18px', fontSize:12, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background:'#5865F2', border:'none', borderRadius:50, color:'white', cursor:'pointer', whiteSpace:'nowrap', boxShadow:'0 0 20px rgba(88,101,242,0.4)' }}
+                    style={{ fontFamily:'inherit', padding:'9px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background:'#5865F2', border:'none', borderRadius:50, color:'white', cursor:'pointer', whiteSpace:'nowrap', boxShadow:'0 0 20px rgba(88,101,242,0.4)' }}
                   >
                     CONNECT DISCORD
                   </button>
