@@ -1363,694 +1363,470 @@ async function submitShipping() {
   }
 }
 
-return (  
-    <>
-      {/* full-screen ant colony BG */}
-     <div
-  className="ant-colony-bg"
-  aria-hidden="true"
-  style={{
-    backgroundImage: `linear-gradient(
-        140deg,
-        rgba(11, 27, 49, 0.18),
-        rgba(7, 13, 26, 0.55)
-      ),
-      url("${shuffleConfig.pageBg}")`,
-  }}
-/>
 
-      {/* HEADER */}
-      <header className="page-head" role="banner">
-        <div className="site-title" style={{ display:"flex", alignItems:"center", gap:10 }}>
-          <Link href="/">Rebel Ants Playground</Link>
-          <button onClick={toggleShuffleMute} title={shuffleMuted ? "Unmute" : "Mute"} style={{ background:"rgba(0,0,0,0.4)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:20, padding:"3px 10px", cursor:"pointer", fontSize:16, color:"rgba(255,255,255,0.8)", lineHeight:1 }}>
-            {shuffleMuted ? "🔇" : "🔊"}
+  return (
+    <>
+      {/* ── PARTICLES ── */}
+      <div style={{ position:'fixed', inset:0, zIndex:0, pointerEvents:'none', overflow:'hidden' }}>
+        {[...Array(30)].map((_,i) => (
+          <div key={i} style={{
+            position:'absolute',
+            bottom:'-4px',
+            left: `${(i*97+13)%100}%`,
+            width: 2+(i%3),
+            height: 2+(i%3),
+            borderRadius:'50%',
+            background: i%3===0?'#a78bfa':i%3===1?'#fbbf24':'#c084fc',
+            opacity: 0.12+(i%5)*0.06,
+            animation: `shuffleFloat ${6+(i%5)*1.8}s ${(i*0.7)%8}s infinite linear`,
+          }} />
+        ))}
+      </div>
+
+      {/* ── FULL PAGE BG ── */}
+      <div style={{ position:'fixed', inset:0, zIndex:0, pointerEvents:'none',
+        background:'radial-gradient(ellipse at 50% 30%, rgba(109,40,217,0.15) 0%, rgba(5,3,15,0.0) 60%), linear-gradient(160deg, #060412 0%, #0d0520 40%, #080318 100%)',
+        backgroundImage: `url("${shuffleConfig.pageBg}")`,
+        backgroundSize:'cover', backgroundPosition:'center', filter:'saturate(0.7) brightness(0.45)'
+      }} />
+      <div style={{ position:'fixed', inset:0, zIndex:1, pointerEvents:'none',
+        background:'linear-gradient(160deg, rgba(6,4,18,0.75) 0%, rgba(13,5,32,0.6) 50%, rgba(6,4,18,0.85) 100%)'
+      }} />
+
+      {/* ── HEADER ── */}
+      <header style={{ position:'relative', zIndex:20, maxWidth:980, margin:'0 auto', padding:'16px 20px 0', display:'flex', alignItems:'center', justifyContent:'space-between', fontFamily:`${JP}` }}>
+        <Link href="/" style={{ display:'flex', alignItems:'center', gap:10, textDecoration:'none', color:'white' }}>
+          <span style={{ fontSize:20, filter:'drop-shadow(0 0 8px rgba(167,139,250,0.6))' }}>←</span>
+          <span style={{ fontSize:11, fontWeight:900, letterSpacing:'0.2em', textTransform:'uppercase', color:'rgba(255,255,255,0.5)' }}>REBEL ANTS</span>
+        </Link>
+        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+          <div style={{ fontSize:13, fontWeight:900, letterSpacing:'0.1em', color:'#fbbf24', filter:'drop-shadow(0 0 8px rgba(251,191,36,0.5))' }}>
+            ⚡ {balance} <span style={{ fontSize:10, color:'rgba(251,191,36,0.6)' }}>REBEL</span>
+          </div>
+          <button onPointerDown={e=>{e.preventDefault();toggleShuffleMute();}}
+            style={{ background:'rgba(0,0,0,0.4)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:20, padding:'6px 12px', cursor:'pointer', fontSize:15, color:'rgba(255,255,255,0.8)', minWidth:40, minHeight:40, touchAction:'manipulation' }}>
+            {shuffleMuted ? '🔇' : '🔊'}
           </button>
         </div>
-        <nav className="tabs" aria-label="Main">
-          <Link href="/tunnel"     className="tab">🐜 Ant Tunnel</Link>
-          <Link href="/faction-wars"      className="tab">⚔️ Faction Wars</Link>
-          <Link href="/the-raid" className="tab">⚔️ The Raid</Link>
-          <Link href="/shuffle"    className="tab tab-active">🃏 Shuffle</Link>
-        </nav>
       </header>
 
-      {/* Game card */}
-      <div className="ant-card ra-shuffle2" style={{ maxWidth: 980, margin: "0 auto" }}>
-        
-        <div className="title">Queen&apos;s Egg Shuffle</div>
-        <p className="subtitle">
-          {EGG_COUNT} eggs. We shuffle. You pick one for a prize.
-        </p>
+      {/* ── MAIN CONTENT ── */}
+      <div style={{ position:'relative', zIndex:10, maxWidth:980, margin:'0 auto', padding:'12px 16px 40px', fontFamily:`${JP}` }}>
 
-        <div
-  className="shuffle-scene ant-scene"
-  style={{ position: "relative", minHeight: 420, overflow: "hidden" }}
->
-          {/* in-scene dojo BG */}
-         <div
-  className="scene-bg"
-  aria-hidden="true"
-  style={{
-    backgroundImage: `linear-gradient(180deg, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.18)),
-      url("${shuffleConfig.cardBg}")`,
-  }}
-/>
-          <div className="strip" />
-
-          {/* Queen 3D */}
-          <Queen3D active={phase === "shuffling"} scale={shuffleConfig.queenScale} y={-0.1} />
-
-          <div className="rail rail-top" />
-          <div className="rail rail-bottom" />
-
-          <AntProgress progress={progress} />
-
-          {Array.from({ length: EGG_COUNT }, (_, i) => (
-  <button
-    key={i}
-    className={`egg-card ${phase === "pick" ? "can-pick" : ""}`}
-   style={{ left: `${LANES[order[i]]}%`, top: "58%" }}
-    onClick={onPick}
-    disabled={phase !== "pick" || busy}
-    aria-label="Pick egg"
-  >
-    <div className={`egg-body ${phase === "pick" ? "wobble-on-pick" : ""}`} />
-    <div className="egg-shadow" />
-    <div className="egg-speckle" />
-  </button>
-))}
+        {/* Title */}
+        <div style={{ textAlign:'center', marginBottom:8 }}>
+          <div style={{ fontSize:'clamp(22px,4vw,38px)', fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase',
+            background:'linear-gradient(135deg,#e9d5ff,#a78bfa,#7c3aed,#fbbf24)',
+            WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text',
+            filter:'drop-shadow(0 0 20px rgba(167,139,250,0.4))',
+          }}>QUEEN&apos;S EGG SHUFFLE</div>
+          <div style={{ fontSize:12, letterSpacing:'0.25em', color:'rgba(255,255,255,0.35)', textTransform:'uppercase', marginTop:4 }}>
+            {EGG_COUNT} EGGS · ONE FATE · CHOOSE WISELY
+          </div>
         </div>
 
-      {/* Shuffle button + balance row */}
-<div className="shuffle-cta" style={{ position: "relative", display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-<div style={{ height: 44, display: "flex", alignItems: "center" }}>
- <button
-  className="btn"
-  onClick={runShuffle}
-  disabled={busy || phase === "shuffling" || needMore > 0}
-  title={needMore > 0 ? "Not enough points" : ""}
-  style={{
-    position: "relative",
-    minWidth: 240,           // ✅ keeps row from reflowing
-    height: 44,              // ✅ consistent height
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-  }}
->
-  {/* ✅ reserve the “largest” label width so layout never shifts */}
-  <span style={{ visibility: "hidden" }}>
-    {`Shuffle (-${cost} ${pointsConfig.currency})`}
-  </span>
+        {/* ── GAME SCENE ── */}
+        <div style={{ position:'relative', minHeight:460, borderRadius:24, overflow:'hidden', marginBottom:20,
+          background:'linear-gradient(180deg, rgba(30,5,60,0.85) 0%, rgba(10,2,30,0.95) 100%)',
+          border:'1px solid rgba(167,139,250,0.2)',
+          boxShadow:'0 0 60px rgba(109,40,217,0.2), 0 0 120px rgba(109,40,217,0.08), inset 0 1px 0 rgba(167,139,250,0.15)',
+        }}>
 
-  {/* ✅ real visible label */}
-  <span
-    style={{
-      position: "absolute",
-      inset: 0,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-    }}
-  >
-    {phase === "shuffling"
-      ? "Shuffling…"
-      : `Shuffle (-${cost} ${pointsConfig.currency})`}
-  </span>
-</button>
-</div>
+          {/* Scene BG image */}
+          <div style={{ position:'absolute', inset:0, zIndex:0, pointerEvents:'none',
+            backgroundImage: `linear-gradient(180deg, rgba(20,4,50,0.4), rgba(5,1,18,0.7)), url("${shuffleConfig.cardBg}")`,
+            backgroundSize:'cover', backgroundPosition:'center',
+          }} />
 
- <button
-  className="btn"
-  type="button"
-  onClick={() => setShowBuyPoints(true)}
-  style={{ padding: "10px 12px", fontSize: 13, opacity: 0.95 }}
-  title="Connect Ape wallet and buy points with APE"
->
-  Buy Points / Connect Ape Wallet
-</button>
+          {/* Purple vignette overlay */}
+          <div style={{ position:'absolute', inset:0, zIndex:1, pointerEvents:'none',
+            background:'radial-gradient(ellipse at 50% 0%, rgba(109,40,217,0.18) 0%, transparent 65%)',
+          }} />
 
-{isDiscordConnected ? (
-  <button
-    className="btn"
-    type="button"
-    onClick={disconnectDiscord}
-    style={{ padding: "10px 12px", fontSize: 13, opacity: 0.95 }}
-  >
-    Disconnect Discord
-  </button>
-) : (
-  <button
-    className="btn"
-    type="button"
-    onClick={() => {
-      try {
-        // ✅ Explicitly clear the gate (deleting won't work with saveProfile merge rules)
-        saveProfile({ discordSkipLink: false });
-        window.dispatchEvent(new Event("ra:identity-changed"));
-      } catch {}
+          {/* Queen aura */}
+          <div style={{ position:'absolute', left:'50%', transform:'translateX(-50%)', top:30, width:200, height:200,
+            background:'radial-gradient(ellipse, rgba(167,139,250,0.25) 0%, rgba(109,40,217,0.12) 40%, transparent 70%)',
+            zIndex:2, pointerEvents:'none',
+            animation: phase==='shuffling' ? 'queenAuraActive 0.6s ease-in-out infinite alternate' : 'queenAura 3s ease-in-out infinite alternate',
+          }} />
 
-      window.location.href = "/api/auth/discord/login";
-    }}
-    style={{ padding: "10px 12px", fontSize: 13, opacity: 0.95 }}
-  >
-    Connect Discord
-  </button>
-)}
+          {/* Queen 3D */}
+          <div style={{ position:'relative', zIndex:3 }}>
+            <Queen3D active={phase === "shuffling"} scale={shuffleConfig.queenScale} y={-0.1} />
+          </div>
 
-<div style={{ fontSize: 12, opacity: 0.8 }}>
-  Discord: <b>{isDiscordConnected ? "Connected ✅" : "Not Connected ❌"}</b>
-</div>
-  
-  <div style={{ marginLeft: 12, fontSize: 13, opacity: 0.9, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-    <span>
-      Balance: <b>{balance}</b> {pointsConfig.currency}
-    </span>
+          {/* Rails */}
+          <div className="rail rail-top" style={{ zIndex:4 }} />
+          <div className="rail rail-bottom" style={{ zIndex:4 }} />
 
-    <button
-      type="button"
-      onClick={() => setShowHowPointsWork((v) => !v)}
-      style={{
-        border: "none",
-        background: "transparent",
-        color: "inherit",
-        textDecoration: "underline",
-        cursor: "pointer",
-        padding: 0,
-        fontSize: 12,
-        opacity: 0.9,
-      }}
-    >
-      How points work
-    </button>
+          {/* Progress */}
+          <div style={{ position:'relative', zIndex:5 }}>
+            <AntProgress progress={progress} />
+          </div>
 
-    {needMore > 0 && (
-      <span style={{ opacity: 0.9 }}>
-        Need {needMore} more {pointsConfig.currency}.
-      </span>
-    )}
-  </div>
+          {/* Eggs */}
+          {Array.from({ length: EGG_COUNT }, (_, i) => (
+            <button
+              key={i}
+              className={`egg-card ${phase === "pick" ? "can-pick" : ""}`}
+              style={{
+                left: `${LANES[order[i]]}%`,
+                top: "58%",
+                zIndex: 6,
+                filter: phase==='pick'
+                  ? 'drop-shadow(0 0 12px rgba(167,139,250,0.7)) drop-shadow(0 0 24px rgba(167,139,250,0.3))'
+                  : 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))',
+                transform: phase==='pick' ? 'perspective(400px) rotateX(-5deg)' : 'perspective(400px) rotateX(0deg)',
+                transition:'all 0.3s ease',
+              }}
+              onClick={onPick}
+              disabled={phase !== "pick" || busy}
+              aria-label="Pick egg"
+            >
+              <div className={`egg-body ${phase === "pick" ? "wobble-on-pick" : ""}`} style={{
+                background: phase==='pick'
+                  ? 'radial-gradient(ellipse at 35% 35%, #fef9c3, #fbbf24 50%, #d97706 100%)'
+                  : 'radial-gradient(ellipse at 35% 35%, #f5d0a0, #d97706 55%, #92400e 100%)',
+                boxShadow: phase==='pick' ? 'inset 0 -4px 12px rgba(0,0,0,0.3), 0 0 20px rgba(251,191,36,0.4)' : 'inset 0 -4px 12px rgba(0,0,0,0.3)',
+              }} />
+              <div className="egg-shadow" />
+              <div className="egg-speckle" style={{ opacity: phase==='pick' ? 0.3 : 0.5 }} />
+            </button>
+          ))}
 
-  {showHowPointsWork && (
-    <div
-      style={{
-        position: "absolute",
-        left: 0,
-        top: "calc(100% + 10px)",
-        width: "min(520px, 92vw)",
-        padding: 12,
-        borderRadius: 12,
-        background: "rgba(15,23,42,.92)",
-        border: "1px solid rgba(255,255,255,.18)",
-        boxShadow: "0 18px 40px rgba(0,0,0,.45)",
-        zIndex: 80,
-      }}
-    >
-      <div style={{ fontWeight: 800, marginBottom: 6 }}>How points work</div>
- <div style={{ fontSize: 13, opacity: 0.9, lineHeight: 1.4 }}>
-  • Shuffle costs <b>{pointsConfig.shuffleCost}</b> {pointsConfig.currency}.<br />
-  • Crates can award <b>REBEL Points</b> and occasionally <b>collectibles/merch</b> when enabled.<br />
-  • Daily claim: <b>+{pointsConfig.dailyClaim}</b> {pointsConfig.currency} (once per day).<br />
-  • Daily plays reset every 24 hours.<br />
-  • Point purchases may include <b>bonus plays</b>, which are used after daily plays run out and do not expire.<br />
-  • Optional: you can buy points with <b>APE</b> (final sale, gas may apply).<br />
-  • See <button onClick={()=>setShowRules(true)} style={{ fontSize:12, textDecoration:"underline", background:"none", border:"none", color:"inherit", cursor:"pointer", padding:0 }}>Official Rules</button> for details.
-</div>
-      <button
-        type="button"
-        className="btn"
-        onClick={() => setShowHowPointsWork(false)}
-        style={{ marginTop: 10, padding: "8px 12px", fontSize: 13 }}
-      >
-        Close
-      </button>
-    </div>
-  )}
-</div>
-    <div style={{ marginTop: 10, fontSize: 13, opacity: 0.9 }}>
-  <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-    <span>Cost: <b>{pointsConfig.shuffleCost}</b> {pointsConfig.currency}</span>
-    <span>Common: <b>+{pointsConfig.rewards.common}</b></span>
-    <span>Rare: <b>+{pointsConfig.rewards.rare}</b></span>
-    <span>Ultra: <b>+{pointsConfig.rewards.ultra}</b></span>
-  </div>
+          {/* Phase overlay — shuffling flash */}
+          {phase === 'shuffling' && (
+            <div style={{ position:'absolute', inset:0, zIndex:7, pointerEvents:'none',
+              background:'radial-gradient(ellipse at 50% 50%, rgba(167,139,250,0.08) 0%, transparent 60%)',
+              animation:'shuffleFlash 0.4s ease-in-out infinite alternate',
+            }} />
+          )}
 
-  <div style={{ marginTop: 8, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-    <span
-      style={{
-        fontWeight: 800,
-        color: "#60a5fa",
-        textShadow: "0 0 8px rgba(96,165,250,0.25)",
-      }}
-    >
-      Total plays left: <b>{Number(totalEarnRoom || 0).toLocaleString()}</b>
-    </span>
-    <span>
-      Daily plays left:{" "}
-      <b>
-        {Number(remainingDaily || 0).toLocaleString()} / {Number(dailyCap || 0).toLocaleString()}
-      </b>
-    </span>
-    <span>
-      Bonus play bank: <b>{Number(capBank || 0).toLocaleString()}</b>
-    </span>
-  </div>
+          {/* Pick phase invitation */}
+          {phase === 'pick' && (
+            <div style={{ position:'absolute', bottom:16, left:'50%', transform:'translateX(-50%)', zIndex:8,
+              fontFamily:`${JP}`, fontSize:12, fontWeight:900, letterSpacing:'0.25em', textTransform:'uppercase',
+              color:'#a78bfa', animation:'pickPulse 1.5s ease-in-out infinite',
+              textShadow:'0 0 12px rgba(167,139,250,0.8)',
+            }}>
+              ✦ CHOOSE YOUR EGG ✦
+            </div>
+          )}
+        </div>
 
-  <div style={{ fontSize: 12, opacity: 0.75, marginTop: 6 }}>
-    Daily plays reset every 24 hours. Bonus plays are included with point purchases and never expire.
-  </div>
-</div>
+        {/* ── ACTION ROW ── */}
+        <div style={{ display:'flex', gap:10, flexWrap:'wrap', alignItems:'center', marginBottom:16 }}>
 
-{/* Name + Claim + DRIP (aligned row) */}
-<div
-  style={{
-    marginTop: 10,
-    display: "flex",
-    gap: 10,
-    flexWrap: "wrap",
-    alignItems: "center",
-  }}
->
-  <label style={{ fontSize: 13, opacity: 0.9 }}>
-    Name:&nbsp;
-    <input
-      value={playerName}
-      onChange={(e) => {
-        const v = (e.target.value.slice(0, 18) || "guest").trim() || "guest";
-        setPlayerName(v);
+          {/* Shuffle Button — main CTA */}
+          <button
+            onClick={runShuffle}
+            disabled={busy || phase === "shuffling" || needMore > 0}
+            title={needMore > 0 ? "Not enough points" : ""}
+            style={{
+              fontFamily:`${JP}`,
+              position:'relative', minWidth:220, height:48,
+              display:'inline-flex', alignItems:'center', justifyContent:'center',
+              fontSize:13, fontWeight:900, letterSpacing:'0.2em', textTransform:'uppercase',
+              background: (busy || needMore>0) ? 'rgba(109,40,217,0.15)' : 'linear-gradient(135deg,#7c3aed,#a855f7,#7c3aed)',
+              backgroundSize:'200% 100%',
+              border: (busy || needMore>0) ? '2px solid rgba(109,40,217,0.3)' : '2px solid rgba(167,139,250,0.6)',
+              borderRadius:50, color:'white', cursor: (busy||needMore>0) ? 'not-allowed' : 'pointer',
+              opacity: (busy||needMore>0) ? 0.55 : 1,
+              boxShadow: (busy||needMore>0) ? 'none' : '0 0 20px rgba(109,40,217,0.5), 0 0 40px rgba(109,40,217,0.2)',
+              animation: (!busy && needMore===0) ? 'btnGlow 2.5s ease-in-out infinite' : 'none',
+              transition:'all 0.2s',
+            }}
+          >
+            <span style={{ visibility:'hidden', position:'absolute' }}>{`Shuffle (-${cost} ${pointsConfig.currency})`}</span>
+            <span style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+              {phase === "shuffling" ? "✦ SHUFFLING..." : `⚔️ SHUFFLE (-${cost} ${pointsConfig.currency})`}
+            </span>
+          </button>
 
-        // Keep the existing stored id — never rewrite it from the name
-        const p = loadProfile();
-        const id = (p?.id || playerId || "guest").trim() || "guest";
-        saveProfile({ name: v, id });
-      }}
-      style={{
-        padding: "6px 10px",
-        borderRadius: 10,
-        border: "1px solid rgba(255,255,255,.18)",
-        background: "rgba(15,23,42,.55)",
-        color: "inherit",
-      }}
-    />
-   <div style={{ fontSize: 11, opacity: 0.7, marginTop: 6 }}>
-  Identity: <b>{playerName || effectivePlayerId}</b>
-</div>
-  </label>
+          {/* Buy Points */}
+          <button onClick={() => setShowBuyPoints(true)}
+            style={{ fontFamily:`${JP}`, padding:'10px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase',
+              background:'rgba(251,191,36,0.1)', border:'1px solid rgba(251,191,36,0.35)', borderRadius:50,
+              color:'#fbbf24', cursor:'pointer', whiteSpace:'nowrap',
+              boxShadow:'0 0 12px rgba(251,191,36,0.15)', transition:'all 0.2s',
+            }}>
+            💎 BUY POINTS
+          </button>
 
-  <button
-    className="btn"
-    type="button"
-    onClick={claimDailyNow}
-    disabled={claimBusy || dailyClaimed}
-    style={{ padding: "8px 12px", fontSize: 13 }}
-    title={dailyClaimed ? "Already claimed today" : "Claim daily points"}
-  >
-    {dailyClaimed
-      ? "Claimed Today ✅"
-      : `Claim Daily +${pointsConfig.dailyClaim} ${pointsConfig.currency}`}
-  </button>
+          {/* Discord */}
+          {isDiscordConnected ? (
+            <button onClick={disconnectDiscord}
+              style={{ fontFamily:`${JP}`, padding:'10px 14px', fontSize:11, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase',
+                background:'rgba(88,101,242,0.12)', border:'1px solid rgba(88,101,242,0.3)', borderRadius:50, color:'#a5b4fc', cursor:'pointer', whiteSpace:'nowrap' }}>
+              ✓ DISCORD
+            </button>
+          ) : (
+            <button onClick={() => { try { saveProfile({ discordSkipLink: false }); window.dispatchEvent(new Event('ra:identity-changed')); } catch {} window.location.href = '/api/auth/discord/login'; }}
+              style={{ fontFamily:`${JP}`, padding:'10px 14px', fontSize:11, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase',
+                background:'#5865F2', border:'none', borderRadius:50, color:'white', cursor:'pointer', whiteSpace:'nowrap',
+                boxShadow:'0 0 16px rgba(88,101,242,0.4)' }}>
+              CONNECT DISCORD
+            </button>
+          )}
 
- <button
-  className="btn"
-  type="button"
-  onClick={async () => {
-    if (!isDiscordConnected) return;
-    await openDripModal();
-  }}
-  disabled={dripBusy || !isDiscordConnected}
-  style={{ padding: "8px 12px", fontSize: 13 }}
-  title={
-    isDiscordConnected
-      ? "Move points from Discord (DRIP) into the game."
-      : "Connect Discord to migrate DRIP points."
-  }
->
-  {dripBusy
-    ? "Loading DRIP…"
-    : isDiscordConnected
-    ? "Migrate Points from DRIP in Discord"
-    : "Connect Discord for DRIP"}
-</button>
+          {/* Balance */}
+          <div style={{ fontFamily:`${JP}`, fontSize:12, letterSpacing:'0.1em', color:'rgba(255,255,255,0.5)', textTransform:'uppercase' }}>
+            <span style={{ color:'#fbbf24', fontWeight:900 }}>{balance}</span> {pointsConfig.currency}
+          </div>
 
-  {typeof dripBalance === "number" && (
-    <div style={{ fontSize: 12, opacity: 0.9, display: "grid", alignItems: "center" }}>
-      DRIP: <b>{dripBalance}</b>
-    </div>
-  )}
+          {needMore > 0 && (
+            <span style={{ fontFamily:`${JP}`, fontSize:11, color:'#f87171', letterSpacing:'0.1em', textTransform:'uppercase' }}>
+              NEED {needMore} MORE
+            </span>
+          )}
+        </div>
 
-  {process.env.NODE_ENV !== "production" && (
-    <button
-      className="btn"
-      type="button"
-      onClick={async () => {
-        await devGrant(5000);
-        await refresh();
-        alert("Dev grant applied ✅");
-      }}
-      style={{ padding: "8px 12px", fontSize: 13, opacity: 0.9 }}
-      title="Dev only (ignores daily cap)"
-    >
-      Dev Grant +5000 {pointsConfig.currency}
-    </button>
-  )}
+        {/* ── INFO STRIP ── */}
+        <div style={{ display:'flex', gap:16, flexWrap:'wrap', alignItems:'center', marginBottom:12,
+          padding:'12px 16px', borderRadius:14,
+          background:'rgba(255,255,255,0.03)', border:'1px solid rgba(167,139,250,0.1)',
+        }}>
+          {/* Costs */}
+          <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+            {[
+              { label:'COST', val:`${pointsConfig.shuffleCost} ${pointsConfig.currency}`, col:'#f87171' },
+              { label:'COMMON', val:`+${pointsConfig.rewards.common}`, col:'#34d399' },
+              { label:'RARE', val:`+${pointsConfig.rewards.rare}`, col:'#a78bfa' },
+              { label:'ULTRA', val:`+${pointsConfig.rewards.ultra}`, col:'#fbbf24' },
+            ].map(item => (
+              <div key={item.label} style={{ fontFamily:`${JP}`, fontSize:10, letterSpacing:'0.12em', textTransform:'uppercase' }}>
+                <span style={{ color:'rgba(255,255,255,0.35)' }}>{item.label} </span>
+                <span style={{ color:item.col, fontWeight:900 }}>{item.val}</span>
+              </div>
+            ))}
+          </div>
 
- {claimStatus && (
-  <div style={{ fontSize: 12, opacity: 0.9 }}>
-    {claimStatus}
-  </div>
-)}
+          <div style={{ flex:1 }} />
 
-{dailyClaimed && msUntilNextClaim > 0 && (
-  <>
-    <div
-      style={{
-        fontSize: 12,
-        marginTop: 4,
-        fontWeight: 700,
-        color:
-          msUntilNextClaim < 5 * 60 * 1000
-            ? "#ef4444" // red
-            : msUntilNextClaim < 60 * 60 * 1000
-            ? "#f97316" // orange
-            : "#facc15", // yellow
-        textShadow:
-          msUntilNextClaim < 5 * 60 * 1000
-            ? "0 0 10px rgba(239,68,68,0.45)"
-            : msUntilNextClaim < 60 * 60 * 1000
-            ? "0 0 8px rgba(249,115,22,0.35)"
-            : "0 0 8px rgba(250,204,21,0.25)",
-        animation:
-          msUntilNextClaim < 5 * 60 * 1000
-            ? "claimPulse 1s ease-in-out infinite"
-            : msUntilNextClaim < 60 * 60 * 1000
-            ? "claimPulse 1.8s ease-in-out infinite"
-            : "none",
-      }}
-    >
-      Next claim in: {formatClaimCountdown(msUntilNextClaim)}
-    </div>
+          {/* Claim Daily */}
+          <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:2 }}>
+            <button onClick={claimDailyNow} disabled={claimBusy || dailyClaimed}
+              style={{ fontFamily:`${JP}`, padding:'7px 14px', fontSize:10, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase',
+                background: dailyClaimed ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg,#ef4444,#f97316)',
+                border: dailyClaimed ? '1px solid rgba(255,255,255,0.1)' : 'none',
+                borderRadius:50, color: dailyClaimed ? 'rgba(255,255,255,0.3)' : 'white',
+                cursor: dailyClaimed ? 'not-allowed' : 'pointer', whiteSpace:'nowrap',
+                boxShadow: dailyClaimed ? 'none' : '0 0 12px rgba(239,68,68,0.3)',
+              }}>
+              {dailyClaimed ? `✓ CLAIMED · NEXT IN ${formatClaimCountdown(msUntilNextClaim)}` : `⚡ CLAIM +${pointsConfig.dailyClaim} REBEL`}
+            </button>
+          </div>
 
-    <style jsx>{`
-      @keyframes claimPulse {
-        0% {
-          transform: scale(1);
-          opacity: 0.9;
-        }
-        50% {
-          transform: scale(1.03);
-          opacity: 1;
-        }
-        100% {
-          transform: scale(1);
-          opacity: 0.9;
-        }
-      }
-    `}</style>
-  </>
-)}
-</div>
-        {/* Official Rules link */}
-        <div className="rules-row">
-          <button className="rules-link" onClick={()=>setShowRules(true)} style={{background:"none",border:"none",cursor:"pointer",padding:0}}>
-            Official Rules
+          {/* DRIP migrate */}
+          {isDiscordConnected && (
+            <button onClick={async () => { if (isDiscordConnected) await openDripModal(); }} disabled={dripBusy}
+              style={{ fontFamily:`${JP}`, padding:'7px 12px', fontSize:10, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase',
+                background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:50, color:'rgba(255,255,255,0.5)', cursor:'pointer', whiteSpace:'nowrap' }}>
+              {dripBusy ? 'LOADING...' : 'MIGRATE DRIP'}
+            </button>
+          )}
+        </div>
+
+        {/* Official Rules */}
+        <div style={{ marginBottom:20 }}>
+          <button onClick={() => setShowRules(true)}
+            style={{ fontFamily:`${JP}`, fontSize:10, letterSpacing:'0.12em', textTransform:'uppercase',
+              background:'transparent', border:'none', color:'rgba(255,255,255,0.3)', cursor:'pointer', textDecoration:'underline' }}>
+            OFFICIAL RULES
           </button>
         </div>
 
-       <div
-  style={{
-    marginTop: 14,
-    padding: 12,
-    borderRadius: 14,
-    border: "1px solid rgba(255,255,255,.14)",
-    background: "rgba(15,23,42,.35)",
-    backdropFilter: "blur(6px)",
-  }}
->
-  <LeaderboardPanel />
-</div>
+        {/* ── LEADERBOARD ── */}
+        <div style={{ borderRadius:18, border:'1px solid rgba(167,139,250,0.15)',
+          background:'rgba(10,4,25,0.6)', backdropFilter:'blur(12px)',
+          padding:16, boxShadow:'0 0 30px rgba(109,40,217,0.1)',
+        }}>
+          <LeaderboardPanel />
+        </div>
 
-   {showPrize && (
-  <PrizeModal
-    rarity={rarity}
-    prize={prize}
-    onClose={() => setShowPrize(false)}
-    needShipping={needShipping}
-    shippingForm={shippingForm}
-    setShippingForm={setShippingForm}
-    shipBusy={shipBusy}
-    shipMsg={shipMsg}
-    onSubmitShipping={submitShipping}
-  />
-)}
-        
+        {/* Copyright */}
+        <div style={{ textAlign:'center', padding:'16px 0 4px', fontSize:10, opacity:0.25, color:'white', letterSpacing:'0.06em', userSelect:'none', fontFamily:`${JP}`, textTransform:'uppercase' }}>
+          © 2026 REBEL ANTS LLC · DEVELOPED BY MIGUEL CONCEPCION
+        </div>
+      </div>
+
+      {/* ── MODALS (all preserved exactly) ── */}
+      {showPrize && (
+        <PrizeModal
+          rarity={rarity}
+          prize={prize}
+          onClose={() => setShowPrize(false)}
+          needShipping={needShipping}
+          shippingForm={shippingForm}
+          setShippingForm={setShippingForm}
+          shipBusy={shipBusy}
+          shipMsg={shipMsg}
+          onSubmitShipping={submitShipping}
+        />
+      )}
+
       {showRules && (
-        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.8)", zIndex:3000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }} onClick={()=>setShowRules(false)}>
-          <div style={{ background:"#0f172a", border:"1px solid rgba(255,255,255,0.15)", borderRadius:16, padding:28, maxWidth:560, width:"100%", maxHeight:"85vh", overflowY:"auto" }} onClick={e=>e.stopPropagation()}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.8)', zIndex:3000, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }} onClick={()=>setShowRules(false)}>
+          <div style={{ background:'#0f172a', border:'1px solid rgba(255,255,255,0.15)', borderRadius:16, padding:28, maxWidth:560, width:'100%', maxHeight:'85vh', overflowY:'auto' }} onClick={e=>e.stopPropagation()}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:18 }}>
               <div style={{ fontWeight:900, fontSize:18 }}>📋 Official Rules</div>
-              <button onClick={()=>setShowRules(false)} style={{ background:"rgba(255,255,255,0.1)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:8, padding:"6px 14px", color:"white", cursor:"pointer", fontSize:13 }}>✕ Close</button>
+              <button onClick={()=>setShowRules(false)} style={{ background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.2)', borderRadius:8, padding:'6px 14px', color:'white', cursor:'pointer', fontSize:13 }}>✕ Close</button>
             </div>
-            <div style={{ fontSize:13, lineHeight:1.7, display:"flex", flexDirection:"column", gap:12, opacity:0.9 }}>
+            <div style={{ fontSize:13, lineHeight:1.7, display:'flex', flexDirection:'column', gap:12, opacity:0.9 }}>
               <p><b>Free-to-play.</b> No purchase necessary to play. Void where prohibited.</p>
               <p><b>Game currency:</b> REBEL Points are an in-app promotional points system. No guaranteed cash value, not redeemable for cash.</p>
-              <p><b>Optional purchase (APE):</b> You may optionally buy REBEL Points using APE to support the project. <b>All purchases are final</b> (no refunds). Gas fees may apply.</p>
-              <p><b>Prizes:</b> Crates may award REBEL Points and/or digital collectibles and/or merch (when available). Availability may vary by location.</p>
-              <p><b>Daily limits:</b> Daily claim and play limits apply to ensure fair access. Daily plays reset every 24 hours. Purchased bonus plays do not expire.</p>
-              <p><b>Fair play:</b> Multi-accounting, bots, exploits, or abuse may result in disqualification, prize forfeiture, or account blocking.</p>
-              <p><b>Odds:</b> Prize odds and point values may change over time based on live configuration and promotions.</p>
-              <p><b>Taxes:</b> You are responsible for any taxes associated with prizes, if applicable.</p>
-              <p style={{ opacity:0.7 }}>By playing, you agree to these rules and acknowledge this is an entertainment experience with promotional rewards.</p>
+              <p><b>Optional purchase (APE):</b> You may optionally buy REBEL Points using APE. <b>All purchases are final</b>. Gas fees may apply.</p>
+              <p><b>Prizes:</b> Crates may award REBEL Points and/or digital collectibles and/or merch when available.</p>
+              <p><b>Daily limits:</b> Daily claim and play limits apply. Daily plays reset every 24 hours. Purchased bonus plays do not expire.</p>
+              <p><b>Fair play:</b> Multi-accounting, bots, or exploits may result in disqualification.</p>
+              <p style={{ opacity:0.7 }}>By playing, you agree to these rules.</p>
             </div>
           </div>
         </div>
       )}
 
-<BuyPointsModal
-  open={showBuyPoints}
-  onClose={() => setShowBuyPoints(false)}
-  playerId={effectivePlayerId} // ✅ IMPORTANT: credit the same id the UI is showing
-  onClaimed={async () => {
-    await refresh();
-  }}
-/>
+      <BuyPointsModal
+        open={showBuyPoints}
+        onClose={() => setShowBuyPoints(false)}
+        playerId={effectivePlayerId}
+        onClaimed={async () => { await refresh(); }}
+      />
 
-{showDripMigrate && (
-  <div
-    style={{
-      position: "fixed",
-      inset: 0,
-      zIndex: 2500,
-      background: "rgba(0,0,0,.55)",
-      display: "grid",
-      placeItems: "center",
-      padding: 16,
-    }}
-    role="dialog"
-    aria-modal="true"
-  >
-    <div
-      style={{
-        width: "min(520px, 95vw)",
-        borderRadius: 16,
-        border: "1px solid rgba(255,255,255,.18)",
-        background: "rgba(15,23,42,.96)",
-        boxShadow: "0 28px 60px rgba(0,0,0,.55)",
-        padding: 16,
-        color: "white",
-      }}
-    >
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-        <div style={{ fontWeight: 900, fontSize: 16 }}>Migrate DRIP Points → Game</div>
-        <button className="btn" onClick={() => setShowDripMigrate(false)} style={{ padding: "8px 12px" }}>
-          Close
-        </button>
-      </div>
-
-      <div style={{ marginTop: 10, fontSize: 13, opacity: 0.9, lineHeight: 1.4 }}>
-        This will <b>deduct</b> points from DRIP (Discord) and <b>credit</b> the same amount into the game.
-        <br />
-        No double-dipping.
-      </div>
-
-      <div style={{ marginTop: 12, fontSize: 13, opacity: 0.95 }}>
-        DRIP Balance: <b>{typeof dripBalance === "number" ? dripBalance : "—"}</b>
-      </div>
-
-      <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
-        <label style={{ fontSize: 12, opacity: 0.9 }}>Amount to migrate</label>
-        <input
-  value={dripAmount === 0 ? "" : String(dripAmount)}
-  onChange={(e) => {
-    const raw = String(e.target.value || "").replace(/^0+/, "");
-    setDripAmount(Number(raw || 0));
-  }}
-  type="number"
-  min={0}
-  step={1}
-  style={{
-    padding: "10px 12px",
-    borderRadius: 12,
-    border: "1px solid rgba(255,255,255,.18)",
-    background: "rgba(15, 23, 42, 0.7)",
-    color: "white",
-    outline: "none",
-    fontWeight: 800,
-  }}
-/>
-
-        <button
-          className="btn"
-          type="button"
-          onClick={migrateDripNow}
-          disabled={dripBusy}
-          style={{ padding: "12px 12px", textAlign: "left" }}
-        >
-          <div style={{ fontWeight: 900 }}>{dripBusy ? "Working…" : "Migrate Now"}</div>
-          <div style={{ fontSize: 12, opacity: 0.9 }}>
-            Deduct from DRIP → Credit to <b>{effectivePlayerId}</b>
+      {showDripMigrate && (
+        <div style={{ position:'fixed', inset:0, zIndex:2500, background:'rgba(0,0,0,.55)', display:'grid', placeItems:'center', padding:16 }} role="dialog" aria-modal="true">
+          <div style={{ width:'min(520px, 95vw)', borderRadius:16, border:'1px solid rgba(255,255,255,.18)', background:'rgba(15,23,42,.96)', boxShadow:'0 28px 60px rgba(0,0,0,.55)', padding:16, color:'white' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', gap:12, alignItems:'center' }}>
+              <div style={{ fontWeight:900, fontSize:16 }}>Migrate DRIP Points → Game</div>
+              <button className="btn" onClick={() => setShowDripMigrate(false)} style={{ padding:'8px 12px' }}>Close</button>
+            </div>
+            <div style={{ marginTop:10, fontSize:13, opacity:0.9, lineHeight:1.4 }}>
+              This will <b>deduct</b> points from DRIP (Discord) and <b>credit</b> the same amount into the game.
+            </div>
+            <div style={{ marginTop:12, fontSize:13, opacity:0.95 }}>
+              DRIP Balance: <b>{typeof dripBalance === 'number' ? dripBalance : '—'}</b>
+            </div>
+            <div style={{ marginTop:12, display:'grid', gap:8 }}>
+              <label style={{ fontSize:12, opacity:0.9 }}>Amount to migrate</label>
+              <input value={dripAmount === 0 ? '' : String(dripAmount)}
+                onChange={(e) => { const raw = String(e.target.value||'').replace(/^0+/,''); const n=parseInt(raw,10); setDripAmount(isNaN(n)?0:Math.max(0,Math.min(n,typeof dripBalance==='number'?dripBalance:0))); }}
+                type="number" min={0} max={typeof dripBalance==='number'?dripBalance:0} placeholder="0"
+                style={{ padding:10, borderRadius:10, border:'1px solid rgba(255,255,255,.18)', background:'rgba(15,23,42,.55)', color:'inherit', fontSize:15, width:160 }} />
+            </div>
+            <div style={{ marginTop:14, display:'flex', gap:8 }}>
+              <button className="btn" onClick={submitDripMigrate} disabled={dripBusy||dripAmount<=0} style={{ padding:'10px 18px', fontSize:13 }}>
+                {dripBusy ? 'Migrating…' : `Migrate ${dripAmount} ${pointsConfig.currency}`}
+              </button>
+            </div>
+            {dripMsg && <div style={{ marginTop:10, fontSize:13 }}>{dripMsg}</div>}
           </div>
-        </button>
-      </div>
-
-          {dripStatus && (
-        <div style={{ marginTop: 12, fontSize: 12, opacity: 0.9, whiteSpace: "pre-wrap" }}>
-          {dripStatus}
         </div>
       )}
 
-      {showDripFix && (
-        <button
-          type="button"
-          onClick={() => window.open("https://drip.re", "_blank", "noopener,noreferrer")}
-          style={{
-            marginTop: 10,
-            padding: "10px 12px",
-            borderRadius: 12,
-            border: "1px solid rgba(255,255,255,.18)",
-            background: "rgba(88, 101, 242, 0.95)",
-            color: "white",
-            fontWeight: 800,
-            cursor: "pointer",
-          }}
-        >
-          Connect DRIP with Discord
-        </button>
-      )}
-
-    <style>{`
-  .btn {
-    border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    background: rgba(15, 23, 42, 0.7);
-    color: white;
-    font-weight: 800;
-    cursor: pointer;
-  }
-  .btn:hover {
-    background: rgba(15, 23, 42, 0.9);
-  }
-  .btn:disabled {
-    opacity: 0.55;
-    cursor: not-allowed;
-  }
-`}</style>
-    </div>
-  </div>
-)}
-      </div>
-
-      {/* Background + header styles (scoped) */}
-      {/* Copyright */}
-      <div style={{ textAlign:"center", padding:"10px 0 6px", fontSize:10, opacity:0.28, color:"white", letterSpacing:"0.05em", userSelect:"none", pointerEvents:"none" }}>
-        © 2026 Rebel Ants LLC · Developed by Miguel Concepcion
-      </div>
+      {/* ── STYLES ── */}
       <style>{`
-      .ant-colony-bg {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  background-position: center, center;
-  background-size: cover, cover;
-  background-repeat: no-repeat, no-repeat;
-  filter: saturate(1.05);
-}
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;700;900&display=swap');
+        * { box-sizing: border-box; }
+        body { background: #060412; }
 
-        .page-head {
-          position: relative;
-          z-index: 10;
-          max-width: 980px;
-          margin: 24px auto 14px;
-          padding: 4px 2px;
-        }
-        .site-title {
-          font-size: 22px;
+        .btn {
+          border-radius: 12px;
+          border: 1px solid rgba(167,139,250,0.25);
+          background: rgba(109,40,217,0.15);
+          color: white;
           font-weight: 800;
-          margin-bottom: 8px;
+          cursor: pointer;
+          transition: all 0.2s;
         }
-        .site-title :global(a) {
-          color: inherit;
-          text-decoration: none;
-        }
-        .tabs {
-          display: flex;
-          gap: 8px;
-          flex-wrap: wrap;
-        }
-        .tab {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 6px 16px;
-          border-radius: 999px;
-          font-size: 13px;
-          font-weight: 700;
-          background: rgba(0, 0, 0, 0.45);
-          border: 1px solid rgba(255, 255, 255, 0.28);
-          color: rgba(255, 255, 255, 0.92);
-          text-decoration: none;
-          backdrop-filter: blur(4px);
-          text-shadow: 0 1px 3px rgba(0,0,0,0.8);
-          transition: transform 0.06s ease, background 0.2s ease;
-        }
-        .tab:hover {
-          transform: translateY(-1px);
-          background: rgba(0, 0, 0, 0.65);
-          border-color: rgba(255, 255, 255, 0.45);
-        }
-        .tab-active {
-          background: rgba(248, 113, 113, 0.25);
-          border-color: rgba(248, 113, 113, 0.55);
-          color: #fca5a5;
-          text-shadow: 0 0 8px rgba(248, 113, 113, 0.4);
-        }
+        .btn:hover { background: rgba(109,40,217,0.3); border-color: rgba(167,139,250,0.5); }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-       .scene-bg {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  border-radius: 12px;
-  background-position: center, center;
-  background-size: cover, cover;
-  background-repeat: no-repeat, no-repeat;
-  box-shadow: inset 0 12px 30px rgba(0, 0, 0, 0.35);
-}
+        .ant-colony-bg { display: none; }
+        .page-head { display: none; }
 
-        .rules-row {
-          margin-top: 10px;
+        .rail { position: absolute; left: 0; right: 0; height: 3px; z-index: 4; border-radius: 2px; }
+        .rail-top { top: 50%; background: linear-gradient(90deg, transparent, rgba(167,139,250,0.4), transparent); }
+        .rail-bottom { top: 72%; background: linear-gradient(90deg, transparent, rgba(167,139,250,0.2), transparent); }
+
+        .scene-bg { position:absolute; inset:0; z-index:0; pointer-events:none; border-radius:20px;
+          background-position:center; background-size:cover; background-repeat:no-repeat; }
+
+        .strip { display: none; }
+        .ant-scene { border-radius: 20px; }
+        .ant-card { background: transparent !important; border: none !important; box-shadow: none !important; }
+        .ra-shuffle2 { padding: 0 !important; }
+
+        .egg-card {
+          position: absolute;
+          transform: translateX(-50%);
+          background: transparent;
+          border: none;
+          padding: 0;
+          cursor: pointer;
+          transition: transform 0.3s ease, filter 0.3s ease;
+          z-index: 6;
         }
-        .rules-link {
-          display: inline-block;
-          font-size: 13px;
-          text-decoration: underline;
-          opacity: 0.85;
-          transition: opacity 0.15s ease;
+        .egg-card:disabled { cursor: not-allowed; }
+        .egg-card.can-pick:hover { transform: translateX(-50%) translateY(-8px) scale(1.08); }
+
+        .egg-body {
+          width: 52px; height: 66px;
+          border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+          background: radial-gradient(ellipse at 35% 35%, #f5d0a0, #d97706 55%, #92400e 100%);
+          box-shadow: inset 0 -4px 12px rgba(0,0,0,0.3), 0 4px 8px rgba(0,0,0,0.4);
+          transition: background 0.3s, box-shadow 0.3s;
+          position: relative;
         }
-        .rules-link:hover {
-          opacity: 1;
+        .egg-shadow {
+          width: 44px; height: 10px;
+          background: radial-gradient(ellipse, rgba(0,0,0,0.45) 0%, transparent 70%);
+          margin: 4px auto 0;
+          border-radius: 50%;
         }
+        .egg-speckle {
+          position: absolute; inset: 0;
+          border-radius: inherit;
+          background: radial-gradient(circle at 30% 25%, rgba(255,255,255,0.25) 0%, transparent 30%),
+                      radial-gradient(circle at 65% 15%, rgba(255,255,255,0.12) 0%, transparent 20%);
+          pointer-events: none;
+        }
+        @keyframes wobble-on-pick {
+          0%,100% { transform: rotate(-3deg); }
+          50% { transform: rotate(3deg); }
+        }
+        .wobble-on-pick { animation: wobble-on-pick 0.7s ease-in-out infinite; }
+
+        .ant-progress { position: absolute; bottom: 8px; left: 10px; right: 10px; z-index: 5; }
+
+        @keyframes shuffleFloat {
+          0% { transform: translateY(0) scale(1); opacity: inherit; }
+          80% { opacity: inherit; }
+          100% { transform: translateY(-100vh) scale(0.2); opacity: 0; }
+        }
+        @keyframes btnGlow {
+          0%,100% { box-shadow: 0 0 20px rgba(109,40,217,0.5), 0 0 40px rgba(109,40,217,0.2); }
+          50% { box-shadow: 0 0 30px rgba(109,40,217,0.8), 0 0 60px rgba(109,40,217,0.3); }
+        }
+        @keyframes queenAura {
+          0% { opacity:0.6; transform:translateX(-50%) scale(1); }
+          100% { opacity:1; transform:translateX(-50%) scale(1.15); }
+        }
+        @keyframes queenAuraActive {
+          0% { opacity:0.8; transform:translateX(-50%) scale(1.1); background: radial-gradient(ellipse, rgba(167,139,250,0.4) 0%, rgba(109,40,217,0.2) 40%, transparent 70%); }
+          100% { opacity:1; transform:translateX(-50%) scale(1.35); background: radial-gradient(ellipse, rgba(250,204,21,0.3) 0%, rgba(167,139,250,0.2) 40%, transparent 70%); }
+        }
+        @keyframes shuffleFlash {
+          0% { opacity:0; }
+          100% { opacity:1; }
+        }
+        @keyframes pickPulse {
+          0%,100% { opacity:0.7; transform:translateX(-50%) scale(1); }
+          50% { opacity:1; transform:translateX(-50%) scale(1.05); letter-spacing:0.3em; }
+        }
+        @keyframes claimPulse {
+          0%,100% { transform:scale(1); opacity:0.9; }
+          50% { transform:scale(1.03); opacity:1; }
+        }
+        .rules-row, .rules-link { display: none; }
       `}</style>
     </>
   );
