@@ -194,9 +194,9 @@ const SWAP_EVERY_MS = 280;
 
 // lane positions across the scene (percent). Works for 3, 5, etc.
 const LANES = Array.from({ length: EGG_COUNT }, (_, i) => {
-  // spread evenly — tightened so eggs stay inside scene boundaries
-  const min = 15;
-  const max = 85;
+  // spread evenly — shifted left to visually center within scene
+  const min = 10;
+  const max = 80;
   if (EGG_COUNT === 1) return 50;
   return min + (i * (max - min)) / (EGG_COUNT - 1);
 });
