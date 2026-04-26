@@ -1,4 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { loadProfile, saveProfile } from '../lib/profile';
+import { usePoints } from '../lib/usePoints';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 
@@ -42,6 +44,50 @@ export default function LandingPage() {
   const [musicMuted, setMusicMuted] = useState(false);
   const audioRef = React.useRef<HTMLAudioElement|null>(null);
   const audioUnlocked = React.useRef(false);
+
+  // ── Commander Strip ──
+  const [profile, setProfile] = useState<any>(null);
+  const [discordLinked, setDiscordLinked] = useState(false);
+  const [claimMsg, setClaimMsg] = useState('');
+  const effectiveId = profile?.primaryId || profile?.discordUserId && `discord:${profile.discordUserId}` || 'guest';
+  const pts = usePoints(effectiveId);
+
+  // Load profile on mount and listen for identity changes
+  useEffect(() => {
+    const load = () => {
+      const p = loadProfile();
+      setProfile(p);
+      setDiscordLinked(!!(p?.discordUserId));
+    };
+    load();
+    window.addEventListener('ra:identity-changed', load);
+    return () => window.removeEventListener('ra:identity-changed', load);
+  }, []);
+
+  const handleClaimDaily = useCallback(async () => {
+    setClaimMsg('Claiming...');
+    const res = await pts.claimDaily();
+    if ((res as any)?.ok === false && (res as any)?.error === 'already_claimed') {
+      setClaimMsg('Already claimed today!');
+    } else if ((res as any)?.added) {
+      setClaimMsg(`+${(res as any).added} REBEL claimed!`);
+    } else {
+      setClaimMsg('Claimed!');
+    }
+    setTimeout(() => setClaimMsg(''), 3000);
+  }, [pts]);
+
+  const handleDisconnectDiscord = useCallback(() => {
+    saveProfile({ discordSkipLink: true, discordUserId: undefined, discordName: undefined, primaryId: undefined });
+    window.dispatchEvent(new Event('ra:identity-changed'));
+    window.location.href = '/api/auth/discord/logout';
+  }, []);
+
+  const handleConnectDiscord = useCallback(() => {
+    saveProfile({ discordSkipLink: false });
+    window.dispatchEvent(new Event('ra:identity-changed'));
+    window.location.href = '/api/auth/discord/login';
+  }, []);
 
   // Unlock & start music on first user interaction (iOS requirement)
   const unlockAudio = React.useCallback(() => {
@@ -204,6 +250,75 @@ export default function LandingPage() {
             >⚔️ &nbsp;ENTER THE PLAYGROUND</button>
 
             <div style={{ position:'absolute', bottom:28, left:'50%', transform:'translateX(-50%)', opacity:0.35, animation:'bounce 2s ease-in-out infinite', fontSize:22 }}>↓</div>
+          </div>
+
+          {/* ══ COMMANDER STRIP ══════════════════════════════════════════════════ */}
+          <div style={{ padding:'0 24px 60px', maxWidth:1100, margin:'0 auto' }}>
+            <div style={{
+              display:'flex', flexWrap:'wrap', alignItems:'center', justifyContent:'space-between',
+              gap:16, padding:'24px 32px',
+              background:'rgba(255,255,255,0.04)',
+              border:'1px solid rgba(255,255,255,0.08)',
+              borderRadius:20, backdropFilter:'blur(16px)',
+            }}>
+              {/* Left — Identity */}
+              <div style={{ display:'flex', flexDirection:'column', gap:4, minWidth:180 }}>
+                <div style={{ fontFamily:'inherit', fontSize:11, letterSpacing:'0.2em', color:'rgba(255,255,255,0.35)', textTransform:'uppercase' }}>COMMANDER</div>
+                <div style={{ fontFamily:'inherit', fontSize:15, fontWeight:900, color:'white', letterSpacing:'0.05em', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:220 }}>
+                  {discordLinked ? (profile?.discordName || profile?.name || 'Commander') : 'GUEST'}
+                </div>
+                {discordLinked && (
+                  <div style={{ fontFamily:'inherit', fontSize:10, color:'rgba(255,255,255,0.3)', letterSpacing:'0.08em' }}>
+                    {effectiveId.slice(0,28)}{effectiveId.length>28?'...':''}
+                  </div>
+                )}
+              </div>
+
+              {/* Center — Balance */}
+              <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+                <div style={{ fontFamily:'inherit', fontSize:11, letterSpacing:'0.2em', color:'rgba(255,255,255,0.35)', textTransform:'uppercase' }}>REBEL BALANCE</div>
+                <div style={{ fontFamily:'inherit', fontSize:28, fontWeight:900, color:'#fbbf24', letterSpacing:'0.05em', filter:'drop-shadow(0 0 12px rgba(251,191,36,0.4))' }}>
+                  {pts.balance !== undefined ? pts.balance.toLocaleString() : '—'}
+                </div>
+                <div style={{ fontFamily:'inherit', fontSize:10, color:'rgba(255,255,255,0.25)', letterSpacing:'0.08em' }}>REBEL TOKENS</div>
+              </div>
+
+              {/* Right — Actions */}
+              <div style={{ display:'flex', flexWrap:'wrap', gap:10, alignItems:'center' }}>
+                {/* Daily Claim */}
+                <button
+                  onPointerDown={e=>{e.preventDefault();handleClaimDaily();}}
+                  style={{ fontFamily:'inherit', padding:'10px 18px', fontSize:12, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background:'linear-gradient(135deg,#ef4444,#f97316)', border:'none', borderRadius:50, color:'white', cursor:'pointer', whiteSpace:'nowrap' }}
+                >
+                  {claimMsg || '⚡ CLAIM DAILY'}
+                </button>
+
+                {/* Buy Points */}
+                <button
+                  onPointerDown={e=>{e.preventDefault(); router.push('/the-raid?buy=1');}}
+                  style={{ fontFamily:'inherit', padding:'10px 18px', fontSize:12, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:50, color:'white', cursor:'pointer', whiteSpace:'nowrap' }}
+                >
+                  💎 BUY POINTS
+                </button>
+
+                {/* Discord */}
+                {discordLinked ? (
+                  <button
+                    onPointerDown={e=>{e.preventDefault();handleDisconnectDiscord();}}
+                    style={{ fontFamily:'inherit', padding:'10px 18px', fontSize:12, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background:'rgba(88,101,242,0.15)', border:'1px solid rgba(88,101,242,0.3)', borderRadius:50, color:'#a5b4fc', cursor:'pointer', whiteSpace:'nowrap' }}
+                  >
+                    ✓ DISCORD
+                  </button>
+                ) : (
+                  <button
+                    onPointerDown={e=>{e.preventDefault();handleConnectDiscord();}}
+                    style={{ fontFamily:'inherit', padding:'10px 18px', fontSize:12, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background:'#5865F2', border:'none', borderRadius:50, color:'white', cursor:'pointer', whiteSpace:'nowrap', boxShadow:'0 0 20px rgba(88,101,242,0.4)' }}
+                  >
+                    CONNECT DISCORD
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* ══ ECONOMY / HOW IT WORKS ══════════════════════════════════════════ */}
