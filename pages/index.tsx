@@ -62,12 +62,23 @@ export default function LandingPage() {
   const [nameAvailMsg, setNameAvailMsg] = useState('');
   const [nameClaiming, setNameClaiming] = useState(false);
   const [nameClaimed, setNameClaimed] = useState('');
+  const [showMergeModal, setShowMergeModal] = useState(false);
+  const [mergeResult, setMergeResult] = useState('');
+  const [dailyClaimAmount, setDailyClaimAmount] = useState(200);
   const debounceRef = React.useRef<ReturnType<typeof setTimeout>|null>(null);
   // Countdown
   const [dailyClaimed, setDailyClaimed] = useState(false);
   const [msUntilClaim, setMsUntilClaim] = useState(0);
   const effectiveId = profile?.primaryId || profile?.discordUserId && `discord:${profile.discordUserId}` || 'guest';
   const pts = usePoints(effectiveId === 'guest' ? 'guest' : effectiveId);
+
+  // Fetch live daily claim amount from admin config
+  useEffect(() => {
+    fetch('/api/config', { cache:'no-store' })
+      .then(r => r.json())
+      .then(d => { if (d?.pointsConfig?.dailyClaim) setDailyClaimAmount(d.pointsConfig.dailyClaim); })
+      .catch(() => {});
+  }, []);
 
   // Load profile + auto-link Discord session on mount
   useEffect(() => {
@@ -162,11 +173,32 @@ export default function LandingPage() {
     setNameClaiming(false);
   }, [nameQuery, nameAvail]);
 
+  const handleMerge = useCallback(async () => {
+    const prof = loadProfile();
+    const fromId = getEffectivePlayerId(prof);
+    const discordId = prof.discordUserId;
+    if (!discordId) return;
+    const toId = `discord:${discordId}`;
+    try {
+      setMergeResult('MERGING...');
+      const r = await fetch('/api/identity/link-discord', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ fromId }) });
+      const j = await r.json();
+      if (r.ok && j.ok) {
+        saveProfile({ primaryId: toId, name: prof.discordName || prof.name, discordSkipLink: false });
+        window.dispatchEvent(new Event('ra:identity-changed'));
+        setMergeResult(`✓ ${j.migrated?.balance || 0} REBEL merged to your Discord account!`);
+        setTimeout(() => { setShowMergeModal(false); setMergeResult(''); }, 3000);
+      } else {
+        setMergeResult('Merge failed — try again');
+      }
+    } catch { setMergeResult('Error — try again'); }
+  }, []);
+
   const handleClaimDaily = useCallback(async () => {
     if (!effectiveId || effectiveId === 'guest') { setClaimMsg('Connect Discord first!'); setTimeout(()=>setClaimMsg(''),3000); return; }
     setClaimMsg('Claiming...');
     try {
-      const r = await fetch('/api/points/claim', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ playerId: effectiveId, amount: 200 }) });
+      const r = await fetch('/api/points/claim', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ playerId: effectiveId, amount: dailyClaimAmount }) });
       const j = await r.json().catch(()=>null);
       if (!r.ok || !j?.ok) { setClaimMsg(j?.error === 'already_claimed' ? 'Already claimed today!' : 'Claim failed'); }
       else { setClaimMsg(`+${j.added || 200} REBEL claimed!`); await pts.refresh(); }
@@ -175,7 +207,11 @@ export default function LandingPage() {
   }, [effectiveId, pts]);
 
   const handleDisconnectDiscord = useCallback(() => {
-    saveProfile({ discordSkipLink: false, discordUserId: undefined, discordName: undefined, primaryId: undefined });
+    const prof = loadProfile();
+    // Preserve name:xxx primaryId — only clear Discord-specific fields
+    const keepPrimaryId = prof.primaryId?.startsWith('name:') ? prof.primaryId : undefined;
+    const keepName = prof.primaryId?.startsWith('name:') ? prof.name : undefined;
+    saveProfile({ discordSkipLink: true, discordUserId: undefined, discordName: undefined, primaryId: keepPrimaryId, name: keepName });
     window.dispatchEvent(new Event('ra:identity-changed'));
     window.location.href = '/api/auth/discord/logout';
   }, []);
@@ -307,6 +343,35 @@ export default function LandingPage() {
                 GUARD IT WELL, COMMANDER.
               </div>
               <button onPointerDown={()=>setNameClaimed('')} style={{ fontFamily:'inherit', padding:'12px 32px', fontSize:12, fontWeight:900, letterSpacing:'0.2em', textTransform:'uppercase', background:'linear-gradient(135deg,#ef4444,#f97316)', border:'none', borderRadius:50, color:'white', cursor:'pointer' }}>ENTER THE PLAYGROUND →</button>
+            </div>
+          </div>
+        )}
+
+        {/* ── MERGE MODAL ── */}
+        {showMergeModal && (
+          <div style={{ position:'fixed', inset:0, zIndex:10003, background:'rgba(0,0,0,0.85)', display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
+            <div style={{ background:'rgba(9,14,30,0.98)', border:'1px solid rgba(88,101,242,0.4)', borderRadius:20, padding:'36px 32px', maxWidth:440, width:'100%', textAlign:'center', boxShadow:'0 0 60px rgba(88,101,242,0.2)' }}>
+              <div style={{ fontSize:40, marginBottom:16 }}>🔗</div>
+              <div style={{ fontFamily:'inherit', fontSize:17, fontWeight:900, letterSpacing:'0.15em', marginBottom:12, textTransform:'uppercase', color:'white' }}>MERGE YOUR ACCOUNTS</div>
+              <div style={{ fontFamily:'inherit', fontSize:11, color:'rgba(255,255,255,0.5)', letterSpacing:'0.1em', lineHeight:1.9, textTransform:'uppercase', marginBottom:28 }}>
+                YOUR COMMANDER NAME HAS REBEL POINTS.<br/>
+                WOULD YOU LIKE TO MERGE THEM INTO YOUR DISCORD ACCOUNT?<br/>
+                <span style={{ color:'#fbbf24' }}>THIS CANNOT BE UNDONE.</span>
+              </div>
+              {mergeResult ? (
+                <div style={{ fontFamily:'inherit', fontSize:13, color:'#34d399', letterSpacing:'0.1em', fontWeight:900, textTransform:'uppercase' }}>{mergeResult}</div>
+              ) : (
+                <div style={{ display:'flex', gap:10, justifyContent:'center' }}>
+                  <button
+                    onPointerDown={e=>{e.preventDefault(); handleMerge();}}
+                    style={{ fontFamily:'inherit', padding:'12px 24px', fontSize:12, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background:'linear-gradient(135deg,#5865F2,#7c3aed)', border:'none', borderRadius:50, color:'white', cursor:'pointer', boxShadow:'0 0 20px rgba(88,101,242,0.4)' }}
+                  >⚔️ YES, MERGE POINTS</button>
+                  <button
+                    onPointerDown={e=>{e.preventDefault(); setShowMergeModal(false);}}
+                    style={{ fontFamily:'inherit', padding:'12px 20px', fontSize:12, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background:'transparent', border:'1px solid rgba(255,255,255,0.15)', borderRadius:50, color:'rgba(255,255,255,0.5)', cursor:'pointer' }}
+                  >KEEP SEPARATE</button>
+                </div>
+              )}
             </div>
           </div>
         )}
