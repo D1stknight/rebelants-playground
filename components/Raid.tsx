@@ -1089,137 +1089,270 @@ export default function Raid() {
 
   const isBattling = phase==="launching"||phase==="battling";
 
+
   return (
     <>
-      {/* Epic background */}
-      <div className="ant-colony-bg" aria-hidden="true" />
+      {/* ── PARTICLES ── */}
+      <div style={{ position:'fixed', inset:0, zIndex:0, pointerEvents:'none', overflow:'hidden' }}>
+        {[...Array(25)].map((_,i) => (
+          <div key={i} style={{
+            position:'absolute', bottom:'-4px',
+            left: `${(i*97+13)%100}%`,
+            width: 1+(i%2), height: 2+(i%4),
+            borderRadius: i%3===0 ? '50%' : '2px',
+            background: i%3===0 ? '#22d3ee' : i%3===1 ? '#0ea5e9' : '#67e8f9',
+            opacity: 0.1+(i%4)*0.05,
+            animation: `raidFloat ${5+(i%5)*1.5}s ${(i*0.6)%7}s infinite linear`,
+          }} />
+        ))}
+      </div>
 
-      <header className="page-head" role="banner">
-        <div className="site-title" style={{ display:"flex", alignItems:"center", gap:10 }}>
-          <Link href="/">Rebel Ants Playground</Link>
-          <button onClick={toggleRaidMute} title={raidMuted ? "Unmute" : "Mute"} style={{ background:"rgba(0,0,0,0.4)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:20, padding:"3px 10px", cursor:"pointer", fontSize:16, color:"rgba(255,255,255,0.8)", lineHeight:1 }}>
-            {raidMuted ? "🔇" : "🔊"}
+      {/* ── FULL PAGE BG ── */}
+      <div style={{ position:'fixed', inset:0, zIndex:0, pointerEvents:'none',
+        backgroundImage: `url('/ui/raid-bg.jpg')`,
+        backgroundSize:'cover', backgroundPosition:'center',
+        filter:'saturate(0.6) brightness(0.35)',
+      }} />
+      <div style={{ position:'fixed', inset:0, zIndex:1, pointerEvents:'none',
+        background:'linear-gradient(160deg, rgba(2,6,23,0.8) 0%, rgba(3,10,28,0.65) 50%, rgba(2,8,20,0.85) 100%)',
+      }} />
+      <div style={{ position:'fixed', inset:0, zIndex:1, pointerEvents:'none',
+        background:'radial-gradient(ellipse at 50% 20%, rgba(6,182,212,0.08) 0%, transparent 60%)',
+      }} />
+
+      {/* ── HEADER ── */}
+      <header style={{ position:'relative', zIndex:20, maxWidth:980, margin:'0 auto', padding:'16px 20px 0',
+        display:'flex', alignItems:'center', justifyContent:'space-between', fontFamily: "'Noto Serif JP', 'Hiragino Mincho ProN', serif" }}>
+        <Link href="/" style={{ display:'flex', alignItems:'center', gap:10, textDecoration:'none', color:'white' }}>
+          <span style={{ fontSize:20, filter:'drop-shadow(0 0 8px rgba(34,211,238,0.6))' }}>←</span>
+          <span style={{ fontSize:11, fontWeight:900, letterSpacing:'0.2em', textTransform:'uppercase', color:'rgba(255,255,255,0.5)' }}>REBEL ANTS</span>
+        </Link>
+        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+          <div style={{ fontSize:13, fontWeight:900, letterSpacing:'0.1em', color:'#fbbf24', filter:'drop-shadow(0 0 8px rgba(251,191,36,0.5))' }}>
+            ⚡ {balance} <span style={{ fontSize:10, color:'rgba(251,191,36,0.6)' }}>REBEL</span>
+          </div>
+          <button onPointerDown={e=>{e.preventDefault();toggleRaidMute();}}
+            style={{ background:'rgba(0,0,0,0.4)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:20, padding:'6px 12px', cursor:'pointer', fontSize:15, color:'rgba(255,255,255,0.8)', minWidth:40, minHeight:40, touchAction:'manipulation' }}>
+            {raidMuted ? '🔇' : '🔊'}
           </button>
         </div>
-        <nav className="tabs" aria-label="Main">
-          <Link href="/tunnel"     className="tab">🐜 Ant Tunnel</Link>
-          <Link href="/faction-wars"      className="tab">⚔️ Faction Wars</Link>
-          <Link href="/the-raid" className="tab tab-active">⚔️ The Raid</Link>
-          <Link href="/shuffle"    className="tab">🃏 Shuffle</Link>
-        </nav>
       </header>
 
-      <div className="ant-card">
-        {/* Hero */}
-        <div style={{ textAlign:"center", marginBottom:4 }}>
-          <div style={{ fontSize:28, fontWeight:900, letterSpacing:"0.06em", background:"linear-gradient(135deg,#f87171,#fbbf24,#60a5fa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", marginBottom:4 }}>
-            ⚔️ THE RAID
-          </div>
-          <div style={{ fontSize:13, opacity:0.65, letterSpacing:"0.04em" }}>
-            🐜 Assemble {SQUAD_SIZE} ants. March into enemy territory. Win loot or die trying.
+      {/* ── MAIN CONTENT ── */}
+      <div style={{ position:'relative', zIndex:10, maxWidth:980, margin:'0 auto', padding:'12px 16px 40px', fontFamily: "'Noto Serif JP', 'Hiragino Mincho ProN', serif" }}>
+
+        {/* Title */}
+        <div style={{ textAlign:'center', marginBottom:20 }}>
+          <div style={{ fontSize:'clamp(26px,5vw,52px)', fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase',
+            background:'linear-gradient(135deg,#e0f2fe,#38bdf8,#0ea5e9,#22d3ee,#67e8f9)',
+            WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text',
+            filter:'drop-shadow(0 0 24px rgba(34,211,238,0.5))',
+          }}>⚔️ THE RAID</div>
+          <div style={{ fontSize:12, letterSpacing:'0.25em', color:'rgba(255,255,255,0.35)', textTransform:'uppercase', marginTop:6 }}>
+            🐜 ASSEMBLE YOUR SQUAD · MARCH INTO ENEMY TERRITORY · WIN LOOT OR DIE TRYING
           </div>
         </div>
 
-        {/* Difficulty warning */}
-        <div style={{ marginTop:10, padding:"8px 14px", borderRadius:10, background:"rgba(248,113,113,.07)", border:"1px solid rgba(248,113,113,.2)", fontSize:11, color:"#f87171", fontWeight:700, textAlign:"center", letterSpacing:"0.04em" }}>
-          ⚠️ BRUTAL DIFFICULTY — Carriers only have {Math.round(Number(cfg?.raidCarrierSurvival ?? 20) * (Number(cfg?.raidCarrierSurvival ?? 20) <= 1 ? 100 : 1))}% survival. Place 🛡️ Guards next to them to boost their odds.
+        {/* ── MISSION BRIEFING (difficulty warning) ── */}
+        <div style={{ marginBottom:16, padding:'12px 18px', borderRadius:14,
+          background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.25)',
+          display:'flex', alignItems:'center', gap:10 }}>
+          <span style={{ fontSize:18 }}>⚠️</span>
+          <div style={{ fontFamily:''Noto Serif JP', 'Hiragino Mincho ProN', serif', fontSize:11, letterSpacing:'0.1em', textTransform:'uppercase', color:'rgba(255,180,180,0.85)' }}>
+            BRUTAL DIFFICULTY — Carriers only have {Math.round(Number(cfg?.raidCarrierSurvival ?? 25) * 100)}% survival chance.
+            Send warriors to protect them.
+          </div>
         </div>
 
-        <RolePicker lastSquad={lastSquad} onLastSquad={(s) => setSquad(s)} squad={squad} onChange={setSquad} disabled={isBattling} carrierPct={Math.round(Number(cfg?.raidCarrierSurvival ?? 0.20) * (Number(cfg?.raidCarrierSurvival ?? 0.20) <= 1 ? 100 : 1))} />
+        {/* ── SQUAD BUILDER ── */}
+        <div style={{ marginBottom:16, borderRadius:20, overflow:'hidden',
+          background:'linear-gradient(135deg, rgba(3,10,28,0.9), rgba(5,15,35,0.95))',
+          border:'1px solid rgba(34,211,238,0.2)',
+          boxShadow:'0 0 40px rgba(6,182,212,0.08), inset 0 1px 0 rgba(34,211,238,0.1)',
+        }}>
+          <div style={{ padding:'14px 20px 0', borderBottom:'1px solid rgba(34,211,238,0.1)' }}>
+            <div style={{ fontFamily:''Noto Serif JP', 'Hiragino Mincho ProN', serif', fontSize:12, fontWeight:900, letterSpacing:'0.25em', textTransform:'uppercase',
+              color:'#22d3ee', marginBottom:12, filter:'drop-shadow(0 0 8px rgba(34,211,238,0.4))' }}>
+              ⚔️ ASSEMBLE YOUR SQUAD
+            </div>
+          </div>
+          <div style={{ padding:'16px 20px' }}>
+            <RolePicker lastSquad={lastSquad} onLastSquad={(s) => setSquad(s)} squad={squad} onChange={setSquad} cfg={cfg} />
+          </div>
+        </div>
 
-        {phase==="launching" && <LaunchAnimation />}
-        {(phase==="battling"||phase==="revealed") && slots.length>0 && (
-          <BattleScene
-            slots={slots} revealedCount={revealedCount} phase={phase}
-            ultraCarriers={ultraCarriersThreshold} ultraRatio={ultraRatioThreshold}
-          />
-        )}
-        {phase==="battling" && (
-          <div style={{ marginTop:8, fontSize:12, opacity:0.65, textAlign:"center", fontWeight:700, letterSpacing:"0.06em" }}>
-            🐜 Ant {Math.min(revealedCount+1,SQUAD_SIZE)} of {SQUAD_SIZE} reporting in…
+        {/* ── BATTLE SCENE ── */}
+        {(phase==='battling'||phase==='revealed') && slots.length>0 && (
+          <div style={{ marginBottom:16, borderRadius:20, overflow:'hidden',
+            background:'linear-gradient(135deg, rgba(3,10,28,0.95), rgba(8,20,50,0.98))',
+            border:'1px solid rgba(34,211,238,0.25)',
+            boxShadow:'0 0 60px rgba(6,182,212,0.15), inset 0 1px 0 rgba(34,211,238,0.15)',
+            padding:'20px',
+          }}>
+            <div style={{ fontFamily:''Noto Serif JP', 'Hiragino Mincho ProN', serif', fontSize:11, fontWeight:900, letterSpacing:'0.25em', textTransform:'uppercase',
+              color:'#22d3ee', marginBottom:14, filter:'drop-shadow(0 0 8px rgba(34,211,238,0.4))' }}>
+              ⚔️ BATTLE REPORT
+            </div>
+            <BattleScene slots={slots} revealedCount={revealedCount} phase={phase}
+              ultraCarriers={ultraCarriersThreshold} ultraRatio={ultraRatioThreshold} />
           </div>
         )}
 
-        {/* CTA */}
-        <div style={{ marginTop:16, display:"flex", gap:10, flexWrap:"wrap", alignItems:"center" }}>
-          <button className="btn" onClick={launchRaid}
+        {phase==='launching' && <LaunchAnimation />}
+
+        {phase==='battling' && (
+          <div style={{ marginTop:8, fontSize:12, textAlign:'center', fontWeight:900,
+            fontFamily:''Noto Serif JP', 'Hiragino Mincho ProN', serif', letterSpacing:'0.2em', textTransform:'uppercase',
+            color:'#22d3ee', animation:'raidPulse 1s ease-in-out infinite',
+            filter:'drop-shadow(0 0 8px rgba(34,211,238,0.6))',
+          }}>
+            🐜 ANT {Math.min(revealedCount+1,SQUAD_SIZE)} OF {SQUAD_SIZE} REPORTING IN…
+          </div>
+        )}
+
+        {/* ── ACTION ROW ── */}
+        <div style={{ display:'flex', gap:10, flexWrap:'wrap', alignItems:'center', marginTop:16, marginBottom:12 }}>
+
+          {/* Launch Raid Button */}
+          <button onClick={launchRaid}
             disabled={busy||squad.length<SQUAD_SIZE||needMore>0}
-            title={squad.length<SQUAD_SIZE?`Need ${SQUAD_SIZE} ants`:needMore>0?"Not enough points":""}
-            style={{ minWidth:240, height:48, fontSize:14, fontWeight:900, display:"inline-flex", alignItems:"center", justifyContent:"center", position:"relative", background:busy?"rgba(15,23,42,.7)":"linear-gradient(135deg,rgba(248,113,113,.18),rgba(96,165,250,.18))", border:"1px solid rgba(248,113,113,.35)", color:"#f87171" }}>
-            <span style={{ visibility:"hidden" }}>Launch Raid (-{cost} {cfg?.currency})</span>
-            <span style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center" }}>
-              {phase==="launching"?"🐜 Marching…":phase==="battling"?"⚔️ Battle in progress…":squad.length<SQUAD_SIZE?`🐜 Need ${SQUAD_SIZE-squad.length} more ants`:`⚔️ Launch Raid (-${totalCost} ${cfg?.currency})`}
+            title={squad.length<SQUAD_SIZE ? `Need ${SQUAD_SIZE} ants` : needMore>0 ? 'Not enough points' : ''}
+            style={{
+              fontFamily:''Noto Serif JP', 'Hiragino Mincho ProN', serif',
+              position:'relative', minWidth:240, height:52,
+              display:'inline-flex', alignItems:'center', justifyContent:'center',
+              fontSize:13, fontWeight:900, letterSpacing:'0.2em', textTransform:'uppercase',
+              background: (busy||squad.length<SQUAD_SIZE||needMore>0)
+                ? 'rgba(6,182,212,0.08)'
+                : 'linear-gradient(135deg,#0369a1,#0ea5e9,#22d3ee)',
+              border: (busy||squad.length<SQUAD_SIZE||needMore>0)
+                ? '2px solid rgba(6,182,212,0.2)'
+                : '2px solid rgba(34,211,238,0.6)',
+              borderRadius:50, color:'white',
+              cursor: (busy||squad.length<SQUAD_SIZE||needMore>0) ? 'not-allowed' : 'pointer',
+              opacity: (busy||squad.length<SQUAD_SIZE||needMore>0) ? 0.45 : 1,
+              boxShadow: (busy||squad.length<SQUAD_SIZE||needMore>0)
+                ? 'none'
+                : '0 0 20px rgba(6,182,212,0.5), 0 0 40px rgba(6,182,212,0.2)',
+              animation: (!busy&&squad.length>=SQUAD_SIZE&&needMore===0) ? 'btnTealGlow 2.5s ease-in-out infinite' : 'none',
+              transition:'all 0.2s',
+            }}>
+            <span style={{ visibility:'hidden', position:'absolute' }}>Launch Raid (-{cost} {cfg?.currency})</span>
+            <span style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+              {phase==='launching' ? '🐜 MARCHING…' : phase==='battling' ? '⚔️ BATTLE IN PROGRESS…' :
+               squad.length<SQUAD_SIZE ? `SQUAD NEEDS ${SQUAD_SIZE-squad.length} MORE` :
+               `⚔️ LAUNCH RAID (-${totalCost} ${cfg?.currency})`}
             </span>
           </button>
 
-          <button className="btn" type="button" onClick={()=>setShowBuyPoints(true)} style={{ padding:"10px 14px", fontSize:12 }}>💳 Buy Points</button>
-
-          {isDiscordConnected
-            ? <button className="btn" type="button" onClick={disconnectDiscord} style={{ padding:"10px 14px", fontSize:12 }}>Disconnect Discord</button>
-            : <button className="btn" type="button"
-                onClick={()=>{ try{saveProfile({discordSkipLink:false});window.dispatchEvent(new Event("ra:identity-changed"));}catch{} window.location.href="/api/auth/discord/login"; }}
-                style={{ padding:"10px 14px", fontSize:12 }}>Connect Discord</button>
-          }
-
-          <button
-            className="btn"
-            type="button"
-            onClick={async()=>{ if(!isDiscordConnected)return; await openDripModal(); }}
-            disabled={dripBusy||!isDiscordConnected}
-            style={{ padding:"10px 14px", fontSize:12 }}
-            title={isDiscordConnected?"Move points from Discord (DRIP) into the game.":"Connect Discord to migrate DRIP points."}
-          >
-            {dripBusy?"Loading DRIP…":isDiscordConnected?"Migrate DRIP Points":"Connect Discord for DRIP"}
+          {/* Buy Points */}
+          <button type="button" onClick={()=>setShowBuyPoints(true)}
+            style={{ fontFamily:''Noto Serif JP', 'Hiragino Mincho ProN', serif', padding:'10px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase',
+              background:'rgba(251,191,36,0.1)', border:'1px solid rgba(251,191,36,0.3)', borderRadius:50,
+              color:'#fbbf24', cursor:'pointer', whiteSpace:'nowrap', boxShadow:'0 0 12px rgba(251,191,36,0.15)' }}>
+            💎 BUY POINTS
           </button>
 
-          <div style={{ fontSize:11, opacity:0.65 }}>Discord: <b>{isDiscordConnected?"✅":"❌"}</b></div>
-        </div>
-
-        <div style={{ marginTop:10, fontSize:12, opacity:0.8, display:"flex", gap:14, flexWrap:"wrap" }}>
-          <span>🐜 Balance: <b>{balance}</b> {cfg?.currency}</span>
-          <span>⚔️ Launch: <b>{cost}</b> + Squad: <b>{squadCost}</b> = <b>{totalCost}</b> {cfg?.currency}</span>
-          {needMore>0 && <span style={{ color:"#f87171" }}>Need {needMore} more {cfg?.currency}</span>}
-        </div>
-        <div style={{ marginTop:6, fontSize:11, opacity:0.55, display:"flex", gap:10, flexWrap:"wrap" }}>
-          <span>🏆 Ultra: +{cfg?.rewards?.ultra}</span>
-          <span>⚔️ Rare: +{cfg?.rewards?.rare}</span>
-          <span>✅ Common: +{cfg?.rewards?.common}</span>
-          <span>📅 Daily cap: {cfg?.dailyEarnCap}</span>
-        </div>
-
-        {/* Name + claim */}
-        <div style={{ marginTop:12, display:"flex", gap:10, flexWrap:"wrap", alignItems:"center" }}>
-          <label style={{ fontSize:12, opacity:0.85 }}>
-            🐜 Commander:&nbsp;
-            <input value={playerName}
-              onChange={e=>{ const v=(e.target.value.slice(0,18)||"guest").trim()||"guest"; setPlayerName(v); const p=loadProfile(); saveProfile({name:v,id:(p?.id||playerId||"guest").trim()||"guest"}); }}
-              style={{ padding:"6px 10px", borderRadius:10, border:"1px solid rgba(255,255,255,.18)", background:"rgba(15,23,42,.55)", color:"inherit" }}
-            />
-            <div style={{ fontSize:10, opacity:0.55, marginTop:3 }}>ID: {profile?.discordName || playerName}</div>
-          </label>
-
-          <button className="btn" type="button" onClick={claimDailyNow} disabled={claimBusy||dailyClaimed} style={{ padding:"8px 12px", fontSize:12 }}>
-            {dailyClaimed
-              ? countdownStr
-                ? `⏱ Next claim in ${countdownStr}`
-                : "🐜 Claimed Today ✅"
-              : `🐜 Daily +${cfg?.dailyClaim} ${cfg?.currency}`}
-          </button>
-
-          {process.env.NODE_ENV!=="production" && (
-            <button className="btn" type="button" onClick={async()=>{ await devGrant(5000); await refresh(); alert("Dev grant ✅"); }} style={{ padding:"8px 12px", fontSize:12 }}>Dev +5000</button>
+          {/* Discord */}
+          {isDiscordConnected ? (
+            <button type="button" onClick={disconnectDiscord}
+              style={{ fontFamily:''Noto Serif JP', 'Hiragino Mincho ProN', serif', padding:'10px 14px', fontSize:11, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase',
+                background:'rgba(88,101,242,0.12)', border:'1px solid rgba(88,101,242,0.3)', borderRadius:50, color:'#a5b4fc', cursor:'pointer', whiteSpace:'nowrap' }}>
+              ✓ DISCORD
+            </button>
+          ) : (
+            <button type="button"
+              onClick={()=>{ try{saveProfile({discordSkipLink:false});window.dispatchEvent(new Event('ra:identity-changed'));}catch{} window.location.href='/api/auth/discord/login'; }}
+              style={{ fontFamily:''Noto Serif JP', 'Hiragino Mincho ProN', serif', padding:'10px 14px', fontSize:11, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase',
+                background:'#5865F2', border:'none', borderRadius:50, color:'white', cursor:'pointer', whiteSpace:'nowrap', boxShadow:'0 0 16px rgba(88,101,242,0.4)' }}>
+              CONNECT DISCORD
+            </button>
           )}
-          {claimStatus && <div style={{ fontSize:11, opacity:0.85 }}>{claimStatus}</div>}
+
+          {/* Balance */}
+          <div style={{ fontFamily:''Noto Serif JP', 'Hiragino Mincho ProN', serif', fontSize:12, letterSpacing:'0.1em', color:'rgba(255,255,255,0.5)', textTransform:'uppercase' }}>
+            <span style={{ color:'#fbbf24', fontWeight:900 }}>{balance}</span> {cfg?.currency}
+          </div>
+
+          {needMore>0 && (
+            <span style={{ fontFamily:''Noto Serif JP', 'Hiragino Mincho ProN', serif', fontSize:11, color:'#f87171', letterSpacing:'0.1em', textTransform:'uppercase' }}>
+              NEED {needMore} MORE
+            </span>
+          )}
         </div>
 
-        <div style={{ marginTop:10 }}>
-          <button onClick={()=>setShowRules(true)} style={{ fontSize:12, textDecoration:"underline", opacity:0.65, background:"none", border:"none", color:"inherit", cursor:"pointer", padding:0 }}>Official Rules</button>
+        {/* ── INFO STRIP ── */}
+        <div style={{ display:'flex', gap:14, flexWrap:'wrap', alignItems:'center', marginBottom:12,
+          padding:'12px 16px', borderRadius:14,
+          background:'rgba(255,255,255,0.03)', border:'1px solid rgba(34,211,238,0.1)' }}>
+          <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+            {[
+              { label:'ULTRA', val:`+${cfg?.rewards?.ultra}`, col:'#fbbf24' },
+              { label:'RARE', val:`+${cfg?.rewards?.rare}`, col:'#22d3ee' },
+              { label:'COMMON', val:`+${cfg?.rewards?.common}`, col:'#34d399' },
+              { label:'LAUNCH', val:String(cost), col:'#f87171' },
+              { label:'SQUAD', val:String(squadCost), col:'#f87171' },
+            ].map(item => (
+              <div key={item.label} style={{ fontFamily:''Noto Serif JP', 'Hiragino Mincho ProN', serif', fontSize:10, letterSpacing:'0.12em', textTransform:'uppercase' }}>
+                <span style={{ color:'rgba(255,255,255,0.35)' }}>{item.label} </span>
+                <span style={{ color:item.col, fontWeight:900 }}>{item.val}</span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ flex:1 }} />
+
+          {/* Daily Claim */}
+          <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:2 }}>
+            <button type="button" onClick={claimDailyNow} disabled={claimBusy||dailyClaimed}
+              style={{ fontFamily:''Noto Serif JP', 'Hiragino Mincho ProN', serif', padding:'7px 14px', fontSize:10, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase',
+                background: dailyClaimed ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg,#ef4444,#f97316)',
+                border: dailyClaimed ? '1px solid rgba(255,255,255,0.1)' : 'none',
+                borderRadius:50, color: dailyClaimed ? 'rgba(255,255,255,0.3)' : 'white',
+                cursor: dailyClaimed ? 'not-allowed' : 'pointer', whiteSpace:'nowrap',
+                boxShadow: dailyClaimed ? 'none' : '0 0 12px rgba(239,68,68,0.3)' }}>
+              {dailyClaimed ? (countdownStr ? `⏱ NEXT IN ${countdownStr}` : '✓ CLAIMED TODAY') : `⚡ CLAIM +${cfg?.dailyClaim} REBEL`}
+            </button>
+          </div>
+
+          {/* DRIP migrate */}
+          {isDiscordConnected && (
+            <button type="button" onClick={async()=>{ if(isDiscordConnected) await openDripModal(); }} disabled={dripBusy}
+              style={{ fontFamily:''Noto Serif JP', 'Hiragino Mincho ProN', serif', padding:'7px 12px', fontSize:10, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase',
+                background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:50,
+                color:'rgba(255,255,255,0.5)', cursor:'pointer', whiteSpace:'nowrap' }}>
+              {dripBusy ? 'LOADING...' : 'MIGRATE DRIP'}
+            </button>
+          )}
         </div>
 
-        <RaidLeaderboardPanel lb={lb} />
+        {/* Official Rules */}
+        <div style={{ marginBottom:20 }}>
+          <button onClick={()=>setShowRules(true)}
+            style={{ fontFamily:''Noto Serif JP', 'Hiragino Mincho ProN', serif', fontSize:10, letterSpacing:'0.12em', textTransform:'uppercase',
+              background:'transparent', border:'none', color:'rgba(255,255,255,0.3)', cursor:'pointer', textDecoration:'underline' }}>
+            OFFICIAL RULES
+          </button>
+        </div>
 
-        {showResult && slots.length>0 && (
-          <RaidResultModal
+        {/* ── LEADERBOARDS ── */}
+        <div style={{ borderRadius:18, border:'1px solid rgba(34,211,238,0.15)',
+          background:'rgba(3,10,28,0.7)', backdropFilter:'blur(12px)',
+          padding:16, boxShadow:'0 0 30px rgba(6,182,212,0.08)',
+        }}>
+          <RaidLeaderboardPanel lb={lb} />
+        </div>
+
+        {/* Copyright */}
+        <div style={{ textAlign:'center', padding:'16px 0 4px', fontSize:10, opacity:0.25, color:'white',
+          letterSpacing:'0.06em', userSelect:'none', fontFamily:''Noto Serif JP', 'Hiragino Mincho ProN', serif', textTransform:'uppercase' }}>
+          © 2026 REBEL ANTS LLC · DEVELOPED BY MIGUEL CONCEPCION
+        </div>
+      </div>
+
+      {/* ── MODALS (all preserved) ── */}
+      {showResult && slots.length>0 && (
+        <RaidResultModal
           slots={slots} rarity={rarity} prize={prize} onClose={resetRaid}
           ultraCarriers={ultraCarriersThreshold} ultraRatio={ultraRatioThreshold}
           rareCarriers={rareCarriersThreshold} rareRatio={rareRatioThreshold}
@@ -1230,103 +1363,102 @@ export default function Raid() {
           setPrizeShipForm={setPrizeShipForm} setPrizeShipMsg={setPrizeShipMsg}
           setPrizeShipBusy={setPrizeShipBusy} setPrizeClaimId={setPrizeClaimId}
           setPrizeNeedShipping={setPrizeNeedShipping} effectivePlayerId={effectivePlayerId}
-          />
-        )}
+        />
+      )}
 
-        <BuyPointsModal open={showBuyPoints} onClose={()=>setShowBuyPoints(false)} playerId={effectivePlayerId} onClaimed={async()=>{ await refresh(); }} />
-
-        {/* DRIP Modal */}
-        {showDripMigrate && (
-          <div style={{ position:"fixed", inset:0, zIndex:2500, background:"rgba(0,0,0,.6)", display:"grid", placeItems:"center", padding:16 }} role="dialog" aria-modal="true">
-            <div style={{ width:"min(520px, 95vw)", borderRadius:16, border:"1px solid rgba(255,255,255,.18)", background:"rgba(15,23,42,.96)", boxShadow:"0 28px 60px rgba(0,0,0,.55)", padding:16, color:"white" }}>
-              <div style={{ display:"flex", justifyContent:"space-between", gap:12, alignItems:"center" }}>
-                <div style={{ fontWeight:900, fontSize:16 }}>Migrate DRIP Points → Game</div>
-                <button className="btn" onClick={()=>setShowDripMigrate(false)} style={{ padding:"8px 12px" }}>Close</button>
-              </div>
-              <div style={{ marginTop:10, fontSize:13, opacity:0.9, lineHeight:1.4 }}>
-                This will <b>deduct</b> points from DRIP (Discord) and <b>credit</b> the same amount into the game. No double-dipping.
-              </div>
-              <div style={{ marginTop:12, fontSize:13, opacity:0.95 }}>DRIP Balance: <b>{typeof dripBalance==="number"?dripBalance:"—"}</b></div>
-              <div style={{ marginTop:12, display:"grid", gap:8 }}>
-                <label style={{ fontSize:12, opacity:0.9 }}>Amount to migrate</label>
-                <input value={dripAmount===0?"":String(dripAmount)} onChange={e=>{ const raw=String(e.target.value||"").replace(/^0+/,""); setDripAmount(Number(raw||0)); }} type="number" min={0} step={1}
-                  style={{ padding:"10px 12px", borderRadius:12, border:"1px solid rgba(255,255,255,.18)", background:"rgba(15,23,42,.7)", color:"white", outline:"none", fontWeight:800 }} />
-                <button className="btn" type="button" onClick={migrateDripNow} disabled={dripBusy} style={{ padding:"12px 12px" }}>
-                  <div style={{ fontWeight:900 }}>{dripBusy?"Working…":"Migrate Now"}</div>
-                  <div style={{ fontSize:12, opacity:0.9 }}>Deduct from DRIP → Credit to <b>{effectivePlayerId}</b></div>
-                </button>
-              </div>
-              {dripStatus && <div style={{ marginTop:12, fontSize:12, opacity:0.9, whiteSpace:"pre-wrap" }}>{dripStatus}</div>}
-            </div>
-          </div>
-        )}
-      </div>
+      <BuyPointsModal open={showBuyPoints} onClose={()=>setShowBuyPoints(false)}
+        playerId={effectivePlayerId} onClaimed={async()=>{ await refresh(); }} />
 
       {showRules && (
-        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.8)", zIndex:3000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }} onClick={()=>setShowRules(false)}>
-          <div style={{ background:"#0f172a", border:"1px solid rgba(255,255,255,0.15)", borderRadius:16, padding:28, maxWidth:560, width:"100%", maxHeight:"85vh", overflowY:"auto", position:"relative" }} onClick={e=>e.stopPropagation()}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
-              <div style={{ fontWeight:900, fontSize:18 }}>📋 Official Rules</div>
-              <button onClick={()=>setShowRules(false)} style={{ background:"rgba(255,255,255,0.1)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:8, padding:"6px 14px", color:"white", cursor:"pointer", fontSize:13 }}>✕ Close</button>
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.85)', zIndex:3000, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }} onClick={()=>setShowRules(false)}>
+          <div style={{ background:'#040c1e', border:'1px solid rgba(34,211,238,0.2)', borderRadius:16, padding:28, maxWidth:560, width:'100%', maxHeight:'85vh', overflowY:'auto' }} onClick={e=>e.stopPropagation()}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:18 }}>
+              <div style={{ fontWeight:900, fontSize:18, fontFamily:''Noto Serif JP', 'Hiragino Mincho ProN', serif', letterSpacing:'0.1em' }}>📋 OFFICIAL RULES</div>
+              <button onClick={()=>setShowRules(false)} style={{ background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.2)', borderRadius:8, padding:'6px 14px', color:'white', cursor:'pointer', fontSize:13 }}>✕</button>
             </div>
-            <div style={{ fontSize:13, lineHeight:1.7, display:"flex", flexDirection:"column", gap:12, opacity:0.9 }}>
-              <p><b>Free-to-play.</b> No purchase necessary to play. Void where prohibited.</p>
-              <p><b>Game currency:</b> REBEL Points are an in-app, promotional points system. They have no guaranteed cash value and are not redeemable for cash.</p>
-              <p><b>Optional purchase (APE):</b> You may optionally buy REBEL Points using APE to support the project. <b>All purchases are final</b> (no refunds). Network fees (gas) may apply.</p>
-              <p><b>Prizes:</b> Crates may award REBEL Points and/or digital collectibles and/or merch (when available). Prize availability may vary by location.</p>
-              <p><b>Daily limits:</b> Daily claim limits and daily play limits apply to support fair access and prevent abuse. Daily plays reset every 24 hours. Purchased bonus plays do not expire.</p>
-              <p><b>Fair play:</b> Multi-accounting, automation/bots, exploits, or abuse may result in disqualification, prize forfeiture, or account blocking.</p>
-              <p><b>Odds:</b> Prize odds and point values may change over time based on live configuration and promotions.</p>
-              <p><b>Taxes:</b> You are responsible for any taxes associated with prizes, if applicable.</p>
-              <p style={{ opacity:0.7 }}>By playing, you agree to these rules and acknowledge this is an entertainment experience with promotional rewards.</p>
+            <div style={{ fontSize:13, lineHeight:1.7, display:'flex', flexDirection:'column', gap:12, opacity:0.9 }}>
+              <p><b>Free-to-play.</b> No purchase necessary. Void where prohibited.</p>
+              <p><b>Game currency:</b> REBEL Points are promotional only. No guaranteed cash value.</p>
+              <p><b>Optional purchase:</b> You may buy REBEL Points using APE. All purchases are final. Gas fees may apply.</p>
+              <p><b>Prizes:</b> May award REBEL Points and/or collectibles/merch when available.</p>
+              <p><b>Daily limits:</b> Apply to ensure fair play. Daily plays reset every 24 hours.</p>
+              <p><b>Fair play:</b> Bots, exploits, or abuse may result in disqualification.</p>
+              <p style={{ opacity:0.7 }}>By playing, you agree to these rules.</p>
             </div>
           </div>
         </div>
       )}
 
+      {showDripMigrate && (
+        <div style={{ position:'fixed', inset:0, zIndex:2500, background:'rgba(0,0,0,.6)', display:'grid', placeItems:'center', padding:16 }} role="dialog" aria-modal="true">
+          <div style={{ width:'min(520px, 95vw)', borderRadius:16, border:'1px solid rgba(255,255,255,.18)', background:'rgba(4,9,22,.97)', boxShadow:'0 28px 60px rgba(0,0,0,.55)', padding:20, color:'white' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', gap:12, alignItems:'center', marginBottom:12 }}>
+              <div style={{ fontWeight:900, fontSize:16 }}>Migrate DRIP Points → Game</div>
+              <button className="btn" onClick={()=>setShowDripMigrate(false)} style={{ padding:'8px 12px' }}>Close</button>
+            </div>
+            <div style={{ fontSize:13, opacity:0.9, lineHeight:1.4, marginBottom:12 }}>
+              This will <b>deduct</b> points from DRIP (Discord) and <b>credit</b> the same amount into the game. No double-dipping.
+            </div>
+            <div style={{ fontSize:13, opacity:0.95, marginBottom:12 }}>DRIP Balance: <b>{typeof dripBalance==='number'?dripBalance:'—'}</b></div>
+            <div style={{ display:'grid', gap:8, marginBottom:14 }}>
+              <label style={{ fontSize:12, opacity:0.9 }}>Amount to migrate</label>
+              <input value={dripAmount===0?'':String(dripAmount)}
+                onChange={(e)=>{ const raw=String(e.target.value||'').replace(/^0+/,''); const n=parseInt(raw,10); setDripAmount(isNaN(n)?0:Math.max(0,Math.min(n,typeof dripBalance==='number'?dripBalance:0))); }}
+                type="number" min={0} max={typeof dripBalance==='number'?dripBalance:0} placeholder="0"
+                style={{ padding:10, borderRadius:10, border:'1px solid rgba(255,255,255,.18)', background:'rgba(15,23,42,.55)', color:'inherit', fontSize:15, width:160 }} />
+            </div>
+            <div style={{ display:'flex', gap:8 }}>
+              <button className="btn" onClick={migrateDripNow} disabled={dripBusy||dripAmount<=0} style={{ padding:'10px 18px', fontSize:13 }}>
+                {dripBusy?'Migrating…':`Migrate ${dripAmount} ${cfg?.currency}`}
+              </button>
+            </div>
+            {dripStatus && <div style={{ marginTop:10, fontSize:13 }}>{dripStatus}</div>}
+          </div>
+        </div>
+      )}
+
+      {/* ── STYLES ── */}
       <style>{`
-        .ant-colony-bg {
-          position: fixed; inset: 0; pointer-events: none; z-index: 0;
-          background-image: url('/ui/raid-bg.jpg');
-          background-size: cover; background-position: center;
-        }
-        .ant-colony-bg::after {
-          content: ''; position: absolute; inset: 0;
-          background: linear-gradient(140deg, rgba(4,9,22,0.78), rgba(7,13,30,0.85));
-        }
-        .page-head {
-          position: relative; z-index: 10;
-          max-width: 980px; margin: 24px auto 14px; padding: 4px 2px;
-        }
-        .site-title { font-size: 22px; font-weight: 800; margin-bottom: 8px; }
-        .site-title a { color: inherit; text-decoration: none; }
-        .tabs { display: flex; gap: 8px; flex-wrap: wrap; }
-        .tab {
-          display: inline-flex; align-items: center; gap: 6px;
-          padding: 6px 10px; border-radius: 999px; font-size: 13px;
-          background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.15);
-          backdrop-filter: blur(4px); transition: transform .06s ease, background .2s ease;
-          color: inherit; text-decoration: none;
-        }
-        .tab:hover { transform: translateY(-1px); background: rgba(255,255,255,.11); }
-        .tab-active { background: rgba(248,113,113,.14); border-color: rgba(248,113,113,.32); color: #f87171; }
-        .ant-card {
-          position: relative; z-index: 5;
-          max-width: 980px; margin: 0 auto 40px;
-          padding: 20px; border-radius: 20px;
-          background: rgba(8,14,32,.88);
-          border: 1px solid rgba(255,255,255,.1);
-          backdrop-filter: blur(14px);
-          box-shadow: 0 24px 60px rgba(0,0,0,.5);
-        }
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;700;900&display=swap');
+        * { box-sizing: border-box; }
+        body { background: #020617; }
+
+        .ant-colony-bg { display: none; }
+        .page-head { display: none; }
+        .site-title { display: none; }
+        .tabs { display: none; }
+
         .btn {
-          border-radius: 12px; border: 1px solid rgba(255,255,255,.18);
-          background: rgba(15,23,42,.7); color: white;
-          font-weight: 800; cursor: pointer; padding: 10px 16px;
-          transition: background .15s, transform .08s;
+          border-radius: 12px;
+          border: 1px solid rgba(34,211,238,0.2);
+          background: rgba(6,182,212,0.1);
+          color: white; font-weight: 800;
+          cursor: pointer; transition: all 0.2s;
         }
-        .btn:hover:not(:disabled) { background: rgba(15,23,42,.95); transform: translateY(-1px); }
-        .btn:disabled { opacity: .42; cursor: not-allowed; transform: none; }
+        .btn:hover:not(:disabled) { background: rgba(6,182,212,0.2); border-color: rgba(34,211,238,0.4); }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .ant-card {
+          background: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+          backdrop-filter: none !important;
+          padding: 0 !important;
+        }
+
+        @keyframes raidFloat {
+          0% { transform: translateY(0) scale(1); opacity: inherit; }
+          80% { opacity: inherit; }
+          100% { transform: translateY(-100vh) scale(0.1); opacity: 0; }
+        }
+        @keyframes btnTealGlow {
+          0%,100% { box-shadow: 0 0 20px rgba(6,182,212,0.5), 0 0 40px rgba(6,182,212,0.2); }
+          50% { box-shadow: 0 0 30px rgba(6,182,212,0.8), 0 0 60px rgba(6,182,212,0.3); }
+        }
+        @keyframes raidPulse {
+          0%,100% { opacity:0.7; transform:scale(1); }
+          50% { opacity:1; transform:scale(1.02); }
+        }
       `}</style>
     </>
   );
