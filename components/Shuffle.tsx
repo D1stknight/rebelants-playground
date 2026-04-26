@@ -1450,8 +1450,8 @@ async function submitShipping() {
             animation: phase==='shuffling' ? 'queenAuraActive 0.6s ease-in-out infinite alternate' : 'queenAura 3s ease-in-out infinite alternate',
           }} />
 
-          {/* Queen 3D */}
-          <div style={{ position:'relative', zIndex:3 }}>
+          {/* Queen 3D — centered, pushed down from top */}
+          <div style={{ position:'absolute', top:'50%', left:'50%', transform:'translate(-50%, -68%)', zIndex:3, pointerEvents:'none' }}>
             <Queen3D active={phase === "shuffling"} scale={shuffleConfig.queenScale} y={-0.1} />
           </div>
 
@@ -1471,7 +1471,7 @@ async function submitShipping() {
               className={`egg-card ${phase === "pick" ? "can-pick" : ""}`}
               style={{
                 left: `${LANES[order[i]]}%`,
-                top: "58%",
+                top: "72%",
                 zIndex: 6,
                 filter: phase==='pick'
                   ? 'drop-shadow(0 0 12px rgba(167,139,250,0.7)) drop-shadow(0 0 24px rgba(167,139,250,0.3))'
@@ -1485,9 +1485,11 @@ async function submitShipping() {
             >
               <div className={`egg-body ${phase === "pick" ? "wobble-on-pick" : ""}`} style={{
                 background: phase==='pick'
-                  ? 'radial-gradient(ellipse at 35% 35%, #fef9c3, #fbbf24 50%, #d97706 100%)'
-                  : 'radial-gradient(ellipse at 35% 35%, #f5d0a0, #d97706 55%, #92400e 100%)',
-                boxShadow: phase==='pick' ? 'inset 0 -4px 12px rgba(0,0,0,0.3), 0 0 20px rgba(251,191,36,0.4)' : 'inset 0 -4px 12px rgba(0,0,0,0.3)',
+                  ? undefined
+                  : undefined,
+                boxShadow: phase==='pick'
+                  ? 'inset -6px -8px 20px rgba(0,0,0,0.4), inset 4px 4px 12px rgba(255,255,220,0.5), 0 8px 24px rgba(0,0,0,0.5), 0 0 30px rgba(251,191,36,0.5), 0 0 60px rgba(251,191,36,0.2)'
+                  : 'inset -6px -8px 20px rgba(0,0,0,0.4), inset 4px 4px 12px rgba(255,255,200,0.3), 0 8px 24px rgba(0,0,0,0.5)',
               }} />
               <div className="egg-shadow" />
               <div className="egg-speckle" style={{ opacity: phase==='pick' ? 0.3 : 0.5 }} />
@@ -1766,27 +1768,37 @@ async function submitShipping() {
           z-index: 6;
         }
         .egg-card:disabled { cursor: not-allowed; }
-        .egg-card.can-pick:hover { transform: translateX(-50%) translateY(-8px) scale(1.08); }
+        .egg-card.can-pick:hover { transform: translateX(-50%) translateY(-12px) scale(1.12) rotateX(-8deg); }
 
         .egg-body {
-          width: 52px; height: 66px;
+          width: 60px; height: 76px;
           border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
-          background: radial-gradient(ellipse at 35% 35%, #f5d0a0, #d97706 55%, #92400e 100%);
-          box-shadow: inset 0 -4px 12px rgba(0,0,0,0.3), 0 4px 8px rgba(0,0,0,0.4);
-          transition: background 0.3s, box-shadow 0.3s;
+          background:
+            radial-gradient(ellipse at 30% 28%, rgba(255,255,220,0.9) 0%, transparent 30%),
+            radial-gradient(ellipse at 65% 15%, rgba(255,255,200,0.5) 0%, transparent 20%),
+            radial-gradient(ellipse at 40% 55%, #fbbf24 0%, #d97706 45%, #b45309 70%, #78350f 100%);
+          box-shadow:
+            inset -6px -8px 20px rgba(0,0,0,0.4),
+            inset 4px 4px 12px rgba(255,255,200,0.3),
+            0 8px 24px rgba(0,0,0,0.5),
+            0 0 0 1px rgba(251,191,36,0.2);
+          transition: background 0.3s, box-shadow 0.3s, transform 0.2s;
           position: relative;
         }
         .egg-shadow {
-          width: 44px; height: 10px;
-          background: radial-gradient(ellipse, rgba(0,0,0,0.45) 0%, transparent 70%);
-          margin: 4px auto 0;
+          width: 56px; height: 14px;
+          background: radial-gradient(ellipse, rgba(0,0,0,0.55) 0%, transparent 65%);
+          margin: 6px auto 0;
           border-radius: 50%;
+          filter: blur(2px);
         }
         .egg-speckle {
           position: absolute; inset: 0;
           border-radius: inherit;
-          background: radial-gradient(circle at 30% 25%, rgba(255,255,255,0.25) 0%, transparent 30%),
-                      radial-gradient(circle at 65% 15%, rgba(255,255,255,0.12) 0%, transparent 20%);
+          background:
+            radial-gradient(circle at 28% 22%, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.2) 18%, transparent 30%),
+            radial-gradient(circle at 62% 14%, rgba(255,255,255,0.3) 0%, transparent 15%),
+            radial-gradient(ellipse at 45% 85%, rgba(120,53,15,0.4) 0%, transparent 40%);
           pointer-events: none;
         }
         @keyframes wobble-on-pick {
