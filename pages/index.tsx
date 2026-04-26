@@ -355,8 +355,9 @@ export default function LandingPage() {
                   </button>
                   <button onPointerDown={e=>{e.preventDefault(); setShowNameClaim(false); setSignInMsg(''); setPinInput('');}} style={{ fontFamily:'inherit', padding:'11px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase', background:'transparent', border:'1px solid rgba(255,255,255,0.15)', borderRadius:50, color:'rgba(255,255,255,0.45)', cursor:'pointer' }}>CANCEL</button>
                 </div>
-                <button onPointerDown={e=>{e.preventDefault(); setNameModalMode('signin'); setSignInMsg(''); setPinInput(''); setSignInName('');}} style={{ fontFamily:'inherit', fontSize:10, color:'rgba(255,255,255,0.35)', background:'transparent', border:'none', cursor:'pointer', letterSpacing:'0.1em', textDecoration:'underline', textTransform:'uppercase' }}>
-                  RETURNING COMMANDER? SIGN IN →
+                <button onPointerDown={e=>{e.preventDefault(); setNameModalMode('signin'); setSignInMsg(''); setPinInput(''); setSignInName('');}}
+                  style={{ fontFamily:'inherit', fontSize:13, fontWeight:900, letterSpacing:'0.18em', textTransform:'uppercase', background:'transparent', border:'2px solid #a78bfa', borderRadius:50, padding:'10px 22px', cursor:'pointer', color:'#a78bfa', boxShadow:'0 0 16px rgba(167,139,250,0.5), 0 0 32px rgba(167,139,250,0.2)', animation:'neonPulse 2s ease-in-out infinite', whiteSpace:'nowrap' }}>
+                  🔑 RETURNING COMMANDER? SIGN IN
                 </button>
               </>)}
 
@@ -592,12 +593,20 @@ export default function LandingPage() {
                     </div>
                   </div>
                 ) : (
-                  <button
-                    onPointerDown={e=>{e.preventDefault(); setNameModalMode('new'); setShowNameClaim(true);}}
-                    style={{ fontFamily:'inherit', padding:'8px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.15em', background:'rgba(239,68,68,0.15)', border:'1px solid rgba(239,68,68,0.4)', borderRadius:50, color:'#fca5a5', cursor:'pointer', textTransform:'uppercase', animation:'pulse 2s ease-in-out infinite' }}
-                  >
-                    ⚔️ CLAIM YOUR NAME
-                  </button>
+                  <div style={{ display:'flex', flexDirection:'column', gap:8, alignItems:'center' }}>
+                    <button
+                      onPointerDown={e=>{e.preventDefault(); setNameModalMode('new'); setShowNameClaim(true);}}
+                      style={{ fontFamily:'inherit', padding:'9px 18px', fontSize:11, fontWeight:900, letterSpacing:'0.15em', background:'rgba(239,68,68,0.12)', border:'2px solid rgba(239,68,68,0.5)', borderRadius:50, color:'#fca5a5', cursor:'pointer', textTransform:'uppercase', animation:'pulse 2s ease-in-out infinite', whiteSpace:'nowrap', boxShadow:'0 0 14px rgba(239,68,68,0.3)' }}
+                    >
+                      ⚔️ CLAIM YOUR NAME
+                    </button>
+                    <button
+                      onPointerDown={e=>{e.preventDefault(); setNameModalMode('signin'); setPinInput(''); setSignInMsg(''); setSignInName(''); setShowNameClaim(true);}}
+                      style={{ fontFamily:'inherit', padding:'9px 18px', fontSize:11, fontWeight:900, letterSpacing:'0.15em', background:'transparent', border:'2px solid rgba(167,139,250,0.5)', borderRadius:50, color:'#a78bfa', cursor:'pointer', textTransform:'uppercase', animation:'neonPulse 2s ease-in-out infinite', whiteSpace:'nowrap', boxShadow:'0 0 14px rgba(167,139,250,0.25)' }}
+                    >
+                      🔑 SIGN IN
+                    </button>
+                  </div>
                 )}
                 {discordLinked && (
                   <div style={{ fontFamily:'inherit', fontSize:10, color:'rgba(255,255,255,0.3)', letterSpacing:'0.08em' }}>
@@ -779,6 +788,10 @@ export default function LandingPage() {
           @keyframes bounce {
             0%,100% { transform: translateX(-50%) translateY(0); }
             50%      { transform: translateX(-50%) translateY(10px); }
+          }
+          @keyframes neonPulse {
+            0%,100% { box-shadow: 0 0 12px rgba(167,139,250,0.5), 0 0 24px rgba(167,139,250,0.2); border-color: #a78bfa; color: #a78bfa; }
+            50%      { box-shadow: 0 0 24px rgba(167,139,250,0.9), 0 0 48px rgba(167,139,250,0.4); border-color: #c4b5fd; color: #c4b5fd; }
           }
           @keyframes pulse {
             0%,100% { transform: scale(1);    filter: drop-shadow(0 0 8px rgba(239,68,68,0.4)); }
