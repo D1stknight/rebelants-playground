@@ -208,94 +208,149 @@ function calcPrize(slots: AntSlot[], cfg: any): { rarity: Rarity; prize: Prize }
 
 // ── Role Picker ───────────────────────────────────────────────────────────────
 
-function RolePicker({ squad, onChange, disabled, carrierPct, lastSquad, onLastSquad }: {
-  squad: AntRole[]; onChange: (n: AntRole[]) => void; disabled: boolean; carrierPct: number; lastSquad?: AntRole[] | null; onLastSquad?: (s: AntRole[]) => void;
+function RolePicker({ squad, onChange, disabled, carrierPct, lastSquad, onLastSquad, faction }: {
+  squad: AntRole[]; onChange: (n: AntRole[]) => void; disabled: boolean; carrierPct: number;
+  lastSquad?: AntRole[] | null; onLastSquad?: (s: AntRole[]) => void;
+  faction: import('../lib/factionConfig').FactionDef;
 }) {
   const roles = Object.keys(ROLE_META) as AntRole[];
+  const fc = faction.colors;
+  const FONT = "'Noto Serif JP', 'Hiragino Mincho ProN', serif";
 
   return (
-    <div style={{ marginTop: 16 }}>
-      <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 10, opacity: 0.9, letterSpacing: "0.05em" }}>
-        🐜 ASSEMBLE YOUR SQUAD — {squad.length}/{SQUAD_SIZE} ANTS · Squad Cost: {calcSquadCost(squad)} REBEL
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 6, marginBottom: 12 }}>
+    <div>
+      {/* Role selection cards */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:8, marginBottom:14 }}>
         {roles.map(role => {
           const m = ROLE_META[role];
           const count = squad.filter(r => r === role).length;
           const canAdd = squad.length < SQUAD_SIZE && !disabled;
+          const imgSrc = faction.roles[role as AntRole]?.img;
           return (
             <button key={role} disabled={!canAdd} title={m.desc}
               onClick={() => canAdd && onChange([...squad, role])}
               style={{
-                padding: "10px 4px", borderRadius: 12,
-                border: `1px solid ${m.color}55`,
-                background: m.bgColor, color: "white",
-                cursor: canAdd ? "pointer" : "not-allowed",
-                fontSize: 11, fontWeight: 700, textAlign: "center",
-                opacity: disabled ? 0.5 : 1,
+                position:'relative', padding:0, borderRadius:16, overflow:'hidden',
+                border: count > 0 ? `2px solid ${fc.primary}` : '2px solid rgba(255,255,255,0.08)',
+                background: count > 0 ? fc.bg : 'rgba(255,255,255,0.03)',
+                cursor: canAdd ? 'pointer' : 'not-allowed',
+                opacity: disabled ? 0.45 : 1,
+                boxShadow: count > 0 ? `0 0 20px ${fc.glow}, inset 0 0 20px ${fc.bg}` : 'none',
+                transition:'all 0.2s ease',
+                transform: count > 0 ? 'scale(1.03)' : 'scale(1)',
+                minHeight: 120,
+                display:'flex', flexDirection:'column', alignItems:'center',
               }}>
-              <div style={{ fontSize: 22, marginBottom: 2 }}>{m.emoji}</div>
-              <div style={{ color: m.color, fontSize: 10, fontWeight: 900 }}>{m.label}</div>
-              <div style={{ opacity: 0.55, fontSize: 9, marginTop: 1 }}>survive: {role === "carrier" ? carrierPct + "%" : m.survivalDisplay}</div>
-              <div style={{ color: m.color, fontSize: 9, marginTop: 1, fontWeight: 900 }}>{ROLE_COST[role]} REBEL</div>
-              <div style={{ marginTop: 4, fontSize: 13, fontWeight: 900, color: count > 0 ? m.color : "rgba(255,255,255,.3)" }}>×{count}</div>
+              {/* Character image */}
+              <div style={{ width:'100%', aspectRatio:'1', overflow:'hidden', borderRadius:'12px 12px 0 0',
+                background: count > 0 ? fc.gradient : 'rgba(0,0,0,0.3)',
+                display:'flex', alignItems:'center', justifyContent:'center', position:'relative' }}>
+                <img src={imgSrc} alt={m.label}
+                  style={{ width:'100%', height:'100%', objectFit:'cover',
+                    filter: count > 0 ? `drop-shadow(0 0 8px ${fc.glow})` : 'brightness(0.7) saturate(0.6)',
+                    transition:'all 0.3s ease' }}
+                  onError={e => { (e.target as HTMLImageElement).style.display='none'; }} />
+                {/* Faction glow overlay when selected */}
+                {count > 0 && <div style={{ position:'absolute', inset:0,
+                  background: `radial-gradient(ellipse at 50% 80%, ${fc.glow} 0%, transparent 65%)`,
+                  pointerEvents:'none' }} />}
+                {/* Count badge */}
+                {count > 0 && (
+                  <div style={{ position:'absolute', top:4, right:4,
+                    width:20, height:20, borderRadius:'50%',
+                    background: fc.primary, color:'#000',
+                    fontSize:11, fontWeight:900, display:'flex', alignItems:'center', justifyContent:'center',
+                    boxShadow: `0 0 8px ${fc.glow}`,
+                    fontFamily: FONT,
+                  }}>{count}</div>
+                )}
+              </div>
+              {/* Label + stats */}
+              <div style={{ padding:'6px 4px 8px', width:'100%', textAlign:'center' }}>
+                <div style={{ fontFamily:FONT, fontSize:10, fontWeight:900, letterSpacing:'0.12em',
+                  textTransform:'uppercase', color: count > 0 ? fc.text : 'rgba(255,255,255,0.6)',
+                  marginBottom:2 }}>{faction.roles[role as AntRole]?.label || m.label}</div>
+                <div style={{ fontFamily:FONT, fontSize:8, opacity:0.55, letterSpacing:'0.08em' }}>
+                  survive: {role === 'carrier' ? carrierPct : m.survivalDisplay}%
+                </div>
+                <div style={{ fontFamily:FONT, fontSize:9, fontWeight:900,
+                  color: count > 0 ? fc.primary : 'rgba(255,255,255,0.3)', marginTop:1 }}>
+                  {ROLE_COST[role as AntRole]} REBEL
+                </div>
+              </div>
             </button>
           );
         })}
       </div>
 
-      <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 6, fontWeight: 700, letterSpacing: "0.06em" }}>
-        🪖 MARCHING ORDER (click ant to remove)
+      {/* Marching order */}
+      <div style={{ fontFamily:FONT, fontSize:9, letterSpacing:'0.2em', textTransform:'uppercase',
+        color:'rgba(255,255,255,0.4)', marginBottom:6 }}>
+        ⚔️ MARCHING ORDER — {squad.length}/{SQUAD_SIZE} · SQUAD COST: {calcSquadCost(squad)} REBEL
       </div>
-
-      <div style={{
-        display: "flex", gap: 3, flexWrap: "wrap",
-        padding: 10, borderRadius: 12,
-        background: "rgba(0,0,0,.35)", border: "1px solid rgba(255,255,255,.08)", minHeight: 54,
-      }}>
+      <div style={{ display:'flex', gap:4, flexWrap:'wrap', padding:'10px 12px', borderRadius:14,
+        background:'rgba(0,0,0,0.4)', border:`1px solid ${fc.primary}22`, minHeight:60 }}>
         {squad.map((role, i) => {
           const m = ROLE_META[role];
+          const imgSrc = faction.roles[role as AntRole]?.img;
           return (
             <button key={i} disabled={disabled}
               title={`#${i+1} ${m.label} — click to remove`}
               onClick={() => { if (!disabled) { const n=[...squad]; n.splice(i,1); onChange(n); }}}
-              style={{
-                width: 32, height: 38, borderRadius: 8,
-                border: `1px solid ${m.color}44`, background: m.bgColor,
-                cursor: disabled ? "default" : "pointer",
-                fontSize: 14, display: "flex", flexDirection: "column",
-                alignItems: "center", justifyContent: "center", position: "relative",
+              style={{ width:40, height:48, borderRadius:10, padding:0, overflow:'hidden',
+                border: `1px solid ${fc.primary}66`,
+                background: fc.bg,
+                cursor: disabled ? 'default' : 'pointer', position:'relative',
+                boxShadow: `0 0 8px ${fc.glow}`,
+                transition:'transform 0.15s, box-shadow 0.15s',
+                display:'flex', flexDirection:'column', alignItems:'center',
               }}>
-              <span>{m.emoji}</span>
-              <span style={{ fontSize: 7, opacity: 0.55, marginTop: 1 }}>{i+1}</span>
+              <img src={imgSrc} alt={m.label}
+                style={{ width:'100%', height:34, objectFit:'cover' }}
+                onError={e => { (e.target as HTMLImageElement).style.display='none'; }} />
+              <div style={{ fontFamily:FONT, fontSize:7, fontWeight:900, letterSpacing:'0.08em',
+                color: fc.text, textTransform:'uppercase', lineHeight:1.2, paddingTop:1 }}>
+                {(faction.roles[role as AntRole]?.label || m.label).slice(0,4)}
+              </div>
+              <div style={{ position:'absolute', top:2, right:2, width:12, height:12, borderRadius:'50%',
+                background:'rgba(0,0,0,0.7)', color:'rgba(255,255,255,0.5)',
+                fontSize:7, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                ✕
+              </div>
             </button>
           );
         })}
-        {Array.from({ length: Math.max(0, SQUAD_SIZE - squad.length) }, (_, i) => (
-          <div key={`e${i}`} style={{
-            width: 32, height: 38, borderRadius: 8,
-            border: "1px dashed rgba(255,255,255,.1)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 16, opacity: 0.18,
-          }}>🐜</div>
+        {Array.from({ length: Math.max(0, SQUAD_SIZE - squad.length) }, (_,i) => (
+          <div key={`e${i}`} style={{ width:40, height:48, borderRadius:10,
+            border: `1px dashed ${fc.primary}22`, display:'flex', alignItems:'center',
+            justifyContent:'center', fontSize:14, opacity:0.15 }}>🐜</div>
         ))}
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+      {/* Action buttons */}
+      <div style={{ display:'flex', gap:8, marginTop:10, flexWrap:'wrap' }}>
         <button disabled={disabled} onClick={() => onChange([...DEFAULT_SQUAD])}
-          style={{ fontSize: 11, padding: "6px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,.18)", background: "rgba(255,255,255,.08)", color: "white", cursor: disabled?"not-allowed":"pointer", opacity: disabled?0.5:1, fontWeight: 700 }}>
-          🐜 Auto-fill Squad
+          style={{ fontFamily:FONT, fontSize:10, padding:'7px 14px', borderRadius:50,
+            border: `1px solid ${fc.primary}44`, background: fc.bg,
+            color: fc.text, cursor: disabled ? 'not-allowed' : 'pointer',
+            letterSpacing:'0.12em', textTransform:'uppercase', fontWeight:900 }}>
+          ⚡ AUTO-FILL
         </button>
         <button disabled={disabled} onClick={() => onChange([])}
-          style={{ fontSize: 11, padding: "6px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,.18)", background: "rgba(255,255,255,.08)", color: "white", cursor: disabled?"not-allowed":"pointer", opacity: disabled?0.5:1, fontWeight: 700 }}>
-          ✕ Clear
+          style={{ fontFamily:FONT, fontSize:10, padding:'7px 14px', borderRadius:50,
+            border:'1px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.04)',
+            color:'rgba(255,255,255,0.5)', cursor: disabled ? 'not-allowed' : 'pointer',
+            letterSpacing:'0.12em', textTransform:'uppercase', fontWeight:900 }}>
+          ✕ CLEAR
         </button>
         {lastSquad && lastSquad.length === SQUAD_SIZE && onLastSquad && (
           <button disabled={disabled} onClick={() => onLastSquad([...lastSquad])}
-            style={{ fontSize:11, padding:"6px 12px", borderRadius:8, border:"1px solid rgba(251,191,36,.4)", background:"rgba(251,191,36,.1)", color:"#fbbf24", cursor:disabled?"not-allowed":"pointer", opacity:disabled?0.5:1, fontWeight:700 }}
-            title="Reuse your last squad — survival odds are slightly lower for repeat squads">
-            🔁 Last Squad <span style={{fontSize:9,opacity:0.65}}>(−10% survival)</span>
+            style={{ fontFamily:FONT, fontSize:10, padding:'7px 14px', borderRadius:50,
+              border:'1px solid rgba(251,191,36,0.3)', background:'rgba(251,191,36,0.08)',
+              color:'#fbbf24', cursor: disabled ? 'not-allowed' : 'pointer',
+              letterSpacing:'0.12em', textTransform:'uppercase', fontWeight:900 }}
+            title="Reuse last squad — −10% survival">
+            🔁 LAST SQUAD <span style={{fontSize:8,opacity:0.65}}>(−10%)</span>
           </button>
         )}
       </div>
@@ -1090,6 +1145,21 @@ export default function Raid() {
   const isBattling = phase==="launching"||phase==="battling";
 
 
+
+  const [factionId, setFactionId] = React.useState<import('../lib/factionConfig').FactionId>('ashigaru');
+  const faction = (window as any).__FACTIONS__?.[factionId] ?? {
+    id:'ashigaru', name:'Ashigaru', available:true,
+    colors:{ primary:'#4ade80', secondary:'#16a34a', bg:'rgba(22,163,74,0.12)', glow:'rgba(74,222,128,0.5)', text:'#4ade80', gradient:'linear-gradient(135deg,#14532d,#166534,#15803d)' },
+    roles:{ scout:{img:'/factions/ashigaru/ashigaru_scout.png',label:'Scout'}, soldier:{img:'/factions/ashigaru/ashigaru_soldier.png',label:'Soldier'}, carrier:{img:'/factions/ashigaru/ashigaru_carrier.png',label:'Carrier'}, guard:{img:'/factions/ashigaru/ashigaru_guard.png',label:'Guard'}, bomber:{img:'/factions/ashigaru/ashigaru_bomber.png',label:'Bomber'} }
+  };
+
+  // Load faction config into window on mount
+  React.useEffect(() => {
+    import('../lib/factionConfig').then(m => {
+      (window as any).__FACTIONS__ = m.FACTIONS;
+    });
+  }, []);
+
   return (
     <>
       {/* ── PARTICLES ── */}
@@ -1107,22 +1177,13 @@ export default function Raid() {
         ))}
       </div>
 
-      {/* ── FULL PAGE BG ── */}
-      <div style={{ position:'fixed', inset:0, zIndex:0, pointerEvents:'none',
-        backgroundImage: `url('/ui/raid-bg.jpg')`,
-        backgroundSize:'cover', backgroundPosition:'center',
-        filter:'saturate(0.6) brightness(0.35)',
-      }} />
-      <div style={{ position:'fixed', inset:0, zIndex:1, pointerEvents:'none',
-        background:'linear-gradient(160deg, rgba(2,6,23,0.8) 0%, rgba(3,10,28,0.65) 50%, rgba(2,8,20,0.85) 100%)',
-      }} />
-      <div style={{ position:'fixed', inset:0, zIndex:1, pointerEvents:'none',
-        background:'radial-gradient(ellipse at 50% 20%, rgba(6,182,212,0.08) 0%, transparent 60%)',
-      }} />
+      {/* ── BG ── */}
+      <div style={{ position:'fixed', inset:0, zIndex:0, pointerEvents:'none', backgroundImage:"url('/ui/raid-bg.jpg')", backgroundSize:'cover', backgroundPosition:'center', filter:'saturate(0.6) brightness(0.35)' }} />
+      <div style={{ position:'fixed', inset:0, zIndex:1, pointerEvents:'none', background:'linear-gradient(160deg, rgba(2,6,23,0.8) 0%, rgba(3,10,28,0.65) 50%, rgba(2,8,20,0.85) 100%)' }} />
+      <div style={{ position:'fixed', inset:0, zIndex:1, pointerEvents:'none', background:'radial-gradient(ellipse at 50% 20%, rgba(6,182,212,0.08) 0%, transparent 60%)' }} />
 
       {/* ── HEADER ── */}
-      <header style={{ position:'relative', zIndex:20, maxWidth:980, margin:'0 auto', padding:'16px 20px 0',
-        display:'flex', alignItems:'center', justifyContent:'space-between', fontFamily: "'Noto Serif JP', 'Hiragino Mincho ProN', serif" }}>
+      <header style={{ position:'relative', zIndex:20, maxWidth:980, margin:'0 auto', padding:'16px 20px 0', display:'flex', alignItems:'center', justifyContent:'space-between', fontFamily: "'Noto Serif JP', 'Hiragino Mincho ProN', serif" }}>
         <Link href="/" style={{ display:'flex', alignItems:'center', gap:10, textDecoration:'none', color:'white' }}>
           <span style={{ fontSize:20, filter:'drop-shadow(0 0 8px rgba(34,211,238,0.6))' }}>←</span>
           <span style={{ fontSize:11, fontWeight:900, letterSpacing:'0.2em', textTransform:'uppercase', color:'rgba(255,255,255,0.5)' }}>REBEL ANTS</span>
@@ -1138,7 +1199,7 @@ export default function Raid() {
         </div>
       </header>
 
-      {/* ── MAIN CONTENT ── */}
+      {/* ── MAIN ── */}
       <div style={{ position:'relative', zIndex:10, maxWidth:980, margin:'0 auto', padding:'12px 16px 40px', fontFamily: "'Noto Serif JP', 'Hiragino Mincho ProN', serif" }}>
 
         {/* Title */}
@@ -1146,38 +1207,83 @@ export default function Raid() {
           <div style={{ fontSize:'clamp(26px,5vw,52px)', fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase',
             background:'linear-gradient(135deg,#e0f2fe,#38bdf8,#0ea5e9,#22d3ee,#67e8f9)',
             WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text',
-            filter:'drop-shadow(0 0 24px rgba(34,211,238,0.5))',
-          }}>⚔️ THE RAID</div>
+            filter:'drop-shadow(0 0 24px rgba(34,211,238,0.5))' }}>⚔️ THE RAID</div>
           <div style={{ fontSize:12, letterSpacing:'0.25em', color:'rgba(255,255,255,0.35)', textTransform:'uppercase', marginTop:6 }}>
             🐜 ASSEMBLE YOUR SQUAD · MARCH INTO ENEMY TERRITORY · WIN LOOT OR DIE TRYING
           </div>
         </div>
 
-        {/* ── MISSION BRIEFING (difficulty warning) ── */}
-        <div style={{ marginBottom:16, padding:'12px 18px', borderRadius:14,
-          background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.25)',
-          display:'flex', alignItems:'center', gap:10 }}>
+        {/* Mission briefing */}
+        <div style={{ marginBottom:16, padding:'12px 18px', borderRadius:14, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.25)', display:'flex', alignItems:'center', gap:10 }}>
           <span style={{ fontSize:18 }}>⚠️</span>
           <div style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:11, letterSpacing:'0.1em', textTransform:'uppercase', color:'rgba(255,180,180,0.85)' }}>
-            BRUTAL DIFFICULTY — Carriers only have {Math.round(Number(cfg?.raidCarrierSurvival ?? 25) * 100)}% survival chance.
-            Send warriors to protect them.
+            BRUTAL DIFFICULTY — Carriers only have {Math.round(Number(cfg?.raidCarrierSurvival ?? 25) * 100)}% survival chance. Send warriors to protect them.
           </div>
         </div>
 
         {/* ── SQUAD BUILDER ── */}
         <div style={{ marginBottom:16, borderRadius:20, overflow:'hidden',
           background:'linear-gradient(135deg, rgba(3,10,28,0.9), rgba(5,15,35,0.95))',
-          border:'1px solid rgba(34,211,238,0.2)',
-          boxShadow:'0 0 40px rgba(6,182,212,0.08), inset 0 1px 0 rgba(34,211,238,0.1)',
+          border:`1px solid ${faction.colors.primary}33`,
+          boxShadow:`0 0 40px ${faction.colors.glow.replace('0.5','0.06')}, inset 0 1px 0 ${faction.colors.primary}22`,
+          transition:'border-color 0.4s, box-shadow 0.4s',
         }}>
-          <div style={{ padding:'14px 20px 0', borderBottom:'1px solid rgba(34,211,238,0.1)' }}>
-            <div style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:12, fontWeight:900, letterSpacing:'0.25em', textTransform:'uppercase',
-              color:'#22d3ee', marginBottom:12, filter:'drop-shadow(0 0 8px rgba(34,211,238,0.4))' }}>
+          {/* Squad builder header + faction dropdown */}
+          <div style={{ padding:'14px 20px 12px', borderBottom:`1px solid ${faction.colors.primary}15`, display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
+            <div style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:12, fontWeight:900, letterSpacing:'0.25em', textTransform:'uppercase', color: faction.colors.text, filter:`drop-shadow(0 0 8px ${faction.colors.glow})` }}>
               ⚔️ ASSEMBLE YOUR SQUAD
             </div>
+
+            {/* Faction Dropdown */}
+            <div style={{ position:'relative', display:'flex', alignItems:'center', gap:10 }}>
+              <span style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:9, letterSpacing:'0.2em', textTransform:'uppercase', color:'rgba(255,255,255,0.4)' }}>FACTION</span>
+              <select
+                value={factionId}
+                onChange={e => setFactionId(e.target.value as any)}
+                style={{
+                  fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif",
+                  fontSize:11, fontWeight:900, letterSpacing:'0.12em',
+                  background:'rgba(0,0,0,0.6)',
+                  border:`1px solid ${faction.colors.primary}55`,
+                  borderRadius:10, padding:'7px 32px 7px 12px',
+                  color: faction.colors.text,
+                  cursor:'pointer', outline:'none', appearance:'none',
+                  boxShadow:`0 0 12px ${faction.colors.glow.replace('0.5','0.2')}`,
+                  textTransform:'uppercase',
+                  minWidth:140,
+                }}>
+                {[
+                  {id:'ashigaru',name:'⛩ ASHIGARU',available:true},
+                  {id:'ronin',name:'🗡 RONIN',available:false},
+                  {id:'samurai',name:'⚔️ SAMURAI',available:false},
+                  {id:'bushi',name:'🏯 BUSHI',available:false},
+                  {id:'warrior',name:'🛡 WARRIORS',available:false},
+                  {id:'shogun',name:'👑 SHOGUN',available:false},
+                  {id:'buke',name:'🌿 BUKE',available:false},
+                  {id:'kenshi',name:'💧 KENSHI',available:false},
+                  {id:'wokou',name:'🌊 WOKOU',available:false},
+                  {id:'sohei',name:'🔥 SOHEI',available:false},
+                  {id:'yamabushi',name:'🌌 YAMABUSHI',available:false},
+                ].map(f => (
+                  <option key={f.id} value={f.id} disabled={!f.available}
+                    style={{ background:'#0a0f1e', color: f.available ? '#fff' : 'rgba(255,255,255,0.3)' }}>
+                    {f.name}{!f.available ? ' (SOON)' : ''}
+                  </option>
+                ))}
+              </select>
+              {/* Dropdown arrow */}
+              <div style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', pointerEvents:'none', color: faction.colors.text, fontSize:9 }}>▼</div>
+            </div>
           </div>
+
           <div style={{ padding:'16px 20px' }}>
-            <RolePicker lastSquad={lastSquad} onLastSquad={(s) => setSquad(s)} squad={squad} onChange={setSquad} disabled={isBattling} carrierPct={Math.round(Number(cfg?.raidCarrierSurvival ?? 0.20) * (Number(cfg?.raidCarrierSurvival ?? 0.20) <= 1 ? 100 : 1))} />
+            <RolePicker
+              lastSquad={lastSquad} onLastSquad={(s) => setSquad(s)}
+              squad={squad} onChange={setSquad}
+              disabled={isBattling}
+              carrierPct={Math.round(Number(cfg?.raidCarrierSurvival ?? 0.20) * (Number(cfg?.raidCarrierSurvival ?? 0.20) <= 1 ? 100 : 1))}
+              faction={faction}
+            />
           </div>
         </div>
 
@@ -1185,12 +1291,10 @@ export default function Raid() {
         {(phase==='battling'||phase==='revealed') && slots.length>0 && (
           <div style={{ marginBottom:16, borderRadius:20, overflow:'hidden',
             background:'linear-gradient(135deg, rgba(3,10,28,0.95), rgba(8,20,50,0.98))',
-            border:'1px solid rgba(34,211,238,0.25)',
-            boxShadow:'0 0 60px rgba(6,182,212,0.15), inset 0 1px 0 rgba(34,211,238,0.15)',
-            padding:'20px',
-          }}>
-            <div style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:11, fontWeight:900, letterSpacing:'0.25em', textTransform:'uppercase',
-              color:'#22d3ee', marginBottom:14, filter:'drop-shadow(0 0 8px rgba(34,211,238,0.4))' }}>
+            border:`1px solid ${faction.colors.primary}33`,
+            boxShadow:`0 0 60px ${faction.colors.glow.replace('0.5','0.1')}, inset 0 1px 0 ${faction.colors.primary}22`,
+            padding:'20px' }}>
+            <div style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:11, fontWeight:900, letterSpacing:'0.25em', textTransform:'uppercase', color: faction.colors.text, marginBottom:14, filter:`drop-shadow(0 0 8px ${faction.colors.glow})` }}>
               ⚔️ BATTLE REPORT
             </div>
             <BattleScene slots={slots} revealedCount={revealedCount} phase={phase}
@@ -1201,97 +1305,68 @@ export default function Raid() {
         {phase==='launching' && <LaunchAnimation />}
 
         {phase==='battling' && (
-          <div style={{ marginTop:8, fontSize:12, textAlign:'center', fontWeight:900,
-            fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", letterSpacing:'0.2em', textTransform:'uppercase',
-            color:'#22d3ee', animation:'raidPulse 1s ease-in-out infinite',
-            filter:'drop-shadow(0 0 8px rgba(34,211,238,0.6))',
-          }}>
+          <div style={{ marginTop:8, fontSize:12, textAlign:'center', fontWeight:900, fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", letterSpacing:'0.2em', textTransform:'uppercase', color:'#22d3ee', animation:'raidPulse 1s ease-in-out infinite', filter:'drop-shadow(0 0 8px rgba(34,211,238,0.6))' }}>
             🐜 ANT {Math.min(revealedCount+1,SQUAD_SIZE)} OF {SQUAD_SIZE} REPORTING IN…
           </div>
         )}
 
         {/* ── ACTION ROW ── */}
         <div style={{ display:'flex', gap:10, flexWrap:'wrap', alignItems:'center', marginTop:16, marginBottom:12 }}>
-
-          {/* Launch Raid Button */}
           <button onClick={launchRaid}
             disabled={busy||squad.length<SQUAD_SIZE||needMore>0}
             title={squad.length<SQUAD_SIZE ? `Need ${SQUAD_SIZE} ants` : needMore>0 ? 'Not enough points' : ''}
             style={{
-              fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif",
-              position:'relative', minWidth:240, height:52,
+              fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", position:'relative', minWidth:240, height:52,
               display:'inline-flex', alignItems:'center', justifyContent:'center',
               fontSize:13, fontWeight:900, letterSpacing:'0.2em', textTransform:'uppercase',
-              background: (busy||squad.length<SQUAD_SIZE||needMore>0)
-                ? 'rgba(6,182,212,0.08)'
-                : 'linear-gradient(135deg,#0369a1,#0ea5e9,#22d3ee)',
-              border: (busy||squad.length<SQUAD_SIZE||needMore>0)
-                ? '2px solid rgba(6,182,212,0.2)'
-                : '2px solid rgba(34,211,238,0.6)',
+              background: (busy||squad.length<SQUAD_SIZE||needMore>0) ? 'rgba(6,182,212,0.08)' : 'linear-gradient(135deg,#0369a1,#0ea5e9,#22d3ee)',
+              border: (busy||squad.length<SQUAD_SIZE||needMore>0) ? '2px solid rgba(6,182,212,0.2)' : '2px solid rgba(34,211,238,0.6)',
               borderRadius:50, color:'white',
               cursor: (busy||squad.length<SQUAD_SIZE||needMore>0) ? 'not-allowed' : 'pointer',
               opacity: (busy||squad.length<SQUAD_SIZE||needMore>0) ? 0.45 : 1,
-              boxShadow: (busy||squad.length<SQUAD_SIZE||needMore>0)
-                ? 'none'
-                : '0 0 20px rgba(6,182,212,0.5), 0 0 40px rgba(6,182,212,0.2)',
+              boxShadow: (busy||squad.length<SQUAD_SIZE||needMore>0) ? 'none' : '0 0 20px rgba(6,182,212,0.5), 0 0 40px rgba(6,182,212,0.2)',
               animation: (!busy&&squad.length>=SQUAD_SIZE&&needMore===0) ? 'btnTealGlow 2.5s ease-in-out infinite' : 'none',
               transition:'all 0.2s',
             }}>
             <span style={{ visibility:'hidden', position:'absolute' }}>Launch Raid (-{cost} {cfg?.currency})</span>
             <span style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
-              {phase==='launching' ? '🐜 MARCHING…' : phase==='battling' ? '⚔️ BATTLE IN PROGRESS…' :
-               squad.length<SQUAD_SIZE ? `SQUAD NEEDS ${SQUAD_SIZE-squad.length} MORE` :
-               `⚔️ LAUNCH RAID (-${totalCost} ${cfg?.currency})`}
+              {phase==='launching' ? '🐜 MARCHING…' : phase==='battling' ? '⚔️ BATTLE IN PROGRESS…' : squad.length<SQUAD_SIZE ? `SQUAD NEEDS ${SQUAD_SIZE-squad.length} MORE` : `⚔️ LAUNCH RAID (-${totalCost} ${cfg?.currency})`}
             </span>
           </button>
 
-          {/* Buy Points */}
           <button type="button" onClick={()=>setShowBuyPoints(true)}
-            style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", padding:'10px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase',
-              background:'rgba(251,191,36,0.1)', border:'1px solid rgba(251,191,36,0.3)', borderRadius:50,
-              color:'#fbbf24', cursor:'pointer', whiteSpace:'nowrap', boxShadow:'0 0 12px rgba(251,191,36,0.15)' }}>
+            style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", padding:'10px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background:'rgba(251,191,36,0.1)', border:'1px solid rgba(251,191,36,0.3)', borderRadius:50, color:'#fbbf24', cursor:'pointer', whiteSpace:'nowrap' }}>
             💎 BUY POINTS
           </button>
 
-          {/* Discord */}
           {isDiscordConnected ? (
             <button type="button" onClick={disconnectDiscord}
-              style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", padding:'10px 14px', fontSize:11, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase',
-                background:'rgba(88,101,242,0.12)', border:'1px solid rgba(88,101,242,0.3)', borderRadius:50, color:'#a5b4fc', cursor:'pointer', whiteSpace:'nowrap' }}>
+              style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", padding:'10px 14px', fontSize:11, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase', background:'rgba(88,101,242,0.12)', border:'1px solid rgba(88,101,242,0.3)', borderRadius:50, color:'#a5b4fc', cursor:'pointer', whiteSpace:'nowrap' }}>
               ✓ DISCORD
             </button>
           ) : (
             <button type="button"
               onClick={()=>{ try{saveProfile({discordSkipLink:false});window.dispatchEvent(new Event('ra:identity-changed'));}catch{} window.location.href='/api/auth/discord/login'; }}
-              style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", padding:'10px 14px', fontSize:11, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase',
-                background:'#5865F2', border:'none', borderRadius:50, color:'white', cursor:'pointer', whiteSpace:'nowrap', boxShadow:'0 0 16px rgba(88,101,242,0.4)' }}>
+              style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", padding:'10px 14px', fontSize:11, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase', background:'#5865F2', border:'none', borderRadius:50, color:'white', cursor:'pointer', whiteSpace:'nowrap' }}>
               CONNECT DISCORD
             </button>
           )}
 
-          {/* Balance */}
           <div style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:12, letterSpacing:'0.1em', color:'rgba(255,255,255,0.5)', textTransform:'uppercase' }}>
             <span style={{ color:'#fbbf24', fontWeight:900 }}>{balance}</span> {cfg?.currency}
           </div>
-
-          {needMore>0 && (
-            <span style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:11, color:'#f87171', letterSpacing:'0.1em', textTransform:'uppercase' }}>
-              NEED {needMore} MORE
-            </span>
-          )}
+          {needMore>0 && <span style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:11, color:'#f87171', letterSpacing:'0.1em', textTransform:'uppercase' }}>NEED {needMore} MORE</span>}
         </div>
 
         {/* ── INFO STRIP ── */}
-        <div style={{ display:'flex', gap:14, flexWrap:'wrap', alignItems:'center', marginBottom:12,
-          padding:'12px 16px', borderRadius:14,
-          background:'rgba(255,255,255,0.03)', border:'1px solid rgba(34,211,238,0.1)' }}>
+        <div style={{ display:'flex', gap:14, flexWrap:'wrap', alignItems:'center', marginBottom:12, padding:'12px 16px', borderRadius:14, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(34,211,238,0.1)' }}>
           <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
             {[
-              { label:'ULTRA', val:`+${cfg?.rewards?.ultra}`, col:'#fbbf24' },
-              { label:'RARE', val:`+${cfg?.rewards?.rare}`, col:'#22d3ee' },
-              { label:'COMMON', val:`+${cfg?.rewards?.common}`, col:'#34d399' },
-              { label:'LAUNCH', val:String(cost), col:'#f87171' },
-              { label:'SQUAD', val:String(squadCost), col:'#f87171' },
+              {label:'ULTRA',val:`+${cfg?.rewards?.ultra}`,col:'#fbbf24'},
+              {label:'RARE',val:`+${cfg?.rewards?.rare}`,col:'#22d3ee'},
+              {label:'COMMON',val:`+${cfg?.rewards?.common}`,col:'#34d399'},
+              {label:'LAUNCH',val:String(cost),col:'#f87171'},
+              {label:'SQUAD',val:String(squadCost),col:'#f87171'},
             ].map(item => (
               <div key={item.label} style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:10, letterSpacing:'0.12em', textTransform:'uppercase' }}>
                 <span style={{ color:'rgba(255,255,255,0.35)' }}>{item.label} </span>
@@ -1299,61 +1374,37 @@ export default function Raid() {
               </div>
             ))}
           </div>
-
           <div style={{ flex:1 }} />
-
-          {/* Daily Claim */}
-          <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:2 }}>
-            <button type="button" onClick={claimDailyNow} disabled={claimBusy||dailyClaimed}
-              style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", padding:'7px 14px', fontSize:10, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase',
-                background: dailyClaimed ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg,#ef4444,#f97316)',
-                border: dailyClaimed ? '1px solid rgba(255,255,255,0.1)' : 'none',
-                borderRadius:50, color: dailyClaimed ? 'rgba(255,255,255,0.3)' : 'white',
-                cursor: dailyClaimed ? 'not-allowed' : 'pointer', whiteSpace:'nowrap',
-                boxShadow: dailyClaimed ? 'none' : '0 0 12px rgba(239,68,68,0.3)' }}>
-              {dailyClaimed ? (countdownStr ? `⏱ NEXT IN ${countdownStr}` : '✓ CLAIMED TODAY') : `⚡ CLAIM +${cfg?.dailyClaim} REBEL`}
-            </button>
-          </div>
-
-          {/* DRIP migrate */}
+          <button type="button" onClick={claimDailyNow} disabled={claimBusy||dailyClaimed}
+            style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", padding:'7px 14px', fontSize:10, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background: dailyClaimed ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg,#ef4444,#f97316)', border: dailyClaimed ? '1px solid rgba(255,255,255,0.1)' : 'none', borderRadius:50, color: dailyClaimed ? 'rgba(255,255,255,0.3)' : 'white', cursor: dailyClaimed ? 'not-allowed' : 'pointer', whiteSpace:'nowrap', boxShadow: dailyClaimed ? 'none' : '0 0 12px rgba(239,68,68,0.3)' }}>
+            {dailyClaimed ? (countdownStr ? `⏱ NEXT IN ${countdownStr}` : '✓ CLAIMED TODAY') : `⚡ CLAIM +${cfg?.dailyClaim} REBEL`}
+          </button>
           {isDiscordConnected && (
             <button type="button" onClick={async()=>{ if(isDiscordConnected) await openDripModal(); }} disabled={dripBusy}
-              style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", padding:'7px 12px', fontSize:10, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase',
-                background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:50,
-                color:'rgba(255,255,255,0.5)', cursor:'pointer', whiteSpace:'nowrap' }}>
+              style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", padding:'7px 12px', fontSize:10, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:50, color:'rgba(255,255,255,0.5)', cursor:'pointer', whiteSpace:'nowrap' }}>
               {dripBusy ? 'LOADING...' : 'MIGRATE DRIP'}
             </button>
           )}
         </div>
 
-        {/* Official Rules */}
         <div style={{ marginBottom:20 }}>
-          <button onClick={()=>setShowRules(true)}
-            style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:10, letterSpacing:'0.12em', textTransform:'uppercase',
-              background:'transparent', border:'none', color:'rgba(255,255,255,0.3)', cursor:'pointer', textDecoration:'underline' }}>
+          <button onClick={()=>setShowRules(true)} style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:10, letterSpacing:'0.12em', textTransform:'uppercase', background:'transparent', border:'none', color:'rgba(255,255,255,0.3)', cursor:'pointer', textDecoration:'underline' }}>
             OFFICIAL RULES
           </button>
         </div>
 
-        {/* ── LEADERBOARDS ── */}
-        <div style={{ borderRadius:18, border:'1px solid rgba(34,211,238,0.15)',
-          background:'rgba(3,10,28,0.7)', backdropFilter:'blur(12px)',
-          padding:16, boxShadow:'0 0 30px rgba(6,182,212,0.08)',
-        }}>
+        <div style={{ borderRadius:18, border:'1px solid rgba(34,211,238,0.15)', background:'rgba(3,10,28,0.7)', backdropFilter:'blur(12px)', padding:16, boxShadow:'0 0 30px rgba(6,182,212,0.08)' }}>
           <RaidLeaderboardPanel lb={lb} />
         </div>
 
-        {/* Copyright */}
-        <div style={{ textAlign:'center', padding:'16px 0 4px', fontSize:10, opacity:0.25, color:'white',
-          letterSpacing:'0.06em', userSelect:'none', fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", textTransform:'uppercase' }}>
+        <div style={{ textAlign:'center', padding:'16px 0 4px', fontSize:10, opacity:0.25, color:'white', letterSpacing:'0.06em', userSelect:'none', fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", textTransform:'uppercase' }}>
           © 2026 REBEL ANTS LLC · DEVELOPED BY MIGUEL CONCEPCION
         </div>
       </div>
 
-      {/* ── MODALS (all preserved) ── */}
+      {/* ── MODALS ── */}
       {showResult && slots.length>0 && (
-        <RaidResultModal
-          slots={slots} rarity={rarity} prize={prize} onClose={resetRaid}
+        <RaidResultModal slots={slots} rarity={rarity} prize={prize} onClose={resetRaid}
           ultraCarriers={ultraCarriersThreshold} ultraRatio={ultraRatioThreshold}
           rareCarriers={rareCarriersThreshold} rareRatio={rareRatioThreshold}
           commonSurvivors={commonSurvivorsThreshold}
@@ -1362,12 +1413,10 @@ export default function Raid() {
           prizeClaimId={prizeClaimId} prizeShipForm={prizeShipForm}
           setPrizeShipForm={setPrizeShipForm} setPrizeShipMsg={setPrizeShipMsg}
           setPrizeShipBusy={setPrizeShipBusy} setPrizeClaimId={setPrizeClaimId}
-          setPrizeNeedShipping={setPrizeNeedShipping} effectivePlayerId={effectivePlayerId}
-        />
+          setPrizeNeedShipping={setPrizeNeedShipping} effectivePlayerId={effectivePlayerId} />
       )}
 
-      <BuyPointsModal open={showBuyPoints} onClose={()=>setShowBuyPoints(false)}
-        playerId={effectivePlayerId} onClaimed={async()=>{ await refresh(); }} />
+      <BuyPointsModal open={showBuyPoints} onClose={()=>setShowBuyPoints(false)} playerId={effectivePlayerId} onClaimed={async()=>{ await refresh(); }} />
 
       {showRules && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.85)', zIndex:3000, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }} onClick={()=>setShowRules(false)}>
@@ -1379,10 +1428,8 @@ export default function Raid() {
             <div style={{ fontSize:13, lineHeight:1.7, display:'flex', flexDirection:'column', gap:12, opacity:0.9 }}>
               <p><b>Free-to-play.</b> No purchase necessary. Void where prohibited.</p>
               <p><b>Game currency:</b> REBEL Points are promotional only. No guaranteed cash value.</p>
-              <p><b>Optional purchase:</b> You may buy REBEL Points using APE. All purchases are final. Gas fees may apply.</p>
               <p><b>Prizes:</b> May award REBEL Points and/or collectibles/merch when available.</p>
-              <p><b>Daily limits:</b> Apply to ensure fair play. Daily plays reset every 24 hours.</p>
-              <p><b>Fair play:</b> Bots, exploits, or abuse may result in disqualification.</p>
+              <p><b>Fair play:</b> Bots or exploits may result in disqualification.</p>
               <p style={{ opacity:0.7 }}>By playing, you agree to these rules.</p>
             </div>
           </div>
@@ -1397,7 +1444,7 @@ export default function Raid() {
               <button className="btn" onClick={()=>setShowDripMigrate(false)} style={{ padding:'8px 12px' }}>Close</button>
             </div>
             <div style={{ fontSize:13, opacity:0.9, lineHeight:1.4, marginBottom:12 }}>
-              This will <b>deduct</b> points from DRIP (Discord) and <b>credit</b> the same amount into the game. No double-dipping.
+              This will <b>deduct</b> points from DRIP (Discord) and <b>credit</b> the same amount into the game.
             </div>
             <div style={{ fontSize:13, opacity:0.95, marginBottom:12 }}>DRIP Balance: <b>{typeof dripBalance==='number'?dripBalance:'—'}</b></div>
             <div style={{ display:'grid', gap:8, marginBottom:14 }}>
@@ -1417,48 +1464,18 @@ export default function Raid() {
         </div>
       )}
 
-      {/* ── STYLES ── */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;700;900&display=swap');
         * { box-sizing: border-box; }
         body { background: #020617; }
-
-        .ant-colony-bg { display: none; }
-        .page-head { display: none; }
-        .site-title { display: none; }
-        .tabs { display: none; }
-
-        .btn {
-          border-radius: 12px;
-          border: 1px solid rgba(34,211,238,0.2);
-          background: rgba(6,182,212,0.1);
-          color: white; font-weight: 800;
-          cursor: pointer; transition: all 0.2s;
-        }
-        .btn:hover:not(:disabled) { background: rgba(6,182,212,0.2); border-color: rgba(34,211,238,0.4); }
-        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-        .ant-card {
-          background: transparent !important;
-          border: none !important;
-          box-shadow: none !important;
-          backdrop-filter: none !important;
-          padding: 0 !important;
-        }
-
-        @keyframes raidFloat {
-          0% { transform: translateY(0) scale(1); opacity: inherit; }
-          80% { opacity: inherit; }
-          100% { transform: translateY(-100vh) scale(0.1); opacity: 0; }
-        }
-        @keyframes btnTealGlow {
-          0%,100% { box-shadow: 0 0 20px rgba(6,182,212,0.5), 0 0 40px rgba(6,182,212,0.2); }
-          50% { box-shadow: 0 0 30px rgba(6,182,212,0.8), 0 0 60px rgba(6,182,212,0.3); }
-        }
-        @keyframes raidPulse {
-          0%,100% { opacity:0.7; transform:scale(1); }
-          50% { opacity:1; transform:scale(1.02); }
-        }
+        .ant-colony-bg, .page-head, .site-title, .tabs { display: none; }
+        .btn { border-radius:12px; border:1px solid rgba(34,211,238,0.2); background:rgba(6,182,212,0.1); color:white; font-weight:800; cursor:pointer; transition:all 0.2s; }
+        .btn:hover:not(:disabled) { background:rgba(6,182,212,0.2); }
+        .btn:disabled { opacity:0.4; cursor:not-allowed; }
+        .ant-card { background:transparent!important; border:none!important; box-shadow:none!important; padding:0!important; }
+        @keyframes raidFloat { 0%{transform:translateY(0) scale(1);opacity:inherit} 80%{opacity:inherit} 100%{transform:translateY(-100vh) scale(0.1);opacity:0} }
+        @keyframes btnTealGlow { 0%,100%{box-shadow:0 0 20px rgba(6,182,212,0.5),0 0 40px rgba(6,182,212,0.2)} 50%{box-shadow:0 0 30px rgba(6,182,212,0.8),0 0 60px rgba(6,182,212,0.3)} }
+        @keyframes raidPulse { 0%,100%{opacity:0.7;transform:scale(1)} 50%{opacity:1;transform:scale(1.02)} }
       `}</style>
     </>
   );
