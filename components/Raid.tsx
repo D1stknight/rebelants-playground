@@ -1177,7 +1177,7 @@ export default function Raid() {
             </div>
           </div>
           <div style={{ padding:'16px 20px' }}>
-            <RolePicker lastSquad={lastSquad} onLastSquad={(s) => setSquad(s)} squad={squad} onChange={setSquad} cfg={cfg} />
+            <RolePicker lastSquad={lastSquad} onLastSquad={(s) => setSquad(s)} squad={squad} onChange={setSquad} disabled={isBattling} carrierPct={Math.round(Number(cfg?.raidCarrierSurvival ?? 0.20) * (Number(cfg?.raidCarrierSurvival ?? 0.20) <= 1 ? 100 : 1))} />
           </div>
         </div>
 
