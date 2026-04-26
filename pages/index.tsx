@@ -62,6 +62,12 @@ export default function LandingPage() {
   const [nameAvailMsg, setNameAvailMsg] = useState('');
   const [nameClaiming, setNameClaiming] = useState(false);
   const [nameClaimed, setNameClaimed] = useState('');
+  // PIN modal state
+  const [nameModalMode, setNameModalMode] = useState<'new'|'signin'|'setpin'>('new');
+  const [pinInput, setPinInput] = useState('');
+  const [signInName, setSignInName] = useState('');
+  const [signInMsg, setSignInMsg] = useState('');
+  const [signInLoading, setSignInLoading] = useState(false);
   const [showMergeModal, setShowMergeModal] = useState(false);
   const [mergeResult, setMergeResult] = useState('');
   const [dailyClaimAmount, setDailyClaimAmount] = useState(200);
@@ -160,7 +166,7 @@ export default function LandingPage() {
     try {
       const r = await fetch('/api/commander/claim-name', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ name: clean, displayName: nameQuery.trim() })
+        body: JSON.stringify({ name: clean, displayName: nameQuery.trim(), pin: pinInput.trim() })
       });
       const j = await r.json();
       if (!r.ok || !j.ok) { setNameAvailMsg(j.error || 'Failed — try another name'); setNameClaiming(false); return; }
@@ -172,6 +178,40 @@ export default function LandingPage() {
     } catch { setNameAvailMsg('Server error — try again'); }
     setNameClaiming(false);
   }, [nameQuery, nameAvail]);
+
+  // Sign in with existing name + PIN
+  const handleSignIn = useCallback(async () => {
+    const name = signInName.trim().toLowerCase().replace(/[^a-z0-9_]/g,'');
+    const pin = pinInput.trim();
+    if (!name || !pin) { setSignInMsg('Enter your name and PIN'); return; }
+    setSignInLoading(true); setSignInMsg('Verifying...');
+    try {
+      const r = await fetch('/api/commander/sign-in', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, pin }) });
+      const j = await r.json();
+      if (!r.ok || !j.ok) { setSignInMsg(j.error || 'Sign in failed'); setSignInLoading(false); return; }
+      saveProfile({ primaryId: j.playerId, name: j.displayName || name, discordSkipLink: false });
+      window.dispatchEvent(new Event('ra:identity-changed'));
+      setShowNameClaim(false); setSignInMsg(''); setPinInput(''); setSignInName('');
+    } catch { setSignInMsg('Error — try again'); }
+    setSignInLoading(false);
+  }, [signInName, pinInput]);
+
+  // Set PIN for existing name (one-time for names claimed without PIN)
+  const handleSetPin = useCallback(async () => {
+    const prof = loadProfile();
+    const name = prof.primaryId?.replace('name:','') || '';
+    const pin = pinInput.trim();
+    if (!name || !pin || pin.length < 4 || !/^[0-9]+$/.test(pin)) { setSignInMsg('Enter a 4-6 digit PIN'); return; }
+    setSignInLoading(true); setSignInMsg('Saving...');
+    try {
+      const r = await fetch('/api/commander/set-pin', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, pin }) });
+      const j = await r.json();
+      if (!r.ok || !j.ok) { setSignInMsg(j.error || 'Failed'); setSignInLoading(false); return; }
+      setSignInMsg(''); setPinInput(''); setShowNameClaim(false);
+      setNameClaimed('PIN_SET'); // triggers success confirmation
+    } catch { setSignInMsg('Error — try again'); }
+    setSignInLoading(false);
+  }, [pinInput]);
 
   const handleMerge = useCallback(async () => {
     const prof = loadProfile();
@@ -290,43 +330,79 @@ export default function LandingPage() {
         {/* ── AUDIO ── */}
         <audio ref={audioRef} src="/audio/japan_sound.mp3" loop preload="none" />
 
-        {/* ── COMMANDER NAME CLAIM MODAL ── */}
+        {/* ── COMMANDER NAME MODAL (3 modes: new / signin / setpin) ── */}
         {showNameClaim && (
-          <div style={{ position:'fixed', inset:0, zIndex:10001, background:'rgba(0,0,0,0.85)', display:'flex', alignItems:'center', justifyContent:'center', padding:24 }} onPointerDown={e=>{ if(e.target===e.currentTarget) setShowNameClaim(false); }}>
-            <div style={{ background:'rgba(9,14,30,0.98)', border:'1px solid rgba(239,68,68,0.3)', borderRadius:20, padding:'36px 32px', maxWidth:440, width:'100%', textAlign:'center', boxShadow:'0 0 60px rgba(239,68,68,0.15)' }}>
-              <div style={{ fontSize:40, marginBottom:16 }}>⚔️</div>
-              <div style={{ fontFamily:'inherit', fontSize:18, fontWeight:900, letterSpacing:'0.2em', marginBottom:8, textTransform:'uppercase' }}>CLAIM YOUR COMMANDER NAME</div>
-              <div style={{ fontFamily:'inherit', fontSize:11, color:'rgba(255,255,255,0.4)', letterSpacing:'0.12em', marginBottom:28, lineHeight:1.8, textTransform:'uppercase' }}>
-                YOUR NAME IS PERMANENT AND CANNOT BE CHANGED.<br/>
-                YOUR REBEL POINTS WILL BE TIED TO THIS NAME FOREVER.
-              </div>
-              <input
-                autoFocus
-                value={nameQuery}
-                onChange={e=>{ setNameQuery(e.target.value); checkName(e.target.value); }}
-                onKeyDown={e=>{ if(e.key==='Enter' && nameAvail) handleClaimName(); }}
-                placeholder="Enter your commander name"
-                maxLength={20}
-                style={{ fontFamily:'inherit', width:'100%', padding:'14px 18px', fontSize:15, fontWeight:900, letterSpacing:'0.1em', background:'rgba(255,255,255,0.06)', border:`1px solid ${nameAvail===true ? '#34d399' : nameAvail===false ? '#ef4444' : 'rgba(255,255,255,0.15)'}`, borderRadius:12, color:'white', outline:'none', marginBottom:10, textTransform:'uppercase', textAlign:'center' }}
-              />
-              {nameAvailMsg && (
-                <div style={{ fontFamily:'inherit', fontSize:11, letterSpacing:'0.12em', color: nameAvail===true ? '#34d399' : nameAvail===false ? '#f87171' : 'rgba(255,255,255,0.4)', marginBottom:16, textTransform:'uppercase' }}>
-                  {nameAvailMsg}
+          <div style={{ position:'fixed', inset:0, zIndex:10001, background:'rgba(0,0,0,0.85)', display:'flex', alignItems:'center', justifyContent:'center', padding:24 }} onPointerDown={e=>{ if(e.target===e.currentTarget){ setShowNameClaim(false); setSignInMsg(''); setPinInput(''); } }}>
+            <div style={{ background:'rgba(9,14,30,0.98)', border:`1px solid ${nameModalMode==='signin'?'rgba(88,101,242,0.4)':nameModalMode==='setpin'?'rgba(251,191,36,0.4)':'rgba(239,68,68,0.3)'}`, borderRadius:20, padding:'36px 32px', maxWidth:440, width:'100%', textAlign:'center', boxShadow:'0 0 60px rgba(239,68,68,0.1)' }}>
+
+              {/* ── MODE: NEW COMMANDER ── */}
+              {nameModalMode === 'new' && (<>
+                <div style={{ fontSize:40, marginBottom:16 }}>⚔️</div>
+                <div style={{ fontFamily:'inherit', fontSize:17, fontWeight:900, letterSpacing:'0.2em', marginBottom:8, textTransform:'uppercase' }}>CLAIM YOUR COMMANDER NAME</div>
+                <div style={{ fontFamily:'inherit', fontSize:10, color:'rgba(255,255,255,0.4)', letterSpacing:'0.1em', marginBottom:24, lineHeight:1.8, textTransform:'uppercase' }}>
+                  YOUR NAME IS PERMANENT · YOUR REBEL POINTS WILL BE TIED TO IT FOREVER
                 </div>
-              )}
-              <div style={{ display:'flex', gap:10, justifyContent:'center' }}>
-                <button
-                  onPointerDown={e=>{e.preventDefault(); if(!nameClaiming && nameAvail) handleClaimName();}}
-                  disabled={!nameAvail || nameClaiming}
-                  style={{ fontFamily:'inherit', padding:'12px 28px', fontSize:12, fontWeight:900, letterSpacing:'0.2em', textTransform:'uppercase', background: nameAvail ? 'linear-gradient(135deg,#ef4444,#f97316)' : 'rgba(255,255,255,0.08)', border:'none', borderRadius:50, color: nameAvail ? 'white' : 'rgba(255,255,255,0.3)', cursor: nameAvail ? 'pointer' : 'not-allowed', boxShadow: nameAvail ? '0 0 20px rgba(239,68,68,0.4)' : 'none' }}
-                >
-                  {nameClaiming ? 'CLAIMING...' : 'CLAIM THIS NAME'}
+                <input autoFocus value={nameQuery} onChange={e=>{ setNameQuery(e.target.value); checkName(e.target.value); }} onKeyDown={e=>{ if(e.key==='Enter' && nameAvail && pinInput.length>=4) handleClaimName(); }} placeholder="COMMANDER NAME" maxLength={20}
+                  style={{ fontFamily:'inherit', width:'100%', padding:'12px 16px', fontSize:14, fontWeight:900, letterSpacing:'0.1em', background:'rgba(255,255,255,0.06)', border:`1px solid ${nameAvail===true?'#34d399':nameAvail===false?'#ef4444':'rgba(255,255,255,0.15)'}`, borderRadius:10, color:'white', outline:'none', marginBottom:6, textTransform:'uppercase', textAlign:'center' }} />
+                {nameAvailMsg && <div style={{ fontFamily:'inherit', fontSize:10, letterSpacing:'0.1em', color:nameAvail===true?'#34d399':nameAvail===false?'#f87171':'rgba(255,255,255,0.4)', marginBottom:10, textTransform:'uppercase' }}>{nameAvailMsg}</div>}
+                <input value={pinInput} onChange={e=>{ if(/^[0-9]*$/.test(e.target.value) && e.target.value.length<=6) setPinInput(e.target.value); }} onKeyDown={e=>{ if(e.key==='Enter' && nameAvail && pinInput.length>=4) handleClaimName(); }} placeholder="CHOOSE A 4-6 DIGIT PIN" maxLength={6} type="password" inputMode="numeric"
+                  style={{ fontFamily:'inherit', width:'100%', padding:'12px 16px', fontSize:14, fontWeight:900, letterSpacing:'0.3em', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:10, color:'white', outline:'none', marginBottom:6, textAlign:'center' }} />
+                <div style={{ fontFamily:'inherit', fontSize:9, color:'rgba(255,255,255,0.3)', marginBottom:20, letterSpacing:'0.1em', textTransform:'uppercase' }}>YOUR PIN LETS YOU SIGN IN FROM ANY DEVICE · NEVER SHARE IT</div>
+                <div style={{ display:'flex', gap:8, justifyContent:'center', marginBottom:16 }}>
+                  <button onPointerDown={e=>{e.preventDefault(); if(!nameClaiming&&nameAvail&&pinInput.length>=4) handleClaimName();}} disabled={!nameAvail||nameClaiming||pinInput.length<4}
+                    style={{ fontFamily:'inherit', padding:'11px 24px', fontSize:11, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background:(nameAvail&&pinInput.length>=4)?'linear-gradient(135deg,#ef4444,#f97316)':'rgba(255,255,255,0.08)', border:'none', borderRadius:50, color:(nameAvail&&pinInput.length>=4)?'white':'rgba(255,255,255,0.3)', cursor:(nameAvail&&pinInput.length>=4)?'pointer':'not-allowed' }}>
+                    {nameClaiming ? 'CLAIMING...' : 'CLAIM THIS NAME'}
+                  </button>
+                  <button onPointerDown={e=>{e.preventDefault(); setShowNameClaim(false); setSignInMsg(''); setPinInput('');}} style={{ fontFamily:'inherit', padding:'11px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase', background:'transparent', border:'1px solid rgba(255,255,255,0.15)', borderRadius:50, color:'rgba(255,255,255,0.45)', cursor:'pointer' }}>CANCEL</button>
+                </div>
+                <button onPointerDown={e=>{e.preventDefault(); setNameModalMode('signin'); setSignInMsg(''); setPinInput(''); setSignInName('');}} style={{ fontFamily:'inherit', fontSize:10, color:'rgba(255,255,255,0.35)', background:'transparent', border:'none', cursor:'pointer', letterSpacing:'0.1em', textDecoration:'underline', textTransform:'uppercase' }}>
+                  RETURNING COMMANDER? SIGN IN →
                 </button>
-                <button onPointerDown={e=>{e.preventDefault(); setShowNameClaim(false);}} style={{ fontFamily:'inherit', padding:'12px 20px', fontSize:12, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background:'transparent', border:'1px solid rgba(255,255,255,0.15)', borderRadius:50, color:'rgba(255,255,255,0.5)', cursor:'pointer' }}>CANCEL</button>
-              </div>
-              <div style={{ fontFamily:'inherit', fontSize:10, color:'rgba(255,255,255,0.25)', marginTop:20, letterSpacing:'0.08em', textTransform:'uppercase' }}>
-                RULES: 3-20 CHARACTERS · LETTERS, NUMBERS, UNDERSCORES ONLY · NO SPACES
-              </div>
+              </>)}
+
+              {/* ── MODE: SIGN IN ── */}
+              {nameModalMode === 'signin' && (<>
+                <div style={{ fontSize:40, marginBottom:16 }}>🔑</div>
+                <div style={{ fontFamily:'inherit', fontSize:17, fontWeight:900, letterSpacing:'0.2em', marginBottom:8, textTransform:'uppercase', color:'#a5b4fc' }}>RETURNING COMMANDER</div>
+                <div style={{ fontFamily:'inherit', fontSize:10, color:'rgba(255,255,255,0.4)', letterSpacing:'0.1em', marginBottom:24, lineHeight:1.8, textTransform:'uppercase' }}>
+                  ENTER YOUR COMMANDER NAME AND PIN TO RESTORE YOUR IDENTITY
+                </div>
+                <input autoFocus value={signInName} onChange={e=>setSignInName(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter') handleSignIn(); }} placeholder="YOUR COMMANDER NAME" maxLength={20}
+                  style={{ fontFamily:'inherit', width:'100%', padding:'12px 16px', fontSize:14, fontWeight:900, letterSpacing:'0.1em', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:10, color:'white', outline:'none', marginBottom:8, textTransform:'uppercase', textAlign:'center' }} />
+                <input value={pinInput} onChange={e=>{ if(/^[0-9]*$/.test(e.target.value) && e.target.value.length<=6) setPinInput(e.target.value); }} onKeyDown={e=>{ if(e.key==='Enter') handleSignIn(); }} placeholder="YOUR PIN" maxLength={6} type="password" inputMode="numeric"
+                  style={{ fontFamily:'inherit', width:'100%', padding:'12px 16px', fontSize:14, fontWeight:900, letterSpacing:'0.3em', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:10, color:'white', outline:'none', marginBottom:8, textAlign:'center' }} />
+                {signInMsg && <div style={{ fontFamily:'inherit', fontSize:10, color: signInMsg.startsWith('✓')?'#34d399':'#f87171', letterSpacing:'0.1em', marginBottom:12, textTransform:'uppercase' }}>{signInMsg}</div>}
+                <div style={{ display:'flex', gap:8, justifyContent:'center', marginBottom:16 }}>
+                  <button onPointerDown={e=>{e.preventDefault(); handleSignIn();}} style={{ fontFamily:'inherit', padding:'11px 24px', fontSize:11, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background:'#5865F2', border:'none', borderRadius:50, color:'white', cursor:'pointer' }}>
+                    {signInLoading ? 'VERIFYING...' : 'SIGN IN'}
+                  </button>
+                  <button onPointerDown={e=>{e.preventDefault(); setShowNameClaim(false); setSignInMsg(''); setPinInput('');}} style={{ fontFamily:'inherit', padding:'11px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase', background:'transparent', border:'1px solid rgba(255,255,255,0.15)', borderRadius:50, color:'rgba(255,255,255,0.45)', cursor:'pointer' }}>CANCEL</button>
+                </div>
+                <button onPointerDown={e=>{e.preventDefault(); setNameModalMode('new'); setSignInMsg(''); setPinInput('');}} style={{ fontFamily:'inherit', fontSize:10, color:'rgba(255,255,255,0.35)', background:'transparent', border:'none', cursor:'pointer', letterSpacing:'0.1em', textDecoration:'underline', textTransform:'uppercase' }}>
+                  ← NEW COMMANDER? CLAIM A NAME
+                </button>
+              </>)}
+
+              {/* ── MODE: SET PIN (existing name without PIN) ── */}
+              {nameModalMode === 'setpin' && (<>
+                <div style={{ fontSize:40, marginBottom:16 }}>🔐</div>
+                <div style={{ fontFamily:'inherit', fontSize:17, fontWeight:900, letterSpacing:'0.2em', marginBottom:8, textTransform:'uppercase', color:'#fbbf24' }}>SET YOUR PIN</div>
+                <div style={{ fontFamily:'inherit', fontSize:10, color:'rgba(255,255,255,0.4)', letterSpacing:'0.1em', marginBottom:24, lineHeight:1.8, textTransform:'uppercase' }}>
+                  SECURE YOUR COMMANDER NAME SO YOU CAN SIGN IN FROM ANY DEVICE.<br/>
+                  CHOOSE A 4-6 DIGIT PIN. DO NOT FORGET IT.
+                </div>
+                <input autoFocus value={pinInput} onChange={e=>{ if(/^[0-9]*$/.test(e.target.value) && e.target.value.length<=6) setPinInput(e.target.value); }} onKeyDown={e=>{ if(e.key==='Enter') handleSetPin(); }} placeholder="CHOOSE YOUR PIN" maxLength={6} type="password" inputMode="numeric"
+                  style={{ fontFamily:'inherit', width:'100%', padding:'12px 16px', fontSize:14, fontWeight:900, letterSpacing:'0.3em', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(251,191,36,0.3)', borderRadius:10, color:'white', outline:'none', marginBottom:8, textAlign:'center' }} />
+                {signInMsg && <div style={{ fontFamily:'inherit', fontSize:10, color: signInMsg.startsWith('Sav')?'rgba(255,255,255,0.4)':'#f87171', letterSpacing:'0.1em', marginBottom:12, textTransform:'uppercase' }}>{signInMsg}</div>}
+                <div style={{ display:'flex', gap:8, justifyContent:'center' }}>
+                  <button onPointerDown={e=>{e.preventDefault(); if(pinInput.length>=4) handleSetPin();}} disabled={pinInput.length<4||signInLoading}
+                    style={{ fontFamily:'inherit', padding:'11px 24px', fontSize:11, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background:pinInput.length>=4?'linear-gradient(135deg,#f59e0b,#f97316)':'rgba(255,255,255,0.08)', border:'none', borderRadius:50, color:pinInput.length>=4?'white':'rgba(255,255,255,0.3)', cursor:pinInput.length>=4?'pointer':'not-allowed' }}>
+                    {signInLoading ? 'SAVING...' : 'SAVE MY PIN'}
+                  </button>
+                  <button onPointerDown={e=>{e.preventDefault(); setShowNameClaim(false); setSignInMsg(''); setPinInput('');}} style={{ fontFamily:'inherit', padding:'11px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase', background:'transparent', border:'1px solid rgba(255,255,255,0.15)', borderRadius:50, color:'rgba(255,255,255,0.45)', cursor:'pointer' }}>LATER</button>
+                </div>
+              </>)}
+
             </div>
           </div>
         )}
@@ -336,12 +412,21 @@ export default function LandingPage() {
           <div style={{ position:'fixed', inset:0, zIndex:10002, background:'rgba(0,0,0,0.85)', display:'flex', alignItems:'center', justifyContent:'center', padding:24 }} onPointerDown={()=>setNameClaimed('')}>
             <div style={{ background:'rgba(9,14,30,0.98)', border:'1px solid rgba(52,211,153,0.4)', borderRadius:20, padding:'40px 36px', maxWidth:420, width:'100%', textAlign:'center', boxShadow:'0 0 60px rgba(52,211,153,0.2)' }}>
               <div style={{ fontSize:52, marginBottom:16, filter:'drop-shadow(0 0 20px rgba(52,211,153,0.6))' }}>🐜</div>
-              <div style={{ fontFamily:'inherit', fontSize:22, fontWeight:900, letterSpacing:'0.15em', color:'#34d399', marginBottom:12, textTransform:'uppercase' }}>⚔️ {nameClaimed.toUpperCase()}</div>
-              <div style={{ fontFamily:'inherit', fontSize:12, color:'rgba(255,255,255,0.5)', letterSpacing:'0.12em', lineHeight:1.9, textTransform:'uppercase', marginBottom:28 }}>
-                IS NOW YOUR PERMANENT COMMANDER NAME.<br/>
-                YOUR REBEL POINTS ARE TIED TO THIS NAME FOREVER.<br/>
-                GUARD IT WELL, COMMANDER.
-              </div>
+              {nameClaimed === 'PIN_SET' ? (<>
+                <div style={{ fontFamily:'inherit', fontSize:18, fontWeight:900, letterSpacing:'0.15em', color:'#fbbf24', marginBottom:12, textTransform:'uppercase' }}>🔐 PIN SAVED!</div>
+                <div style={{ fontFamily:'inherit', fontSize:12, color:'rgba(255,255,255,0.5)', letterSpacing:'0.12em', lineHeight:1.9, textTransform:'uppercase', marginBottom:28 }}>
+                  YOUR COMMANDER NAME IS NOW PROTECTED.<br/>
+                  YOU CAN SIGN IN FROM ANY DEVICE USING<br/>YOUR NAME AND PIN.
+                </div>
+              </>) : (<>
+                <div style={{ fontFamily:'inherit', fontSize:22, fontWeight:900, letterSpacing:'0.15em', color:'#34d399', marginBottom:12, textTransform:'uppercase' }}>⚔️ {nameClaimed.toUpperCase()}</div>
+                <div style={{ fontFamily:'inherit', fontSize:12, color:'rgba(255,255,255,0.5)', letterSpacing:'0.12em', lineHeight:1.9, textTransform:'uppercase', marginBottom:28 }}>
+                  IS NOW YOUR PERMANENT COMMANDER NAME.<br/>
+                  YOUR REBEL POINTS ARE TIED TO THIS NAME FOREVER.<br/>
+                  YOUR PIN LETS YOU SIGN IN FROM ANY DEVICE.<br/>
+                  GUARD BOTH WELL, COMMANDER.
+                </div>
+              </>)}
               <button onPointerDown={()=>setNameClaimed('')} style={{ fontFamily:'inherit', padding:'12px 32px', fontSize:12, fontWeight:900, letterSpacing:'0.2em', textTransform:'uppercase', background:'linear-gradient(135deg,#ef4444,#f97316)', border:'none', borderRadius:50, color:'white', cursor:'pointer' }}>ENTER THE PLAYGROUND →</button>
             </div>
           </div>
@@ -499,13 +584,16 @@ export default function LandingPage() {
                     {profile?.discordName || profile?.name || 'Commander'}
                   </div>
                 ) : profile?.primaryId?.startsWith('name:') ? (
-                  <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+                  <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
                     <div style={{ fontFamily:'inherit', fontSize:15, fontWeight:900, color:'#34d399', letterSpacing:'0.05em' }}>{profile.name}</div>
-                    <div style={{ fontFamily:'inherit', fontSize:9, color:'rgba(255,255,255,0.3)', letterSpacing:'0.1em' }}>COMMANDER NAME · PERMANENT</div>
+                    <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+                      <div style={{ fontFamily:'inherit', fontSize:9, color:'rgba(255,255,255,0.3)', letterSpacing:'0.1em' }}>COMMANDER NAME · PERMANENT</div>
+                      <button onPointerDown={e=>{e.preventDefault(); setNameModalMode('setpin'); setPinInput(''); setSignInMsg(''); setShowNameClaim(true);}} style={{ fontFamily:'inherit', fontSize:8, padding:'2px 6px', background:'rgba(251,191,36,0.15)', border:'1px solid rgba(251,191,36,0.3)', borderRadius:4, color:'#fbbf24', cursor:'pointer', letterSpacing:'0.08em' }}>SET PIN</button>
+                    </div>
                   </div>
                 ) : (
                   <button
-                    onPointerDown={e=>{e.preventDefault(); setShowNameClaim(true);}}
+                    onPointerDown={e=>{e.preventDefault(); setNameModalMode('new'); setShowNameClaim(true);}}
                     style={{ fontFamily:'inherit', padding:'8px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.15em', background:'rgba(239,68,68,0.15)', border:'1px solid rgba(239,68,68,0.4)', borderRadius:50, color:'#fca5a5', cursor:'pointer', textTransform:'uppercase', animation:'pulse 2s ease-in-out infinite' }}
                   >
                     ⚔️ CLAIM YOUR NAME
