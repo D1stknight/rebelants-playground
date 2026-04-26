@@ -1713,11 +1713,11 @@ async function submitShipping() {
                 style={{ padding:10, borderRadius:10, border:'1px solid rgba(255,255,255,.18)', background:'rgba(15,23,42,.55)', color:'inherit', fontSize:15, width:160 }} />
             </div>
             <div style={{ marginTop:14, display:'flex', gap:8 }}>
-              <button className="btn" onClick={submitDripMigrate} disabled={dripBusy||dripAmount<=0} style={{ padding:'10px 18px', fontSize:13 }}>
+              <button className="btn" onClick={migrateDripNow} disabled={dripBusy||dripAmount<=0} style={{ padding:'10px 18px', fontSize:13 }}>
                 {dripBusy ? 'Migrating…' : `Migrate ${dripAmount} ${pointsConfig.currency}`}
               </button>
             </div>
-            {dripMsg && <div style={{ marginTop:10, fontSize:13 }}>{dripMsg}</div>}
+            {dripStatus && <div style={{ marginTop:10, fontSize:13 }}>{dripStatus}</div>}
           </div>
         </div>
       )}
