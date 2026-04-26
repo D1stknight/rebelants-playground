@@ -1394,7 +1394,7 @@ async function submitShipping() {
       }} />
 
       {/* ── HEADER ── */}
-      <header style={{ position:'relative', zIndex:20, maxWidth:980, margin:'0 auto', padding:'16px 20px 0', display:'flex', alignItems:'center', justifyContent:'space-between', fontFamily:`${JP}` }}>
+      <header style={{ position:'relative', zIndex:20, maxWidth:980, margin:'0 auto', padding:'16px 20px 0', display:'flex', alignItems:'center', justifyContent:'space-between', fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif" }}>
         <Link href="/" style={{ display:'flex', alignItems:'center', gap:10, textDecoration:'none', color:'white' }}>
           <span style={{ fontSize:20, filter:'drop-shadow(0 0 8px rgba(167,139,250,0.6))' }}>←</span>
           <span style={{ fontSize:11, fontWeight:900, letterSpacing:'0.2em', textTransform:'uppercase', color:'rgba(255,255,255,0.5)' }}>REBEL ANTS</span>
@@ -1411,7 +1411,7 @@ async function submitShipping() {
       </header>
 
       {/* ── MAIN CONTENT ── */}
-      <div style={{ position:'relative', zIndex:10, maxWidth:980, margin:'0 auto', padding:'12px 16px 40px', fontFamily:`${JP}` }}>
+      <div style={{ position:'relative', zIndex:10, maxWidth:980, margin:'0 auto', padding:'12px 16px 40px', fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif" }}>
 
         {/* Title */}
         <div style={{ textAlign:'center', marginBottom:8 }}>
@@ -1505,7 +1505,7 @@ async function submitShipping() {
           {/* Pick phase invitation */}
           {phase === 'pick' && (
             <div style={{ position:'absolute', bottom:16, left:'50%', transform:'translateX(-50%)', zIndex:8,
-              fontFamily:`${JP}`, fontSize:12, fontWeight:900, letterSpacing:'0.25em', textTransform:'uppercase',
+              fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:12, fontWeight:900, letterSpacing:'0.25em', textTransform:'uppercase',
               color:'#a78bfa', animation:'pickPulse 1.5s ease-in-out infinite',
               textShadow:'0 0 12px rgba(167,139,250,0.8)',
             }}>
@@ -1523,7 +1523,7 @@ async function submitShipping() {
             disabled={busy || phase === "shuffling" || needMore > 0}
             title={needMore > 0 ? "Not enough points" : ""}
             style={{
-              fontFamily:`${JP}`,
+              fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif",
               position:'relative', minWidth:220, height:48,
               display:'inline-flex', alignItems:'center', justifyContent:'center',
               fontSize:13, fontWeight:900, letterSpacing:'0.2em', textTransform:'uppercase',
@@ -1545,7 +1545,7 @@ async function submitShipping() {
 
           {/* Buy Points */}
           <button onClick={() => setShowBuyPoints(true)}
-            style={{ fontFamily:`${JP}`, padding:'10px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase',
+            style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", padding:'10px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase',
               background:'rgba(251,191,36,0.1)', border:'1px solid rgba(251,191,36,0.35)', borderRadius:50,
               color:'#fbbf24', cursor:'pointer', whiteSpace:'nowrap',
               boxShadow:'0 0 12px rgba(251,191,36,0.15)', transition:'all 0.2s',
@@ -1556,13 +1556,13 @@ async function submitShipping() {
           {/* Discord */}
           {isDiscordConnected ? (
             <button onClick={disconnectDiscord}
-              style={{ fontFamily:`${JP}`, padding:'10px 14px', fontSize:11, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase',
+              style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", padding:'10px 14px', fontSize:11, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase',
                 background:'rgba(88,101,242,0.12)', border:'1px solid rgba(88,101,242,0.3)', borderRadius:50, color:'#a5b4fc', cursor:'pointer', whiteSpace:'nowrap' }}>
               ✓ DISCORD
             </button>
           ) : (
             <button onClick={() => { try { saveProfile({ discordSkipLink: false }); window.dispatchEvent(new Event('ra:identity-changed')); } catch {} window.location.href = '/api/auth/discord/login'; }}
-              style={{ fontFamily:`${JP}`, padding:'10px 14px', fontSize:11, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase',
+              style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", padding:'10px 14px', fontSize:11, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase',
                 background:'#5865F2', border:'none', borderRadius:50, color:'white', cursor:'pointer', whiteSpace:'nowrap',
                 boxShadow:'0 0 16px rgba(88,101,242,0.4)' }}>
               CONNECT DISCORD
@@ -1570,12 +1570,12 @@ async function submitShipping() {
           )}
 
           {/* Balance */}
-          <div style={{ fontFamily:`${JP}`, fontSize:12, letterSpacing:'0.1em', color:'rgba(255,255,255,0.5)', textTransform:'uppercase' }}>
+          <div style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:12, letterSpacing:'0.1em', color:'rgba(255,255,255,0.5)', textTransform:'uppercase' }}>
             <span style={{ color:'#fbbf24', fontWeight:900 }}>{balance}</span> {pointsConfig.currency}
           </div>
 
           {needMore > 0 && (
-            <span style={{ fontFamily:`${JP}`, fontSize:11, color:'#f87171', letterSpacing:'0.1em', textTransform:'uppercase' }}>
+            <span style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:11, color:'#f87171', letterSpacing:'0.1em', textTransform:'uppercase' }}>
               NEED {needMore} MORE
             </span>
           )}
@@ -1594,7 +1594,7 @@ async function submitShipping() {
               { label:'RARE', val:`+${pointsConfig.rewards.rare}`, col:'#a78bfa' },
               { label:'ULTRA', val:`+${pointsConfig.rewards.ultra}`, col:'#fbbf24' },
             ].map(item => (
-              <div key={item.label} style={{ fontFamily:`${JP}`, fontSize:10, letterSpacing:'0.12em', textTransform:'uppercase' }}>
+              <div key={item.label} style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:10, letterSpacing:'0.12em', textTransform:'uppercase' }}>
                 <span style={{ color:'rgba(255,255,255,0.35)' }}>{item.label} </span>
                 <span style={{ color:item.col, fontWeight:900 }}>{item.val}</span>
               </div>
@@ -1606,7 +1606,7 @@ async function submitShipping() {
           {/* Claim Daily */}
           <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:2 }}>
             <button onClick={claimDailyNow} disabled={claimBusy || dailyClaimed}
-              style={{ fontFamily:`${JP}`, padding:'7px 14px', fontSize:10, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase',
+              style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", padding:'7px 14px', fontSize:10, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase',
                 background: dailyClaimed ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg,#ef4444,#f97316)',
                 border: dailyClaimed ? '1px solid rgba(255,255,255,0.1)' : 'none',
                 borderRadius:50, color: dailyClaimed ? 'rgba(255,255,255,0.3)' : 'white',
@@ -1620,7 +1620,7 @@ async function submitShipping() {
           {/* DRIP migrate */}
           {isDiscordConnected && (
             <button onClick={async () => { if (isDiscordConnected) await openDripModal(); }} disabled={dripBusy}
-              style={{ fontFamily:`${JP}`, padding:'7px 12px', fontSize:10, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase',
+              style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", padding:'7px 12px', fontSize:10, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase',
                 background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:50, color:'rgba(255,255,255,0.5)', cursor:'pointer', whiteSpace:'nowrap' }}>
               {dripBusy ? 'LOADING...' : 'MIGRATE DRIP'}
             </button>
@@ -1630,7 +1630,7 @@ async function submitShipping() {
         {/* Official Rules */}
         <div style={{ marginBottom:20 }}>
           <button onClick={() => setShowRules(true)}
-            style={{ fontFamily:`${JP}`, fontSize:10, letterSpacing:'0.12em', textTransform:'uppercase',
+            style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:10, letterSpacing:'0.12em', textTransform:'uppercase',
               background:'transparent', border:'none', color:'rgba(255,255,255,0.3)', cursor:'pointer', textDecoration:'underline' }}>
             OFFICIAL RULES
           </button>
@@ -1645,7 +1645,7 @@ async function submitShipping() {
         </div>
 
         {/* Copyright */}
-        <div style={{ textAlign:'center', padding:'16px 0 4px', fontSize:10, opacity:0.25, color:'white', letterSpacing:'0.06em', userSelect:'none', fontFamily:`${JP}`, textTransform:'uppercase' }}>
+        <div style={{ textAlign:'center', padding:'16px 0 4px', fontSize:10, opacity:0.25, color:'white', letterSpacing:'0.06em', userSelect:'none', fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", textTransform:'uppercase' }}>
           © 2026 REBEL ANTS LLC · DEVELOPED BY MIGUEL CONCEPCION
         </div>
       </div>
