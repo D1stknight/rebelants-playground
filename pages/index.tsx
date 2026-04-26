@@ -39,6 +39,39 @@ export default function LandingPage() {
   const [hovered,  setHovered]  = useState('');
   const [legends,  setLegends]  = useState<Legend[]>([]);
   const [ctaHover, setCtaHover] = useState(false);
+  const [musicMuted, setMusicMuted] = useState(false);
+  const audioRef = React.useRef<HTMLAudioElement|null>(null);
+  const audioUnlocked = React.useRef(false);
+
+  // Unlock & start music on first user interaction (iOS requirement)
+  const unlockAudio = React.useCallback(() => {
+    if (audioUnlocked.current) return;
+    audioUnlocked.current = true;
+    if (audioRef.current) {
+      audioRef.current.volume = 0.35;
+      audioRef.current.play().catch(()=>{});
+    }
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener('pointerdown', unlockAudio, { once: true });
+    window.addEventListener('touchstart', unlockAudio, { once: true });
+    return () => {
+      window.removeEventListener('pointerdown', unlockAudio);
+      window.removeEventListener('touchstart', unlockAudio);
+    };
+  }, [unlockAudio]);
+
+  const toggleMusic = React.useCallback(() => {
+    setMusicMuted(m => {
+      const next = !m;
+      if (audioRef.current) {
+        if (next) { audioRef.current.pause(); }
+        else { audioRef.current.volume = 0.35; audioRef.current.play().catch(()=>{}); }
+      }
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     const t1 = setTimeout(() => setTitleIn(true),  200);
@@ -75,6 +108,16 @@ export default function LandingPage() {
 
       <div style={{ position:'relative', minHeight:'100vh', background:'#050810', color:'white', fontFamily: JP, overflowX:'hidden' }}>
 
+        {/* ── AUDIO ── */}
+        <audio ref={audioRef} src="/audio/japan_sound.mp3" loop preload="none" />
+
+        {/* ── MUTE BUTTON ── */}
+        <button
+          onPointerDown={e=>{e.preventDefault();toggleMusic();}}
+          style={{ position:'fixed', top:16, right:16, zIndex:9999, background:'rgba(0,0,0,0.5)', border:'1px solid rgba(255,255,255,0.2)', borderRadius:50, padding:'8px 14px', cursor:'pointer', color:'white', fontSize:16, fontFamily:'inherit', minWidth:44, minHeight:44, touchAction:'manipulation', backdropFilter:'blur(8px)' }}
+          title={musicMuted ? 'Unmute' : 'Mute'}
+        >{musicMuted ? '🔇' : '🎵'}</button>
+
         {/* ── VIDEO BACKGROUND ── */}
         <div style={{ position:'fixed', inset:0, zIndex:0 }}>
           <video autoPlay muted loop playsInline style={{ width:'100%', height:'100%', objectFit:'cover', opacity:0.5 }} src="/videos/hero-bg.mp4" />
@@ -99,7 +142,9 @@ export default function LandingPage() {
           {/* ══ HERO ══════════════════════════════════════════════════════════ */}
           <div style={{ minHeight:'100vh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'60px 24px 80px', textAlign:'center' }}>
 
-            <div style={{ fontSize:52, marginBottom:20, opacity: titleIn ? 1 : 0, transform: titleIn ? 'scale(1) rotate(0deg)' : 'scale(0.4) rotate(-20deg)', transition:'all 0.7s cubic-bezier(0.34,1.56,0.64,1)' }}>🐜</div>
+            <div style={{ marginBottom:20, opacity: titleIn ? 1 : 0, transform: titleIn ? 'scale(1) rotate(0deg)' : 'scale(0.4) rotate(-20deg)', transition:'all 0.7s cubic-bezier(0.34,1.56,0.64,1)', width:140, height:140, margin:'0 auto 20px' }}>
+              <img src="/bg/rebel-ants-logo.png" alt="Rebel Ants" style={{ width:'100%', height:'100%', objectFit:'contain', mixBlendMode:'screen', filter:'drop-shadow(0 0 30px rgba(239,68,68,0.6))' }} />
+            </div>
 
             <h1 style={{
               fontFamily: JP,
@@ -243,7 +288,9 @@ export default function LandingPage() {
 
           {/* ══ DISCORD CTA ════════════════════════════════════════════════════ */}
           <div style={{ padding:'80px 24px', textAlign:'center', background:'linear-gradient(to bottom, transparent, rgba(88,101,242,0.06), transparent)' }}>
-            <div style={{ fontSize:52, marginBottom:18, animation:'pulse 3s ease-in-out infinite' }}>🐜</div>
+            <div style={{ width:100, height:100, margin:'0 auto 18px', animation:'pulse 3s ease-in-out infinite' }}>
+              <img src="/bg/rebel-ants-logo.png" alt="Rebel Ants" style={{ width:'100%', height:'100%', objectFit:'contain', mixBlendMode:'screen', filter:'drop-shadow(0 0 20px rgba(239,68,68,0.5))' }} />
+            </div>
             <h2 style={{ fontFamily:JP, fontSize:'clamp(20px,4vw,40px)', fontWeight:900, marginBottom:18, letterSpacing:'0.15em', textTransform:'uppercase' }}>JOIN THE COLONY</h2>
             <p style={{ fontFamily:JP, color:'rgba(255,255,255,0.4)', maxWidth:400, margin:'0 auto 44px', lineHeight:1.9, fontSize:12, letterSpacing:'0.15em', textTransform:'uppercase' }}>
               CHALLENGE NOTIFICATIONS. TOURNAMENT UPDATES.<br/>FACTION RIVALRIES. THE COMMUNITY LIVES ON DISCORD.
