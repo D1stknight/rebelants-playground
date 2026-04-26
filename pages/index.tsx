@@ -55,6 +55,17 @@ export default function LandingPage() {
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
+  // Commander Name system
+  const [showNameClaim, setShowNameClaim] = useState(false);
+  const [nameQuery, setNameQuery] = useState('');
+  const [nameAvail, setNameAvail] = useState<null|boolean>(null);
+  const [nameAvailMsg, setNameAvailMsg] = useState('');
+  const [nameClaiming, setNameClaiming] = useState(false);
+  const [nameClaimed, setNameClaimed] = useState('');
+  const debounceRef = React.useRef<ReturnType<typeof setTimeout>|null>(null);
+  // Countdown
+  const [dailyClaimed, setDailyClaimed] = useState(false);
+  const [msUntilClaim, setMsUntilClaim] = useState(0);
   const effectiveId = profile?.primaryId || profile?.discordUserId && `discord:${profile.discordUserId}` || 'guest';
   const pts = usePoints(effectiveId === 'guest' ? 'guest' : effectiveId);
 
@@ -90,6 +101,66 @@ export default function LandingPage() {
 
     return () => window.removeEventListener('ra:identity-changed', load);
   }, []);
+
+  // Refresh claim status whenever effectiveId changes
+  useEffect(() => {
+    if (!effectiveId || effectiveId === 'guest') return;
+    const refresh = async () => {
+      try {
+        const r = await fetch(`/api/points/claim?playerId=${encodeURIComponent(effectiveId)}`, { cache:'no-store' });
+        const j = await r.json().catch(()=>null);
+        if (r.ok && j?.ok) {
+          setDailyClaimed(!!j.claimed);
+          setMsUntilClaim(Number(j.msUntilNextClaim || 0));
+        }
+      } catch {}
+    };
+    refresh();
+  }, [effectiveId]);
+
+  // Countdown tick
+  useEffect(() => {
+    if (!dailyClaimed || msUntilClaim <= 0) return;
+    const t = setInterval(() => setMsUntilClaim(p => Math.max(0, p - 1000)), 1000);
+    return () => clearInterval(t);
+  }, [dailyClaimed, msUntilClaim]);
+
+  // Live name availability check (debounced 500ms)
+  const checkName = useCallback((val: string) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    const clean = val.toLowerCase().replace(/[^a-z0-9_]/g, '');
+    if (!clean || clean.length < 3) { setNameAvail(null); setNameAvailMsg(clean.length > 0 ? 'Min 3 characters' : ''); return; }
+    if (clean.length > 20) { setNameAvail(false); setNameAvailMsg('Max 20 characters'); return; }
+    setNameAvailMsg('Checking...');
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/commander/check-name?name=${encodeURIComponent(clean)}`);
+        const j = await r.json();
+        setNameAvail(j.available);
+        setNameAvailMsg(j.available ? '✓ AVAILABLE' : '✗ TAKEN');
+      } catch { setNameAvailMsg('Check failed'); }
+    }, 500);
+  }, []);
+
+  const handleClaimName = useCallback(async () => {
+    const clean = nameQuery.toLowerCase().replace(/[^a-z0-9_]/g, '');
+    if (!clean || clean.length < 3 || !nameAvail) return;
+    setNameClaiming(true);
+    try {
+      const r = await fetch('/api/commander/claim-name', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ name: clean, displayName: nameQuery.trim() })
+      });
+      const j = await r.json();
+      if (!r.ok || !j.ok) { setNameAvailMsg(j.error || 'Failed — try another name'); setNameClaiming(false); return; }
+      // Save to profile
+      saveProfile({ primaryId: `name:${clean}`, name: j.displayName || clean, discordSkipLink: false });
+      window.dispatchEvent(new Event('ra:identity-changed'));
+      setNameClaimed(j.displayName || clean);
+      setShowNameClaim(false);
+    } catch { setNameAvailMsg('Server error — try again'); }
+    setNameClaiming(false);
+  }, [nameQuery, nameAvail]);
 
   const handleClaimDaily = useCallback(async () => {
     if (!effectiveId || effectiveId === 'guest') { setClaimMsg('Connect Discord first!'); setTimeout(()=>setClaimMsg(''),3000); return; }
@@ -183,6 +254,63 @@ export default function LandingPage() {
         {/* ── AUDIO ── */}
         <audio ref={audioRef} src="/audio/japan_sound.mp3" loop preload="none" />
 
+        {/* ── COMMANDER NAME CLAIM MODAL ── */}
+        {showNameClaim && (
+          <div style={{ position:'fixed', inset:0, zIndex:10001, background:'rgba(0,0,0,0.85)', display:'flex', alignItems:'center', justifyContent:'center', padding:24 }} onPointerDown={e=>{ if(e.target===e.currentTarget) setShowNameClaim(false); }}>
+            <div style={{ background:'rgba(9,14,30,0.98)', border:'1px solid rgba(239,68,68,0.3)', borderRadius:20, padding:'36px 32px', maxWidth:440, width:'100%', textAlign:'center', boxShadow:'0 0 60px rgba(239,68,68,0.15)' }}>
+              <div style={{ fontSize:40, marginBottom:16 }}>⚔️</div>
+              <div style={{ fontFamily:'inherit', fontSize:18, fontWeight:900, letterSpacing:'0.2em', marginBottom:8, textTransform:'uppercase' }}>CLAIM YOUR COMMANDER NAME</div>
+              <div style={{ fontFamily:'inherit', fontSize:11, color:'rgba(255,255,255,0.4)', letterSpacing:'0.12em', marginBottom:28, lineHeight:1.8, textTransform:'uppercase' }}>
+                YOUR NAME IS PERMANENT AND CANNOT BE CHANGED.<br/>
+                YOUR REBEL POINTS WILL BE TIED TO THIS NAME FOREVER.
+              </div>
+              <input
+                autoFocus
+                value={nameQuery}
+                onChange={e=>{ setNameQuery(e.target.value); checkName(e.target.value); }}
+                onKeyDown={e=>{ if(e.key==='Enter' && nameAvail) handleClaimName(); }}
+                placeholder="Enter your commander name"
+                maxLength={20}
+                style={{ fontFamily:'inherit', width:'100%', padding:'14px 18px', fontSize:15, fontWeight:900, letterSpacing:'0.1em', background:'rgba(255,255,255,0.06)', border:`1px solid ${nameAvail===true ? '#34d399' : nameAvail===false ? '#ef4444' : 'rgba(255,255,255,0.15)'}`, borderRadius:12, color:'white', outline:'none', marginBottom:10, textTransform:'uppercase', textAlign:'center' }}
+              />
+              {nameAvailMsg && (
+                <div style={{ fontFamily:'inherit', fontSize:11, letterSpacing:'0.12em', color: nameAvail===true ? '#34d399' : nameAvail===false ? '#f87171' : 'rgba(255,255,255,0.4)', marginBottom:16, textTransform:'uppercase' }}>
+                  {nameAvailMsg}
+                </div>
+              )}
+              <div style={{ display:'flex', gap:10, justifyContent:'center' }}>
+                <button
+                  onPointerDown={e=>{e.preventDefault(); if(!nameClaiming && nameAvail) handleClaimName();}}
+                  disabled={!nameAvail || nameClaiming}
+                  style={{ fontFamily:'inherit', padding:'12px 28px', fontSize:12, fontWeight:900, letterSpacing:'0.2em', textTransform:'uppercase', background: nameAvail ? 'linear-gradient(135deg,#ef4444,#f97316)' : 'rgba(255,255,255,0.08)', border:'none', borderRadius:50, color: nameAvail ? 'white' : 'rgba(255,255,255,0.3)', cursor: nameAvail ? 'pointer' : 'not-allowed', boxShadow: nameAvail ? '0 0 20px rgba(239,68,68,0.4)' : 'none' }}
+                >
+                  {nameClaiming ? 'CLAIMING...' : 'CLAIM THIS NAME'}
+                </button>
+                <button onPointerDown={e=>{e.preventDefault(); setShowNameClaim(false);}} style={{ fontFamily:'inherit', padding:'12px 20px', fontSize:12, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background:'transparent', border:'1px solid rgba(255,255,255,0.15)', borderRadius:50, color:'rgba(255,255,255,0.5)', cursor:'pointer' }}>CANCEL</button>
+              </div>
+              <div style={{ fontFamily:'inherit', fontSize:10, color:'rgba(255,255,255,0.25)', marginTop:20, letterSpacing:'0.08em', textTransform:'uppercase' }}>
+                RULES: 3-20 CHARACTERS · LETTERS, NUMBERS, UNDERSCORES ONLY · NO SPACES
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── NAME CLAIMED CONFIRMATION ── */}
+        {nameClaimed && (
+          <div style={{ position:'fixed', inset:0, zIndex:10002, background:'rgba(0,0,0,0.85)', display:'flex', alignItems:'center', justifyContent:'center', padding:24 }} onPointerDown={()=>setNameClaimed('')}>
+            <div style={{ background:'rgba(9,14,30,0.98)', border:'1px solid rgba(52,211,153,0.4)', borderRadius:20, padding:'40px 36px', maxWidth:420, width:'100%', textAlign:'center', boxShadow:'0 0 60px rgba(52,211,153,0.2)' }}>
+              <div style={{ fontSize:52, marginBottom:16, filter:'drop-shadow(0 0 20px rgba(52,211,153,0.6))' }}>🐜</div>
+              <div style={{ fontFamily:'inherit', fontSize:22, fontWeight:900, letterSpacing:'0.15em', color:'#34d399', marginBottom:12, textTransform:'uppercase' }}>⚔️ {nameClaimed.toUpperCase()}</div>
+              <div style={{ fontFamily:'inherit', fontSize:12, color:'rgba(255,255,255,0.5)', letterSpacing:'0.12em', lineHeight:1.9, textTransform:'uppercase', marginBottom:28 }}>
+                IS NOW YOUR PERMANENT COMMANDER NAME.<br/>
+                YOUR REBEL POINTS ARE TIED TO THIS NAME FOREVER.<br/>
+                GUARD IT WELL, COMMANDER.
+              </div>
+              <button onPointerDown={()=>setNameClaimed('')} style={{ fontFamily:'inherit', padding:'12px 32px', fontSize:12, fontWeight:900, letterSpacing:'0.2em', textTransform:'uppercase', background:'linear-gradient(135deg,#ef4444,#f97316)', border:'none', borderRadius:50, color:'white', cursor:'pointer' }}>ENTER THE PLAYGROUND →</button>
+            </div>
+          </div>
+        )}
+
         {/* ── BUY POINTS MODAL ── */}
         {showBuyModal && (
           <div style={{ position:'fixed', inset:0, zIndex:10000, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }} onPointerDown={e=>{ if(e.target===e.currentTarget) setShowBuyModal(false); }}>
@@ -268,7 +396,7 @@ export default function LandingPage() {
             </p>
 
             <button
-              onClick={() => router.push('/hatch')}
+              onClick={() => { if ((discordLinked || (profile?.primaryId?.startsWith('name:')))) router.push('/faction-wars'); else { const el = document.getElementById('commander-strip'); el?.scrollIntoView({ behavior:'smooth' }); } }}
               onMouseEnter={() => setCtaHover(true)}
               onMouseLeave={() => setCtaHover(false)}
               style={{
@@ -276,19 +404,20 @@ export default function LandingPage() {
                 padding:'18px 60px', fontSize:15, fontWeight:900, letterSpacing:'0.2em',
                 textTransform:'uppercase', background:'linear-gradient(135deg,#ef4444,#f97316)',
                 border:'none', borderRadius:50, color:'white', cursor:'pointer',
-                opacity: ctaIn ? 1 : 0,
+                opacity: ctaIn ? ((discordLinked || (profile?.primaryId?.startsWith('name:'))) ? 1 : 0.55) : 0,
                 transform: ctaIn ? (ctaHover ? 'translateY(-3px) scale(1.04)' : 'translateY(0) scale(1)') : 'translateY(24px) scale(0.92)',
                 transition:'all 0.5s cubic-bezier(0.34,1.56,0.64,1)',
                 boxShadow: ctaHover
                   ? '0 0 60px rgba(239,68,68,0.7), 0 0 120px rgba(239,68,68,0.3), 0 8px 32px rgba(0,0,0,0.5)'
                   : '0 0 40px rgba(239,68,68,0.4), 0 0 80px rgba(239,68,68,0.15), 0 4px 16px rgba(0,0,0,0.4)',
               }}
-            >⚔️ &nbsp;ENTER THE PLAYGROUND</button>
+            >{(discordLinked || (profile?.primaryId?.startsWith('name:'))) ? '⚔️  ENTER THE PLAYGROUND' : '⚔️  SET YOUR NAME TO ENTER'}</button>
 
             <div style={{ position:'absolute', bottom:28, left:'50%', transform:'translateX(-50%)', opacity:0.35, animation:'bounce 2s ease-in-out infinite', fontSize:22 }}>↓</div>
           </div>
 
           {/* ══ COMMANDER STRIP ══════════════════════════════════════════════════ */}
+          <div id="commander-strip" />
           <div style={{ padding:'0 24px 60px', maxWidth:1100, margin:'0 auto' }}>
             <div style={{
               display:'flex', flexWrap:'wrap', alignItems:'center', justifyContent:'space-between',
@@ -304,27 +433,18 @@ export default function LandingPage() {
                   <div style={{ fontFamily:'inherit', fontSize:15, fontWeight:900, color:'white', letterSpacing:'0.05em', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:220 }}>
                     {profile?.discordName || profile?.name || 'Commander'}
                   </div>
+                ) : profile?.primaryId?.startsWith('name:') ? (
+                  <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+                    <div style={{ fontFamily:'inherit', fontSize:15, fontWeight:900, color:'#34d399', letterSpacing:'0.05em' }}>{profile.name}</div>
+                    <div style={{ fontFamily:'inherit', fontSize:9, color:'rgba(255,255,255,0.3)', letterSpacing:'0.1em' }}>COMMANDER NAME · PERMANENT</div>
+                  </div>
                 ) : (
-                  editingName ? (
-                    <input
-                      autoFocus
-                      value={nameInput}
-                      onChange={e=>setNameInput(e.target.value)}
-                      onBlur={()=>{ if(nameInput.trim()) saveProfile({ name: nameInput.trim() }); setEditingName(false); window.dispatchEvent(new Event('ra:identity-changed')); }}
-                      onKeyDown={e=>{ if(e.key==='Enter'){ if(nameInput.trim()) saveProfile({ name: nameInput.trim() }); setEditingName(false); window.dispatchEvent(new Event('ra:identity-changed')); } if(e.key==='Escape') setEditingName(false); }}
-                      placeholder="Enter your name"
-                      maxLength={24}
-                      style={{ fontFamily:'inherit', fontSize:14, fontWeight:900, background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.3)', borderRadius:8, color:'white', padding:'4px 10px', outline:'none', width:180, letterSpacing:'0.05em' }}
-                    />
-                  ) : (
-                    <div
-                      onPointerDown={e=>{e.preventDefault(); setEditingName(true);}}
-                      style={{ fontFamily:'inherit', fontSize:15, fontWeight:900, color: profile?.name && profile.name !== 'guest' ? 'white' : 'rgba(255,255,255,0.35)', letterSpacing:'0.05em', cursor:'text', display:'flex', alignItems:'center', gap:6 }}
-                    >
-                      {profile?.name && profile.name !== 'guest' ? profile.name : 'TAP TO SET NAME'}
-                      <span style={{ fontSize:10, opacity:0.5 }}>✏️</span>
-                    </div>
-                  )
+                  <button
+                    onPointerDown={e=>{e.preventDefault(); setShowNameClaim(true);}}
+                    style={{ fontFamily:'inherit', padding:'8px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.15em', background:'rgba(239,68,68,0.15)', border:'1px solid rgba(239,68,68,0.4)', borderRadius:50, color:'#fca5a5', cursor:'pointer', textTransform:'uppercase', animation:'pulse 2s ease-in-out infinite' }}
+                  >
+                    ⚔️ CLAIM YOUR NAME
+                  </button>
                 )}
                 {discordLinked && (
                   <div style={{ fontFamily:'inherit', fontSize:10, color:'rgba(255,255,255,0.3)', letterSpacing:'0.08em' }}>
@@ -359,6 +479,15 @@ export default function LandingPage() {
                 >
                   💎 BUY POINTS
                 </button>
+
+                {/* Countdown */}
+                {effectiveId && effectiveId !== 'guest' && (
+                  <div style={{ fontFamily:'inherit', fontSize:10, letterSpacing:'0.12em', color: dailyClaimed && msUntilClaim > 0 ? 'rgba(255,255,255,0.4)' : '#34d399', textTransform:'uppercase', textAlign:'center', minWidth:120 }}>
+                    {dailyClaimed && msUntilClaim > 0
+                      ? `NEXT CLAIM ${Math.floor(msUntilClaim/3600000)}h ${Math.floor((msUntilClaim%3600000)/60000)}m ${Math.floor((msUntilClaim%60000)/1000)}s`
+                      : '⚡ READY TO CLAIM'}
+                  </div>
+                )}
 
                 {/* Discord */}
                 {discordLinked ? (
