@@ -50,7 +50,7 @@ export default function LandingPage() {
   const [discordLinked, setDiscordLinked] = useState(false);
   const [claimMsg, setClaimMsg] = useState('');
   const effectiveId = profile?.primaryId || profile?.discordUserId && `discord:${profile.discordUserId}` || 'guest';
-  const pts = usePoints(effectiveId);
+  const pts = usePoints(effectiveId === 'guest' ? 'guest' : effectiveId);
 
   // Load profile on mount and listen for identity changes
   useEffect(() => {
@@ -65,17 +65,16 @@ export default function LandingPage() {
   }, []);
 
   const handleClaimDaily = useCallback(async () => {
+    if (!effectiveId || effectiveId === 'guest') { setClaimMsg('Connect Discord first!'); setTimeout(()=>setClaimMsg(''),3000); return; }
     setClaimMsg('Claiming...');
-    const res = await pts.claimDaily();
-    if ((res as any)?.ok === false && (res as any)?.error === 'already_claimed') {
-      setClaimMsg('Already claimed today!');
-    } else if ((res as any)?.added) {
-      setClaimMsg(`+${(res as any).added} REBEL claimed!`);
-    } else {
-      setClaimMsg('Claimed!');
-    }
+    try {
+      const r = await fetch('/api/points/claim', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ playerId: effectiveId, amount: 200 }) });
+      const j = await r.json().catch(()=>null);
+      if (!r.ok || !j?.ok) { setClaimMsg(j?.error === 'already_claimed' ? 'Already claimed today!' : 'Claim failed'); }
+      else { setClaimMsg(`+${j.added || 200} REBEL claimed!`); await pts.refresh(); }
+    } catch { setClaimMsg('Error — try again'); }
     setTimeout(() => setClaimMsg(''), 3000);
-  }, [pts]);
+  }, [effectiveId, pts]);
 
   const handleDisconnectDiscord = useCallback(() => {
     saveProfile({ discordSkipLink: true, discordUserId: undefined, discordName: undefined, primaryId: undefined });
