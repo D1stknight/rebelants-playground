@@ -1158,7 +1158,7 @@ export default function Raid() {
           background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.25)',
           display:'flex', alignItems:'center', gap:10 }}>
           <span style={{ fontSize:18 }}>⚠️</span>
-          <div style={{ fontFamily:''Noto Serif JP', 'Hiragino Mincho ProN', serif', fontSize:11, letterSpacing:'0.1em', textTransform:'uppercase', color:'rgba(255,180,180,0.85)' }}>
+          <div style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:11, letterSpacing:'0.1em', textTransform:'uppercase', color:'rgba(255,180,180,0.85)' }}>
             BRUTAL DIFFICULTY — Carriers only have {Math.round(Number(cfg?.raidCarrierSurvival ?? 25) * 100)}% survival chance.
             Send warriors to protect them.
           </div>
@@ -1171,7 +1171,7 @@ export default function Raid() {
           boxShadow:'0 0 40px rgba(6,182,212,0.08), inset 0 1px 0 rgba(34,211,238,0.1)',
         }}>
           <div style={{ padding:'14px 20px 0', borderBottom:'1px solid rgba(34,211,238,0.1)' }}>
-            <div style={{ fontFamily:''Noto Serif JP', 'Hiragino Mincho ProN', serif', fontSize:12, fontWeight:900, letterSpacing:'0.25em', textTransform:'uppercase',
+            <div style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:12, fontWeight:900, letterSpacing:'0.25em', textTransform:'uppercase',
               color:'#22d3ee', marginBottom:12, filter:'drop-shadow(0 0 8px rgba(34,211,238,0.4))' }}>
               ⚔️ ASSEMBLE YOUR SQUAD
             </div>
@@ -1189,7 +1189,7 @@ export default function Raid() {
             boxShadow:'0 0 60px rgba(6,182,212,0.15), inset 0 1px 0 rgba(34,211,238,0.15)',
             padding:'20px',
           }}>
-            <div style={{ fontFamily:''Noto Serif JP', 'Hiragino Mincho ProN', serif', fontSize:11, fontWeight:900, letterSpacing:'0.25em', textTransform:'uppercase',
+            <div style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:11, fontWeight:900, letterSpacing:'0.25em', textTransform:'uppercase',
               color:'#22d3ee', marginBottom:14, filter:'drop-shadow(0 0 8px rgba(34,211,238,0.4))' }}>
               ⚔️ BATTLE REPORT
             </div>
@@ -1202,7 +1202,7 @@ export default function Raid() {
 
         {phase==='battling' && (
           <div style={{ marginTop:8, fontSize:12, textAlign:'center', fontWeight:900,
-            fontFamily:''Noto Serif JP', 'Hiragino Mincho ProN', serif', letterSpacing:'0.2em', textTransform:'uppercase',
+            fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", letterSpacing:'0.2em', textTransform:'uppercase',
             color:'#22d3ee', animation:'raidPulse 1s ease-in-out infinite',
             filter:'drop-shadow(0 0 8px rgba(34,211,238,0.6))',
           }}>
@@ -1218,7 +1218,7 @@ export default function Raid() {
             disabled={busy||squad.length<SQUAD_SIZE||needMore>0}
             title={squad.length<SQUAD_SIZE ? `Need ${SQUAD_SIZE} ants` : needMore>0 ? 'Not enough points' : ''}
             style={{
-              fontFamily:''Noto Serif JP', 'Hiragino Mincho ProN', serif',
+              fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif",
               position:'relative', minWidth:240, height:52,
               display:'inline-flex', alignItems:'center', justifyContent:'center',
               fontSize:13, fontWeight:900, letterSpacing:'0.2em', textTransform:'uppercase',
@@ -1247,7 +1247,7 @@ export default function Raid() {
 
           {/* Buy Points */}
           <button type="button" onClick={()=>setShowBuyPoints(true)}
-            style={{ fontFamily:''Noto Serif JP', 'Hiragino Mincho ProN', serif', padding:'10px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase',
+            style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", padding:'10px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase',
               background:'rgba(251,191,36,0.1)', border:'1px solid rgba(251,191,36,0.3)', borderRadius:50,
               color:'#fbbf24', cursor:'pointer', whiteSpace:'nowrap', boxShadow:'0 0 12px rgba(251,191,36,0.15)' }}>
             💎 BUY POINTS
@@ -1256,26 +1256,26 @@ export default function Raid() {
           {/* Discord */}
           {isDiscordConnected ? (
             <button type="button" onClick={disconnectDiscord}
-              style={{ fontFamily:''Noto Serif JP', 'Hiragino Mincho ProN', serif', padding:'10px 14px', fontSize:11, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase',
+              style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", padding:'10px 14px', fontSize:11, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase',
                 background:'rgba(88,101,242,0.12)', border:'1px solid rgba(88,101,242,0.3)', borderRadius:50, color:'#a5b4fc', cursor:'pointer', whiteSpace:'nowrap' }}>
               ✓ DISCORD
             </button>
           ) : (
             <button type="button"
               onClick={()=>{ try{saveProfile({discordSkipLink:false});window.dispatchEvent(new Event('ra:identity-changed'));}catch{} window.location.href='/api/auth/discord/login'; }}
-              style={{ fontFamily:''Noto Serif JP', 'Hiragino Mincho ProN', serif', padding:'10px 14px', fontSize:11, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase',
+              style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", padding:'10px 14px', fontSize:11, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase',
                 background:'#5865F2', border:'none', borderRadius:50, color:'white', cursor:'pointer', whiteSpace:'nowrap', boxShadow:'0 0 16px rgba(88,101,242,0.4)' }}>
               CONNECT DISCORD
             </button>
           )}
 
           {/* Balance */}
-          <div style={{ fontFamily:''Noto Serif JP', 'Hiragino Mincho ProN', serif', fontSize:12, letterSpacing:'0.1em', color:'rgba(255,255,255,0.5)', textTransform:'uppercase' }}>
+          <div style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:12, letterSpacing:'0.1em', color:'rgba(255,255,255,0.5)', textTransform:'uppercase' }}>
             <span style={{ color:'#fbbf24', fontWeight:900 }}>{balance}</span> {cfg?.currency}
           </div>
 
           {needMore>0 && (
-            <span style={{ fontFamily:''Noto Serif JP', 'Hiragino Mincho ProN', serif', fontSize:11, color:'#f87171', letterSpacing:'0.1em', textTransform:'uppercase' }}>
+            <span style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:11, color:'#f87171', letterSpacing:'0.1em', textTransform:'uppercase' }}>
               NEED {needMore} MORE
             </span>
           )}
@@ -1293,7 +1293,7 @@ export default function Raid() {
               { label:'LAUNCH', val:String(cost), col:'#f87171' },
               { label:'SQUAD', val:String(squadCost), col:'#f87171' },
             ].map(item => (
-              <div key={item.label} style={{ fontFamily:''Noto Serif JP', 'Hiragino Mincho ProN', serif', fontSize:10, letterSpacing:'0.12em', textTransform:'uppercase' }}>
+              <div key={item.label} style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:10, letterSpacing:'0.12em', textTransform:'uppercase' }}>
                 <span style={{ color:'rgba(255,255,255,0.35)' }}>{item.label} </span>
                 <span style={{ color:item.col, fontWeight:900 }}>{item.val}</span>
               </div>
@@ -1305,7 +1305,7 @@ export default function Raid() {
           {/* Daily Claim */}
           <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:2 }}>
             <button type="button" onClick={claimDailyNow} disabled={claimBusy||dailyClaimed}
-              style={{ fontFamily:''Noto Serif JP', 'Hiragino Mincho ProN', serif', padding:'7px 14px', fontSize:10, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase',
+              style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", padding:'7px 14px', fontSize:10, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase',
                 background: dailyClaimed ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg,#ef4444,#f97316)',
                 border: dailyClaimed ? '1px solid rgba(255,255,255,0.1)' : 'none',
                 borderRadius:50, color: dailyClaimed ? 'rgba(255,255,255,0.3)' : 'white',
@@ -1318,7 +1318,7 @@ export default function Raid() {
           {/* DRIP migrate */}
           {isDiscordConnected && (
             <button type="button" onClick={async()=>{ if(isDiscordConnected) await openDripModal(); }} disabled={dripBusy}
-              style={{ fontFamily:''Noto Serif JP', 'Hiragino Mincho ProN', serif', padding:'7px 12px', fontSize:10, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase',
+              style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", padding:'7px 12px', fontSize:10, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase',
                 background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:50,
                 color:'rgba(255,255,255,0.5)', cursor:'pointer', whiteSpace:'nowrap' }}>
               {dripBusy ? 'LOADING...' : 'MIGRATE DRIP'}
@@ -1329,7 +1329,7 @@ export default function Raid() {
         {/* Official Rules */}
         <div style={{ marginBottom:20 }}>
           <button onClick={()=>setShowRules(true)}
-            style={{ fontFamily:''Noto Serif JP', 'Hiragino Mincho ProN', serif', fontSize:10, letterSpacing:'0.12em', textTransform:'uppercase',
+            style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:10, letterSpacing:'0.12em', textTransform:'uppercase',
               background:'transparent', border:'none', color:'rgba(255,255,255,0.3)', cursor:'pointer', textDecoration:'underline' }}>
             OFFICIAL RULES
           </button>
@@ -1345,7 +1345,7 @@ export default function Raid() {
 
         {/* Copyright */}
         <div style={{ textAlign:'center', padding:'16px 0 4px', fontSize:10, opacity:0.25, color:'white',
-          letterSpacing:'0.06em', userSelect:'none', fontFamily:''Noto Serif JP', 'Hiragino Mincho ProN', serif', textTransform:'uppercase' }}>
+          letterSpacing:'0.06em', userSelect:'none', fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", textTransform:'uppercase' }}>
           © 2026 REBEL ANTS LLC · DEVELOPED BY MIGUEL CONCEPCION
         </div>
       </div>
@@ -1373,7 +1373,7 @@ export default function Raid() {
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.85)', zIndex:3000, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }} onClick={()=>setShowRules(false)}>
           <div style={{ background:'#040c1e', border:'1px solid rgba(34,211,238,0.2)', borderRadius:16, padding:28, maxWidth:560, width:'100%', maxHeight:'85vh', overflowY:'auto' }} onClick={e=>e.stopPropagation()}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:18 }}>
-              <div style={{ fontWeight:900, fontSize:18, fontFamily:''Noto Serif JP', 'Hiragino Mincho ProN', serif', letterSpacing:'0.1em' }}>📋 OFFICIAL RULES</div>
+              <div style={{ fontWeight:900, fontSize:18, fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", letterSpacing:'0.1em' }}>📋 OFFICIAL RULES</div>
               <button onClick={()=>setShowRules(false)} style={{ background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.2)', borderRadius:8, padding:'6px 14px', color:'white', cursor:'pointer', fontSize:13 }}>✕</button>
             </div>
             <div style={{ fontSize:13, lineHeight:1.7, display:'flex', flexDirection:'column', gap:12, opacity:0.9 }}>
