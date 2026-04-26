@@ -188,7 +188,7 @@ export default function LandingPage() {
           <div style={{ position:'fixed', inset:0, zIndex:10000, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }} onPointerDown={e=>{ if(e.target===e.currentTarget) setShowBuyModal(false); }}>
             <div style={{ position:'relative', maxWidth:480, width:'100%' }}>
               <button onPointerDown={()=>setShowBuyModal(false)} style={{ position:'absolute', top:-12, right:-12, zIndex:1, background:'rgba(0,0,0,0.6)', border:'1px solid rgba(255,255,255,0.2)', borderRadius:50, color:'white', width:32, height:32, cursor:'pointer', fontSize:16, display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>
-              <BuyPointsModal playerId={effectiveId} onClose={()=>setShowBuyModal(false)} onPurchase={()=>{ setShowBuyModal(false); pts.refresh(); }} />
+              <BuyPointsModal open={showBuyModal} playerId={effectiveId} onClose={()=>setShowBuyModal(false)} onClaimed={()=>{ setShowBuyModal(false); pts.refresh(); }} />
             </div>
           </div>
         )}
