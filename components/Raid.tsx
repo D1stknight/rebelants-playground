@@ -1147,18 +1147,14 @@ export default function Raid() {
 
 
   const [factionId, setFactionId] = React.useState<import('../lib/factionConfig').FactionId>('ashigaru');
-  const faction = (window as any).__FACTIONS__?.[factionId] ?? {
-    id:'ashigaru', name:'Ashigaru', available:true,
-    colors:{ primary:'#4ade80', secondary:'#16a34a', bg:'rgba(22,163,74,0.12)', glow:'rgba(74,222,128,0.5)', text:'#4ade80', gradient:'linear-gradient(135deg,#14532d,#166534,#15803d)' },
-    roles:{ scout:{img:'/factions/ashigaru/ashigaru_scout.png',label:'Scout'}, soldier:{img:'/factions/ashigaru/ashigaru_soldier.png',label:'Soldier'}, carrier:{img:'/factions/ashigaru/ashigaru_carrier.png',label:'Carrier'}, guard:{img:'/factions/ashigaru/ashigaru_guard.png',label:'Guard'}, bomber:{img:'/factions/ashigaru/ashigaru_bomber.png',label:'Bomber'} }
+  // Inline faction data — SSR safe, no window access
+  const FACTION_DATA: Record<string, any> = {
+    ashigaru: { id:'ashigaru', name:'Ashigaru', available:true,
+      colors:{ primary:'#4ade80', secondary:'#16a34a', bg:'rgba(22,163,74,0.12)', glow:'rgba(74,222,128,0.5)', text:'#4ade80', gradient:'linear-gradient(135deg,#14532d,#166534,#15803d)' },
+      roles:{ scout:{img:'/factions/ashigaru/ashigaru_scout.png',label:'Scout'}, soldier:{img:'/factions/ashigaru/ashigaru_soldier.png',label:'Soldier'}, carrier:{img:'/factions/ashigaru/ashigaru_carrier.png',label:'Carrier'}, guard:{img:'/factions/ashigaru/ashigaru_guard.png',label:'Guard'}, bomber:{img:'/factions/ashigaru/ashigaru_bomber.png',label:'Bomber'} }
+    },
   };
-
-  // Load faction config into window on mount
-  React.useEffect(() => {
-    import('../lib/factionConfig').then(m => {
-      (window as any).__FACTIONS__ = m.FACTIONS;
-    });
-  }, []);
+  const faction = FACTION_DATA[factionId] ?? FACTION_DATA['ashigaru'];
 
   return (
     <>
