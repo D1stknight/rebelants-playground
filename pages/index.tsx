@@ -466,7 +466,7 @@ export default function LandingPage() {
               <div style={{ display:'flex', flexWrap:'wrap', gap:8, alignItems:'center' }}>
 
                 {/* Claim Daily + countdown — countdown is absolute so it doesn't affect button alignment */}
-                <div style={{ position:'relative', paddingBottom:14 }}>
+                <div style={{ position:'relative' }}>
                   <button
                     onPointerDown={e=>{e.preventDefault();handleClaimDaily();}}
                     style={{ fontFamily:'inherit', padding:'9px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background:'linear-gradient(135deg,#ef4444,#f97316)', border:'none', borderRadius:50, color:'white', cursor:'pointer', whiteSpace:'nowrap' }}
@@ -474,7 +474,7 @@ export default function LandingPage() {
                     {claimMsg || '⚡ CLAIM DAILY'}
                   </button>
                   {effectiveId && effectiveId !== 'guest' && (
-                    <div style={{ position:'absolute', bottom:0, left:'50%', transform:'translateX(-50%)', fontFamily:'inherit', fontSize:9, letterSpacing:'0.1em', color: dailyClaimed && msUntilClaim > 0 ? 'rgba(255,255,255,0.35)' : '#34d399', textTransform:'uppercase', whiteSpace:'nowrap' }}>
+                    <div style={{ position:'absolute', top:'100%', marginTop:3, left:'50%', transform:'translateX(-50%)', fontFamily:'inherit', fontSize:9, letterSpacing:'0.1em', color: dailyClaimed && msUntilClaim > 0 ? 'rgba(255,255,255,0.35)' : '#34d399', textTransform:'uppercase', whiteSpace:'nowrap' }}>
                       {dailyClaimed && msUntilClaim > 0
                         ? `NEXT ${Math.floor(msUntilClaim/3600000)}h ${Math.floor((msUntilClaim%3600000)/60000)}m ${Math.floor((msUntilClaim%60000)/1000)}s`
                         : '⚡ READY'}
