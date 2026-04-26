@@ -1,5 +1,8 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { loadProfile, saveProfile } from '../lib/profile';
+import { getEffectivePlayerId } from '../lib/profile';
+import dynamic from 'next/dynamic';
+const BuyPointsModal = dynamic(() => import('../components/BuyPointsModal'), { ssr: false });
 import { usePoints } from '../lib/usePoints';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
@@ -49,18 +52,42 @@ export default function LandingPage() {
   const [profile, setProfile] = useState<any>(null);
   const [discordLinked, setDiscordLinked] = useState(false);
   const [claimMsg, setClaimMsg] = useState('');
+  const [showBuyModal, setShowBuyModal] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState('');
   const effectiveId = profile?.primaryId || profile?.discordUserId && `discord:${profile.discordUserId}` || 'guest';
   const pts = usePoints(effectiveId === 'guest' ? 'guest' : effectiveId);
 
-  // Load profile on mount and listen for identity changes
+  // Load profile + auto-link Discord session on mount
   useEffect(() => {
     const load = () => {
       const p = loadProfile();
       setProfile(p);
-      setDiscordLinked(!!(p?.discordUserId));
+      setDiscordLinked(!!(p?.discordUserId || p?.primaryId?.startsWith('discord:')));
+      setNameInput(p?.name && p.name !== 'guest' ? p.name : '');
     };
     load();
     window.addEventListener('ra:identity-changed', load);
+
+    // Auto-link Discord if OAuth just completed
+    const autoLink = async () => {
+      const gate = loadProfile();
+      if (gate?.discordSkipLink) return;
+      try {
+        const sr = await fetch('/api/auth/discord/session', { cache: 'no-store' });
+        const sj = await sr.json().catch(() => null);
+        if (!sr.ok || !sj?.ok || !sj?.discordUserId) return;
+        const prof = loadProfile();
+        const fromId = getEffectivePlayerId(prof);
+        const toId = `discord:${sj.discordUserId}`;
+        if (String(prof.primaryId || '') === toId) return;
+        await fetch('/api/identity/link-discord', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fromId }) });
+        saveProfile({ discordUserId: sj.discordUserId, discordName: sj.discordName, primaryId: toId, name: sj.discordName || prof.name, discordSkipLink: false });
+        window.dispatchEvent(new Event('ra:identity-changed'));
+      } catch {}
+    };
+    autoLink();
+
     return () => window.removeEventListener('ra:identity-changed', load);
   }, []);
 
@@ -77,7 +104,7 @@ export default function LandingPage() {
   }, [effectiveId, pts]);
 
   const handleDisconnectDiscord = useCallback(() => {
-    saveProfile({ discordSkipLink: true, discordUserId: undefined, discordName: undefined, primaryId: undefined });
+    saveProfile({ discordSkipLink: false, discordUserId: undefined, discordName: undefined, primaryId: undefined });
     window.dispatchEvent(new Event('ra:identity-changed'));
     window.location.href = '/api/auth/discord/logout';
   }, []);
@@ -155,6 +182,16 @@ export default function LandingPage() {
 
         {/* ── AUDIO ── */}
         <audio ref={audioRef} src="/audio/japan_sound.mp3" loop preload="none" />
+
+        {/* ── BUY POINTS MODAL ── */}
+        {showBuyModal && (
+          <div style={{ position:'fixed', inset:0, zIndex:10000, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }} onPointerDown={e=>{ if(e.target===e.currentTarget) setShowBuyModal(false); }}>
+            <div style={{ position:'relative', maxWidth:480, width:'100%' }}>
+              <button onPointerDown={()=>setShowBuyModal(false)} style={{ position:'absolute', top:-12, right:-12, zIndex:1, background:'rgba(0,0,0,0.6)', border:'1px solid rgba(255,255,255,0.2)', borderRadius:50, color:'white', width:32, height:32, cursor:'pointer', fontSize:16, display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>
+              <BuyPointsModal playerId={effectiveId} onClose={()=>setShowBuyModal(false)} onPurchase={()=>{ setShowBuyModal(false); pts.refresh(); }} />
+            </div>
+          </div>
+        )}
 
         {/* ── MUTE BUTTON ── */}
         <button
@@ -263,9 +300,32 @@ export default function LandingPage() {
               {/* Left — Identity */}
               <div style={{ display:'flex', flexDirection:'column', gap:4, minWidth:180 }}>
                 <div style={{ fontFamily:'inherit', fontSize:11, letterSpacing:'0.2em', color:'rgba(255,255,255,0.35)', textTransform:'uppercase' }}>COMMANDER</div>
-                <div style={{ fontFamily:'inherit', fontSize:15, fontWeight:900, color:'white', letterSpacing:'0.05em', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:220 }}>
-                  {discordLinked ? (profile?.discordName || profile?.name || 'Commander') : 'GUEST'}
-                </div>
+                {discordLinked ? (
+                  <div style={{ fontFamily:'inherit', fontSize:15, fontWeight:900, color:'white', letterSpacing:'0.05em', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:220 }}>
+                    {profile?.discordName || profile?.name || 'Commander'}
+                  </div>
+                ) : (
+                  editingName ? (
+                    <input
+                      autoFocus
+                      value={nameInput}
+                      onChange={e=>setNameInput(e.target.value)}
+                      onBlur={()=>{ if(nameInput.trim()) saveProfile({ name: nameInput.trim() }); setEditingName(false); window.dispatchEvent(new Event('ra:identity-changed')); }}
+                      onKeyDown={e=>{ if(e.key==='Enter'){ if(nameInput.trim()) saveProfile({ name: nameInput.trim() }); setEditingName(false); window.dispatchEvent(new Event('ra:identity-changed')); } if(e.key==='Escape') setEditingName(false); }}
+                      placeholder="Enter your name"
+                      maxLength={24}
+                      style={{ fontFamily:'inherit', fontSize:14, fontWeight:900, background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.3)', borderRadius:8, color:'white', padding:'4px 10px', outline:'none', width:180, letterSpacing:'0.05em' }}
+                    />
+                  ) : (
+                    <div
+                      onPointerDown={e=>{e.preventDefault(); setEditingName(true);}}
+                      style={{ fontFamily:'inherit', fontSize:15, fontWeight:900, color: profile?.name && profile.name !== 'guest' ? 'white' : 'rgba(255,255,255,0.35)', letterSpacing:'0.05em', cursor:'text', display:'flex', alignItems:'center', gap:6 }}
+                    >
+                      {profile?.name && profile.name !== 'guest' ? profile.name : 'TAP TO SET NAME'}
+                      <span style={{ fontSize:10, opacity:0.5 }}>✏️</span>
+                    </div>
+                  )
+                )}
                 {discordLinked && (
                   <div style={{ fontFamily:'inherit', fontSize:10, color:'rgba(255,255,255,0.3)', letterSpacing:'0.08em' }}>
                     {effectiveId.slice(0,28)}{effectiveId.length>28?'...':''}
@@ -294,7 +354,7 @@ export default function LandingPage() {
 
                 {/* Buy Points */}
                 <button
-                  onPointerDown={e=>{e.preventDefault(); router.push('/the-raid?buy=1');}}
+                  onPointerDown={e=>{e.preventDefault(); setShowBuyModal(true);}}
                   style={{ fontFamily:'inherit', padding:'10px 18px', fontSize:12, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:50, color:'white', cursor:'pointer', whiteSpace:'nowrap' }}
                 >
                   💎 BUY POINTS
