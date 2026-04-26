@@ -1,5 +1,12 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
+import { createHash } from "crypto";
+
+function hashPin(name: string, pin: string): string {
+  return createHash("sha256")
+    .update(`ra:commander:${name.toLowerCase()}:${pin}:rebel-ants-2026`)
+    .digest("hex");
+}
 
 function normalize(n: string) {
   return n.toLowerCase().replace(/[^a-z0-9_]/g, "");
@@ -16,11 +23,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body ?? {});
   const raw = String(body.name || "").trim();
-  const name = normalize(raw);
+  const pin = String(body.pin || "").trim();
   const displayName = String(body.displayName || raw).trim().slice(0, 24);
+  const name = normalize(raw);
 
   if (!name || name.length < 3) return res.status(400).json({ ok: false, error: "Name must be at least 3 characters" });
   if (name.length > 20) return res.status(400).json({ ok: false, error: "Name must be 20 characters or less" });
+  if (!pin || pin.length < 4 || pin.length > 6 || !/^[0-9]+$/.test(pin)) {
+    return res.status(400).json({ ok: false, error: "PIN must be 4-6 digits (numbers only)" });
+  }
 
   // IP rate limit — max 3 new names per IP per 24h
   const ip = getIP(req);
@@ -35,13 +46,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const playerId = `name:${name}`;
 
-  // Claim it — store permanently (no TTL)
-  await redis.set(nameKey, playerId);
-  // Increment IP rate limit counter (24h TTL)
-  await redis.incr(ipKey);
-  await redis.expire(ipKey, 86400);
-  // Store reverse lookup
-  await redis.set(`ra:commander:player:${playerId}`, displayName);
+  // Store name + PIN + metadata atomically
+  await Promise.all([
+    redis.set(nameKey, playerId),
+    redis.set(`ra:commander:pin:${name}`, hashPin(name, pin)),
+    redis.set(`ra:commander:player:${playerId}`, displayName),
+    redis.incr(ipKey).then(() => redis.expire(ipKey, 86400)),
+  ]);
 
   return res.status(200).json({ ok: true, name, displayName, playerId });
 }
