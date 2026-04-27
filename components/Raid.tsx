@@ -403,14 +403,12 @@ function BattleScene({ slots, revealedCount, phase, ultraCarriers, ultraRatio, f
               transform: isActive ? "scale(1.2)" : "scale(1)",
               boxShadow: isActive ? `0 0 24px ${m.color}aa` : survived && isRevealed ? `0 0 8px ${m.color}33` : "none",
             }}>
-              <span style={{
-                filter: !isRevealed ? "grayscale(1)" : !survived ? "grayscale(.9) brightness(.5)" : "none",
                 {faction?.roles?.[slot.role as AntRole]?.img ? (
                   <img src={faction.roles[slot.role as AntRole].img} alt={m.label}
                     style={{
-                      width:'100%', height:38, objectFit:'contain',
+                      width:'100%', height:40, objectFit:'contain',
                       filter: !isRevealed ? 'grayscale(1) brightness(0.3)'
-                        : !survived ? 'grayscale(1) brightness(0.35) sepia(1) hue-rotate(280deg)'
+                        : !survived ? 'grayscale(1) brightness(0.4) sepia(1) hue-rotate(280deg)'
                         : 'none',
                       transition:'filter 0.4s ease',
                     }}
