@@ -394,16 +394,16 @@ function formatMs(ms: number) {
 
 // ── Difficulty levels ──────────────────────────────────────────────────────
 const DIFFICULTY: Record<string, {label:string;emoji:string;desc:string}> = {
-  colony:  {label:"Level 1",  emoji:"🐜", desc:"Classic colony. Learn the ropes."},
-  neon:    {label:"Level 2",  emoji:"⚡", desc:"Electric. Spider moves faster."},
-  mythic:  {label:"Level 3",  emoji:"🔮", desc:"Dark magic. Tighter paths."},
-  lava:    {label:"Level 4",  emoji:"🌋", desc:"Volcanic. Heat slows your breaks."},
-  ice:     {label:"Level 5",  emoji:"🧊", desc:"Frozen. Spider is relentless."},
-  golden:  {label:"Level 6",  emoji:"🏆", desc:"Guarded vault. Charges dwindling."},
-  shadow:  {label:"Level 7",  emoji:"👁️", desc:"You barely see the walls."},
-  amber:   {label:"Level 8",  emoji:"🏺", desc:"Ancient stone. Walls resist breaking."},
-  toxic:   {label:"Level 9",  emoji:"☢️", desc:"Poison mist. Near impossible odds."},
-  void:    {label:"Level 10", emoji:"💀", desc:"Pure darkness. Maximum difficulty."},
+  colony:  {label:"The Colony",  emoji:"🐜", desc:"Classic colony. Learn the ropes."},
+  neon:    {label:"Neon Grid",  emoji:"⚡", desc:"Electric. Spider moves faster."},
+  mythic:  {label:"Mythic Dark",  emoji:"🔮", desc:"Dark magic. Tighter paths."},
+  lava:    {label:"Lava Caves",  emoji:"🌋", desc:"Volcanic. Heat slows your breaks."},
+  ice:     {label:"Ice Caverns",  emoji:"🧊", desc:"Frozen. Spider is relentless."},
+  golden:  {label:"Golden Vault",  emoji:"🏆", desc:"Guarded vault. Charges dwindling."},
+  shadow:  {label:"Shadow Realm",  emoji:"👁️", desc:"You barely see the walls."},
+  amber:   {label:"Amber Ruins",  emoji:"🏺", desc:"Ancient stone. Walls resist breaking."},
+  toxic:   {label:"Toxic Depths",  emoji:"☢️", desc:"Poison mist. Near impossible odds."},
+  void:    {label:"Void Core", emoji:"💀", desc:"Pure darkness. Maximum intensity."},
 };
 
 export default function TunnelShell() {
@@ -1376,23 +1376,21 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           padding: isPlaying && isMobileView ? "10px 8px" : "20px 16px",
         }}
       >
-        <header style={{ marginBottom: 28, backgroundImage:"url('/bg/tunnel-bg.png')", backgroundSize:"cover", backgroundPosition:"center top", backgroundRepeat:"no-repeat", position:"relative" as const, overflow:"hidden", padding:"16px 20px 20px"}}>
-        <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom, rgba(9,12,22,0.3) 0%, rgba(9,12,22,0.75) 100%)",zIndex:0,pointerEvents:"none"}}/>
-          <div style={{ fontSize: 28, fontWeight: 900, marginBottom: 12, position:"relative", zIndex:1, display:"flex", alignItems:"center", gap:10 }}>
-            <Link href="/" style={{ textDecoration: "none", color: "inherit" }}>
-              Rebel Ants Playground
+        <header style={{ position:'relative', marginBottom:0, overflow:'hidden', minHeight:70 }}>
+          <div style={{ position:'absolute', inset:0, backgroundImage:"url('/bg/tunnel-bg.png')", backgroundSize:'cover', backgroundPosition:'center', filter:'saturate(0.7) brightness(0.35)' }} />
+          <div style={{ position:'absolute', inset:0, background:'linear-gradient(to bottom, rgba(5,8,18,0.5) 0%, rgba(2,4,12,0.85) 100%)' }} />
+          <div style={{ position:'relative', zIndex:2, maxWidth:1200, margin:'0 auto', padding:'14px 20px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+            <Link href="/" style={{ display:'flex', alignItems:'center', gap:10, textDecoration:'none', color:'white' }}>
+              <span style={{ fontSize:20, filter:'drop-shadow(0 0 8px rgba(96,165,250,0.6))' }}>←</span>
+              <span style={{ fontSize:11, fontWeight:900, letterSpacing:'0.2em', textTransform:'uppercase', color:'rgba(255,255,255,0.5)' }}>REBEL ANTS</span>
             </Link>
-            <button onClick={toggleMute} title={muted ? "Unmute" : "Mute"} style={{ background:"rgba(0,0,0,0.4)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:20, padding:"3px 10px", cursor:"pointer", fontSize:16, color:"rgba(255,255,255,0.8)", lineHeight:1 }}>
-              {muted ? "🔇" : "🔊"}
-            </button>
+            <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+              <div style={{ fontSize:13, fontWeight:900, color:'#fbbf24' }}>⚡ {balance} <span style={{ fontSize:10, color:'rgba(251,191,36,0.6)' }}>REBEL</span></div>
+              <button onPointerDown={e=>{e.preventDefault();toggleMute();}} style={{ background:'rgba(0,0,0,0.4)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:20, padding:'6px 12px', cursor:'pointer', fontSize:15, color:'rgba(255,255,255,0.8)', minWidth:40, minHeight:40 }}>
+                {muted ? "🔇" : "🔊"}
+              </button>
+            </div>
           </div>
-
-          <nav className="tabs" aria-label="Main" style={{ position:"relative", zIndex:1 }}>
-            <Link href="/tunnel"     className="tab tab-active">🐜 Ant Tunnel</Link>
-            <Link href="/faction-wars"      className="tab">⚔️ Faction Wars</Link>
-            <Link href="/the-raid" className="tab">⚔️ The Raid</Link>
-            <Link href="/shuffle"    className="tab">🃏 Shuffle</Link>
-          </nav>
         </header>
 
               <div
@@ -1403,9 +1401,10 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
         >
           {!(isPlaying && isMobileView) && (
             <>
-              <div style={{ fontSize: 30, fontWeight: 900, marginBottom: 6 }}>
-                Ant Tunnel
-              </div>
+              <div style={{ textAlign:'center', marginBottom:18, paddingTop:8 }}>
+          <div style={{ fontSize:'clamp(26px,5vw,50px)', fontWeight:900, letterSpacing:'0.1em', textTransform:'uppercase', background:'linear-gradient(135deg,#e0f2fe,#93c5fd,#60a5fa,#3b82f6,#818cf8)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text', filter:'drop-shadow(0 0 24px rgba(96,165,250,0.5))' }}>🐜 ANT TUNNEL</div>
+          <div style={{ fontSize:11, letterSpacing:'0.25em', color:'rgba(255,255,255,0.35)', textTransform:'uppercase', marginTop:5 }}>UNDERGROUND TUNNELS · CRUMBS · CRYSTALS · DANGER</div>
+        </div>
               <p style={{ opacity: 0.88, marginBottom: 12, fontSize: 13 }}>
                 Samurai Rebel Ants. Underground tunnels. Crumbs, sugar, crystals, danger, and breakable walls.
               </p>
@@ -1567,7 +1566,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               const d = DIFFICULTY[key]; const th = themeMap[key]; const active = boardTheme === key;
               return (
                 <button key={key} onClick={() => { setBoardTheme(key); setLayoutIndex(0); }}
-                  style={{padding:"5px 12px",borderRadius:20,fontSize:11,fontWeight:700,cursor:"pointer",
+                  style={{padding:"8px 14px",borderRadius:12,fontSize:12,fontWeight:900,cursor:"pointer",letterSpacing:"0.06em",
                     border:active?(`2px solid ${th.accent}`):"2px solid rgba(255,255,255,0.15)",
                     background:active?(`${th.bg}dd`):"rgba(255,255,255,0.06)",
                     color:active?th.accent:"rgba(255,255,255,0.65)",
