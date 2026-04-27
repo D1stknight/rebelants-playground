@@ -297,19 +297,19 @@ function RolePicker({ squad, onChange, disabled, carrierPct, lastSquad, onLastSq
             <button key={i} disabled={disabled}
               title={`#${i+1} ${m.label} — click to remove`}
               onClick={() => { if (!disabled) { const n=[...squad]; n.splice(i,1); onChange(n); }}}
-              style={{ width:40, height:48, borderRadius:10, padding:0, overflow:'hidden',
+              style={{ width:40, height:52, borderRadius:10, padding:'4px 2px 3px', overflow:'hidden',
                 border: `1px solid ${fc.primary}66`,
                 background: fc.bg,
                 cursor: disabled ? 'default' : 'pointer', position:'relative',
                 boxShadow: `0 0 8px ${fc.glow}`,
                 transition:'transform 0.15s, box-shadow 0.15s',
-                display:'flex', flexDirection:'column', alignItems:'center',
+                display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:2,
               }}>
               <img src={imgSrc} alt={m.label}
-                style={{ width:'100%', height:28, objectFit:'contain', background:'rgba(0,0,0,0.2)' }}
+                style={{ width:'85%', height:26, objectFit:'contain' }}
                 onError={e => { (e.target as HTMLImageElement).style.display='none'; }} />
-              <div style={{ fontFamily:FONT, fontSize:7, fontWeight:900, letterSpacing:'0.08em',
-                color: fc.text, textTransform:'uppercase', lineHeight:1.2, paddingTop:1 }}>
+              <div style={{ fontFamily:FONT, fontSize:6, fontWeight:900, letterSpacing:'0.05em',
+                color: fc.text, textTransform:'uppercase', lineHeight:1, marginTop:0 }}>
                 {(faction.roles[role as AntRole]?.label || m.label).slice(0,4)}
               </div>
               <div style={{ position:'absolute', top:2, right:2, width:12, height:12, borderRadius:'50%',
@@ -360,9 +360,10 @@ function RolePicker({ squad, onChange, disabled, carrierPct, lastSquad, onLastSq
 
 // ── Battle Scene ──────────────────────────────────────────────────────────────
 
-function BattleScene({ slots, revealedCount, phase, ultraCarriers, ultraRatio }: {
+function BattleScene({ slots, revealedCount, phase, ultraCarriers, ultraRatio, faction }: {
   slots: AntSlot[]; revealedCount: number; phase: Phase;
   ultraCarriers: number; ultraRatio: number;
+  faction?: any;
 }) {
   const survivors = slots.slice(0, revealedCount).filter(s => s.survived).length;
   const carriers  = slots.slice(0, revealedCount).filter(s => s.role === "carrier" && s.survived).length;
@@ -404,9 +405,23 @@ function BattleScene({ slots, revealedCount, phase, ultraCarriers, ultraRatio }:
             }}>
               <span style={{
                 filter: !isRevealed ? "grayscale(1)" : !survived ? "grayscale(.9) brightness(.5)" : "none",
-                fontSize: isActive ? 22 : 18, transition: "font-size .2s ease",
-              }}>{m.emoji}</span>
-              {isRevealed && <span style={{ fontSize: 9, marginTop: 1, fontWeight: 900 }}>{survived ? "✅" : "💀"}</span>}
+                {faction?.roles?.[slot.role as AntRole]?.img ? (
+                  <img src={faction.roles[slot.role as AntRole].img} alt={m.label}
+                    style={{
+                      width:'100%', height:38, objectFit:'contain',
+                      filter: !isRevealed ? 'grayscale(1) brightness(0.3)'
+                        : !survived ? 'grayscale(1) brightness(0.35) sepia(1) hue-rotate(280deg)'
+                        : 'none',
+                      transition:'filter 0.4s ease',
+                    }}
+                    onError={e=>{(e.target as HTMLImageElement).style.display='none';}}
+                  />
+                ) : (
+                  <span style={{
+                    filter: !isRevealed ? "grayscale(1)" : !survived ? "grayscale(.9) brightness(.5)" : "none",
+                    fontSize: isActive ? 22 : 18, transition: "font-size .2s ease",
+                  }}>{m.emoji}</span>
+                )}
               {slot.boosted && isRevealed && survived && (
                 <div style={{ position: "absolute", top: -6, right: -4, fontSize: 8, background: "#f472b6", borderRadius: 4, padding: "1px 3px", color: "white", fontWeight: 900 }}>💥</div>
               )}
@@ -1299,7 +1314,7 @@ export default function Raid() {
               ⚔️ BATTLE REPORT
             </div>
             <BattleScene slots={slots} revealedCount={revealedCount} phase={phase}
-              ultraCarriers={ultraCarriersThreshold} ultraRatio={ultraRatioThreshold} />
+              ultraCarriers={ultraCarriersThreshold} ultraRatio={ultraRatioThreshold} faction={faction} />
           </div>
         )}
 
