@@ -246,7 +246,7 @@ function RolePicker({ squad, onChange, disabled, carrierPct, lastSquad, onLastSq
                 background: count > 0 ? fc.gradient : 'rgba(0,0,0,0.3)',
                 display:'flex', alignItems:'center', justifyContent:'center', position:'relative' }}>
                 <img src={imgSrc} alt={m.label}
-                  style={{ width:'100%', height:'100%', objectFit:'cover',
+                  style={{ width:'90%', height:'90%', objectFit:'contain',
                     filter: count > 0 ? `drop-shadow(0 0 8px ${fc.glow})` : 'brightness(0.7) saturate(0.6)',
                     transition:'all 0.3s ease' }}
                   onError={e => { (e.target as HTMLImageElement).style.display='none'; }} />
@@ -306,7 +306,7 @@ function RolePicker({ squad, onChange, disabled, carrierPct, lastSquad, onLastSq
                 display:'flex', flexDirection:'column', alignItems:'center',
               }}>
               <img src={imgSrc} alt={m.label}
-                style={{ width:'100%', height:34, objectFit:'cover' }}
+                style={{ width:'100%', height:28, objectFit:'contain', background:'rgba(0,0,0,0.2)' }}
                 onError={e => { (e.target as HTMLImageElement).style.display='none'; }} />
               <div style={{ fontFamily:FONT, fontSize:7, fontWeight:900, letterSpacing:'0.08em',
                 color: fc.text, textTransform:'uppercase', lineHeight:1.2, paddingTop:1 }}>
@@ -392,7 +392,7 @@ function BattleScene({ slots, revealedCount, phase, ultraCarriers, ultraRatio }:
 
           return (
             <div key={i} style={{
-              width: 44, height: 52, borderRadius: 10,
+              width: 48, height: 64, borderRadius: 10, overflow:'hidden', padding: 0,
               border: `1px solid ${!isRevealed ? "rgba(255,255,255,.07)" : survived ? `${m.color}66` : "rgba(239,68,68,.35)"}`,
               background: !isRevealed ? "rgba(255,255,255,.03)" : survived ? m.bgColor : "rgba(239,68,68,.08)",
               display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
@@ -1156,6 +1156,11 @@ export default function Raid() {
   };
   const faction = FACTION_DATA[factionId] ?? FACTION_DATA['ashigaru'];
 
+  // Expose current faction to BattleScene via window (client-only)
+  if (typeof window !== 'undefined') {
+    (window as any).__RAID_FACTION__ = faction;
+  }
+
   return (
     <>
       {/* ── PARTICLES ── */}
@@ -1174,7 +1179,7 @@ export default function Raid() {
       </div>
 
       {/* ── BG ── */}
-      <div style={{ position:'fixed', inset:0, zIndex:0, pointerEvents:'none', backgroundImage:"url('/ui/raid-bg.jpg')", backgroundSize:'cover', backgroundPosition:'center', filter:'saturate(0.6) brightness(0.35)' }} />
+      <div style={{ position:'fixed', inset:0, zIndex:0, pointerEvents:'none', backgroundImage:"url('/ui/raid-bg.jpg')", backgroundSize:'cover', backgroundPosition:'center', filter:'saturate(0.75) brightness(0.55)' }} />
       <div style={{ position:'fixed', inset:0, zIndex:1, pointerEvents:'none', background:'linear-gradient(160deg, rgba(2,6,23,0.8) 0%, rgba(3,10,28,0.65) 50%, rgba(2,8,20,0.85) 100%)' }} />
       <div style={{ position:'fixed', inset:0, zIndex:1, pointerEvents:'none', background:'radial-gradient(ellipse at 50% 20%, rgba(6,182,212,0.08) 0%, transparent 60%)' }} />
 
