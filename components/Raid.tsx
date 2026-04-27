@@ -245,7 +245,7 @@ function RolePicker({ squad, onChange, disabled, carrierPct, lastSquad, onLastSq
               <div style={{ width:'100%', aspectRatio:'1', overflow:'hidden', borderRadius:'12px 12px 0 0',
                 background: count > 0 ? fc.gradient : 'rgba(0,0,0,0.3)',
                 display:'flex', alignItems:'center', justifyContent:'center', position:'relative' }}>
-                <img src={imgSrc} alt={m.label}
+                <img key={imgSrc} src={imgSrc} alt={m.label}
                   style={{ width:'90%', height:'90%', objectFit:'contain',
                     filter: count > 0 ? `drop-shadow(0 0 8px ${fc.glow})` : 'brightness(0.7) saturate(0.6)',
                     transition:'all 0.3s ease' }}
@@ -305,7 +305,7 @@ function RolePicker({ squad, onChange, disabled, carrierPct, lastSquad, onLastSq
                 transition:'transform 0.15s, box-shadow 0.15s',
                 display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:2,
               }}>
-              <img src={imgSrc} alt={m.label}
+              <img key={imgSrc} src={imgSrc} alt={m.label}
                 style={{ width:'85%', height:26, objectFit:'contain' }}
                 onError={e => { (e.target as HTMLImageElement).style.display='none'; }} />
               <div style={{ fontFamily:FONT, fontSize:6, fontWeight:900, letterSpacing:'0.05em',
@@ -404,7 +404,7 @@ function BattleScene({ slots, revealedCount, phase, ultraCarriers, ultraRatio, f
               boxShadow: isActive ? `0 0 24px ${m.color}aa` : survived && isRevealed ? `0 0 8px ${m.color}33` : "none",
             }}>
                 {faction?.roles?.[slot.role as AntRole]?.img ? (
-                  <img src={faction.roles[slot.role as AntRole].img} alt={m.label}
+                  <img key={faction.roles[slot.role as AntRole].img} src={faction.roles[slot.role as AntRole].img} alt={m.label}
                     style={{
                       width:'100%', height:40, objectFit:'contain',
                       filter: !isRevealed ? 'grayscale(1) brightness(0.3)'
