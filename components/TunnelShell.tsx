@@ -1400,183 +1400,192 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           }}
         >
           {!(isPlaying && isMobileView) && (
-            <>
-              <div style={{ textAlign:'center', marginBottom:18, paddingTop:8 }}>
-          <div style={{ fontSize:'clamp(26px,5vw,50px)', fontWeight:900, letterSpacing:'0.1em', textTransform:'uppercase', background:'linear-gradient(135deg,#e0f2fe,#93c5fd,#60a5fa,#3b82f6,#818cf8)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text', filter:'drop-shadow(0 0 24px rgba(96,165,250,0.5))' }}>🐜 ANT TUNNEL</div>
-          <div style={{ fontSize:11, letterSpacing:'0.25em', color:'rgba(255,255,255,0.35)', textTransform:'uppercase', marginTop:5 }}>UNDERGROUND TUNNELS · CRUMBS · CRYSTALS · DANGER</div>
+<>
+        {/* ── Floating particles ── */}
+        <div style={{position:'fixed',inset:0,zIndex:0,pointerEvents:'none',overflow:'hidden'}}>
+          {[...Array(20)].map((_,i) => (
+            <div key={i} style={{
+              position:'absolute',bottom:'-4px',left:`${(i*97+13)%100}%`,
+              width:1+(i%2),height:2+(i%4),borderRadius:'50%',
+              background:i%3===0?'#60a5fa':i%3===1?'#818cf8':'#93c5fd',
+              opacity:0.08+(i%4)*0.04,
+              animation:`tunnelFloat ${5+(i%5)*1.5}s ${(i*0.6)%7}s infinite linear`,
+            }} />
+          ))}
         </div>
-              <p style={{ opacity: 0.88, marginBottom: 12, fontSize: 13 }}>
-                Samurai Rebel Ants. Underground tunnels. Crumbs, sugar, crystals, danger, and breakable walls.
-              </p>
 
-              <SharedEconomyPanel
-                playerId={effectivePlayerId}
-                balance={balance}
-                totalPlaysLeft={totalEarnRoom}
-                dailyPlaysLeft={remainingDaily}
-                bonusPlayBank={capBank}
-                dailyCap={Number(dailyCap || 0)}
-                currency={tunnelCfg.currency}
-                dailyClaimAmount={tunnelCfg.dailyClaim}
-                onOpenBuyPoints={() => setShowBuyPoints(true)}
-                onRefresh={refresh}
-              />
+        {/* ── Title ── */}
+        <div style={{textAlign:'center',marginBottom:20,paddingTop:8}}>
+          <div style={{fontSize:'clamp(26px,5vw,50px)',fontWeight:900,letterSpacing:'0.1em',textTransform:'uppercase',background:'linear-gradient(135deg,#e0f2fe,#93c5fd,#60a5fa,#3b82f6,#818cf8)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text',filter:'drop-shadow(0 0 24px rgba(96,165,250,0.5))'}}>🐜 ANT TUNNEL</div>
+          <div style={{fontSize:11,letterSpacing:'0.25em',color:'rgba(255,255,255,0.35)',textTransform:'uppercase',marginTop:5}}>UNDERGROUND TUNNELS · CRUMBS · CRYSTALS · DANGER</div>
+        </div>
 
+        {/* ── Economy & Actions ── */}
+        <div style={{maxWidth:900,margin:'0 auto 16px',padding:'0 4px'}}>
+          <div style={{borderRadius:18,border:'1px solid rgba(96,165,250,0.15)',background:'rgba(3,10,28,0.7)',backdropFilter:'blur(12px)',padding:'14px 18px',boxShadow:'0 0 30px rgba(96,165,250,0.06)'}}>
+            <SharedEconomyPanel
+              playerId={effectivePlayerId}
+              balance={balance}
+              totalPlaysLeft={totalEarnRoom}
+              dailyPlaysLeft={remainingDaily}
+              bonusPlayBank={capBank}
+              dailyCap={Number(dailyCap || 0)}
+              currency={tunnelCfg.currency}
+              dailyClaimAmount={tunnelCfg.dailyClaim}
+              onOpenBuyPoints={() => setShowBuyPoints(true)}
+              onRefresh={refresh}
+            />
 
-          {/* ── Economy buttons — exact Raid.tsx pattern ─────────── */}
-          <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:12,marginTop:8,alignItems:"center"}}>
+            {/* ── Action buttons ── */}
+            <div style={{display:'flex',flexWrap:'wrap',gap:8,marginTop:12,alignItems:'center'}}>
+              {showDisconnect ? (
+                <button onClick={()=>{
+                  const p=loadProfile();
+                  const fallback=(p as any)?.walletAddress?`wallet:${(p as any).walletAddress}`:(p?.id||"guest");
+                  saveProfile({...(p as any),discordUserId:undefined,discordName:undefined,primaryId:fallback} as any);
+                  window.location.href="/api/auth/discord/logout";
+                }} style={{padding:'8px 14px',borderRadius:20,border:'1px solid rgba(96,165,250,0.3)',cursor:'pointer',fontWeight:700,fontSize:12,background:'rgba(96,165,250,0.08)',color:'#93c5fd',letterSpacing:'0.06em'}}>
+                  ✓ DISCORD
+                </button>
+              ) : (
+                <button onClick={()=>{
+                  const p=loadProfile();
+                  saveProfile({...(p as any),discordSkipLink:false} as any);
+                  window.location.href="/api/auth/discord/login";
+                }} style={{padding:'8px 14px',borderRadius:20,border:'none',cursor:'pointer',fontWeight:700,fontSize:12,background:'#5865F2',color:'white',letterSpacing:'0.06em'}}>
+                  CONNECT DISCORD
+                </button>
+              )}
 
-            {/* Discord connect/disconnect */}
-            {showDisconnect?(
-              <button onClick={()=>{
-                const p = loadProfile();
-                const fallback = (p as any)?.walletAddress ? `wallet:${(p as any).walletAddress}` : (p?.id || "guest");
-                saveProfile({ ...(p as any), discordUserId: undefined, discordName: undefined, primaryId: fallback, discordSkipLink: true } as any);
-                window.location.href="/api/auth/discord/logout";
-              }}
-                style={{padding:"8px 14px",borderRadius:20,border:"1px solid rgba(255,255,255,0.2)",cursor:"pointer",fontWeight:700,fontSize:13,background:"rgba(255,255,255,0.06)",color:"rgba(255,255,255,0.7)"}}>
-                Disconnect Discord
+              <button onClick={()=>setShowBuyPoints(true)}
+                style={{padding:'8px 14px',borderRadius:20,border:'1px solid rgba(251,191,36,0.3)',cursor:'pointer',fontWeight:700,fontSize:12,background:'rgba(251,191,36,0.08)',color:'#fbbf24',letterSpacing:'0.06em'}}>
+                💎 BUY POINTS
               </button>
-            ):(
-              <button onClick={()=>{
-                const p = loadProfile();
-                saveProfile({ ...(p as any), discordSkipLink: false } as any);
-                window.location.href="/api/auth/discord/login";
-              }}
-                style={{padding:"8px 14px",borderRadius:20,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,background:"#5865f2",color:"#fff"}}>
-                🔗 Connect Discord
-              </button>
-            )}
 
-            {/* Discord status — shown when connected */}
-            {showDisconnect && (
-              <div style={{fontSize:13,fontWeight:700,color:"#22c55e"}}>
-                Discord: Connected ✅
-              </div>
-            )}
-
-            {/* Migrate DRIP — only when discord connected */}
-            {showDisconnect && (
-              <button onClick={()=>setDripPanelOpen(v=>!v)}
-                style={{padding:"8px 14px",borderRadius:20,border:"1px solid rgba(255,255,255,0.2)",cursor:"pointer",fontWeight:700,fontSize:13,background:dripPanelOpen?"rgba(255,255,255,0.12)":"rgba(255,255,255,0.06)",color:"rgba(255,255,255,0.8)"}}>
-                Migrate Points from DRIP in Discord
-              </button>
-            )}
-
-            {/* DRIP balance — shown next to migrate button */}
-            {showDisconnect && dripBalance !== null && (
-              <div style={{fontSize:13,opacity:0.8}}>
-                DRIP: <b>{dripBalance}</b>
-              </div>
-            )}
-
+              {showDisconnect && (
+                <button onClick={()=>setDripPanelOpen(v=>!v)}
+                  style={{padding:'8px 14px',borderRadius:20,border:'1px solid rgba(255,255,255,0.15)',cursor:'pointer',fontWeight:700,fontSize:12,background:'rgba(255,255,255,0.05)',color:'rgba(255,255,255,0.6)',letterSpacing:'0.06em'}}>
+                  MIGRATE DRIP
+                </button>
+              )}
+              {showDisconnect && dripBalance !== null && (
+                <div style={{fontSize:12,opacity:0.6}}>DRIP: <b>{dripBalance}</b></div>
+              )}
+            </div>
           </div>
+        </div>
 
-          {/* Drip migrate panel */}
-          {dripPanelOpen && showDisconnect && (
-            <div style={{marginBottom:12,padding:"12px 14px",borderRadius:14,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.12)"}}>
+        {/* ── DRIP migrate panel ── */}
+        {dripPanelOpen && showDisconnect && (
+          <div style={{maxWidth:900,margin:'0 auto 14px',padding:'0 4px'}}>
+            <div style={{borderRadius:14,border:'1px solid rgba(255,255,255,0.12)',background:'rgba(5,10,25,0.95)',padding:'14px 16px'}}>
               <div style={{fontWeight:900,fontSize:14,marginBottom:8}}>Migrate DRIP Points → Game</div>
-              <div style={{fontSize:12,opacity:0.8,marginBottom:10}}>This will <b>deduct</b> points from DRIP (Discord) and <b>credit</b> the same amount into the game. No double-dipping.</div>
+              <div style={{fontSize:12,opacity:0.8,marginBottom:10}}>This will <b>deduct</b> points from DRIP (Discord) and <b>credit</b> them into the game.</div>
               {dripBalance !== null && <div style={{fontSize:13,marginBottom:8}}>DRIP Balance: <b>{dripBalance}</b></div>}
-              <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-                <label style={{fontSize:12,opacity:0.8}}>Amount to migrate:</label>
+              <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+                <label style={{fontSize:12,opacity:0.8}}>Amount:</label>
                 <input type="number" min={1} value={dripAmount||""} onChange={e=>setDripAmount(Number(e.target.value))}
-                  style={{width:100,padding:"6px 10px",borderRadius:10,border:"1px solid rgba(255,255,255,0.2)",background:"rgba(15,23,42,0.7)",color:"white",fontWeight:700}}
-                  placeholder="e.g. 100" />
+                  style={{width:100,padding:'6px 10px',borderRadius:10,border:'1px solid rgba(255,255,255,0.2)',background:'rgba(15,23,42,0.55)',color:'inherit',fontSize:15}} placeholder="e.g. 100" />
                 <button disabled={dripBusy||!dripAmount} onClick={async()=>{
                   if(!dripAmount||dripAmount<=0)return;
                   setDripBusy(true);setDripStatus("");
                   try{
                     const idem=Date.now().toString(36);
-                    const r=await fetch("/api/drip/migrate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({amount:dripAmount,playerId:effectivePlayerId,idempotencyKey:idem})});
+                    const r=await fetch("/api/drip/migrate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({playerId:effectivePlayerId,amount:dripAmount,idempotencyKey:idem})});
                     const j=await r.json().catch(()=>null);
-                    if(r.ok&&j?.ok){
-                      await refresh();
-                      setDripBalance(b=>b!==null?b-dripAmount:null);
-                      setDripStatus(`✅ Migrated ${dripAmount} points!`);
-                      setDripPanelOpen(false);setDripAmount(0);
-                    } else setDripStatus(j?.error||"Migration failed.");
+                    if(r.ok&&j?.ok){await refresh();setDripBalance(b=>b!==null?b-dripAmount:null);setDripStatus(`✅ Migrated ${dripAmount} points!`);setDripPanelOpen(false);setDripAmount(0);}
+                    else setDripStatus(j?.error||"Migration failed.");
                   }catch(e:any){setDripStatus(e?.message||"Error.");}
                   finally{setDripBusy(false);}
-                }} style={{padding:"8px 16px",borderRadius:14,border:"none",cursor:dripBusy?"default":"pointer",fontWeight:700,fontSize:13,background:"#5865f2",color:"#fff",opacity:dripBusy?0.5:1}}>
-                  {dripBusy?"Migrating…":"Migrate Now"}
+                }} style={{padding:'8px 16px',borderRadius:14,border:'none',cursor:dripBusy?'default':'pointer',fontWeight:700,background:dripBusy?'rgba(255,255,255,0.1)':'#3b82f6',color:'white',opacity:dripBusy||!dripAmount?0.5:1}}>
+                  {dripBusy?"Migrating…":`Migrate ${dripAmount}`}
                 </button>
-                <button onClick={()=>{setDripPanelOpen(false);setDripStatus("");}}
-                  style={{padding:"8px 12px",borderRadius:12,border:"1px solid rgba(255,255,255,0.15)",cursor:"pointer",fontWeight:700,fontSize:12,background:"transparent",color:"rgba(255,255,255,0.5)"}}>
-                  Close
-                </button>
+                <button onClick={()=>{setDripPanelOpen(false);setDripStatus("");}} style={{padding:'8px 12px',borderRadius:12,border:'1px solid rgba(255,255,255,0.15)',cursor:'pointer',background:'transparent',color:'rgba(255,255,255,0.6)'}}>Close</button>
               </div>
-              {dripStatus && <div style={{marginTop:8,fontSize:12,fontWeight:700,color:dripStatus.includes("✅")?"#22c55e":"#f87171"}}>{dripStatus}</div>}
+              {dripStatus && <div style={{marginTop:8,fontSize:12,fontWeight:700,color:dripStatus.includes("✅")?"#4ade80":"#f87171"}}>{dripStatus}</div>}
             </div>
-          )}
-              {/* Layout chooser */}
-              <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:8,flexWrap:"wrap"}}>
-                <button onClick={()=>{setLayoutMode("random");setSelectedLayout(null);}} style={{padding:"5px 14px",borderRadius:20,fontSize:12,fontWeight:700,cursor:"pointer",border:layoutMode==="random"?"2px solid rgba(96,165,250,0.8)":"2px solid rgba(255,255,255,0.15)",background:layoutMode==="random"?"rgba(96,165,250,0.15)":"rgba(255,255,255,0.06)",color:layoutMode==="random"?"#93c5fd":"rgba(255,255,255,0.5)"}}>🎲 Random Layout</button>
-                <button onClick={()=>setLayoutMode("pick")} style={{padding:"5px 14px",borderRadius:20,fontSize:12,fontWeight:700,cursor:"pointer",border:layoutMode==="pick"?"2px solid rgba(250,204,21,0.8)":"2px solid rgba(255,255,255,0.15)",background:layoutMode==="pick"?"rgba(250,204,21,0.12)":"rgba(255,255,255,0.06)",color:layoutMode==="pick"?"#fde68a":"rgba(255,255,255,0.5)"}}>🗺️ Choose Layout</button>
-                {layoutMode==="pick"&&selectedLayout!==null&&<span style={{fontSize:12,opacity:0.75}}>Playing: <b style={{color:"#fde68a"}}>#{selectedLayout+1} {LAYOUT_NAMES[selectedLayout]}</b></span>}
-              </div>
-              {layoutMode==="pick"&&(
-                <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:6,marginBottom:12,padding:10,borderRadius:14,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)"}}>
-                  {TUNNEL_LAYOUTS.map((layout,idx)=>{
-                    const ws=new Set(layout as string[]);const active=selectedLayout===idx;
-                    return(<button key={idx} onClick={()=>setSelectedLayout(idx)} title={LAYOUT_NAMES[idx]} style={{padding:0,border:active?"2px solid rgba(250,204,21,0.9)":"2px solid rgba(255,255,255,0.08)",borderRadius:8,background:active?"rgba(250,204,21,0.08)":"rgba(255,255,255,0.03)",cursor:"pointer",overflow:"hidden",transition:"all 0.15s"}}>
-                      <div style={{display:"grid",gridTemplateColumns:"repeat(22,1fr)",padding:2}}>
-                        {Array.from({length:14*22},(_,i)=>{const r=Math.floor(i/22),c=i%22;const w=r===0||r===13||c===0||c===21||ws.has(r+":"+c);return <div key={i} style={{aspectRatio:"1",background:w?"rgba(120,80,40,0.9)":"rgba(255,255,255,0.07)"}}/>;}) }
-                      </div>
-                      <div style={{fontSize:9,fontWeight:700,padding:"2px 3px 3px",textAlign:"center",color:active?"#fde68a":"rgba(255,255,255,0.45)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>#{idx+1} {LAYOUT_NAMES[idx]}</div>
-                    </button>);
-                  })}
-                </div>
-              )}
-                            <div
-                style={{
-                  ...tunnelTopMetaRowStyle,
-                  ...(isMobileView ? tunnelTopMetaRowMobileStyle : null),
-                }}
-              >
-                <label style={{ fontSize: 13, opacity: 0.9 }}>
-                  Name:&nbsp;
-                  <input
-                    value={playerName}
-                    onChange={(e) => {
-                      const v = (e.target.value.slice(0, 18) || "guest").trim() || "guest";
-                      setPlayerName(v);
-                      const p = loadProfile();
-                      const id = (p?.id || "guest").trim() || "guest";
-                      saveProfile({ name: v, id });
-                    }}
-                                        style={inputStyle}
-                  />
-                </label>
+          </div>
+        )}
 
-                <div style={tunnelFlavorQuoteStyle}>
-                  Move with purpose. Break what stands in your way. In the dark, hesitation is defeat.
-                </div>
+        {/* ── Layout chooser + Name row ── */}
+        <div style={{maxWidth:900,margin:'0 auto 12px',padding:'0 4px',display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
+          <div style={{display:'flex',gap:6,alignItems:'center'}}>
+            <button onClick={()=>{setLayoutMode("random");setSelectedLayout(null);}}
+              style={{padding:'6px 14px',borderRadius:20,fontSize:11,fontWeight:800,cursor:'pointer',letterSpacing:'0.08em',
+                border:layoutMode==="random"?'2px solid #60a5fa':'2px solid rgba(255,255,255,0.15)',
+                background:layoutMode==="random"?'rgba(96,165,250,0.15)':'rgba(255,255,255,0.04)',
+                color:layoutMode==="random"?'#93c5fd':'rgba(255,255,255,0.55)'}}>
+              🎲 RANDOM
+            </button>
+            <button onClick={()=>setLayoutMode("pick")}
+              style={{padding:'6px 14px',borderRadius:20,fontSize:11,fontWeight:800,cursor:'pointer',letterSpacing:'0.08em',
+                border:layoutMode==="pick"?'2px solid #60a5fa':'2px solid rgba(255,255,255,0.15)',
+                background:layoutMode==="pick"?'rgba(96,165,250,0.15)':'rgba(255,255,255,0.04)',
+                color:layoutMode==="pick"?'#93c5fd':'rgba(255,255,255,0.55)'}}>
+              🗺 CHOOSE LAYOUT
+            </button>
+            {layoutMode==="pick"&&selectedLayout!==null&&<span style={{fontSize:11,opacity:0.7,color:'#93c5fd'}}>#{selectedLayout+1} selected</span>}
+          </div>
+          <div style={{flex:1}} />
+          <label style={{fontSize:12,opacity:0.8,display:'flex',alignItems:'center',gap:6}}>
+            <span style={{letterSpacing:'0.08em',textTransform:'uppercase',fontSize:10,opacity:0.6}}>NAME</span>
+            <input value={playerName} onChange={(e)=>{const v=(e.target.value.slice(0,18)||"guest").trim()||"guest";setPlayerName(v);const p=loadProfile();const id=(p?.id||"guest").trim()||"guest";saveProfile({name:v,id});}}
+              style={inputStyle} />
+          </label>
+          <Link href="/tunnel-rules" style={{...tunnelRulesLinkStyle,fontSize:11,letterSpacing:'0.1em',textTransform:'uppercase',opacity:0.5}}>HOW TO PLAY</Link>
+        </div>
 
-            <Link href="/tunnel-rules" style={tunnelRulesLinkStyle}>How to Play</Link>
-              </div>
-            {discordUserId && (
-              <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", fontSize:11, opacity:0.6, marginTop:4}}>
-                <span>ID: {identityDisplay}</span>
-                <button onClick={()=>setShowRules(true)} style={{ fontSize:11, textDecoration:"underline", opacity:0.8, background:"none", border:"none", color:"inherit", cursor:"pointer", padding:0 }}>Official Rules</button>
-              </div>
-            )}
-              <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:14,marginTop:8}}>
-            {(["colony","neon","mythic","lava","ice","golden","shadow","amber","toxic","void"] as BoardTheme[]).map(key => {
-              const d = DIFFICULTY[key]; const th = themeMap[key]; const active = boardTheme === key;
-              return (
-                <button key={key} onClick={() => { setBoardTheme(key); setLayoutIndex(0); }}
-                  style={{padding:"8px 14px",borderRadius:12,fontSize:12,fontWeight:900,cursor:"pointer",letterSpacing:"0.06em",
-                    border:active?(`2px solid ${th.accent}`):"2px solid rgba(255,255,255,0.15)",
-                    background:active?(`${th.bg}dd`):"rgba(255,255,255,0.06)",
-                    color:active?th.accent:"rgba(255,255,255,0.65)",
-                    boxShadow:active?(`0 0 8px ${th.accent}55`):"none",transition:"all 0.2s"}}>
-                  {d.emoji} {d.label}
+        {/* ── Layout picker grid ── */}
+        {layoutMode==="pick" && (
+          <div style={{maxWidth:900,margin:'0 auto 12px',padding:'0 4px'}}>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:6,padding:10,borderRadius:14,background:'rgba(0,0,0,0.4)',border:'1px solid rgba(96,165,250,0.12)'}}>
+              {TUNNEL_LAYOUTS.map((layout,idx)=>{
+                const ws=new Set(layout as string[]);const active=selectedLayout===idx;
+                return(<button key={idx} onClick={()=>setSelectedLayout(idx)} title={LAYOUT_NAMES[idx]}
+                  style={{padding:0,borderRadius:8,overflow:'hidden',border:active?'2px solid #60a5fa':'2px solid rgba(255,255,255,0.08)',background:active?'rgba(96,165,250,0.12)':'rgba(255,255,255,0.04)',cursor:'pointer',transition:'all 0.15s'}}>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(22,1fr)',padding:2}}>
+                    {Array.from({length:14*22},(_,i)=>{const r=Math.floor(i/22),c=i%22;const w=r===0||r===13||c===0||c===21;const isWall=ws.has(`${r}:${c}`);return <div key={i} style={{aspectRatio:'1',background:w?'rgba(96,165,250,0.6)':isWall?'rgba(96,165,250,0.35)':'transparent'}} />;})}</div>
+                  <div style={{fontSize:9,fontWeight:700,padding:'2px 3px 3px',textAlign:'center',color:active?'#93c5fd':'rgba(255,255,255,0.4)'}}>#{idx+1}</div>
+                </button>);
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── Environment selector ── */}
+        <div style={{maxWidth:900,margin:'0 auto 16px',padding:'0 4px'}}>
+          <div style={{fontSize:10,fontWeight:900,letterSpacing:'0.25em',textTransform:'uppercase',color:'rgba(255,255,255,0.3)',marginBottom:10}}>SELECT YOUR TUNNEL ENVIRONMENT</div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+            {(["colony","neon","mythic","lava","ice","golden","shadow","amber","toxic","void"] as BoardTheme[]).map(key=>{
+              const d=DIFFICULTY[key];const th=themeMap[key];const active=boardTheme===key;
+              return(
+                <button key={key} onClick={()=>{setBoardTheme(key);setLayoutIndex(0);}}
+                  style={{
+                    padding:'10px 14px',borderRadius:14,cursor:'pointer',transition:'all 0.2s',
+                    border:active?`2px solid ${th.accent}`:'2px solid rgba(255,255,255,0.1)',
+                    background:active?`linear-gradient(135deg,${th.accent}18,${th.accent}08)`:'rgba(255,255,255,0.04)',
+                    boxShadow:active?`0 0 16px ${th.accent}44,inset 0 0 20px ${th.accent}08`:'none',
+                    transform:active?'scale(1.04)':'scale(1)',
+                    display:'flex',flexDirection:'column',alignItems:'center',gap:4,minWidth:76,
+                  }}>
+                  <div style={{fontSize:20,filter:active?`drop-shadow(0 0 8px ${th.accent})`:'none'}}>{d.emoji}</div>
+                  <div style={{fontSize:10,fontWeight:900,letterSpacing:'0.08em',textTransform:'uppercase',color:active?th.accent:'rgba(255,255,255,0.65)',lineHeight:1.2,textAlign:'center'}}>{d.label}</div>
+                  {active && <div style={{fontSize:9,color:'rgba(255,255,255,0.5)',textAlign:'center',lineHeight:1.3,maxWidth:80}}>{d.desc}</div>}
+                  <div style={{width:20,height:3,borderRadius:4,background:active?th.accent:'rgba(255,255,255,0.1)',marginTop:2,transition:'all 0.2s'}} />
                 </button>
               );
             })}
           </div>
-            </>
+        </div>
+
+        {/* ── Identity display ── */}
+        {discordUserId && (
+          <div style={{maxWidth:900,margin:'0 auto 8px',padding:'0 4px',display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:10,opacity:0.4}}>
+            <span>ID: {identityDisplay}</span>
+            <button onClick={()=>setShowRules(true)} style={{fontSize:10,textDecoration:'underline',opacity:0.6,background:'transparent',border:'none',color:'inherit',cursor:'pointer'}}>Official Rules</button>
+          </div>
+        )}
+      </>
           )}
 
           {isPlaying && isMobileView && (
