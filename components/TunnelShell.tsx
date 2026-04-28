@@ -1423,31 +1423,35 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
         <div style={{maxWidth:900,margin:'0 auto 16px',padding:'0 4px'}}>
           <div style={{borderRadius:18,border:'1px solid rgba(96,165,250,0.15)',background:'linear-gradient(135deg,rgba(3,10,28,0.85),rgba(5,14,35,0.9))',backdropFilter:'blur(12px)',padding:'16px 20px',boxShadow:'0 0 30px rgba(96,165,250,0.06),inset 0 1px 0 rgba(96,165,250,0.08)'}}>
             {/* ── Plays & Daily Cap info ── */}
-            <div style={{display:'flex',flexWrap:'wrap',gap:8,alignItems:'center',marginBottom:14}}>
-              <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',flex:1}}>
-                <div style={{padding:'5px 14px',borderRadius:20,background:'rgba(96,165,250,0.1)',border:'1px solid rgba(96,165,250,0.25)'}}>
-                  <span style={{fontSize:10,letterSpacing:'0.1em',textTransform:'uppercase',color:'rgba(255,255,255,0.45)',marginRight:5}}>PLAYS TODAY</span>
-                  <span style={{fontSize:14,fontWeight:900,color:'#93c5fd'}}>{remainingDaily}</span>
-                  <span style={{fontSize:10,color:'rgba(255,255,255,0.3)'}}> / {Number(dailyCap||0)}</span>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:10,marginBottom:8}}>
+            <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+              <div style={{padding:'6px 14px',borderRadius:20,background:'rgba(96,165,250,0.08)',border:'1px solid rgba(96,165,250,0.2)'}}>
+                <span style={{fontSize:10,letterSpacing:'0.12em',textTransform:'uppercase',color:'rgba(255,255,255,0.4)',marginRight:6}}>PLAYS TODAY</span>
+                <span style={{fontSize:14,fontWeight:900,color:'#93c5fd'}}>{remainingDaily}</span>
+                <span style={{fontSize:10,color:'rgba(255,255,255,0.25)'}}> / {Number(dailyCap||0)}</span>
+              </div>
+              {capBank > 0 && (
+                <div style={{padding:'6px 14px',borderRadius:20,background:'rgba(251,191,36,0.08)',border:'1px solid rgba(251,191,36,0.2)'}}>
+                  <span style={{fontSize:10,letterSpacing:'0.12em',textTransform:'uppercase',color:'rgba(255,255,255,0.4)',marginRight:5}}>BONUS</span>
+                  <span style={{fontSize:14,fontWeight:900,color:'#fbbf24'}}>+{capBank}</span>
                 </div>
-                {capBank > 0 && (
-                  <div style={{padding:'5px 14px',borderRadius:20,background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.25)'}}>
-                    <span style={{fontSize:10,letterSpacing:'0.1em',textTransform:'uppercase',color:'rgba(255,255,255,0.45)',marginRight:5}}>BONUS PLAYS</span>
-                    <span style={{fontSize:14,fontWeight:900,color:'#fbbf24'}}>+{capBank}</span>
-                    <span style={{fontSize:9,color:'rgba(255,255,255,0.3)',marginLeft:4}}>NEVER EXPIRE</span>
-                  </div>
-                )}
-              </div>
-              <div style={{fontSize:10,color:'rgba(255,255,255,0.35)',letterSpacing:'0.06em',textAlign:'right',lineHeight:1.5}}>
-                🔄 Free plays reset daily · 💎 Buying REBEL raises your daily cap permanently + adds to your bonus bank (never expires)
-              </div>
-              <div style={{flex:1}} />
-              <button onClick={()=>void claimDailyNow()} disabled={dailyClaimed}
-                style={{padding:'9px 20px',borderRadius:50,fontWeight:900,fontSize:12,letterSpacing:'0.1em',textTransform:'uppercase',cursor:dailyClaimed?'not-allowed':'pointer',background:dailyClaimed?'rgba(255,255,255,0.05)':'linear-gradient(135deg,#ef4444,#f97316)',border:dailyClaimed?'1px solid rgba(255,255,255,0.1)':'none',color:dailyClaimed?'rgba(255,255,255,0.3)':'white',boxShadow:dailyClaimed?'none':'0 0 16px rgba(239,68,68,0.35)',transition:'all 0.2s',whiteSpace:'nowrap'}}>
-                {dailyClaimed?(countdownStr?`⏱ NEXT IN ${countdownStr}`:'✓ CLAIMED TODAY'):`⚡ CLAIM +${tunnelCfg.dailyClaim} REBEL`}
-              </button>
+              )}
+              {totalEarnRoom > 0 && (
+                <div style={{padding:'6px 14px',borderRadius:20,background:'rgba(74,222,128,0.06)',border:'1px solid rgba(74,222,128,0.15)'}}>
+                  <span style={{fontSize:10,letterSpacing:'0.12em',textTransform:'uppercase',color:'rgba(255,255,255,0.4)',marginRight:5}}>TOTAL LEFT</span>
+                  <span style={{fontSize:14,fontWeight:900,color:'#4ade80'}}>{totalEarnRoom}</span>
+                </div>
+              )}
             </div>
-            {/* ── Action buttons ── */}
+            <button onClick={()=>void claimDailyNow()} disabled={dailyClaimed}
+              style={{padding:'9px 20px',borderRadius:50,fontWeight:900,fontSize:12,letterSpacing:'0.1em',textTransform:'uppercase',cursor:dailyClaimed?'not-allowed':'pointer',background:dailyClaimed?'rgba(255,255,255,0.05)':'linear-gradient(135deg,#ef4444,#f97316)',border:dailyClaimed?'1px solid rgba(255,255,255,0.1)':'none',color:dailyClaimed?'rgba(255,255,255,0.3)':'white',boxShadow:dailyClaimed?'none':'0 0 16px rgba(239,68,68,0.35)',transition:'all 0.2s',whiteSpace:'nowrap'}}>
+              {dailyClaimed?(countdownStr?`⏱ NEXT IN ${countdownStr}`:'✓ CLAIMED TODAY'):`⚡ CLAIM +${tunnelCfg.dailyClaim} REBEL`}
+            </button>
+          </div>
+          <div style={{fontSize:10,color:'rgba(255,255,255,0.3)',lineHeight:1.5,marginBottom:4}}>
+            🔄 Free plays reset daily · 💎 Buying REBEL raises your daily cap permanently + adds to your bonus bank (never expires)
+          </div>
+          {/* ── Action buttons ── */}
             <div style={{display:'flex',flexWrap:'wrap',gap:8,alignItems:'center',borderTop:'1px solid rgba(255,255,255,0.06)',paddingTop:12}}>
               {showDisconnect ? (
                 <button onClick={()=>{const p=loadProfile();const fallback=(p as any)?.walletAddress?`wallet:${(p as any).walletAddress}`:(p?.id||"guest");saveProfile({...(p as any),discordUserId:undefined,discordName:undefined,primaryId:fallback} as any);window.location.href="/api/auth/discord/logout";}} style={{padding:'8px 16px',borderRadius:20,border:'1px solid rgba(96,165,250,0.3)',cursor:'pointer',fontWeight:700,fontSize:11,background:'rgba(96,165,250,0.08)',color:'#93c5fd',letterSpacing:'0.08em',textTransform:'uppercase'}}>✓ DISCORD</button>
