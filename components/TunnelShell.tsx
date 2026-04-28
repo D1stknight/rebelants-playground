@@ -1423,25 +1423,23 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
         <div style={{maxWidth:900,margin:'0 auto 16px',padding:'0 4px'}}>
           <div style={{borderRadius:18,border:'1px solid rgba(96,165,250,0.15)',background:'linear-gradient(135deg,rgba(3,10,28,0.85),rgba(5,14,35,0.9))',backdropFilter:'blur(12px)',padding:'16px 20px',boxShadow:'0 0 30px rgba(96,165,250,0.06),inset 0 1px 0 rgba(96,165,250,0.08)'}}>
             {/* ── Plays & Daily Cap info ── */}
-            <div style={{display:'flex',flexWrap:'wrap',gap:10,alignItems:'center',marginBottom:14}}>
-              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                <div style={{padding:'6px 14px',borderRadius:20,background:'rgba(96,165,250,0.08)',border:'1px solid rgba(96,165,250,0.2)'}}>
-                  <span style={{fontSize:10,letterSpacing:'0.12em',textTransform:'uppercase',color:'rgba(255,255,255,0.4)',marginRight:6}}>PLAYS TODAY</span>
+            <div style={{display:'flex',flexWrap:'wrap',gap:8,alignItems:'center',marginBottom:14}}>
+              <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',flex:1}}>
+                <div style={{padding:'5px 14px',borderRadius:20,background:'rgba(96,165,250,0.1)',border:'1px solid rgba(96,165,250,0.25)'}}>
+                  <span style={{fontSize:10,letterSpacing:'0.1em',textTransform:'uppercase',color:'rgba(255,255,255,0.45)',marginRight:5}}>PLAYS TODAY</span>
                   <span style={{fontSize:14,fontWeight:900,color:'#93c5fd'}}>{remainingDaily}</span>
                   <span style={{fontSize:10,color:'rgba(255,255,255,0.3)'}}> / {Number(dailyCap||0)}</span>
                 </div>
                 {capBank > 0 && (
-                  <div style={{padding:'6px 14px',borderRadius:20,background:'rgba(251,191,36,0.08)',border:'1px solid rgba(251,191,36,0.2)'}}>
-                    <span style={{fontSize:10,letterSpacing:'0.12em',textTransform:'uppercase',color:'rgba(255,255,255,0.4)',marginRight:6}}>BONUS PLAYS</span>
-                    <span style={{fontSize:14,fontWeight:900,color:'#fbbf24'}}>{capBank}</span>
+                  <div style={{padding:'5px 14px',borderRadius:20,background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.25)'}}>
+                    <span style={{fontSize:10,letterSpacing:'0.1em',textTransform:'uppercase',color:'rgba(255,255,255,0.45)',marginRight:5}}>BONUS PLAYS</span>
+                    <span style={{fontSize:14,fontWeight:900,color:'#fbbf24'}}>+{capBank}</span>
+                    <span style={{fontSize:9,color:'rgba(255,255,255,0.3)',marginLeft:4}}>NEVER EXPIRE</span>
                   </div>
                 )}
-                {totalEarnRoom > 0 && (
-                  <div style={{padding:'6px 14px',borderRadius:20,background:'rgba(74,222,128,0.06)',border:'1px solid rgba(74,222,128,0.15)'}}>
-                    <span style={{fontSize:10,letterSpacing:'0.12em',textTransform:'uppercase',color:'rgba(255,255,255,0.4)',marginRight:6}}>TOTAL LEFT</span>
-                    <span style={{fontSize:14,fontWeight:900,color:'#4ade80'}}>{totalEarnRoom}</span>
-                  </div>
-                )}
+              </div>
+              <div style={{fontSize:10,color:'rgba(255,255,255,0.35)',letterSpacing:'0.06em',textAlign:'right',lineHeight:1.5}}>
+                Resets daily · 💎 Buy REBEL for bonus plays that never expire
               </div>
               <div style={{flex:1}} />
               <button onClick={()=>void claimDailyNow()} disabled={dailyClaimed}
