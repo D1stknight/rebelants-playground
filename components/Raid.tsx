@@ -1403,6 +1403,18 @@ export default function Raid() {
               </div>
             ))}
           </div>
+{/* ── Plays cap pills ── */}
+              <div style={{ padding:'5px 13px', borderRadius:20, background:'rgba(34,211,238,0.08)', border:'1px solid rgba(34,211,238,0.2)' }}>
+                <span style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:10, letterSpacing:'0.1em', textTransform:'uppercase', color:'rgba(255,255,255,0.4)', marginRight:5 }}>PLAYS TODAY</span>
+                <span style={{ fontSize:13, fontWeight:900, color:'#22d3ee' }}>{remainingDaily}</span>
+                <span style={{ fontSize:10, color:'rgba(255,255,255,0.25)' }}> / {Number(dailyCap||0)}</span>
+              </div>
+              {capBank > 0 && (
+                <div style={{ padding:'5px 13px', borderRadius:20, background:'rgba(251,191,36,0.08)', border:'1px solid rgba(251,191,36,0.2)' }}>
+                  <span style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:10, letterSpacing:'0.1em', textTransform:'uppercase', color:'rgba(255,255,255,0.4)', marginRight:5 }}>BONUS</span>
+                  <span style={{ fontSize:13, fontWeight:900, color:'#fbbf24' }}>{capBank}</span>
+                </div>
+              )}
           <div style={{ flex:1 }} />
           <button type="button" onClick={claimDailyNow} disabled={claimBusy||dailyClaimed}
             style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", padding:'7px 14px', fontSize:10, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background: dailyClaimed ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg,#ef4444,#f97316)', border: dailyClaimed ? '1px solid rgba(255,255,255,0.1)' : 'none', borderRadius:50, color: dailyClaimed ? 'rgba(255,255,255,0.3)' : 'white', cursor: dailyClaimed ? 'not-allowed' : 'pointer', whiteSpace:'nowrap', boxShadow: dailyClaimed ? 'none' : '0 0 12px rgba(239,68,68,0.3)' }}>
