@@ -1357,7 +1357,7 @@ export default function Raid() {
               animation: (!busy&&squad.length>=SQUAD_SIZE&&needMore===0) ? 'btnTealGlow 2.5s ease-in-out infinite' : 'none',
               transition:'all 0.2s',
             }}>
-            <span style={{ visibility:'hidden', position:'absolute' }}>Launch Raid (-{cost} {cfg?.currency})</span>
+            <span style={{ visibility:'hidden', position:'absolute' }}>LAUNCH RAID (cost: {totalCost} REBEL)</span>
             <span style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
               {phase==='launching' ? '🐜 MARCHING…' : phase==='battling' ? '⚔️ BATTLE IN PROGRESS…' : squad.length<SQUAD_SIZE ? `SQUAD NEEDS ${SQUAD_SIZE-squad.length} MORE` : `⚔️ LAUNCH RAID · COST: ${totalCost} ${cfg?.currency}`}
             </span>
@@ -1381,33 +1381,32 @@ export default function Raid() {
             </button>
           )}
 
-          <div style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:12, letterSpacing:'0.1em', color:'rgba(255,255,255,0.5)', textTransform:'uppercase' }}>
-            <span style={{ color:'#fbbf24', fontWeight:900 }}>{balance}</span> {cfg?.currency}
-          </div>
           {needMore>0 && <span style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:11, color:'#f87171', letterSpacing:'0.1em', textTransform:'uppercase' }}>NEED {needMore} MORE</span>}
         </div>
 
         
-        {/* ── Plays & Cap Info ── */}
-        <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center', marginBottom:10, padding:'12px 16px', borderRadius:14, background:'rgba(34,211,238,0.05)', border:'1px solid rgba(34,211,238,0.12)' }}>
-          <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center', flex:1 }}>
-            <div style={{ padding:'5px 14px', borderRadius:20, background:'rgba(34,211,238,0.1)', border:'1px solid rgba(34,211,238,0.25)' }}>
-              <span style={{ fontSize:10, letterSpacing:'0.1em', textTransform:'uppercase', color:'rgba(255,255,255,0.45)', marginRight:5 }}>PLAYS TODAY</span>
-              <span style={{ fontSize:14, fontWeight:900, color:'#22d3ee' }}>{remainingDaily}</span>
-              <span style={{ fontSize:10, color:'rgba(255,255,255,0.3)' }}> / {Number(dailyCap||0)}</span>
-            </div>
-            {capBank > 0 && (
-              <div style={{ padding:'5px 14px', borderRadius:20, background:'rgba(251,191,36,0.1)', border:'1px solid rgba(251,191,36,0.25)' }}>
-                <span style={{ fontSize:10, letterSpacing:'0.1em', textTransform:'uppercase', color:'rgba(255,255,255,0.45)', marginRight:5 }}>BONUS PLAYS</span>
-                <span style={{ fontSize:14, fontWeight:900, color:'#fbbf24' }}>+{capBank}</span>
-                <span style={{ fontSize:9, color:'rgba(255,255,255,0.3)', marginLeft:4 }}>NEVER EXPIRE</span>
+        {/* ── Plays & Daily Cap ── */}
+        {(remainingDaily > 0 || dailyCap > 0 || capBank > 0) && (
+          <div style={{ borderRadius:14, border:'1px solid rgba(34,211,238,0.12)', background:'rgba(3,10,28,0.6)', padding:'12px 16px', marginBottom:12 }}>
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center', marginBottom:8 }}>
+              <div style={{ padding:'5px 14px', borderRadius:20, background:'rgba(34,211,238,0.08)', border:'1px solid rgba(34,211,238,0.2)' }}>
+                <span style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:10, letterSpacing:'0.1em', textTransform:'uppercase', color:'rgba(255,255,255,0.4)', marginRight:6 }}>PLAYS TODAY</span>
+                <span style={{ fontSize:13, fontWeight:900, color:'#22d3ee' }}>{remainingDaily}</span>
+                <span style={{ fontSize:10, color:'rgba(255,255,255,0.25)' }}> / {Number(dailyCap||0)}</span>
               </div>
-            )}
+              {capBank > 0 && (
+                <div style={{ padding:'5px 14px', borderRadius:20, background:'rgba(251,191,36,0.08)', border:'1px solid rgba(251,191,36,0.2)' }}>
+                  <span style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:10, letterSpacing:'0.1em', textTransform:'uppercase', color:'rgba(255,255,255,0.4)', marginRight:6 }}>BONUS BANK</span>
+                  <span style={{ fontSize:13, fontWeight:900, color:'#fbbf24' }}>{capBank}</span>
+                  <span style={{ fontSize:9, color:'rgba(255,255,255,0.3)', marginLeft:4 }}>NEVER EXPIRE</span>
+                </div>
+              )}
+            </div>
+            <div style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:10, color:'rgba(255,255,255,0.3)', lineHeight:1.6 }}>
+              🔄 Free plays reset daily · 💎 Buying REBEL raises your daily cap permanently + adds to your bonus bank (never expires)
+            </div>
           </div>
-          <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', letterSpacing:'0.06em', textAlign:'right', lineHeight:1.5 }}>
-            Resets daily · 💎 Buy REBEL for bonus plays that never expire
-          </div>
-        </div>
+        )}
         {/* ── INFO STRIP ── */}
         <div style={{ display:'flex', gap:14, flexWrap:'wrap', alignItems:'center', marginBottom:12, padding:'12px 16px', borderRadius:14, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(34,211,238,0.1)' }}>
           <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
