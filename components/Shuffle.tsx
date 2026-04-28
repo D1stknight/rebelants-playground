@@ -1586,6 +1586,1355 @@ async function submitShipping() {
         {/* ── INFO STRIP ── */}
 
         {/* ── Plays & Daily Cap ── */}
+        <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center', marginBottom:10, padding:'12px 16px', borderRadius:14, background:'rgba(124,58,237,0.05)', border:'1px solid rgba(167,139,250,0.12)' }}>
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center', flex:1 }}>
+            <div style={{ padding:'5px 14px', borderRadius:20, background:'rgba(167,139,250,0.1)', border:'1px solid rgba(167,139,250,0.25)' }}>
+              <span style={{ fontSize:10, letterSpacing:'0.1em', textTransform:'uppercase', color:'rgba(255,255,255,0.45)', marginRight:5 }}>PLAYS TODAY</span>
+              <span style={{ fontSize:14, fontWeight:900, color:'#a78bfa' }}>{remainingDaily}</span>
+              <span style={{ fontSize:10, color:'rgba(255,255,255,0.3)' }}> / {Number(dailyCap||0)}</span>
+            </div>
+            {capBank > 0 && (
+              <div style={{ padding:'5px 14px', borderRadius:20, background:'rgba(251,191,36,0.1)', border:'1px solid rgba(251,191,36,0.25)' }}>
+                <span style={{ fontSize:10, letterSpacing:'0.1em', textTransform:'uppercase', color:'rgba(255,255,255,0.45)', marginRight:5 }}>BONUS PLAYS</span>
+                <span style={{ fontSize:14, fontWeight:900, color:'#fbbf24' }}>+{capBank}</span>
+                <span style={{ fontSize:9, color:'rgba(255,255,255,0.3)', marginLeft:4 }}>NEVER EXPIRE</span>
+              </div>
+            )}
+          </div>
+          <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', letterSpacing:'0.06em', textAlign:'right', lineHeight:1.5 }}>
+            Resets daily · 💎 Buy REBEL for bonus plays that never expire
+          </div>
+        </div>
+      ))}
+      
+    </div>
+  );
+}
+
+/* -------- prize modal (bright sparkles) -------- */
+function PrizeModal({
+  rarity,
+  prize,
+  onClose,
+  needShipping,
+  shippingForm,
+  setShippingForm,
+  shipBusy,
+  shipMsg,
+  onSubmitShipping,
+}: {
+  rarity: Rarity;
+  prize: Prize | null;
+  onClose: () => void;
+
+  // ✅ merch shipping flow
+  needShipping: boolean;
+  shippingForm: any;
+  setShippingForm: (v: any) => void;
+  shipBusy: boolean;
+  shipMsg: string;
+  onSubmitShipping: () => Promise<void>;
+}) {
+  const title =
+    rarity === "ultra"
+      ? "ULTRA CRATE!"
+      : rarity === "rare"
+      ? "Rare Crate!"
+      : rarity === "common"
+      ? "Crate Unlocked"
+      : "No crate this time";
+
+  const sparks = useMemo(
+    () =>
+      Array.from({ length: 24 }, (_, i) => ({
+        left: `${8 + (i * 4.1) % 84}%`,
+        top: `${10 + (i * 7.3) % 62}%`,
+        size: 10 + ((i * 3) % 14),
+        delay: (i * 0.18) % 3.2,
+      })),
+    []
+  );
+
+ return (
+  <div className="prize-modal" role="dialog" aria-modal="true">
+    <div className={`prize-card pm-${rarity}`}>
+      {rarity !== "none" && (
+        <div className="sparkle-layer" aria-hidden="true">
+          {sparks.map((s, i) => (
+            <span
+              key={i}
+              className={`pm-sparkle ${rarity}`}
+              style={{
+                left: s.left,
+                top: s.top,
+                width: s.size,
+                height: s.size,
+                animationDelay: `${s.delay}s`,
+              }}
+            />
+          ))}
+        </div>
+      )}
+
+      <div className="prize-title">{title}</div>
+
+      {prize?.label ? (
+        <div className="prize-sub" style={{ marginTop: 6 }}>
+          <b>{prize.label}</b>
+        </div>
+      ) : null}
+
+      {rarity !== "none" ? (
+        <>
+          <div className="prize-aura" data-rarity={rarity} />
+          <img className="prize-art" src={`/crates/${rarity}.png`} alt={`${rarity} crate`} />
+
+          <div className="prize-sub" style={{ marginBottom: 8 }}>
+            You won:{" "}
+            <b>
+{prize?.type === "points" ? `+${prize.points}` : prize?.label || "—"}
+            </b>
+          </div>
+
+         {needShipping ? (
+  <div style={{ marginTop: 10, textAlign: "left" }}>
+    <div className="prize-sub" style={{ marginBottom: 10 }}>
+      ✅ This merch prize needs shipping info to fulfill.
+    </div>
+
+    <div style={{ display: "grid", gap: 8 }}>
+      <input
+        value={shippingForm.name}
+        onChange={(e) => setShippingForm({ ...shippingForm, name: e.target.value })}
+        placeholder="Full Name"
+        style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
+      />
+      <input
+        value={shippingForm.email}
+        onChange={(e) => setShippingForm({ ...shippingForm, email: e.target.value })}
+        placeholder="Email"
+        style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
+      />
+      <input
+        value={shippingForm.phone}
+        onChange={(e) => setShippingForm({ ...shippingForm, phone: e.target.value })}
+        placeholder="Phone"
+        style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
+      />
+      <input
+        value={shippingForm.address1}
+        onChange={(e) => setShippingForm({ ...shippingForm, address1: e.target.value })}
+        placeholder="Address Line 1"
+        style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
+      />
+      <input
+        value={shippingForm.address2}
+        onChange={(e) => setShippingForm({ ...shippingForm, address2: e.target.value })}
+        placeholder="Address Line 2 (optional)"
+        style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
+      />
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        <input
+          value={shippingForm.city}
+          onChange={(e) => setShippingForm({ ...shippingForm, city: e.target.value })}
+          placeholder="City"
+          style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
+        />
+        <input
+          value={shippingForm.state}
+          onChange={(e) => setShippingForm({ ...shippingForm, state: e.target.value })}
+          placeholder="State"
+          style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
+        />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        <input
+          value={shippingForm.zip}
+          onChange={(e) => setShippingForm({ ...shippingForm, zip: e.target.value })}
+          placeholder="ZIP"
+          style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
+        />
+        <input
+          value={shippingForm.country}
+          onChange={(e) => setShippingForm({ ...shippingForm, country: e.target.value })}
+          placeholder="Country (US)"
+          style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
+        />
+      </div>
+
+      <button className="btn" onClick={onSubmitShipping} disabled={shipBusy} style={{ padding: "10px 12px" }}>
+        {shipBusy ? "Saving…" : "Save Shipping"}
+      </button>
+
+      {shipMsg ? (
+        <div className="prize-sub" style={{ marginTop: 8 }}>
+          {shipMsg}
+        </div>
+      ) : null}
+    </div>
+  </div>
+) : (
+  <>
+    {/* ✅ NFT wallet capture (ONLY if Ultra NFT + no wallet connected) */}
+    {rarity === "ultra" && prize?.type === "nft" && !loadProfile()?.walletAddress ? (
+      <div style={{ marginTop: 10, textAlign: "left" }}>
+        <div className="prize-sub" style={{ marginBottom: 10 }}>
+          ✅ Enter the wallet you want this NFT sent to (we’ll remember it for next time).
+        </div>
+
+        <input
+          defaultValue={loadProfile()?.walletAddress || ""}
+          onChange={(e) => {
+            const next = String(e.target.value || "").trim();
+            const p = loadProfile();
+            saveProfile({ ...p, walletAddress: next });
+          }}
+          placeholder="0x… wallet address"
+          style={{
+            width: "100%",
+            padding: "10px 12px",
+            borderRadius: 10,
+            border: "1px solid rgba(255,255,255,.18)",
+            background: "rgba(0,0,0,.25)",
+            color: "white",
+          }}
+        />
+
+        <div className="prize-sub" style={{ marginTop: 8 }}>
+          After you continue, your claim will show up in Admin → Claims.
+        </div>
+      </div>
+    ) : (
+      <div className="prize-sub">Tap continue to play again.</div>
+    )}
+  </>
+)}
+        </>
+      ) : (
+        <div className="prize-sub" style={{ marginBottom: 12 }}>
+          Bummer! Try another egg.
+        </div>
+      )}
+
+     <button
+  className="btn"
+  onClick={async () => {
+    try {
+      // ✅ If it's an NFT prize, create a claim BEFORE closing
+      if (prize?.type === "nft") {
+        const p = loadProfile();
+
+        // Prefer connected wallet, else use what user typed
+        const wallet =
+          (p as any)?.walletAddress ||
+          (shippingForm as any)?.walletAddress ||
+          "";
+
+        if (!wallet) {
+          alert("Please enter a wallet address first.");
+          return;
+        }
+
+       const r = await fetch("/api/prizes/claim", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    claimId: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    playerId: getEffectivePlayerId(loadProfile()),
+    prize,
+    wallet: wallet,
+    shipping: null,
+  }),
+});
+
+        const j = await r.json().catch(() => null);
+
+        if (!r.ok || !j?.ok) {
+          console.log("CLAIM CREATE FAILED", r.status, j);
+          alert(`Claim failed (${r.status}). Check console.`);
+          return;
+        }
+
+        console.log("✅ CLAIM CREATED", j);
+      }
+    } catch (e: any) {
+      console.log("CLAIM CREATE ERROR", e);
+      alert(`Claim error: ${String(e?.message || e)}`);
+      return;
+    }
+
+    onClose();
+  }}
+>
+  Continue
+</button>
+    </div>
+
+    <style>{`
+      .prize-modal {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 2147483647; /* 👈 always above header/tabs */
+}
+      .prize-card {
+        position: relative;
+        min-width: 320px;
+        padding: 20px;
+        border-radius: 12px;
+        text-align: center;
+        background: rgba(15, 23, 42, 0.95);
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        box-shadow: 0 24px 40px rgba(0, 0, 0, 0.55);
+        overflow: visible;
+      }
+      .prize-title {
+        font-size: 18px;
+        font-weight: 800;
+        margin: 10px 0;
+      }
+      .prize-sub {
+        font-size: 14px;
+        opacity: 0.85;
+        margin-bottom: 12px;
+      }
+      .prize-art {
+        display: block;
+        width: 240px;
+        max-width: 80vw;
+        height: auto;
+        margin: 0 auto 12px;
+        position: relative;
+        z-index: 1;
+      }
+      .sparkle-layer {
+        position: absolute;
+        inset: -8% -10%;
+        pointer-events: none;
+        z-index: 0;
+      }
+      .pm-sparkle {
+        position: absolute;
+        border-radius: 50%;
+        background: radial-gradient(
+          circle,
+          rgba(255, 255, 255, 0.95) 0%,
+          rgba(255, 255, 255, 0) 65%
+        );
+        filter: blur(0.3px) drop-shadow(0 0 12px rgba(255, 255, 255, 0.65));
+        opacity: 0;
+        animation: pmSpark 2.6s ease-in-out infinite;
+      }
+      .pm-sparkle.common {
+        filter: blur(0.3px) drop-shadow(0 0 14px rgba(147, 197, 253, 0.85));
+      }
+      .pm-sparkle.rare {
+        filter: blur(0.3px) drop-shadow(0 0 14px rgba(59, 130, 246, 0.95));
+      }
+      .pm-sparkle.ultra {
+        filter: blur(0.3px) drop-shadow(0 0 16px rgba(244, 63, 94, 1));
+      }
+      @keyframes pmSpark {
+        0% {
+          transform: scale(0.4);
+          opacity: 0;
+        }
+        20% {
+          opacity: 1;
+        }
+        55% {
+          transform: scale(1.1);
+          opacity: 0.9;
+        }
+        85% {
+          transform: scale(0.7);
+          opacity: 0.7;
+        }
+        100% {
+          transform: scale(0.3);
+          opacity: 0;
+        }
+      }
+    `}</style>
+  </div>
+);
+}
+/* ---------------- component ---------------- */
+export default function Shuffle() {
+  const [{ name: initialName, id: initialId, effectiveId: initialEffectiveId }] = useState(() => {
+    const p = loadProfile();
+
+    const name = (p?.name || "guest").trim() || "guest";
+    let id = (p?.id || "").trim();
+
+    if (!id) {
+      const suffix = Math.random().toString(36).slice(2, 7);
+      id = `guest-${suffix}`;
+      saveProfile({ name, id });
+    }
+
+    // ✅ NEW: Discord > Wallet > Guest (uses your profile.ts helper)
+    const effectiveId = getEffectivePlayerId({ ...p, id, name } as any);
+
+    return { name, id, effectiveId };
+  });
+
+  const [playerName, setPlayerName] = useState(initialName);
+
+  // ✅ Keep showing guest id in UI (for now)
+  const [playerId, setPlayerId] = useState(initialId);
+
+  // ✅ NEW: this is what points + wins should use going forward
+  const [effectivePlayerId, setEffectivePlayerId] = useState(initialEffectiveId);
+
+  // Start music on mount, stop on unmount
+  React.useEffect(() => { startMusic(); return () => { stopMusic(); }; }, []);
+
+  // ✅ If profile identity changes (wallet connect / discord connect), refresh effective id
+ React.useEffect(() => {
+  const updateIdentity = () => {
+    const p = loadProfile();
+    const nextId = getEffectivePlayerId(p);
+    setEffectivePlayerId(nextId);
+    console.log("🔁 Identity updated:", nextId);
+  };
+
+  // initial sync
+  updateIdentity();
+
+  // listen for wallet / discord changes
+  window.addEventListener("ra:identity-changed", updateIdentity);
+ 
+  return () => {
+    window.removeEventListener("ra:identity-changed", updateIdentity);
+  };
+}, []);
+
+  // ✅ LIVE economy config (starts with defaults, then loads from /api/config)
+  const [pointsConfig, setPointsConfig] = useState(defaultPointsConfig);
+
+  // ✅ Pull latest config override from Redis
+  React.useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const r = await fetch("/api/config", { cache: "no-store" });
+        const j = await r.json().catch(() => null);
+
+        // expected: { ok: true, pointsConfig: {...} }
+        if (!cancelled && r.ok && j?.pointsConfig) {
+          setPointsConfig((prev) => ({ ...prev, ...j.pointsConfig }));
+          console.log("LIVE POINTS CONFIG =", j.pointsConfig);
+        } else {
+          console.log("LIVE CONFIG NOT LOADED =", r.status, j);
+        }
+      } catch (e) {
+        console.log("LIVE CONFIG ERROR =", e);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+const {
+  balance,
+  earnedToday,
+  capBank,
+  dailyCap,
+  remainingDaily,
+  totalEarnRoom,
+  spend,
+  earn,
+  claimDaily,
+  devGrant,
+  refresh,
+} = usePoints(effectivePlayerId);
+
+// ✅ Keep profile reactive (so UI updates when localStorage changes)
+const [profile, setProfile] = React.useState<any>(() => {
+  try {
+    return loadProfile();
+  } catch {
+    return {};
+  }
+});
+
+React.useEffect(() => {
+  const sync = () => {
+    try {
+      setProfile(loadProfile());
+    } catch {
+      setProfile({});
+    }
+  };
+
+  // initial
+  sync();
+
+  // whenever identity changes (wallet/discord connect/disconnect)
+  window.addEventListener("ra:identity-changed", sync);
+  return () => window.removeEventListener("ra:identity-changed", sync);
+}, []);
+
+// ✅ If returning from Discord OAuth, refresh identity immediately
+React.useEffect(() => {
+  if (typeof window === "undefined") return;
+
+  const params = new URLSearchParams(window.location.search);
+
+  if (params.get("discord") === "1") {
+    window.dispatchEvent(new Event("ra:identity-changed"));
+  }
+}, []);  
+
+const isDiscordConnected = !!profile?.discordUserId && !(profile as any)?.discordSkipLink;
+  
+// ✅ Whenever identity changes, force the points hook to refetch for the new id
+const lastPidRef = React.useRef<string>("");
+
+React.useEffect(() => {
+  if (!effectivePlayerId) return;
+  if (lastPidRef.current === effectivePlayerId) return;
+  lastPidRef.current = effectivePlayerId;
+
+  (async () => {
+    try {
+      await refresh();
+    } catch {}
+  })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [effectivePlayerId]);
+  
+// ✅ Run once guard (prevents React crash loops / duplicate linking)
+const didDiscordLinkRef = React.useRef(false);
+
+React.useEffect(() => {
+  if (didDiscordLinkRef.current) return;
+  didDiscordLinkRef.current = true;
+
+  let cancelled = false;
+
+  (async () => {
+    try {
+      // ✅ If user clicked "Disconnect", do NOT auto-reconnect on refresh
+const gate = loadProfile();
+if ((gate as any)?.discordSkipLink) return;
+
+      const sr = await fetch("/api/auth/discord/session", { cache: "no-store" });
+      const sj = await sr.json().catch(() => null);
+
+      if (!sr.ok || !sj?.ok || !sj?.discordUserId) return;
+
+      const prof = loadProfile();
+      const fromId = getEffectivePlayerId(prof); // current id (wallet or guest)
+      const toId = `discord:${sj.discordUserId}`;
+
+      // if already primary, nothing to do
+      if (String(prof.primaryId || "") === toId) return;
+
+      const lr = await fetch("/api/identity/link-discord", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fromId }),
+      });
+
+      const lj = await lr.json().catch(() => null);
+      if (!lr.ok || !lj?.ok) {
+        console.warn("Discord link failed:", lr.status, lj);
+        return;
+      }
+
+      // ✅ lock identity to Discord (permanent)
+saveProfile({
+  discordUserId: sj.discordUserId,
+  discordName: sj.discordName,
+  primaryId: toId,
+  name: sj.discordName || prof.name,
+  discordSkipLink: false,
+});
+
+// ✅ CRITICAL: tell the app to recompute effectivePlayerId immediately
+if (typeof window !== "undefined") {
+  window.dispatchEvent(new Event("ra:identity-changed"));
+}
+
+if (!cancelled) {
+  // force refresh so UI pulls balance under new discord id
+  await refresh();
+}
+    } catch (e) {
+      console.warn("Discord session check error:", e);
+    }
+  })();
+
+  return () => {
+    cancelled = true;
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
+  
+console.log("PLAYER ID (guest) =", playerId, "| effective =", effectivePlayerId);
+
+  const cost = pointsConfig.shuffleCost;
+  const needMore = Math.max(0, cost - balance);
+
+const [phase, setPhase] = useState<Phase>("idle");
+const { muted: shuffleMuted, toggleMute: toggleShuffleMute, startMusic, stopMusic, sfx: shuffleSfx } = useShuffleAudio();
+const [showHowPointsWork, setShowHowPointsWork] = useState(false);
+const [order, setOrder] = useState<number[]>(() => Array.from({ length: EGG_COUNT }, (_, i) => i));
+const [progress, setProgress] = useState(0);
+const [busy, setBusy] = useState(false);
+const [rarity, setRarity] = useState<Rarity>("none");
+const [prize, setPrize] = useState<Prize | null>(null);
+const [showPrize, setShowPrize] = useState(false);
+const [showBuyPoints, setShowBuyPoints] = useState(false);
+
+// ✅ Merch shipping capture (only for merch)
+const [lastClaimId, setLastClaimId] = useState<string>("");
+const [lastPid, setLastPid] = useState<string>("");
+const [needShipping, setNeedShipping] = useState<boolean>(false);
+const [shipBusy, setShipBusy] = useState<boolean>(false);
+const [shipMsg, setShipMsg] = useState<string>("");
+
+const [shippingForm, setShippingForm] = useState<any>({
+  name: "",
+  email: "",
+  phone: "",
+  address1: "",
+  address2: "",
+  city: "",
+  state: "",
+  zip: "",
+  country: "US",
+});
+// ✅ DRIP migrate UI
+const [showDripMigrate, setShowDripMigrate] = useState(false);
+  const [showRules, setShowRules] = useState(false);
+const [dripBalance, setDripBalance] = useState<number | null>(null);
+
+const [dripAmount, setDripAmount] = useState<number>(0);
+const [dripBusy, setDripBusy] = useState(false);
+const [dripStatus, setDripStatus] = useState("");
+const [showDripFix, setShowDripFix] = useState(false);
+
+// ==============================
+// ✅ ADD DAILY CLAIM BLOCK HERE
+// ==============================
+
+const [dailyClaimed, setDailyClaimed] = useState(false);
+const [claimStatus, setClaimStatus] = useState("");
+const [claimBusy, setClaimBusy] = useState(false);
+const [msUntilNextClaim, setMsUntilNextClaim] = useState(0);
+const [nextClaimAt, setNextClaimAt] = useState("");
+
+function formatClaimCountdown(ms: number) {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${hours}h ${minutes}m ${seconds}s`;
+}
+
+async function refreshClaimStatus(pid: string) {
+  try {
+    const r = await fetch(
+      `/api/points/claim?playerId=${encodeURIComponent(pid)}`,
+      { cache: "no-store" }
+    );
+    const j = await r.json().catch(() => null);
+
+    if (r.ok && j?.ok) {
+      setDailyClaimed(!!j.claimed);
+      setMsUntilNextClaim(Number(j.msUntilNextClaim || 0));
+      setNextClaimAt(String(j.nextClaimAt || ""));
+    }
+  } catch {}
+}
+
+React.useEffect(() => {
+  if (!effectivePlayerId) return;
+  refreshClaimStatus(effectivePlayerId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [effectivePlayerId]);
+
+React.useEffect(() => {
+  if (!dailyClaimed || msUntilNextClaim <= 0) return;
+
+  const interval = setInterval(() => {
+    setMsUntilNextClaim((prev) => Math.max(0, prev - 1000));
+  }, 1000);
+
+  return () => clearInterval(interval);
+}, [dailyClaimed, msUntilNextClaim]);
+
+async function claimDailyNow() {
+  if (!effectivePlayerId) return;
+  if (claimBusy) return;
+
+  setClaimBusy(true);
+  setClaimStatus("");
+
+  try {
+    const r = await fetch("/api/points/claim", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        playerId: effectivePlayerId,
+        amount: pointsConfig.dailyClaim,
+      }),
+    });
+
+    const j = await r.json().catch(() => null);
+
+    if (!r.ok || !j?.ok) {
+      setClaimStatus(j?.error || "Claim failed.");
+      return;
+    }
+
+    if (j?.alreadyClaimed) {
+      setClaimStatus("Already claimed today ✅");
+    } else {
+      setClaimStatus(
+        `Claimed +${j?.added || pointsConfig.dailyClaim} ${pointsConfig.currency} ✅`
+      );
+    }
+
+    setDailyClaimed(true);
+    await refresh();
+    await refreshClaimStatus(effectivePlayerId);
+  } catch (e: any) {
+    setClaimStatus(e?.message || "Claim error");
+  } finally {
+    setClaimBusy(false);
+  }
+}
+// ✅ NEW: show what the player actually won
+const [winText, setWinText] = useState<string>("");
+const runShuffle = async () => {
+  if (busy) return;
+
+  if (balance < cost) return;
+
+  if (Number(totalEarnRoom || 0) <= 0) {
+    setWinText("No play room left today. Buy a pack to keep playing.");
+    return;
+  }
+
+  const spendRes = await spend(cost, "shuffle");
+
+  if (!spendRes?.ok) {
+    setWinText(
+      spendRes?.error || "No play room left today. Buy a pack to keep playing."
+    );
+    return;
+  }
+
+  setWinText("");
+  setBusy(true);
+  setPhase("shuffling"); startMusic();
+  setProgress(0);
+  setShowPrize(false);
+
+  let swapTimer: NodeJS.Timeout | null = null;
+  swapTimer = setInterval(() => setOrder(shuffledN(EGG_COUNT)), SWAP_EVERY_MS);
+
+  const t0 = performance.now();
+  const tick = (t: number) => {
+    const p = Math.min(1, (t - t0) / SHUFFLE_MS);
+    setProgress(Math.floor(p * 100));
+    if (p < 1) requestAnimationFrame(tick);
+    else {
+      if (swapTimer) clearInterval(swapTimer);
+      setProgress(100);
+      setPhase("pick");
+      setBusy(false);
+    }
+  };
+  requestAnimationFrame(tick);
+};
+  const onPick = () => {
+    if (phase !== "pick" || busy) return;
+    shuffleSfx.pick();
+    setBusy(true);
+
+setTimeout(async () => {
+  // ✅ Determine player identity ONCE (wins MUST follow effective identity)
+  const prof = loadProfile();
+  const pid =
+    String(effectivePlayerId || getEffectivePlayerId(prof) || prof?.id || "guest")
+      .trim()
+      .slice(0, 64) || "guest";
+
+  const pname =
+    (prof?.discordName || playerName || prof?.name || "guest").trim() || "guest";
+
+  // ✅ Roll rarity + prize ON THE SERVER (Model C enforced server-side)
+  const rollRes = await fetch("/api/prizes/roll", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId: pid }),
+  });
+
+  const rollJson = await rollRes.json().catch(() => null);
+
+  if (!rollRes.ok || !rollJson?.ok) {
+    console.warn("Prize roll failed:", rollRes.status, rollJson);
+    setBusy(false);
+    return;
+  }
+
+  const r = rollJson.rarity as any;
+  let pz = rollJson.prize as any;
+
+// ✅ Merch auto-claim (creates claim immediately, then modal captures shipping)
+setNeedShipping(false);
+setShipMsg("");
+setLastClaimId("");
+setLastPid(pid);
+
+if (String(pz?.type || "").toLowerCase() === "merch") {
+  const claimId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  const cr = await fetch("/api/prizes/claim", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      claimId,
+      playerId: pid,
+      prize: pz,
+      wallet: null,
+      shipping: null,
+    }),
+  });
+
+  const cj = await cr.json().catch(() => null);
+
+  if (cr.ok && cj?.ok) {
+    setLastClaimId(claimId);
+    setNeedShipping(!!cj.needShipping);
+  } else {
+    console.warn("Merch claim failed:", cr.status, cj);
+    setShipMsg(cj?.error || "Merch claim failed");
+  }
+}  
+
+  // ✅ If prize is points, credit them via /api/points/earn (respects daily cap)
+  if (pz?.type === "points" && Number(pz?.points || 0) > 0) {
+    const earnRes: any = await earn(Number(pz.points || 0));
+
+    if (earnRes?.ok === false) {
+      console.warn("EARN failed:", earnRes);
+    }
+
+    const applied = Number(earnRes?.added ?? earnRes?.applied ?? pz.points);
+
+    // If daily cap limited the reward
+    if (Number.isFinite(applied) && applied < Number(pz.points || 0)) {
+      pz = {
+        ...pz,
+        label: `Daily cap reached — prize rolled, but only ${applied} ${
+          pointsConfig.currency || "REBEL"
+        } could be credited today.`,
+      };
+    }
+
+    await refresh();
+  }
+
+  // ✅ Save what the user won so the modal can show it
+  setPrize(pz);
+
+  // ✅ Wins tracking: pointsAwarded only if points
+  const pointsAwarded = pz?.type === "points" ? Number(pz?.points || 0) : 0;
+
+  // local (keep for now)
+  addWin({
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    ts: Date.now(),
+    game: "shuffle",
+    playerId: pid,
+    playerName: pname,
+    rarity: r,
+    pointsAwarded,
+  });
+
+// server (source of truth for leaderboards)
+await fetch("/api/wins/add", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    ts: Date.now(),
+    game: "shuffle",
+
+    // ✅ IMPORTANT: record wins to the same identity used for points
+    playerId: effectivePlayerId || pid,
+    playerName: prof?.discordName || prof?.name || pname,
+
+    rarity: r,
+    pointsAwarded,
+
+    // ✅ KEY: let the server know if this win had a real prize
+    // (points wins will usually have prize null)
+    prize: pz?.type && pz.type !== "points" ? pz : null,
+  }),
+}).catch(() => {});
+
+window.dispatchEvent(new Event("ra:leaderboards-refresh"));
+  
+setRarity(r);
+setPhase("revealed");
+setShowPrize(true);
+setBusy(false);
+if (r === "ultra") shuffleSfx.ultra();
+else if (r === "rare") shuffleSfx.rare();
+else if (r === "common") shuffleSfx.common();
+else shuffleSfx.none();
+    }, 350);
+  };
+ const resetAfterPrize = async () => {
+  try {
+    // ✅ If the prize was an NFT, create a claim
+    if (prize && prize.type === "nft" && prize.meta) {
+     const wallet = loadProfile()?.walletAddress || "";
+
+      await fetch("/api/claims/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          playerId: effectivePlayerId,
+          wallet,
+          prize: prize,
+        }),
+      });
+    }
+  } catch (e) {
+    console.error("Claim creation failed", e);
+  }
+
+  stopMusic();
+  setShowPrize(false);
+  setRarity("none");
+  setWinText("");
+  setPrize(null);
+  setProgress(0);
+  setOrder(Array.from({ length: EGG_COUNT }, (_, i) => i));
+  setPhase("idle");
+};
+
+// ✅ Leaderboards (server summary)
+const [lb, setLb] = React.useState<{
+  balance: { playerId: string; score: number }[];
+  earned: { playerId: string; score: number }[];
+  wins: { playerId: string; score: number }[];
+  recentWins: any[];
+}>({
+  balance: [],
+  earned: [],
+  wins: [],
+  recentWins: [],
+});
+
+async function loadLeaderboards() {
+  try {
+    const r = await fetch("/api/leaderboard/summary", { cache: "no-store" });
+    const j = await r.json().catch(() => null);
+    if (!r.ok || !j?.ok) return;
+    setLb({
+      balance: Array.isArray(j.balance) ? j.balance : [],
+      earned: Array.isArray(j.earned) ? j.earned : [],
+      wins: Array.isArray(j.wins) ? j.wins : [],
+      recentWins: Array.isArray(j.recentWins) ? j.recentWins : [],
+    });
+  } catch {}
+}
+
+// ✅ Load once on mount
+React.useEffect(() => {
+  loadLeaderboards();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
+
+// ✅ Live-refresh leaderboards when a win is recorded (no page refresh needed)
+React.useEffect(() => {
+  const onRefresh = () => loadLeaderboards();
+  window.addEventListener("ra:leaderboards-refresh", onRefresh);
+  return () => window.removeEventListener("ra:leaderboards-refresh", onRefresh);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
+
+async function openDripModal() {
+  setDripStatus("");
+  setDripBusy(true);
+  setDripBalance(null);
+
+  try {
+    const r = await fetch("/api/drip/balance", { cache: "no-store" });
+    const j = await r.json().catch(() => null);
+
+    if (!r.ok || !j?.ok) {
+      setDripStatus(j?.error || "Could not load DRIP balance.");
+      setShowDripMigrate(true);
+      return;
+    }
+
+    setDripBalance(Number(j.balance || 0));
+    setDripAmount(0);
+    setShowDripMigrate(true);
+  } catch (e: any) {
+    setDripStatus(e?.message || "DRIP balance error");
+    setShowDripMigrate(true);
+  } finally {
+    setDripBusy(false);
+  }
+}
+
+function disconnectDiscord() {
+  try {
+    const p: any = loadProfile() || {};
+    const fallback = (p.walletAddress ? `wallet:${p.walletAddress}` : (p.id || "guest")).trim();
+
+    // ✅ Clear discord identity using saveProfile (now supports clearing)
+    saveProfile({
+      discordUserId: undefined,
+      discordName: undefined,
+      primaryId: fallback,
+      // keep this if you're using it to block auto-link
+      discordSkipLink: true as any,
+    } as any);
+
+    window.dispatchEvent(new Event("ra:identity-changed"));
+  } catch {}
+
+  // ✅ log out server-side (clears httpOnly cookie)
+  window.location.href = "/api/auth/discord/logout";
+}
+  
+async function migrateDripNow() {
+  const amt = Math.floor(Number(dripAmount || 0));
+  if (!amt || amt <= 0) {
+    setDripStatus("Enter an amount greater than 0.");
+    return;
+  }
+
+  setDripBusy(true);
+  setDripStatus("Migrating… (deducting from DRIP + crediting game)");
+
+  try {
+    const idem = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+    const r = await fetch("/api/drip/migrate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-idempotency-key": idem,
+      },
+      body: JSON.stringify({
+        amount: amt,
+        playerId: effectivePlayerId,
+        idempotencyKey: idem,
+      }),
+    });
+
+    const j = await r.json().catch(() => null);
+
+           if (!r.ok || !j?.ok) {
+      const rawError = String(j?.error || "Migrate failed.");
+
+      if (
+        rawError.toLowerCase().includes("drip credential not found") ||
+        rawError.toLowerCase().includes("user must link drip first")
+      ) {
+        setDripStatus("No DRIP Discord link found yet.");
+        setShowDripFix(true);
+      } else {
+        setDripStatus(rawError);
+        setShowDripFix(false);
+      }
+
+      if (typeof j?.dripBalance === "number") setDripBalance(j.dripBalance);
+      return;
+    }
+
+    setDripStatus(`✅ Migrated ${amt} points into the game.`);
+    setShowDripFix(false);
+    await refresh();
+
+    const br = await fetch("/api/drip/balance", { cache: "no-store" });
+    const bj = await br.json().catch(() => null);
+    if (br.ok && bj?.ok) setDripBalance(Number(bj.balance || 0));
+  } catch (e: any) {
+    setDripStatus(e?.message || "Migrate error");
+  } finally {
+    setDripBusy(false);
+  }
+}
+
+// ✅ put submitShipping HERE (outside migrateDripNow, but still inside Shuffle component)
+async function submitShipping() {
+  if (!lastClaimId || !lastPid) {
+    setShipMsg("Missing claimId/playerId");
+    return;
+  }
+
+  setShipBusy(true);
+  setShipMsg("");
+
+  try {
+    const r = await fetch("/api/prizes/shipping", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        claimId: lastClaimId,
+        playerId: lastPid,
+        shipping: shippingForm,
+      }),
+    });
+
+    const j = await r.json().catch(() => null);
+
+    if (!r.ok || !j?.ok) {
+      setShipMsg(j?.error || "Could not save shipping.");
+      return;
+    }
+
+    setShipMsg("✅ Shipping saved! We’ll email you when it ships.");
+// ✅ IMPORTANT: do NOT setNeedShipping(false) here
+  } catch (e: any) {
+    setShipMsg(e?.message || "Shipping error");
+  } finally {
+    setShipBusy(false);
+  }
+}
+
+
+  return (
+    <>
+      {/* ── PARTICLES ── */}
+      <div style={{ position:'fixed', inset:0, zIndex:0, pointerEvents:'none', overflow:'hidden' }}>
+        {[...Array(30)].map((_,i) => (
+          <div key={i} style={{
+            position:'absolute',
+            bottom:'-4px',
+            left: `${(i*97+13)%100}%`,
+            width: 2+(i%3),
+            height: 2+(i%3),
+            borderRadius:'50%',
+            background: i%3===0?'#a78bfa':i%3===1?'#fbbf24':'#c084fc',
+            opacity: 0.12+(i%5)*0.06,
+            animation: `shuffleFloat ${6+(i%5)*1.8}s ${(i*0.7)%8}s infinite linear`,
+          }} />
+        ))}
+      </div>
+
+      {/* ── FULL PAGE BG ── */}
+      <div style={{ position:'fixed', inset:0, zIndex:0, pointerEvents:'none',
+        background:'radial-gradient(ellipse at 50% 30%, rgba(109,40,217,0.15) 0%, rgba(5,3,15,0.0) 60%), linear-gradient(160deg, #060412 0%, #0d0520 40%, #080318 100%)',
+        backgroundImage: `url("${shuffleConfig.pageBg}")`,
+        backgroundSize:'cover', backgroundPosition:'center', filter:'saturate(0.7) brightness(0.45)'
+      }} />
+      <div style={{ position:'fixed', inset:0, zIndex:1, pointerEvents:'none',
+        background:'linear-gradient(160deg, rgba(6,4,18,0.75) 0%, rgba(13,5,32,0.6) 50%, rgba(6,4,18,0.85) 100%)'
+      }} />
+
+      {/* ── HEADER ── */}
+      <header style={{ position:'relative', zIndex:20, maxWidth:980, margin:'0 auto', padding:'16px 20px 0', display:'flex', alignItems:'center', justifyContent:'space-between', fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif" }}>
+        <Link href="/" style={{ display:'flex', alignItems:'center', gap:10, textDecoration:'none', color:'white' }}>
+          <span style={{ fontSize:20, filter:'drop-shadow(0 0 8px rgba(167,139,250,0.6))' }}>←</span>
+          <span style={{ fontSize:11, fontWeight:900, letterSpacing:'0.2em', textTransform:'uppercase', color:'rgba(255,255,255,0.5)' }}>REBEL ANTS</span>
+        </Link>
+        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+          <div style={{ fontSize:13, fontWeight:900, letterSpacing:'0.1em', color:'#fbbf24', filter:'drop-shadow(0 0 8px rgba(251,191,36,0.5))' }}>
+            ⚡ {balance} <span style={{ fontSize:10, color:'rgba(251,191,36,0.6)' }}>REBEL</span>
+          </div>
+          <button onPointerDown={e=>{e.preventDefault();toggleShuffleMute();}}
+            style={{ background:'rgba(0,0,0,0.4)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:20, padding:'6px 12px', cursor:'pointer', fontSize:15, color:'rgba(255,255,255,0.8)', minWidth:40, minHeight:40, touchAction:'manipulation' }}>
+            {shuffleMuted ? '🔇' : '🔊'}
+          </button>
+        </div>
+      </header>
+
+      {/* ── MAIN CONTENT ── */}
+      <div style={{ position:'relative', zIndex:10, maxWidth:980, margin:'0 auto', padding:'12px 16px 40px', fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif" }}>
+
+        {/* Title */}
+        <div style={{ textAlign:'center', marginBottom:8 }}>
+          <div style={{ fontSize:'clamp(22px,4vw,38px)', fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase',
+            background:'linear-gradient(135deg,#e9d5ff,#a78bfa,#7c3aed,#fbbf24)',
+            WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text',
+            filter:'drop-shadow(0 0 20px rgba(167,139,250,0.4))',
+          }}>QUEEN&apos;S EGG SHUFFLE</div>
+          <div style={{ fontSize:12, letterSpacing:'0.25em', color:'rgba(255,255,255,0.35)', textTransform:'uppercase', marginTop:4 }}>
+            {EGG_COUNT} EGGS · ONE FATE · CHOOSE WISELY
+          </div>
+        </div>
+
+        {/* ── GAME SCENE ── */}
+        <div style={{ position:'relative', minHeight:460, borderRadius:24, overflow:'hidden', marginBottom:20,
+          background:'linear-gradient(180deg, rgba(30,5,60,0.85) 0%, rgba(10,2,30,0.95) 100%)',
+          border:'1px solid rgba(167,139,250,0.2)',
+          boxShadow:'0 0 60px rgba(109,40,217,0.2), 0 0 120px rgba(109,40,217,0.08), inset 0 1px 0 rgba(167,139,250,0.15)',
+        }}>
+
+          {/* Scene BG image */}
+          <div style={{ position:'absolute', inset:0, zIndex:0, pointerEvents:'none',
+            backgroundImage: `linear-gradient(180deg, rgba(20,4,50,0.4), rgba(5,1,18,0.7)), url("${shuffleConfig.cardBg}")`,
+            backgroundSize:'cover', backgroundPosition:'center',
+          }} />
+
+          {/* Purple vignette overlay */}
+          <div style={{ position:'absolute', inset:0, zIndex:1, pointerEvents:'none',
+            background:'radial-gradient(ellipse at 50% 0%, rgba(109,40,217,0.18) 0%, transparent 65%)',
+          }} />
+
+          {/* Queen aura */}
+          <div style={{ position:'absolute', left:'50%', transform:'translateX(-50%)', top:30, width:200, height:200,
+            background:'radial-gradient(ellipse, rgba(167,139,250,0.25) 0%, rgba(109,40,217,0.12) 40%, transparent 70%)',
+            zIndex:2, pointerEvents:'none',
+            animation: phase==='shuffling' ? 'queenAuraActive 0.6s ease-in-out infinite alternate' : 'queenAura 3s ease-in-out infinite alternate',
+          }} />
+
+          {/* Queen 3D — centered, pushed down from top */}
+          <div style={{ position:'absolute', top:'50%', left:'50%', transform:'translate(-50%, -68%)', zIndex:3, pointerEvents:'none' }}>
+            <Queen3D active={phase === "shuffling"} scale={shuffleConfig.queenScale} y={-0.1} />
+          </div>
+
+          {/* Rails */}
+          <div className="rail rail-top" style={{ zIndex:4 }} />
+          <div className="rail rail-bottom" style={{ zIndex:4 }} />
+
+          {/* Progress */}
+          <div style={{ position:'relative', zIndex:5 }}>
+            <AntProgress progress={progress} />
+          </div>
+
+          {/* Eggs */}
+          {Array.from({ length: EGG_COUNT }, (_, i) => (
+            <button
+              key={i}
+              className={`egg-card ${phase === "pick" ? "can-pick" : ""}`}
+              style={{
+                left: `${LANES[order[i]]}%`,
+                top: "72%",
+                zIndex: 6,
+                filter: phase==='pick'
+                  ? 'drop-shadow(0 0 12px rgba(167,139,250,0.7)) drop-shadow(0 0 24px rgba(167,139,250,0.3))'
+                  : 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))',
+                transform: phase==='pick' ? 'perspective(400px) rotateX(-5deg)' : 'perspective(400px) rotateX(0deg)',
+                transition:'all 0.3s ease',
+              }}
+              onClick={onPick}
+              disabled={phase !== "pick" || busy}
+              aria-label="Pick egg"
+            >
+              <div className={`egg-body ${phase === "pick" ? "wobble-on-pick" : ""}`} style={{
+                background: phase==='pick'
+                  ? undefined
+                  : undefined,
+                boxShadow: phase==='pick'
+                  ? 'inset -6px -8px 20px rgba(0,0,0,0.4), inset 4px 4px 12px rgba(255,255,220,0.5), 0 8px 24px rgba(0,0,0,0.5), 0 0 30px rgba(251,191,36,0.5), 0 0 60px rgba(251,191,36,0.2)'
+                  : 'inset -6px -8px 20px rgba(0,0,0,0.4), inset 4px 4px 12px rgba(255,255,200,0.3), 0 8px 24px rgba(0,0,0,0.5)',
+              }} />
+              <div className="egg-shadow" />
+              <div className="egg-speckle" style={{ opacity: phase==='pick' ? 0.3 : 0.5 }} />
+            </button>
+          ))}
+
+          {/* Phase overlay — shuffling flash */}
+          {phase === 'shuffling' && (
+            <div style={{ position:'absolute', inset:0, zIndex:7, pointerEvents:'none',
+              background:'radial-gradient(ellipse at 50% 50%, rgba(167,139,250,0.08) 0%, transparent 60%)',
+              animation:'shuffleFlash 0.4s ease-in-out infinite alternate',
+            }} />
+          )}
+
+          {/* Pick phase invitation */}
+          {phase === 'pick' && (
+            <div style={{ position:'absolute', bottom:16, left:'50%', transform:'translateX(-50%)', zIndex:8,
+              fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:12, fontWeight:900, letterSpacing:'0.25em', textTransform:'uppercase',
+              color:'#a78bfa', animation:'pickPulse 1.5s ease-in-out infinite',
+              textShadow:'0 0 12px rgba(167,139,250,0.8)',
+            }}>
+              ✦ CHOOSE YOUR EGG ✦
+            </div>
+          )}
+        </div>
+
+        {/* ── ACTION ROW ── */}
+        <div style={{ display:'flex', gap:10, flexWrap:'wrap', alignItems:'center', marginBottom:16 }}>
+
+          {/* Shuffle Button — main CTA */}
+          <button
+            onClick={runShuffle}
+            disabled={busy || phase === "shuffling" || needMore > 0}
+            title={needMore > 0 ? "Not enough points" : ""}
+            style={{
+              fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif",
+              position:'relative', minWidth:220, height:48,
+              display:'inline-flex', alignItems:'center', justifyContent:'center',
+              fontSize:13, fontWeight:900, letterSpacing:'0.2em', textTransform:'uppercase',
+              background: (busy || needMore>0) ? 'rgba(109,40,217,0.15)' : 'linear-gradient(135deg,#7c3aed,#a855f7,#7c3aed)',
+              backgroundSize:'200% 100%',
+              border: (busy || needMore>0) ? '2px solid rgba(109,40,217,0.3)' : '2px solid rgba(167,139,250,0.6)',
+              borderRadius:50, color:'white', cursor: (busy||needMore>0) ? 'not-allowed' : 'pointer',
+              opacity: (busy||needMore>0) ? 0.55 : 1,
+              boxShadow: (busy||needMore>0) ? 'none' : '0 0 20px rgba(109,40,217,0.5), 0 0 40px rgba(109,40,217,0.2)',
+              animation: (!busy && needMore===0) ? 'btnGlow 2.5s ease-in-out infinite' : 'none',
+              transition:'all 0.2s',
+            }}
+          >
+            <span style={{ visibility:'hidden', position:'absolute' }}>{`Shuffle (-${cost} ${pointsConfig.currency})`}</span>
+            <span style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+              {phase === "shuffling" ? "✦ SHUFFLING..." : `⚔️ SHUFFLE (-${cost} ${pointsConfig.currency})`}
+            </span>
+          </button>
+
+          {/* Buy Points */}
+          <button onClick={() => setShowBuyPoints(true)}
+            style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", padding:'10px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase',
+              background:'rgba(251,191,36,0.1)', border:'1px solid rgba(251,191,36,0.35)', borderRadius:50,
+              color:'#fbbf24', cursor:'pointer', whiteSpace:'nowrap',
+              boxShadow:'0 0 12px rgba(251,191,36,0.15)', transition:'all 0.2s',
+            }}>
+            💎 BUY POINTS
+          </button>
+
+          {/* Discord */}
+          {isDiscordConnected ? (
+            <button onClick={disconnectDiscord}
+              style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", padding:'10px 14px', fontSize:11, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase',
+                background:'rgba(88,101,242,0.12)', border:'1px solid rgba(88,101,242,0.3)', borderRadius:50, color:'#a5b4fc', cursor:'pointer', whiteSpace:'nowrap' }}>
+              ✓ DISCORD
+            </button>
+          ) : (
+            <button onClick={() => { try { saveProfile({ discordSkipLink: false }); window.dispatchEvent(new Event('ra:identity-changed')); } catch {} window.location.href = '/api/auth/discord/login'; }}
+              style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", padding:'10px 14px', fontSize:11, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase',
+                background:'#5865F2', border:'none', borderRadius:50, color:'white', cursor:'pointer', whiteSpace:'nowrap',
+                boxShadow:'0 0 16px rgba(88,101,242,0.4)' }}>
+              CONNECT DISCORD
+            </button>
+          )}
+
+          {/* Balance */}
+          <div style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:12, letterSpacing:'0.1em', color:'rgba(255,255,255,0.5)', textTransform:'uppercase' }}>
+            <span style={{ color:'#fbbf24', fontWeight:900 }}>{balance}</span> {pointsConfig.currency}
+          </div>
+
+          {needMore > 0 && (
+            <span style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:11, color:'#f87171', letterSpacing:'0.1em', textTransform:'uppercase' }}>
+              NEED {needMore} MORE
+            </span>
+          )}
+        </div>
+
+        {/* ── INFO STRIP ── */}
+
+        {/* ── Plays & Daily Cap ── */}
         <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center', marginBottom:10, padding:'10px 16px', borderRadius:14, background:'rgba(124,58,237,0.06)', border:'1px solid rgba(167,139,250,0.1)' }}>
           <div style={{ padding:'5px 13px', borderRadius:20, background:'rgba(167,139,250,0.1)', border:'1px solid rgba(167,139,250,0.25)' }}>
             <span style={{ fontSize:10, letterSpacing:'0.1em', textTransform:'uppercase', color:'rgba(255,255,255,0.4)', marginRight:5 }}>PLAYS TODAY</span>
@@ -1612,7 +2961,7 @@ async function submitShipping() {
           {/* Costs */}
           <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
             {[
-              { label:'COST', val:`${pointsConfig.shuffleCost} ${pointsConfig.currency}`, col:'#f87171' },
+              { label:'COST PER PICK', val:`${pointsConfig.shuffleCost} ${pointsConfig.currency}`, col:'#f87171' },
               { label:'COMMON', val:`+${pointsConfig.rewards.common}`, col:'#34d399' },
               { label:'RARE', val:`+${pointsConfig.rewards.rare}`, col:'#a78bfa' },
               { label:'ULTRA', val:`+${pointsConfig.rewards.ultra}`, col:'#fbbf24' },
