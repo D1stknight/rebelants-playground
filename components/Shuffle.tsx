@@ -1584,6 +1584,27 @@ async function submitShipping() {
         </div>
 
         {/* ── INFO STRIP ── */}
+
+        {/* ── Plays & Daily Cap ── */}
+        <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center', marginBottom:10, padding:'10px 16px', borderRadius:14, background:'rgba(124,58,237,0.06)', border:'1px solid rgba(167,139,250,0.1)' }}>
+          <div style={{ padding:'5px 13px', borderRadius:20, background:'rgba(167,139,250,0.1)', border:'1px solid rgba(167,139,250,0.25)' }}>
+            <span style={{ fontSize:10, letterSpacing:'0.1em', textTransform:'uppercase', color:'rgba(255,255,255,0.4)', marginRight:5 }}>PLAYS TODAY</span>
+            <span style={{ fontSize:13, fontWeight:900, color:'#a78bfa' }}>{remainingDaily}</span>
+            <span style={{ fontSize:10, color:'rgba(255,255,255,0.25)' }}> / {Number(dailyCap||0)}</span>
+          </div>
+          {capBank > 0 && (
+            <div style={{ padding:'5px 13px', borderRadius:20, background:'rgba(251,191,36,0.08)', border:'1px solid rgba(251,191,36,0.2)' }}>
+              <span style={{ fontSize:10, letterSpacing:'0.1em', textTransform:'uppercase', color:'rgba(255,255,255,0.4)', marginRight:5 }}>BONUS PLAYS</span>
+              <span style={{ fontSize:13, fontWeight:900, color:'#fbbf24' }}>{capBank}</span>
+            </div>
+          )}
+          {totalEarnRoom > 0 && (
+            <div style={{ padding:'5px 13px', borderRadius:20, background:'rgba(74,222,128,0.06)', border:'1px solid rgba(74,222,128,0.15)' }}>
+              <span style={{ fontSize:10, letterSpacing:'0.1em', textTransform:'uppercase', color:'rgba(255,255,255,0.4)', marginRight:5 }}>TOTAL LEFT</span>
+              <span style={{ fontSize:13, fontWeight:900, color:'#4ade80' }}>{totalEarnRoom}</span>
+            </div>
+          )}
+        </div>
         <div style={{ display:'flex', gap:16, flexWrap:'wrap', alignItems:'center', marginBottom:12,
           padding:'12px 16px', borderRadius:14,
           background:'rgba(255,255,255,0.03)', border:'1px solid rgba(167,139,250,0.1)',
