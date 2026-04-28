@@ -1462,7 +1462,6 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
             </div>
           </div>
         </div>
-        </div>
 
         {/* ── DRIP migrate panel ── */}
         {dripPanelOpen && showDisconnect && (
