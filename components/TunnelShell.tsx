@@ -1439,7 +1439,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                 )}
               </div>
               <div style={{fontSize:10,color:'rgba(255,255,255,0.35)',letterSpacing:'0.06em',textAlign:'right',lineHeight:1.5}}>
-                Resets daily · 💎 Buy REBEL for bonus plays that never expire
+                🔄 Free plays reset daily · 💎 Buying REBEL raises your daily cap permanently + adds to your bonus bank (never expires)
               </div>
               <div style={{flex:1}} />
               <button onClick={()=>void claimDailyNow()} disabled={dailyClaimed}
@@ -1605,7 +1605,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                         disabled={isPlaying}
                         style={{...startRunButtonStyle, opacity: isPlaying ? 0.4 : 1, cursor: isPlaying ? 'default' : 'pointer', fontSize: isPlaying ? 13 : 15, padding: isPlaying ? '10px 14px' : '12px 20px'}}
                       >
-                        {isPlaying ? "Running..." : "Start Run"}
+                        {isPlaying ? "Running..." : "▶ START RUN (1 play)"}
                       </button>
 
                     <div style={statusPillStyle}>
