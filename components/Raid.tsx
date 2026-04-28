@@ -848,7 +848,7 @@ export default function Raid() {
     return () => { cancelled=true; };
   }, []);
 
-  const { balance, spend, earn, devGrant, refresh } = usePoints(effectivePlayerId);
+  const { balance, spend, earn, devGrant, refresh, remainingDaily, capBank, dailyCap, totalEarnRoom } = usePoints(effectivePlayerId);
 
   const [profile, setProfile] = useState<any>(()=>{ try{return loadProfile();}catch{return {};} });
   useEffect(() => {
