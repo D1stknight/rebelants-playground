@@ -1,6 +1,6 @@
 // components/HiveDescent/FactionCharacter.tsx
 // Hive Descent rigged faction character.
-// Current test: idle.fbx maps to idle, run.fbx maps to run, run slowed down.
+// Current test: always play the real run action to verify run setup.
 
 import { useEffect, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -27,8 +27,8 @@ function loadAnimationsOnce(): Promise<void> {
   if (animCachePromise) return animCachePromise;
 
   const fbxLoader = new FBXLoader();
-  const names: AnimStateName[] = ['idle', 'run'];
-  console.log('[FactionCharacter movement test] Loading idle.fbx and run.fbx');
+  const names: AnimStateName[] = ['run'];
+  console.log('[constant run test] Loading run.fbx');
 
   animCachePromise = Promise.all(names.map(name => {
     return new Promise<void>((resolve) => {
@@ -39,16 +39,13 @@ function loadAnimationsOnce(): Promise<void> {
             const clip = fbx.animations[0];
             clip.name = name;
             animCache[name] = clip;
-            console.log(`[movement test] Loaded ${name}: ${clip.tracks.length} tracks, ${clip.duration.toFixed(2)}s`);
-            for (let i = 0; i < Math.min(3, clip.tracks.length); i++) {
-              console.log(`  track[${i}]: ${clip.tracks[i].name}`);
-            }
+            console.log(`[constant run test] Loaded ${name}: ${clip.tracks.length} tracks, ${clip.duration.toFixed(2)}s`);
           }
           resolve();
         },
         undefined,
         (err: any) => {
-          console.warn(`[movement test] Failed ${name}:`, err);
+          console.warn(`[constant run test] Failed ${name}:`, err);
           resolve();
         }
       );
@@ -63,7 +60,6 @@ function buildBoneMap(skinnedMesh: THREE.SkinnedMesh): Map<string, string> {
   const skeleton = skinnedMesh.skeleton;
   if (!skeleton) return map;
 
-  console.log(`[movement test] Skeleton has ${skeleton.bones.length} bones`);
   for (const bone of skeleton.bones) {
     const fullName = bone.name;
     const lower = fullName.toLowerCase();
@@ -76,10 +72,6 @@ function buildBoneMap(skinnedMesh: THREE.SkinnedMesh): Map<string, string> {
 
 function retargetClip(clip: THREE.AnimationClip, boneMap: Map<string, string>): THREE.AnimationClip {
   const newTracks: THREE.KeyframeTrack[] = [];
-  let kept = 0;
-  let dropped = 0;
-  let skippedPos = 0;
-  let skippedScale = 0;
 
   for (const track of clip.tracks) {
     const lastDot = track.name.lastIndexOf('.');
@@ -91,14 +83,7 @@ function retargetClip(clip: THREE.AnimationClip, boneMap: Map<string, string>): 
     const fbxBone = track.name.substring(0, lastDot);
     const property = track.name.substring(lastDot);
 
-    if (property === '.position') {
-      skippedPos++;
-      continue;
-    }
-    if (property === '.scale') {
-      skippedScale++;
-      continue;
-    }
+    if (property === '.position' || property === '.scale') continue;
 
     const stripped = fbxBone.replace(/^mixamorig:?/i, '').toLowerCase();
     const target = boneMap.get(fbxBone.toLowerCase()) || boneMap.get(stripped);
@@ -107,21 +92,16 @@ function retargetClip(clip: THREE.AnimationClip, boneMap: Map<string, string>): 
       const newTrack = track.clone();
       newTrack.name = target + property;
       newTracks.push(newTrack);
-      kept++;
-    } else {
-      dropped++;
     }
   }
 
-  console.log(`[movement test retarget] ${clip.name}: kept ${kept}/${clip.tracks.length} rot, skipped ${skippedPos} pos + ${skippedScale} scale, dropped ${dropped}`);
+  console.log(`[constant run test] ${clip.name}: ${newTracks.length} usable tracks`);
   return new THREE.AnimationClip(clip.name, clip.duration, newTracks);
 }
 
-export default function FactionCharacter({ factionId, animState, onMissingAssets }: FactionCharacterProps) {
+export default function FactionCharacter({ factionId, onMissingAssets }: FactionCharacterProps) {
   const groupRef = useRef<THREE.Group>(null);
   const mixerRef = useRef<THREE.AnimationMixer | null>(null);
-  const actionsRef = useRef<Partial<Record<AnimStateName, THREE.AnimationAction>>>({});
-  const currentActionRef = useRef<AnimStateName | null>(null);
 
   const [loadedScene, setLoadedScene] = useState<THREE.Group | null>(null);
   const [skinnedMesh, setSkinnedMesh] = useState<THREE.SkinnedMesh | null>(null);
@@ -132,7 +112,6 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
     let cancelled = false;
     const loader = new GLTFLoader();
     const modelPath = `/descent/models/factions/${factionId}.glb`;
-    console.log(`[movement test] Loading ${modelPath}`);
 
     loader.load(
       modelPath,
@@ -152,21 +131,17 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
         });
 
         if (!foundSkinned) {
-          console.warn('[movement test] No SkinnedMesh found in GLB');
           setLoadFailed(true);
           onMissingAssets?.();
           return;
         }
 
-        const sm = foundSkinned as THREE.SkinnedMesh;
-        console.log(`[movement test] SkinnedMesh: ${sm.name}, bones=${sm.skeleton?.bones.length || 0}`);
         setLoadedScene(scene);
-        setSkinnedMesh(sm);
+        setSkinnedMesh(foundSkinned as THREE.SkinnedMesh);
       },
       undefined,
-      (err: any) => {
+      () => {
         if (cancelled) return;
-        console.warn('[movement test] GLB load failed:', err);
         setLoadFailed(true);
         onMissingAssets?.();
       }
@@ -181,8 +156,7 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
     let cancelled = false;
     loadAnimationsOnce().then(() => {
       if (cancelled) return;
-      if (!animCache.idle || !animCache.run) {
-        console.warn('[movement test] Missing idle or run animation');
+      if (!animCache.run) {
         setLoadFailed(true);
         onMissingAssets?.();
       } else {
@@ -201,56 +175,20 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
     const mixer = new THREE.AnimationMixer(skinnedMesh);
     mixerRef.current = mixer;
 
-    const actions: Partial<Record<AnimStateName, THREE.AnimationAction>> = {};
-
-    const idleClip = animCache.idle ? retargetClip(animCache.idle, boneMap) : null;
-    if (idleClip && idleClip.tracks.length > 0) {
-      const idleAction = mixer.clipAction(idleClip);
-      idleAction.setLoop(THREE.LoopRepeat, Infinity);
-      idleAction.timeScale = 1;
-      actions.idle = idleAction;
-    }
-
     const runClip = animCache.run ? retargetClip(animCache.run, boneMap) : null;
     if (runClip && runClip.tracks.length > 0) {
       const runAction = mixer.clipAction(runClip);
       runAction.setLoop(THREE.LoopRepeat, Infinity);
       runAction.timeScale = RUN_TIME_SCALE;
-      actions.run = runAction;
-    }
-
-    actionsRef.current = actions;
-
-    if (actions.idle) {
-      actions.idle.play();
-      currentActionRef.current = 'idle';
-      console.log('[movement test] Started idle animation');
+      runAction.reset().play();
+      console.log('[constant run test] Run action playing');
     }
 
     return () => {
       mixer.stopAllAction();
       mixerRef.current = null;
-      actionsRef.current = {};
-      currentActionRef.current = null;
     };
   }, [loadedScene, skinnedMesh, animsReady]);
-
-  useEffect(() => {
-    if (!mixerRef.current) return;
-
-    const actions = actionsRef.current;
-    const target: AnimStateName = animState === 'run' ? 'run' : 'idle';
-    const current = currentActionRef.current;
-    if (current === target) return;
-
-    const targetAction = actions[target];
-    const currentAction = current ? actions[current] : null;
-    if (!targetAction) return;
-
-    targetAction.reset().fadeIn(0.2).play();
-    if (currentAction && currentAction !== targetAction) currentAction.fadeOut(0.2);
-    currentActionRef.current = target;
-  }, [animState]);
 
   useFrame((_, dt) => {
     if (mixerRef.current) mixerRef.current.update(dt);
