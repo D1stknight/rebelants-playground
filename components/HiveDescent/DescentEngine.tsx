@@ -457,7 +457,13 @@ const Scene: React.FC<SceneProps> = ({
         else nextAnim = "idle";
       }
       lastHpRef.current = player.hp;
-      setAnimState((prev) => (prev === nextAnim ? prev : nextAnim));
+      setAnimState((prev) => {
+        if (prev !== nextAnim) {
+          console.log(`[HiveDescent run debug] DescentEngine animState ${prev} -> ${nextAnim} (moving=${input.up || input.down || input.left || input.right})`);
+          return nextAnim;
+        }
+        return prev;
+      });
     }
     // ---------- Player mesh transform (Phase C: with attack lunge) ----------
     const pg = playerGroupRef.current;

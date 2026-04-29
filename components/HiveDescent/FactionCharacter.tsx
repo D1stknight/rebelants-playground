@@ -38,6 +38,7 @@ function loadRunAnimationOnce(): Promise<void> {
           clip.name = 'run';
           runClipCache = clip;
           console.log(`[HiveDescent run test] Loaded run clip: ${clip.tracks.length} tracks, ${clip.duration.toFixed(2)}s`);
+          console.log('[HiveDescent run debug] run.fbx first 5 track names:', clip.tracks.slice(0, 5).map((t) => t.name));
         } else {
           console.warn('[HiveDescent run test] No animation clip found in run.fbx');
         }
@@ -73,12 +74,18 @@ function buildBoneMap(skinnedMesh: THREE.SkinnedMesh): Map<string, string> {
 function retargetClip(clip: THREE.AnimationClip, boneMap: Map<string, string>): THREE.AnimationClip {
   const newTracks: THREE.KeyframeTrack[] = [];
 
+  console.log('[HiveDescent run debug] retargetClip source first 5 track names:', clip.tracks.slice(0, 5).map((t) => t.name));
+
   for (const track of clip.tracks) {
     const lastDot = track.name.lastIndexOf('.');
     if (lastDot === -1) continue;
 
     const sourceBone = track.name.substring(0, lastDot);
     const property = track.name.substring(lastDot);
+
+    if (newTracks.length < 5) {
+      console.log(`[HiveDescent run debug] source track property: ${property} | bone: ${sourceBone}`);
+    }
 
     // Keep only bone rotations for this test. Root position/scale tracks can cause flips, floating, or twitching.
     if (property !== '.quaternion') continue;
@@ -94,6 +101,7 @@ function retargetClip(clip: THREE.AnimationClip, boneMap: Map<string, string>): 
   }
 
   console.log(`[HiveDescent run test] Retargeted run clip: ${newTracks.length} usable rotation tracks`);
+  console.log('[HiveDescent run debug] retargeted first 5 track names:', newTracks.slice(0, 5).map((t) => t.name));
   return new THREE.AnimationClip(clip.name, clip.duration, newTracks);
 }
 
@@ -169,7 +177,9 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
     if (!loadedScene || !skinnedMesh || !runReady || !runClipCache) return;
 
     const boneMap = buildBoneMap(skinnedMesh);
+    console.log(`[HiveDescent run debug] bone map entries: ${boneMap.size}`);
     const mixer = new THREE.AnimationMixer(skinnedMesh);
+    console.log('[HiveDescent run debug] AnimationMixer root object:', skinnedMesh.name || '(unnamed skinned mesh)');
     mixerRef.current = mixer;
 
     const retargetedRunClip = retargetClip(runClipCache, boneMap);
@@ -190,6 +200,7 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
   }, [loadedScene, skinnedMesh, runReady]);
 
   useEffect(() => {
+    console.log(`[HiveDescent run debug] FactionCharacter animState prop: ${animState}`);
     const runAction = runActionRef.current;
     if (!runAction) return;
 
@@ -199,6 +210,7 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
       runAction.reset().fadeIn(0.15).play();
       isRunPlayingRef.current = true;
       console.log('[HiveDescent run test] Run animation started');
+      console.log('[HiveDescent run debug] runAction.play() invoked');
     }
 
     if (!shouldRun && isRunPlayingRef.current) {
