@@ -18,7 +18,7 @@ interface FactionCharacterProps {
 
 const GROUND_OFFSET = 1.25;
 const RENDER_SCALE = 1.25;
-const RUN_TIME_SCALE = 0.45;
+const RUN_TIME_SCALE = 0.18;
 
 const animCache: Partial<Record<AnimStateName, THREE.AnimationClip>> = {};
 let animCachePromise: Promise<void> | null = null;
