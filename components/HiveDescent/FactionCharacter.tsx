@@ -1,12 +1,11 @@
 // components/HiveDescent/FactionCharacter.tsx
 // Hive Descent rigged faction character.
-// Current test: always play the real run action to verify run setup.
+// Current test: use the animation clip from test.glb, but keep the real Samurai model.
 
 import { useEffect, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 
 export type AnimStateName = 'idle' | 'walk' | 'run' | 'attack' | 'hurt' | 'die';
 
@@ -18,41 +17,40 @@ interface FactionCharacterProps {
 
 const GROUND_OFFSET = 1.25;
 const RENDER_SCALE = 1.25;
-const RUN_TIME_SCALE = 0.18;
+const RUN_TIME_SCALE = 0.35;
 
-const animCache: Partial<Record<AnimStateName, THREE.AnimationClip>> = {};
-let animCachePromise: Promise<void> | null = null;
+let testClip: THREE.AnimationClip | null = null;
+let testClipPromise: Promise<void> | null = null;
 
-function loadAnimationsOnce(): Promise<void> {
-  if (animCachePromise) return animCachePromise;
+function loadTestGlbAnimationOnce(): Promise<void> {
+  if (testClipPromise) return testClipPromise;
 
-  const fbxLoader = new FBXLoader();
-  const names: AnimStateName[] = ['run'];
-  console.log('[constant run test] Loading run.fbx');
+  const loader = new GLTFLoader();
+  console.log('[test-glb-clip] Loading animation clip from /descent/anim-test/test.glb');
 
-  animCachePromise = Promise.all(names.map(name => {
-    return new Promise<void>((resolve) => {
-      fbxLoader.load(
-        `/descent/models/animations/${name}.fbx`,
-        (fbx: any) => {
-          if (fbx.animations && fbx.animations.length > 0) {
-            const clip = fbx.animations[0];
-            clip.name = name;
-            animCache[name] = clip;
-            console.log(`[constant run test] Loaded ${name}: ${clip.tracks.length} tracks, ${clip.duration.toFixed(2)}s`);
-          }
-          resolve();
-        },
-        undefined,
-        (err: any) => {
-          console.warn(`[constant run test] Failed ${name}:`, err);
-          resolve();
+  testClipPromise = new Promise<void>((resolve) => {
+    loader.load(
+      '/descent/anim-test/test.glb',
+      (loaded: any) => {
+        const clip = loaded.animations?.[0] as THREE.AnimationClip | undefined;
+        if (clip) {
+          clip.name = 'run';
+          testClip = clip;
+          console.log(`[test-glb-clip] Loaded clip: ${clip.name}, ${clip.tracks.length} tracks, ${clip.duration.toFixed(2)}s`);
+        } else {
+          console.warn('[test-glb-clip] No animation clip found in test.glb');
         }
-      );
-    });
-  })).then(() => undefined);
+        resolve();
+      },
+      undefined,
+      (err: any) => {
+        console.warn('[test-glb-clip] Failed to load test.glb animation:', err);
+        resolve();
+      }
+    );
+  });
 
-  return animCachePromise;
+  return testClipPromise;
 }
 
 function buildBoneMap(skinnedMesh: THREE.SkinnedMesh): Map<string, string> {
@@ -75,18 +73,15 @@ function retargetClip(clip: THREE.AnimationClip, boneMap: Map<string, string>): 
 
   for (const track of clip.tracks) {
     const lastDot = track.name.lastIndexOf('.');
-    if (lastDot === -1) {
-      newTracks.push(track);
-      continue;
-    }
+    if (lastDot === -1) continue;
 
-    const fbxBone = track.name.substring(0, lastDot);
+    const sourceBone = track.name.substring(0, lastDot);
     const property = track.name.substring(lastDot);
 
     if (property === '.position' || property === '.scale') continue;
 
-    const stripped = fbxBone.replace(/^mixamorig:?/i, '').toLowerCase();
-    const target = boneMap.get(fbxBone.toLowerCase()) || boneMap.get(stripped);
+    const stripped = sourceBone.replace(/^mixamorig:?/i, '').toLowerCase();
+    const target = boneMap.get(sourceBone.toLowerCase()) || boneMap.get(stripped);
 
     if (target) {
       const newTrack = track.clone();
@@ -95,7 +90,7 @@ function retargetClip(clip: THREE.AnimationClip, boneMap: Map<string, string>): 
     }
   }
 
-  console.log(`[constant run test] ${clip.name}: ${newTracks.length} usable tracks`);
+  console.log(`[test-glb-clip] Retargeted ${clip.name}: ${newTracks.length} usable tracks`);
   return new THREE.AnimationClip(clip.name, clip.duration, newTracks);
 }
 
@@ -105,7 +100,7 @@ export default function FactionCharacter({ factionId, onMissingAssets }: Faction
 
   const [loadedScene, setLoadedScene] = useState<THREE.Group | null>(null);
   const [skinnedMesh, setSkinnedMesh] = useState<THREE.SkinnedMesh | null>(null);
-  const [animsReady, setAnimsReady] = useState(false);
+  const [clipReady, setClipReady] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
@@ -154,13 +149,13 @@ export default function FactionCharacter({ factionId, onMissingAssets }: Faction
 
   useEffect(() => {
     let cancelled = false;
-    loadAnimationsOnce().then(() => {
+    loadTestGlbAnimationOnce().then(() => {
       if (cancelled) return;
-      if (!animCache.run) {
+      if (!testClip) {
         setLoadFailed(true);
         onMissingAssets?.();
       } else {
-        setAnimsReady(true);
+        setClipReady(true);
       }
     });
     return () => {
@@ -169,26 +164,28 @@ export default function FactionCharacter({ factionId, onMissingAssets }: Faction
   }, [onMissingAssets]);
 
   useEffect(() => {
-    if (!loadedScene || !skinnedMesh || !animsReady) return;
+    if (!loadedScene || !skinnedMesh || !clipReady || !testClip) return;
 
     const boneMap = buildBoneMap(skinnedMesh);
     const mixer = new THREE.AnimationMixer(skinnedMesh);
     mixerRef.current = mixer;
 
-    const runClip = animCache.run ? retargetClip(animCache.run, boneMap) : null;
-    if (runClip && runClip.tracks.length > 0) {
+    const runClip = retargetClip(testClip, boneMap);
+    if (runClip.tracks.length > 0) {
       const runAction = mixer.clipAction(runClip);
       runAction.setLoop(THREE.LoopRepeat, Infinity);
       runAction.timeScale = RUN_TIME_SCALE;
       runAction.reset().play();
-      console.log('[constant run test] Run action playing');
+      console.log('[test-glb-clip] Playing test.glb animation clip on Samurai model');
+    } else {
+      console.warn('[test-glb-clip] No usable tracks after retarget');
     }
 
     return () => {
       mixer.stopAllAction();
       mixerRef.current = null;
     };
-  }, [loadedScene, skinnedMesh, animsReady]);
+  }, [loadedScene, skinnedMesh, clipReady]);
 
   useFrame((_, dt) => {
     if (mixerRef.current) mixerRef.current.update(dt);
