@@ -13,6 +13,7 @@ import {
 import { BIOMES } from "./biomes";
 
 const FactionPicker = dynamic(() => import("./FactionPicker"), { ssr: false });
+const DescentEngine = dynamic(() => import("./DescentEngine"), { ssr: false });
 
 type RunState = "lobby" | "picking" | "running" | "reward" | "dead" | "victory";
 
@@ -291,94 +292,26 @@ const HiveDescent: React.FC = () => {
     );
   }
 
-  // ===================== RUNNING (placeholder until Phase B engine) =====================
+  // ===================== RUNNING — Phase B engine =====================
   if (runState === "running") {
     const biome = BIOMES[Math.min(currentFloor - 1, BIOMES.length - 1)];
+    if (!factionId) { setRunState("lobby"); return null; }
     return (
-      <div style={{
-        minHeight: "100vh", color: "#fff",
-        background: "linear-gradient(180deg, " + biome.skyTop + " 0%, " + biome.skyBottom + " 100%)",
-        position: "relative",
-        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-        padding: 20, textAlign: "center",
-      }}>
-        <div style={{
-          fontSize: 11, color: biome.particleColor, letterSpacing: "0.4em",
-          textTransform: "uppercase", marginBottom: 8,
-        }}>
-          Floor {biome.floor} of {DESCENT_TOTAL_FLOORS}
-        </div>
-        <h1 style={{
-          fontSize: "clamp(32px, 6vw, 56px)", margin: 0, fontWeight: 900,
-          letterSpacing: "-0.01em",
-          color: "#fff",
-          textShadow: "0 0 30px " + biome.particleColor,
-        }}>
-          {biome.name}
-        </h1>
-        <div style={{
-          fontSize: 14, color: "rgba(255,255,255,0.7)", fontStyle: "italic",
-          marginTop: 10, maxWidth: 480,
-        }}>
-          "{biome.subtitle}"
-        </div>
-        <div style={{
-          marginTop: 28, padding: "14px 24px",
-          background: "rgba(0,0,0,0.5)", border: "1px solid " + biome.particleColor,
-          borderRadius: 12, maxWidth: 460,
-        }}>
-          <div style={{ fontSize: 11, color: biome.particleColor, letterSpacing: "0.2em", marginBottom: 6 }}>
-            ⚙ ENGINE LOADING ⚙
-          </div>
-          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.8)" }}>
-            The Three.js combat engine arrives in Phase B.<br/>
-            For now, you can step through floors to preview the cinematic.
-          </div>
-        </div>
-
-        <div style={{
-          marginTop: 24, display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center",
-        }}>
-          {currentFloor < DESCENT_TOTAL_FLOORS && (
-            <button onClick={() => setCurrentFloor((f) => Math.min(f + 1, DESCENT_TOTAL_FLOORS))} style={{
-              padding: "12px 22px", border: "none", borderRadius: 10,
-              background: "linear-gradient(180deg, " + biome.particleColor + " 0%, " + biome.fogColor + " 100%)",
-              color: "#fff", fontWeight: 800, fontSize: 13, letterSpacing: "0.1em", cursor: "pointer",
-              boxShadow: "0 0 20px " + biome.particleColor + "66",
-            }}>
-              ⏷ DESCEND TO FLOOR {currentFloor + 1}
-            </button>
-          )}
-          {currentFloor === DESCENT_TOTAL_FLOORS && (
-            <button onClick={() => setRunState("victory")} style={{
-              padding: "12px 22px", border: "none", borderRadius: 10,
-              background: "linear-gradient(180deg, #ffd700 0%, #aa6600 100%)",
-              color: "#000", fontWeight: 900, fontSize: 13, letterSpacing: "0.1em", cursor: "pointer",
-              boxShadow: "0 0 24px #ffd700aa",
-            }}>
-              ★ DEFEAT THE QUEEN ★
-            </button>
-          )}
-          <button onClick={handleAbandon} style={{
-            padding: "12px 18px", borderRadius: 10,
-            background: "rgba(255,255,255,0.06)",
-            border: "1px solid rgba(255,255,255,0.18)",
-            color: "#fff", fontWeight: 700, fontSize: 12, letterSpacing: "0.1em", cursor: "pointer",
-          }}>
-            ✕ ABANDON
-          </button>
-        </div>
-
-        {selectedFaction && (
-          <div style={{
-            position: "absolute", top: 14, left: 14,
-            background: "rgba(0,0,0,0.5)", padding: "6px 12px", borderRadius: 8,
-            fontSize: 11, letterSpacing: "0.1em", fontWeight: 700,
-          }}>
-            🐜 {selectedFaction.name.toUpperCase()} · ⚡ {selectedFaction.specialName}
-          </div>
-        )}
-      </div>
+      <DescentEngine
+        factionId={factionId}
+        floor={currentFloor}
+        biome={biome}
+        onFloorComplete={(earned) => {
+          // Phase B: just go straight to next floor or victory. Reward modal lands in Phase D.
+          if (currentFloor >= DESCENT_TOTAL_FLOORS) {
+            setRunState("victory");
+          } else {
+            setCurrentFloor((f) => f + 1);
+          }
+        }}
+        onDeath={() => setRunState("dead")}
+        onAbandon={handleAbandon}
+      />
     );
   }
 
