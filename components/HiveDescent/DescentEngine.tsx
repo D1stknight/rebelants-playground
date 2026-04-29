@@ -7,6 +7,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import HUD from "./HUD";
 import MobileControls, { type DescentInput } from "./MobileControls";
+import FactionCharacter from "./FactionCharacter";
 import type { Biome } from "./biomes";
 import { ENEMIES, spawnCountForFloor, type EnemyKind } from "./enemies";
 import {
@@ -257,6 +258,7 @@ const Chamber: React.FC<{ biome: Biome }> = ({ biome }) => {
 type SceneProps = {
   biome: Biome;
   factionColor: string;
+  factionId: string;
   playerRef: React.MutableRefObject<PlayerRef>;
   enemiesRef: React.MutableRefObject<EnemyRef[]>;
   inputRef: React.MutableRefObject<DescentInput>;
@@ -267,7 +269,7 @@ type SceneProps = {
 };
 
 const Scene: React.FC<SceneProps> = ({
-  biome, factionColor, playerRef, enemiesRef, inputRef, hudPushRef,
+  biome, factionColor, factionId, playerRef, enemiesRef, inputRef, hudPushRef,
   factionSpecialCooldownMs, onPlayerDeath, onAllClear,
 }) => {
   const { camera } = useThree();
@@ -280,6 +282,12 @@ const Scene: React.FC<SceneProps> = ({
   // Phase C: attack lunge animation + camera shake
   const playerAnimRef = useRef({ attackingUntil: 0, lungeOffset: 0 });
   const cameraShakeRef = useRef({ amplitude: 0, decayUntil: 0 });
+  // Phase D: animation state machine for the rigged character
+  const [animState, setAnimState] = useState<"idle" | "walk" | "run" | "attack" | "hurt" | "die">("idle");
+  const [useGLB, setUseGLB] = useState(true); // false if GLB load fails — falls back to procedural
+  const lastAnimUpdateRef = useRef(0);
+  const lastHpRef = useRef(100);
+  const lastAttackAtRef = useRef(0);
 
   // Set initial camera
   useEffect(() => {
@@ -432,6 +440,25 @@ const Scene: React.FC<SceneProps> = ({
       }
     }
 
+    // ---------- Phase D: Animation state machine ----------
+    if (now - lastAnimUpdateRef.current > 80) {
+      lastAnimUpdateRef.current = now;
+      let nextAnim: "idle" | "walk" | "run" | "attack" | "hurt" | "die" = "idle";
+      if (player.hp <= 0) {
+        nextAnim = "die";
+      } else if (player.hp < lastHpRef.current - 0.5) {
+        nextAnim = "hurt";
+      } else if (player.lastAttackAt !== lastAttackAtRef.current) {
+        nextAnim = "attack";
+        lastAttackAtRef.current = player.lastAttackAt;
+      } else {
+        const moving = (input.up || input.down || input.left || input.right);
+        if (moving) nextAnim = "run";
+        else nextAnim = "idle";
+      }
+      lastHpRef.current = player.hp;
+      setAnimState((prev) => (prev === nextAnim ? prev : nextAnim));
+    }
     // ---------- Player mesh transform (Phase C: with attack lunge) ----------
     const pg = playerGroupRef.current;
     if (pg) {
@@ -497,7 +524,17 @@ const Scene: React.FC<SceneProps> = ({
 
       {/* Player */}
       <group position={[0, 0, 0]}>
-        <AntCharacter groupRef={playerGroupRef} factionColor={factionColor} />
+        {useGLB ? (
+          <group ref={playerGroupRef}>
+            <FactionCharacter
+              factionId={factionId}
+              animState={animState}
+              onMissingAssets={() => setUseGLB(false)}
+            />
+          </group>
+        ) : (
+          <AntCharacter groupRef={playerGroupRef} factionColor={factionColor} />
+        )}
       </group>
 
       {/* Enemies */}
@@ -662,6 +699,7 @@ const DescentEngine: React.FC<Props> = ({
         <Suspense fallback={null}>
           <Scene key={spawnSig}
             biome={biome}
+            factionId={factionId}
             factionColor={factionColor}
             playerRef={playerRef}
             enemiesRef={enemiesRef}
