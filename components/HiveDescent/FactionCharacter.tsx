@@ -1,7 +1,6 @@
 // components/HiveDescent/FactionCharacter.tsx
 // Hive Descent rigged faction character.
-// Restored to stable visual setup: Samurai model, correct scale, rotation, and ground height.
-// Restore marker: stable visual-only character loader, no animation mixer active.
+// Visual-only rotation test: flipped wrapper rotation, no animation mixer active.
 
 import { useEffect, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -75,7 +74,7 @@ export default function FactionCharacter({ factionId, onMissingAssets }: Faction
     <group ref={groupRef}>
       <group
         position={[0, GROUND_OFFSET, 0]}
-        rotation={[-Math.PI / 2, 0, 0]}
+        rotation={[Math.PI / 2, 0, 0]}
         scale={RENDER_SCALE}
       >
         <primitive object={loadedScene} />
