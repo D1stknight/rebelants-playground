@@ -79,21 +79,31 @@ function buildBoneMap(skinnedMesh: THREE.SkinnedMesh): Map<string, string> {
   return map;
 }
 
-/** Retarget animation track names to match the bones in our skeleton. */
+/** Retarget animation track names to match the bones in our skeleton.
+ *  v4: Drops .position and .scale tracks. Mixamo FBX position tracks are in cm
+ *  and teleport bones to wildly wrong locations on differently-scaled GLB skeletons.
+ *  Rotation-only is the standard cross-scale solution. The character's world
+ *  position is controlled by the parent group in DescentEngine, so we don't need
+ *  root motion from the clips. */
 function retargetClip(clip: THREE.AnimationClip, boneMap: Map<string, string>): THREE.AnimationClip {
   const newTracks: THREE.KeyframeTrack[] = [];
-  let kept = 0, dropped = 0;
+  let kept = 0, dropped = 0, skippedPos = 0, skippedScale = 0;
   const droppedNames: string[] = [];
   for (const track of clip.tracks) {
     const lastDot = track.name.lastIndexOf('.');
     if (lastDot === -1) { newTracks.push(track); continue; }
     const fbxBone = track.name.substring(0, lastDot);
     const property = track.name.substring(lastDot);
-    
+
+    // Drop position and scale tracks — they are in source-skeleton units (cm)
+    // and break the visual when applied to our pre-scaled GLB skeleton.
+    if (property === '.position') { skippedPos++; continue; }
+    if (property === '.scale') { skippedScale++; continue; }
+
     // Try multiple forms: full, lower, stripped-prefix
     const stripped = fbxBone.replace(/^mixamorig:?/i, '').toLowerCase();
     const target = boneMap.get(fbxBone.toLowerCase()) || boneMap.get(stripped);
-    
+
     if (target) {
       const newTrack = track.clone();
       newTrack.name = target + property;
@@ -104,9 +114,9 @@ function retargetClip(clip: THREE.AnimationClip, boneMap: Map<string, string>): 
       if (droppedNames.length < 3) droppedNames.push(fbxBone);
     }
   }
-  console.log(`[v3 retarget] ${clip.name}: kept ${kept}/${clip.tracks.length}, dropped ${dropped}${droppedNames.length ? ' (e.g. ' + droppedNames.join(', ') + ')' : ''}`);
+  console.log(`[v4 retarget] ${clip.name}: kept ${kept}/${clip.tracks.length} rot, skipped ${skippedPos} pos + ${skippedScale} scale, dropped ${dropped}${droppedNames.length ? ' (e.g. ' + droppedNames.join(', ') + ')' : ''}`);
   if (kept > 0 && newTracks.length > 0) {
-    console.log(`  first retargeted: ${newTracks[0].name}`);
+    console.log(`  first kept: ${newTracks[0].name}`);
   }
   return new THREE.AnimationClip(clip.name, clip.duration, newTracks);
 }
