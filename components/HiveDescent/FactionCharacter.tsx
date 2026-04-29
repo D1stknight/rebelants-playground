@@ -48,8 +48,8 @@ let animCachePromise: Promise<void> | null = null;
 function loadAnimationsOnce(): Promise<void> {
   if (animCachePromise) return animCachePromise;
   const fbxLoader = new FBXLoader();
-  const names: AnimStateName[] = ['idle', 'walk', 'run', 'attack', 'hurt', 'die'];
-  console.log('[FactionCharacter v3] Loading 6 animations');
+  const names: AnimStateName[] = ['idle'];
+  console.log('[FactionCharacter idle-only test] Loading idle animation only');
   animCachePromise = Promise.all(names.map(name => {
     return new Promise<void>((resolve) => {
       fbxLoader.load(`/descent/models/animations/${name}.fbx`,
@@ -247,23 +247,18 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
     }
 
     const actions: Partial<Record<AnimStateName, THREE.AnimationAction>> = {};
-    (Object.keys(animCache) as AnimStateName[]).forEach(name => {
-      const raw = animCache[name];
-      if (!raw) return;
-      const clip = retargetClip(raw, boneMap);
+    const rawIdle = animCache.idle;
+    if (rawIdle) {
+      const clip = retargetClip(rawIdle, boneMap);
       if (clip.tracks.length === 0) {
-        console.warn(`[v5] ${name} has no tracks after retarget; skipping`);
-        return;
-      }
-      const action = mixer.clipAction(clip);
-      if (ONE_SHOT[name]) {
-        action.setLoop(THREE.LoopOnce, 1);
-        action.clampWhenFinished = true;
+        console.warn('[idle-only test] idle has no tracks after retarget; skipping');
       } else {
+        const action = mixer.clipAction(clip);
         action.setLoop(THREE.LoopRepeat, Infinity);
+        actions.idle = action;
+        console.log('[idle-only test] idle action created and assigned only to idle state');
       }
-      actions[name] = action;
-    });
+    }
     actionsRef.current = actions;
 
     if (actions.idle) {
