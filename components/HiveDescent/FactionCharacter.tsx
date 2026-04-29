@@ -1,11 +1,11 @@
 // components/HiveDescent/FactionCharacter.tsx
 // Hive Descent rigged faction character.
-// Current test: load the new Mixamo-rigged samurai.fbx model with no animation mixer.
+// Current test: load the new Mixamo-rigged samurai.glb model with no animation mixer.
 
 import { useEffect, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 export type AnimStateName = 'idle' | 'walk' | 'run' | 'attack' | 'hurt' | 'die';
 
@@ -16,7 +16,7 @@ interface FactionCharacterProps {
 }
 
 const GROUND_OFFSET = 0;
-const RENDER_SCALE = 0.01;
+const RENDER_SCALE = 1;
 
 export default function FactionCharacter({ factionId, onMissingAssets }: FactionCharacterProps) {
   const groupRef = useRef<THREE.Group>(null);
@@ -25,19 +25,20 @@ export default function FactionCharacter({ factionId, onMissingAssets }: Faction
 
   useEffect(() => {
     let cancelled = false;
-    const loader = new FBXLoader();
-    const modelPath = `/descent/models/factions/${factionId}.fbx`;
+    const loader = new GLTFLoader();
+    const modelPath = `/descent/models/factions/${factionId}.glb`;
 
-    console.log(`[HiveDescent FBX model test] Loading ${modelPath}`);
+    console.log(`[HiveDescent GLB model test] Loading ${modelPath}`);
 
     loader.load(
       modelPath,
-      (loaded: THREE.Group) => {
+      (loaded: any) => {
         if (cancelled) return;
 
+        const scene = loaded.scene as THREE.Group;
         let foundSkinned = false;
 
-        loaded.traverse((obj: any) => {
+        scene.traverse((obj: any) => {
           if (obj.isSkinnedMesh) foundSkinned = true;
           if (obj.isMesh) {
             obj.castShadow = true;
@@ -46,7 +47,7 @@ export default function FactionCharacter({ factionId, onMissingAssets }: Faction
           }
         });
 
-        console.log(`[HiveDescent FBX model test] Skinned mesh found: ${foundSkinned}`);
+        console.log(`[HiveDescent GLB model test] Skinned mesh found: ${foundSkinned}`);
 
         if (!foundSkinned) {
           setLoadFailed(true);
@@ -54,12 +55,12 @@ export default function FactionCharacter({ factionId, onMissingAssets }: Faction
           return;
         }
 
-        setLoadedScene(loaded);
+        setLoadedScene(scene);
       },
       undefined,
       (err: any) => {
         if (cancelled) return;
-        console.warn('[HiveDescent FBX model test] FBX load failed:', err);
+        console.warn('[HiveDescent GLB model test] GLB load failed:', err);
         setLoadFailed(true);
         onMissingAssets?.();
       }
