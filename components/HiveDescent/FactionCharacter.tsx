@@ -114,6 +114,7 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
   const [loadedScene, setLoadedScene] = useState<THREE.Group | null>(null);
   const [skinnedMesh, setSkinnedMesh] = useState<THREE.SkinnedMesh | null>(null);
   const [runReady, setRunReady] = useState(false);
+  const [runActionReady, setRunActionReady] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
@@ -188,6 +189,7 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
       action.setLoop(THREE.LoopRepeat, Infinity);
       action.timeScale = RUN_TIME_SCALE;
       runActionRef.current = action;
+      setRunActionReady(true);
       console.log('[HiveDescent run test] Run action ready');
     }
 
@@ -196,13 +198,14 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
       mixerRef.current = null;
       runActionRef.current = null;
       isRunPlayingRef.current = false;
+      setRunActionReady(false);
     };
   }, [loadedScene, skinnedMesh, runReady]);
 
   useEffect(() => {
     console.log(`[HiveDescent run debug] FactionCharacter animState prop: ${animState}`);
     const runAction = runActionRef.current;
-    if (!runAction) return;
+    if (!runAction || !runActionReady) return;
 
     const shouldRun = animState === 'run';
 
@@ -218,7 +221,7 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
       isRunPlayingRef.current = false;
       console.log('[HiveDescent run test] Run animation stopped');
     }
-  }, [animState]);
+  }, [animState, runActionReady]);
 
   useFrame((_, dt) => {
     if (mixerRef.current) mixerRef.current.update(dt);
