@@ -49,16 +49,17 @@ function loadAnimationsOnce(): Promise<void> {
   if (animCachePromise) return animCachePromise;
   const fbxLoader = new FBXLoader();
   const names: AnimStateName[] = ['idle'];
-  console.log('[FactionCharacter idle-only test] Loading idle animation only');
+  const sourceName = 'run';
+  console.log('[FactionCharacter run-as-idle test] Loading run.fbx but assigning it to idle');
   animCachePromise = Promise.all(names.map(name => {
     return new Promise<void>((resolve) => {
-      fbxLoader.load(`/descent/models/animations/${name}.fbx`,
+      fbxLoader.load(`/descent/models/animations/${sourceName}.fbx`,
         (fbx: any) => {
           if (fbx.animations && fbx.animations.length > 0) {
             const clip = fbx.animations[0];
             clip.name = name;
             animCache[name] = clip;
-            console.log(`[v3] Loaded ${name}: ${clip.tracks.length} tracks, ${clip.duration.toFixed(2)}s`);
+            console.log(`[run-as-idle test] Loaded ${sourceName}.fbx as ${name}: ${clip.tracks.length} tracks, ${clip.duration.toFixed(2)}s`);
             // Log first 3 track names so we see the EXACT format
             for (let i = 0; i < Math.min(3, clip.tracks.length); i++) {
               console.log(`  track[${i}]: ${clip.tracks[i].name}`);
@@ -67,7 +68,7 @@ function loadAnimationsOnce(): Promise<void> {
           resolve();
         },
         undefined,
-        (err: any) => { console.warn(`[v3] Failed ${name}:`, err); resolve(); }
+        (err: any) => { console.warn(`[run-as-idle test] Failed ${sourceName}:`, err); resolve(); }
       );
     });
   })).then(() => undefined);
@@ -251,12 +252,12 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
     if (rawIdle) {
       const clip = retargetClip(rawIdle, boneMap);
       if (clip.tracks.length === 0) {
-        console.warn('[idle-only test] idle has no tracks after retarget; skipping');
+        console.warn('[run-as-idle test] run clip has no tracks after retarget; skipping');
       } else {
         const action = mixer.clipAction(clip);
         action.setLoop(THREE.LoopRepeat, Infinity);
         actions.idle = action;
-        console.log('[idle-only test] idle action created and assigned only to idle state');
+        console.log('[run-as-idle test] run clip action created and assigned to idle state');
       }
     }
     actionsRef.current = actions;
