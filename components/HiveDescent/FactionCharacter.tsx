@@ -1,6 +1,6 @@
 // components/HiveDescent/FactionCharacter.tsx
 // Hive Descent rigged faction character.
-// Current test: GLB model visible with debug markers removed.
+// Current test: GLB model visible with size and ground-height tuning.
 
 import { useEffect, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -15,8 +15,8 @@ interface FactionCharacterProps {
   onMissingAssets?: () => void;
 }
 
-const TARGET_HEIGHT = 2.2;
-const MODEL_Y_OFFSET = 0.8;
+const TARGET_HEIGHT = 1.75;
+const MODEL_Y_OFFSET = 1.05;
 
 export default function FactionCharacter({ factionId }: FactionCharacterProps) {
   const groupRef = useRef<THREE.Group>(null);
