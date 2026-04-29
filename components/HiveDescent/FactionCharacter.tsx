@@ -27,6 +27,12 @@ const ONE_SHOT: Record<AnimStateName, boolean> = {
   attack: true, hurt: true, die: true,
 };
 
+// Vertical lift applied to the loaded GLB so its feet sit on the floor (y=0).
+// In Mixamo's rest pose, the hips bone is ~1m above the skeleton origin, which
+// would put the feet below y=0 if the model is mounted at the parent's origin.
+// Tune this if a faction's GLB has a different rest-pose hip height.
+const GROUND_OFFSET = 0.95;
+
 const animCache: Partial<Record<AnimStateName, THREE.AnimationClip>> = {};
 let animCachePromise: Promise<void> | null = null;
 
@@ -311,7 +317,9 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
 
   return (
     <group ref={groupRef}>
-      <primitive object={loadedScene} />
+      <group position={[0, GROUND_OFFSET, 0]}>
+        <primitive object={loadedScene} />
+      </group>
     </group>
   );
 }
