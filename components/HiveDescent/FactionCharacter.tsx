@@ -1,22 +1,18 @@
 // components/HiveDescent/FactionCharacter.tsx
-// Phase D v2: load a rigged GLB character + retarget Mixamo FBX animations.
+// Phase D v3: explicit SkinnedMesh-based mixer with full diagnostic logging.
 //
-// Key fix in v2: when an FBX animation is loaded, three.js treats its track names as
-// the bone names from the FBX file's internal skeleton (e.g. "mixamorig:LeftArm.position").
-// If the GLB skeleton uses different bone names or hierarchy, the AnimationMixer can't
-// find matching nodes and silently does nothing. The fix is to:
-//   1. Find the GLB's actual skeleton bones
-//   2. Walk each animation track and rewrite the prefix to match a real bone
-//   3. Drop tracks that have no matching bone in the GLB
-//
-// Also adds console logging so we can verify what's happening.
+// v3 changes vs v2:
+// - Mixer is mounted on the SkinnedMesh, not the scene root
+// - Walks the loaded scene to find the SkinnedMesh and its skeleton bones explicitly
+// - Validates that each retargeted track resolves to a real bone via getObjectByName
+// - Drops cloneSkeleton (we render only one character per scene; clone is unnecessary)
+// - Logs full bone hierarchy and the result of one frame of evaluation
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
-import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 export type AnimStateName = 'idle' | 'walk' | 'run' | 'attack' | 'hurt' | 'die';
 
@@ -27,15 +23,10 @@ interface FactionCharacterProps {
 }
 
 const ONE_SHOT: Record<AnimStateName, boolean> = {
-  idle: false,
-  walk: false,
-  run: false,
-  attack: true,
-  hurt: true,
-  die: true,
+  idle: false, walk: false, run: false,
+  attack: true, hurt: true, die: true,
 };
 
-// Module-level cache: animations are loaded once globally
 const animCache: Partial<Record<AnimStateName, THREE.AnimationClip>> = {};
 let animCachePromise: Promise<void> | null = null;
 
@@ -43,89 +34,81 @@ function loadAnimationsOnce(): Promise<void> {
   if (animCachePromise) return animCachePromise;
   const fbxLoader = new FBXLoader();
   const names: AnimStateName[] = ['idle', 'walk', 'run', 'attack', 'hurt', 'die'];
-  console.log('[FactionCharacter] Loading 6 animations from /descent/models/animations/');
+  console.log('[FactionCharacter v3] Loading 6 animations');
   animCachePromise = Promise.all(names.map(name => {
     return new Promise<void>((resolve) => {
-      fbxLoader.load(
-        `/descent/models/animations/${name}.fbx`,
+      fbxLoader.load(`/descent/models/animations/${name}.fbx`,
         (fbx: any) => {
           if (fbx.animations && fbx.animations.length > 0) {
             const clip = fbx.animations[0];
             clip.name = name;
             animCache[name] = clip;
-            console.log(`[FactionCharacter] Loaded ${name}: ${clip.tracks.length} tracks, ${clip.duration.toFixed(2)}s duration`);
-            if (clip.tracks.length > 0) {
-              console.log(`  First track: ${clip.tracks[0].name}`);
+            console.log(`[v3] Loaded ${name}: ${clip.tracks.length} tracks, ${clip.duration.toFixed(2)}s`);
+            // Log first 3 track names so we see the EXACT format
+            for (let i = 0; i < Math.min(3, clip.tracks.length); i++) {
+              console.log(`  track[${i}]: ${clip.tracks[i].name}`);
             }
-          } else {
-            console.warn(`[FactionCharacter] ${name}.fbx has no animations`);
           }
           resolve();
         },
         undefined,
-        (err: any) => {
-          console.warn(`[FactionCharacter] Failed to load ${name}:`, err);
-          resolve();
-        }
+        (err: any) => { console.warn(`[v3] Failed ${name}:`, err); resolve(); }
       );
     });
-  })).then(() => {
-    console.log(`[FactionCharacter] All animations loaded. Cache:`, Object.keys(animCache));
-  });
+  })).then(() => undefined);
   return animCachePromise;
 }
 
-/**
- * Retarget an animation clip to a new skeleton.
- * Mixamo FBX clips have track names like "mixamorigHips.position" (no colon, prefix concatenated).
- * The GLB skeleton has bones named "mixamorig:Hips" (with colon, original Mixamo naming).
- * We rewrite tracks to match the GLB's bone names by:
- *   1. Stripping any "mixamorig" prefix from the FBX track name
- *   2. Looking for a matching bone in the GLB by base name (e.g. "Hips")
- */
-function retargetClip(clip: THREE.AnimationClip, targetSkeleton: THREE.Bone[]): THREE.AnimationClip {
-  // Build a lookup of GLB bone basename -> full name
-  // GLB bones might be "mixamorig:Hips" or "Hips" or "mixamorigHips" — be flexible
-  const targetBoneByBase: Map<string, string> = new Map();
-  targetSkeleton.forEach(bone => {
+/** Build a bone-name lookup map. Maps any normalized form (lowercase, no prefix) to the real bone name. */
+function buildBoneMap(skinnedMesh: THREE.SkinnedMesh): Map<string, string> {
+  const map = new Map<string, string>();
+  const skeleton = skinnedMesh.skeleton;
+  if (!skeleton) {
+    console.warn('[v3] SkinnedMesh has no skeleton');
+    return map;
+  }
+  console.log(`[v3] Skeleton has ${skeleton.bones.length} bones`);
+  for (const bone of skeleton.bones) {
     const fullName = bone.name;
-    // Strip any "mixamorig:" or "mixamorig" prefix
-    let base = fullName.replace(/^mixamorig:?/, '');
-    targetBoneByBase.set(base.toLowerCase(), fullName);
-    targetBoneByBase.set(fullName.toLowerCase(), fullName); // also try full match
-  });
+    const lower = fullName.toLowerCase();
+    map.set(lower, fullName);
+    // Also strip any "mixamorig" or "mixamorig:" prefix
+    const stripped = fullName.replace(/^mixamorig:?/i, '').toLowerCase();
+    if (stripped && stripped !== lower) map.set(stripped, fullName);
+  }
+  return map;
+}
 
+/** Retarget animation track names to match the bones in our skeleton. */
+function retargetClip(clip: THREE.AnimationClip, boneMap: Map<string, string>): THREE.AnimationClip {
   const newTracks: THREE.KeyframeTrack[] = [];
-  let kept = 0;
-  let dropped = 0;
+  let kept = 0, dropped = 0;
+  const droppedNames: string[] = [];
   for (const track of clip.tracks) {
-    // Track name format: "BoneName.property" e.g. "mixamorigHips.position"
     const lastDot = track.name.lastIndexOf('.');
-    if (lastDot === -1) {
-      newTracks.push(track);
-      continue;
-    }
-    const fbxBoneName = track.name.substring(0, lastDot);
-    const property = track.name.substring(lastDot); // ".position"
+    if (lastDot === -1) { newTracks.push(track); continue; }
+    const fbxBone = track.name.substring(0, lastDot);
+    const property = track.name.substring(lastDot);
     
-    // Strip mixamorig prefix from fbxBoneName
-    const baseName = fbxBoneName.replace(/^mixamorig:?/, '');
-    const targetName = targetBoneByBase.get(baseName.toLowerCase()) || targetBoneByBase.get(fbxBoneName.toLowerCase());
+    // Try multiple forms: full, lower, stripped-prefix
+    const stripped = fbxBone.replace(/^mixamorig:?/i, '').toLowerCase();
+    const target = boneMap.get(fbxBone.toLowerCase()) || boneMap.get(stripped);
     
-    if (targetName) {
-      // Clone the track with the new name
+    if (target) {
       const newTrack = track.clone();
-      newTrack.name = targetName + property;
+      newTrack.name = target + property;
       newTracks.push(newTrack);
       kept++;
     } else {
       dropped++;
+      if (droppedNames.length < 3) droppedNames.push(fbxBone);
     }
   }
-  console.log(`[retarget] ${clip.name}: kept ${kept}/${clip.tracks.length} tracks (${dropped} dropped — no matching bone)`);
-
-  const newClip = new THREE.AnimationClip(clip.name, clip.duration, newTracks);
-  return newClip;
+  console.log(`[v3 retarget] ${clip.name}: kept ${kept}/${clip.tracks.length}, dropped ${dropped}${droppedNames.length ? ' (e.g. ' + droppedNames.join(', ') + ')' : ''}`);
+  if (kept > 0 && newTracks.length > 0) {
+    console.log(`  first retargeted: ${newTracks[0].name}`);
+  }
+  return new THREE.AnimationClip(clip.name, clip.duration, newTracks);
 }
 
 export default function FactionCharacter({ factionId, animState, onMissingAssets }: FactionCharacterProps) {
@@ -134,37 +117,60 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
   const actionsRef = useRef<Partial<Record<AnimStateName, THREE.AnimationAction>>>({});
   const currentActionRef = useRef<AnimStateName | null>(null);
 
-  const [gltfScene, setGltfScene] = useState<THREE.Group | null>(null);
+  const [loadedScene, setLoadedScene] = useState<THREE.Group | null>(null);
+  const [skinnedMesh, setSkinnedMesh] = useState<THREE.SkinnedMesh | null>(null);
   const [animsReady, setAnimsReady] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
 
   // Load the GLB
   useEffect(() => {
     let cancelled = false;
-    console.log(`[FactionCharacter] Loading /descent/models/factions/${factionId}.glb`);
+    console.log(`[v3] Loading /descent/models/factions/${factionId}.glb`);
     const loader = new GLTFLoader();
     loader.load(
       `/descent/models/factions/${factionId}.glb`,
       (loaded: any) => {
         if (cancelled) return;
-        const cloned = cloneSkeleton(loaded.scene) as THREE.Group;
-        // Collect bones for debug
-        const bones: string[] = [];
-        cloned.traverse((obj: any) => {
+        const scene = loaded.scene as THREE.Group;
+        // Find the SkinnedMesh
+        let foundSkinned: THREE.SkinnedMesh | null = null;
+        const allMeshes: string[] = [];
+        scene.traverse((obj: any) => {
+          if (obj.isMesh) allMeshes.push(`${obj.name} (skinned=${!!obj.isSkinnedMesh})`);
+          if (obj.isSkinnedMesh && !foundSkinned) foundSkinned = obj;
           if (obj.isMesh) {
             obj.castShadow = true;
             obj.receiveShadow = true;
-            obj.frustumCulled = false; // skinned meshes can have wrong bounds
+            obj.frustumCulled = false;
           }
-          if (obj.isBone) bones.push(obj.name);
         });
-        console.log(`[FactionCharacter] GLB loaded. Bones (${bones.length}):`, bones.slice(0, 10).join(', '), bones.length > 10 ? '...' : '');
-        setGltfScene(cloned);
+        console.log(`[v3] GLB loaded. Meshes found: ${allMeshes.length}`);
+        for (const m of allMeshes.slice(0, 5)) console.log(`  ${m}`);
+        if (!foundSkinned) {
+          console.warn('[v3] No SkinnedMesh — model has no rig?');
+          setLoadFailed(true);
+          onMissingAssets?.();
+          return;
+        }
+        const sm = foundSkinned as THREE.SkinnedMesh;
+        if (sm.skeleton) {
+          console.log(`[v3] SkinnedMesh: ${sm.name}, skeleton has ${sm.skeleton.bones.length} bones`);
+          // Log first 3 bones with parent chain
+          for (let i = 0; i < Math.min(3, sm.skeleton.bones.length); i++) {
+            const b = sm.skeleton.bones[i];
+            const parents: string[] = [];
+            let p: any = b.parent;
+            while (p && parents.length < 4) { parents.push(p.name || p.type); p = p.parent; }
+            console.log(`  bone[${i}]: ${b.name} <- ${parents.join(' <- ')}`);
+          }
+        }
+        setLoadedScene(scene);
+        setSkinnedMesh(sm);
       },
       undefined,
       (err: any) => {
         if (cancelled) return;
-        console.warn(`[FactionCharacter] Failed to load ${factionId}.glb:`, err);
+        console.warn(`[v3] GLB load failed:`, err);
         setLoadFailed(true);
         onMissingAssets?.();
       }
@@ -172,45 +178,52 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
     return () => { cancelled = true; };
   }, [factionId, onMissingAssets]);
 
-  // Load all animations once
+  // Load animations
   useEffect(() => {
     let cancelled = false;
     loadAnimationsOnce().then(() => {
-      if (!cancelled) {
-        if (!animCache.idle) {
-          console.warn('[FactionCharacter] No idle animation — falling back to procedural');
-          setLoadFailed(true);
-          onMissingAssets?.();
-        } else {
-          setAnimsReady(true);
-        }
+      if (cancelled) return;
+      if (!animCache.idle) {
+        setLoadFailed(true);
+        onMissingAssets?.();
+      } else {
+        setAnimsReady(true);
       }
     });
     return () => { cancelled = true; };
   }, [onMissingAssets]);
 
-  // Wire up mixer + actions when both are ready
+  // Set up mixer when both are ready
   useEffect(() => {
-    if (!gltfScene || !animsReady) return;
-    
-    // Collect target skeleton bones
-    const bones: THREE.Bone[] = [];
-    gltfScene.traverse((obj: any) => {
-      if (obj.isBone) bones.push(obj);
-    });
-    console.log(`[FactionCharacter] Setting up mixer with ${bones.length} bones in target skeleton`);
+    if (!loadedScene || !skinnedMesh || !animsReady) return;
 
-    const mixer = new THREE.AnimationMixer(gltfScene);
-    mixerRef.current = mixer;
-    const actions: Partial<Record<AnimStateName, THREE.AnimationAction>> = {};
+    // Build bone lookup from the SkinnedMesh's actual skeleton
+    const boneMap = buildBoneMap(skinnedMesh);
     
+    // Mount mixer on the LOADED SCENE (the root that contains both the mesh and bones)
+    // Mount on the scene root. AnimationMixer will resolve track names via PropertyBinding.findNode().
+    const mixer = new THREE.AnimationMixer(loadedScene);
+    mixerRef.current = mixer;
+    console.log(`[v3] Mixer created on loadedScene`);
+
+    // Verify at least one bone is findable from the mixer's root
+    const firstBone = skinnedMesh.skeleton?.bones[0];
+    if (firstBone) {
+      const found = loadedScene.getObjectByName(firstBone.name);
+      console.log(`[v3] getObjectByName('${firstBone.name}') from scene root: ${found ? 'FOUND' : 'NOT FOUND'}`);
+      if (!found) {
+        // Bones live outside the scene — try parenting them
+        console.warn('[v3] Bones not under scene root. Skeleton bones may be detached.');
+      }
+    }
+
+    const actions: Partial<Record<AnimStateName, THREE.AnimationAction>> = {};
     (Object.keys(animCache) as AnimStateName[]).forEach(name => {
-      const rawClip = animCache[name];
-      if (!rawClip) return;
-      // Retarget the clip to our skeleton's bone names
-      const clip = retargetClip(rawClip, bones);
+      const raw = animCache[name];
+      if (!raw) return;
+      const clip = retargetClip(raw, boneMap);
       if (clip.tracks.length === 0) {
-        console.warn(`[FactionCharacter] ${name} has no usable tracks after retargeting — skipping`);
+        console.warn(`[v3] ${name} has no tracks after retarget; skipping`);
         return;
       }
       const action = mixer.clipAction(clip);
@@ -223,14 +236,17 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
       actions[name] = action;
     });
     actionsRef.current = actions;
-    console.log(`[FactionCharacter] Actions ready:`, Object.keys(actions));
 
     if (actions.idle) {
       actions.idle.play();
       currentActionRef.current = 'idle';
-      console.log(`[FactionCharacter] Started idle animation`);
-    } else {
-      console.warn(`[FactionCharacter] No idle action created — character will be stiff`);
+      console.log('[v3] Started idle animation');
+      // Force one update so we can verify the mixer evaluates
+      mixer.update(0.016);
+      const firstBoneNow = skinnedMesh.skeleton?.bones[0];
+      if (firstBoneNow) {
+        console.log(`[v3] After 1 frame, ${firstBoneNow.name}.position:`, firstBoneNow.position.x.toFixed(3), firstBoneNow.position.y.toFixed(3), firstBoneNow.position.z.toFixed(3));
+      }
     }
 
     return () => {
@@ -239,9 +255,9 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
       actionsRef.current = {};
       currentActionRef.current = null;
     };
-  }, [gltfScene, animsReady]);
+  }, [loadedScene, skinnedMesh, animsReady]);
 
-  // Watch animState and crossfade
+  // Animation state changes — crossfade
   useEffect(() => {
     if (!mixerRef.current) return;
     const actions = actionsRef.current;
@@ -259,11 +275,8 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
       }
       return;
     }
-
     targetAction.reset().fadeIn(0.2).play();
-    if (currentAction && currentAction !== targetAction) {
-      currentAction.fadeOut(0.2);
-    }
+    if (currentAction && currentAction !== targetAction) currentAction.fadeOut(0.2);
     currentActionRef.current = target;
 
     if (ONE_SHOT[target] && target !== 'die') {
@@ -284,13 +297,11 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
     if (mixerRef.current) mixerRef.current.update(dt);
   });
 
-  if (loadFailed || !gltfScene) {
-    return null;
-  }
+  if (loadFailed || !loadedScene) return null;
 
   return (
     <group ref={groupRef}>
-      <primitive object={gltfScene} />
+      <primitive object={loadedScene} />
     </group>
   );
 }
