@@ -143,6 +143,7 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
   const currentActionRef = useRef<AnimStateName | null>(null);
 
   const [loadedScene, setLoadedScene] = useState<THREE.Group | null>(null);
+  const [loadedAnimations, setLoadedAnimations] = useState<THREE.AnimationClip[]>([]);
   const [skinnedMesh, setSkinnedMesh] = useState<THREE.SkinnedMesh | null>(null);
   const [animsReady, setAnimsReady] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -150,13 +151,21 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
   // Load the GLB
   useEffect(() => {
     let cancelled = false;
-    console.log(`[v3] Loading /descent/models/factions/${factionId}.glb`);
+    const modelPath = factionId === 'samurai'
+      ? '/descent/anim-test/test.glb'
+      : `/descent/models/factions/${factionId}.glb`;
+    console.log(`[v6 baked-test] Loading ${modelPath}`);
     const loader = new GLTFLoader();
     loader.load(
-      `/descent/models/factions/${factionId}.glb`,
+      modelPath,
       (loaded: any) => {
         if (cancelled) return;
         const scene = loaded.scene as THREE.Group;
+        const bakedAnimations = (loaded.animations || []) as THREE.AnimationClip[];
+        console.log(`[v6 baked-test] Baked animations found: ${bakedAnimations.length}`);
+        if (bakedAnimations[0]) {
+          console.log(`[v6 baked-test] First baked clip: ${bakedAnimations[0].name}, ${bakedAnimations[0].tracks.length} tracks, ${bakedAnimations[0].duration.toFixed(2)}s`);
+        }
         // Find the SkinnedMesh
         let foundSkinned: THREE.SkinnedMesh | null = null;
         const allMeshes: string[] = [];
@@ -189,6 +198,7 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
             console.log(`  bone[${i}]: ${b.name} <- ${parents.join(' <- ')}`);
           }
         }
+        setLoadedAnimations(bakedAnimations);
         setLoadedScene(scene);
         setSkinnedMesh(sm);
       },
@@ -208,12 +218,7 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
     let cancelled = false;
     loadAnimationsOnce().then(() => {
       if (cancelled) return;
-      if (!animCache.idle) {
-        setLoadFailed(true);
-        onMissingAssets?.();
-      } else {
-        setAnimsReady(true);
-      }
+      setAnimsReady(true);
     });
     return () => { cancelled = true; };
   }, [onMissingAssets]);
@@ -247,23 +252,39 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
     }
 
     const actions: Partial<Record<AnimStateName, THREE.AnimationAction>> = {};
-    (Object.keys(animCache) as AnimStateName[]).forEach(name => {
-      const raw = animCache[name];
-      if (!raw) return;
-      const clip = retargetClip(raw, boneMap);
-      if (clip.tracks.length === 0) {
-        console.warn(`[v5] ${name} has no tracks after retarget; skipping`);
-        return;
-      }
-      const action = mixer.clipAction(clip);
-      if (ONE_SHOT[name]) {
-        action.setLoop(THREE.LoopOnce, 1);
-        action.clampWhenFinished = true;
-      } else {
-        action.setLoop(THREE.LoopRepeat, Infinity);
-      }
-      actions[name] = action;
-    });
+
+    if (loadedAnimations.length > 0) {
+      const bakedClip = loadedAnimations[0];
+      console.log(`[v6 baked-test] Using baked GLB clip for all states: ${bakedClip.name}`);
+      (['idle', 'walk', 'run', 'attack', 'hurt', 'die'] as AnimStateName[]).forEach(name => {
+        const action = mixer.clipAction(bakedClip);
+        if (ONE_SHOT[name]) {
+          action.setLoop(THREE.LoopOnce, 1);
+          action.clampWhenFinished = true;
+        } else {
+          action.setLoop(THREE.LoopRepeat, Infinity);
+        }
+        actions[name] = action;
+      });
+    } else {
+      (Object.keys(animCache) as AnimStateName[]).forEach(name => {
+        const raw = animCache[name];
+        if (!raw) return;
+        const clip = retargetClip(raw, boneMap);
+        if (clip.tracks.length === 0) {
+          console.warn(`[v5] ${name} has no tracks after retarget; skipping`);
+          return;
+        }
+        const action = mixer.clipAction(clip);
+        if (ONE_SHOT[name]) {
+          action.setLoop(THREE.LoopOnce, 1);
+          action.clampWhenFinished = true;
+        } else {
+          action.setLoop(THREE.LoopRepeat, Infinity);
+        }
+        actions[name] = action;
+      });
+    }
     actionsRef.current = actions;
 
     if (actions.idle) {
@@ -295,7 +316,7 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
       actionsRef.current = {};
       currentActionRef.current = null;
     };
-  }, [loadedScene, skinnedMesh, animsReady]);
+  }, [loadedScene, skinnedMesh, animsReady, loadedAnimations]);
 
   // Animation state changes — crossfade
   useEffect(() => {
@@ -320,7 +341,7 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
     currentActionRef.current = target;
 
     if (ONE_SHOT[target] && target !== 'die') {
-      const clip = animCache[target];
+      const clip = loadedAnimations[0] || animCache[target];
       const duration = clip ? clip.duration * 1000 : 800;
       const handle = setTimeout(() => {
         if (currentActionRef.current === target && actions.idle) {
@@ -331,7 +352,7 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
       }, duration);
       return () => clearTimeout(handle);
     }
-  }, [animState]);
+  }, [animState, loadedAnimations]);
 
   useFrame((_, dt) => {
     if (mixerRef.current) mixerRef.current.update(dt);
