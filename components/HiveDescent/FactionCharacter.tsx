@@ -1,6 +1,6 @@
 // components/HiveDescent/FactionCharacter.tsx
 // Hive Descent rigged faction character.
-// Current test: load the new Mixamo-rigged samurai.glb model with no animation mixer.
+// Current test: load, auto-center, ground, and auto-scale the new samurai.glb with no animation mixer.
 
 import { useEffect, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -15,12 +15,12 @@ interface FactionCharacterProps {
   onMissingAssets?: () => void;
 }
 
-const GROUND_OFFSET = 0;
-const RENDER_SCALE = 100;
+const TARGET_HEIGHT = 2.2;
 
 export default function FactionCharacter({ factionId, onMissingAssets }: FactionCharacterProps) {
   const groupRef = useRef<THREE.Group>(null);
   const [loadedScene, setLoadedScene] = useState<THREE.Group | null>(null);
+  const [renderScale, setRenderScale] = useState(1);
   const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
@@ -28,7 +28,7 @@ export default function FactionCharacter({ factionId, onMissingAssets }: Faction
     const loader = new GLTFLoader();
     const modelPath = `/descent/models/factions/${factionId}.glb`;
 
-    console.log(`[HiveDescent GLB model test] Loading ${modelPath}`);
+    console.log(`[HiveDescent GLB auto-fit test] Loading ${modelPath}`);
 
     loader.load(
       modelPath,
@@ -36,31 +36,50 @@ export default function FactionCharacter({ factionId, onMissingAssets }: Faction
         if (cancelled) return;
 
         const scene = loaded.scene as THREE.Group;
+        let meshCount = 0;
         let foundSkinned = false;
 
         scene.traverse((obj: any) => {
           if (obj.isSkinnedMesh) foundSkinned = true;
           if (obj.isMesh) {
+            meshCount++;
             obj.castShadow = true;
             obj.receiveShadow = true;
             obj.frustumCulled = false;
           }
         });
 
-        console.log(`[HiveDescent GLB model test] Skinned mesh found: ${foundSkinned}`);
+        const box = new THREE.Box3().setFromObject(scene);
+        const size = new THREE.Vector3();
+        const center = new THREE.Vector3();
+        box.getSize(size);
+        box.getCenter(center);
 
-        if (!foundSkinned) {
+        console.log('[HiveDescent GLB auto-fit test] meshCount:', meshCount);
+        console.log('[HiveDescent GLB auto-fit test] skinnedMesh:', foundSkinned);
+        console.log('[HiveDescent GLB auto-fit test] box size:', size.toArray());
+        console.log('[HiveDescent GLB auto-fit test] box center:', center.toArray());
+
+        if (meshCount === 0 || !Number.isFinite(size.y) || size.y <= 0) {
+          console.warn('[HiveDescent GLB auto-fit test] Model loaded but no usable mesh bounds found');
           setLoadFailed(true);
           onMissingAssets?.();
           return;
         }
 
+        // Move the model so it is centered on X/Z and its lowest point sits on y=0.
+        scene.position.set(-center.x, -box.min.y, -center.z);
+
+        const nextScale = TARGET_HEIGHT / size.y;
+        console.log('[HiveDescent GLB auto-fit test] auto scale:', nextScale);
+
+        setRenderScale(nextScale);
         setLoadedScene(scene);
       },
       undefined,
       (err: any) => {
         if (cancelled) return;
-        console.warn('[HiveDescent GLB model test] GLB load failed:', err);
+        console.warn('[HiveDescent GLB auto-fit test] GLB load failed:', err);
         setLoadFailed(true);
         onMissingAssets?.();
       }
@@ -78,9 +97,9 @@ export default function FactionCharacter({ factionId, onMissingAssets }: Faction
   return (
     <group ref={groupRef}>
       <group
-        position={[0, GROUND_OFFSET, 0]}
+        position={[0, 0, 0]}
         rotation={[0, 0, 0]}
-        scale={RENDER_SCALE}
+        scale={renderScale}
       >
         <primitive object={loadedScene} />
       </group>
