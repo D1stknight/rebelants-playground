@@ -16,7 +16,7 @@ interface FactionCharacterProps {
 }
 
 const GROUND_OFFSET = 0;
-const RENDER_SCALE = 1;
+const RENDER_SCALE = 100;
 
 export default function FactionCharacter({ factionId, onMissingAssets }: FactionCharacterProps) {
   const groupRef = useRef<THREE.Group>(null);
