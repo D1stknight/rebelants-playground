@@ -277,6 +277,9 @@ const Scene: React.FC<SceneProps> = ({
   const allClearFiredRef = useRef(false);
   const cameraTargetRef = useRef(new THREE.Vector3(0, 1, 0));
   const cameraLerpRef = useRef(new THREE.Vector3(0, 6, -7));
+  // Phase C: attack lunge animation + camera shake
+  const playerAnimRef = useRef({ attackingUntil: 0, lungeOffset: 0 });
+  const cameraShakeRef = useRef({ amplitude: 0, decayUntil: 0 });
 
   // Set initial camera
   useEffect(() => {
@@ -292,23 +295,32 @@ const Scene: React.FC<SceneProps> = ({
     const input = inputRef.current;
     if (!player.alive) return;
 
-    // ---------- Player movement ----------
+    // ---------- Player movement (Phase C: camera-relative) ----------
     let mx = 0, mz = 0;
     if (input.up) mz += 1;
     if (input.down) mz -= 1;
     if (input.left) mx -= 1;
     if (input.right) mx += 1;
-    const len = Math.hypot(mx, mz);
-    if (len > 0.001) {
-      mx /= len; mz /= len;
-      // Move in world space (camera is behind player, so 'up' = +z)
+    const inLen = Math.hypot(mx, mz);
+    if (inLen > 0.001) {
+      mx /= inLen; mz /= inLen;
+      // Camera-relative basis: forward = camera XZ direction toward target
+      const cf = new THREE.Vector3();
+      camera.getWorldDirection(cf);
+      cf.y = 0; cf.normalize();
+      // Right = world up cross forward
+      const cr = new THREE.Vector3(cf.z, 0, -cf.x); // perpendicular on XZ
+      // Build world-space velocity: "up" = forward, "right" = strafe right
+      const wx = cf.x * mz + cr.x * mx;
+      const wz = cf.z * mz + cr.z * mx;
+      const wlen = Math.hypot(wx, wz) || 1;
       const speed = BASE_MOVE_SPEED;
-      player.pos.x += mx * speed * dt;
-      player.pos.z += mz * speed * dt;
-      // Face movement direction
-      const targetFacing = Math.atan2(mx, mz);
+      player.pos.x += (wx / wlen) * speed * dt;
+      player.pos.z += (wz / wlen) * speed * dt;
+      // Face the world-space movement direction
+      const targetFacing = Math.atan2(wx, wz);
       const da = ((targetFacing - player.facing + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
-      player.facing += da * Math.min(1, dt * 12);
+      player.facing += da * Math.min(1, dt * 14);
     }
     // Clamp to arena
     const distFromCenter = Math.hypot(player.pos.x, player.pos.z);
@@ -317,15 +329,14 @@ const Scene: React.FC<SceneProps> = ({
       const k = ARENA_R / distFromCenter;
       player.pos.x *= k; player.pos.z *= k;
     }
-
-    // ---------- Player attack pulse ----------
-    const attackCooldown = 1000 / BASE_ATTACK_SPEED;
+    // ---------- Player attack / special / dodge (Phase C: snappier) ----------
+    const attackCooldownMs = 260; // was 625ms — much snappier
     if (input.attackPulse > 0) {
       input.attackPulse = 0;
-      if (now - player.lastAttackAt >= attackCooldown) {
+      if (now - player.lastAttackAt >= attackCooldownMs) {
         player.lastAttackAt = now;
-        // Hit any enemy in front of the player within range
-        const range = 2.0;
+        playerAnimRef.current.attackingUntil = now + 180; // lunge animation duration
+        const range = 2.4; // was 2.0 — more forgiving
         const facing = player.facing;
         const fx = Math.sin(facing), fz = Math.cos(facing);
         for (const e of enemies) {
@@ -334,11 +345,14 @@ const Scene: React.FC<SceneProps> = ({
           const dz = e.pos.z - player.pos.z;
           const dist = Math.hypot(dx, dz);
           if (dist > range) continue;
-          // Only hit if within ~120deg cone in front
           const dot = (dx * fx + dz * fz) / (dist || 1);
-          if (dot < -0.3) continue;
+          if (dot < -0.2) continue; // ~155deg cone
           e.hp -= BASE_ATTACK_DAMAGE;
-          e.hitFlashUntil = now + 120;
+          e.hitFlashUntil = now + 160;
+          // Knockback: push enemy 0.7m away
+          const ndx = dx / (dist || 1), ndz = dz / (dist || 1);
+          e.pos.x += ndx * 0.7;
+          e.pos.z += ndz * 0.7;
           if (e.hp <= 0) {
             e.alive = false;
             e.state = "dead";
@@ -365,7 +379,6 @@ const Scene: React.FC<SceneProps> = ({
         player.pos.z += Math.cos(player.facing) * 1.5;
       }
     }
-
     // ---------- Enemy AI ----------
     let aliveCount = 0;
     for (const e of enemies) {
@@ -397,6 +410,8 @@ const Scene: React.FC<SceneProps> = ({
         if (now - e.lastAttackAt >= arch.attackCooldownMs) {
           e.lastAttackAt = now;
           if (now > player.iframesUntil) {
+            cameraShakeRef.current.amplitude = 0.4;
+            cameraShakeRef.current.decayUntil = now + 220;
             player.hp -= arch.damage;
             if (player.hp <= 0) {
               player.hp = 0;
@@ -417,15 +432,18 @@ const Scene: React.FC<SceneProps> = ({
       }
     }
 
-    // ---------- Player mesh transform ----------
+    // ---------- Player mesh transform (Phase C: with attack lunge) ----------
     const pg = playerGroupRef.current;
     if (pg) {
-      pg.position.set(player.pos.x, player.pos.y, player.pos.z);
+      // Lunge: when attacking, push the visual mesh forward briefly
+      const lungeT = Math.max(0, (playerAnimRef.current.attackingUntil - now) / 180);
+      const lunge = lungeT > 0 ? Math.sin(lungeT * Math.PI) * 0.4 : 0;
+      const lx = Math.sin(player.facing) * lunge;
+      const lz = Math.cos(player.facing) * lunge;
+      pg.position.set(player.pos.x + lx, player.pos.y, player.pos.z + lz);
       pg.rotation.y = player.facing;
     }
-
-    // ---------- Camera (third-person behind shoulder) ----------
-    // Target: above and behind the player along negative facing direction
+    // ---------- Camera (third-person behind shoulder, with shake) ----------
     const camDist = 5.5;
     const camHeight = 4.2;
     const desiredX = player.pos.x - Math.sin(player.facing) * camDist;
@@ -434,10 +452,17 @@ const Scene: React.FC<SceneProps> = ({
     cameraLerpRef.current.x += (desiredX - cameraLerpRef.current.x) * Math.min(1, dt * 5);
     cameraLerpRef.current.y += (desiredY - cameraLerpRef.current.y) * Math.min(1, dt * 5);
     cameraLerpRef.current.z += (desiredZ - cameraLerpRef.current.z) * Math.min(1, dt * 5);
-    camera.position.copy(cameraLerpRef.current);
+    // Shake: random offset that decays
+    let shakeX = 0, shakeY = 0;
+    if (now < cameraShakeRef.current.decayUntil && cameraShakeRef.current.amplitude > 0) {
+      const tLeft = (cameraShakeRef.current.decayUntil - now) / 220;
+      const a = cameraShakeRef.current.amplitude * tLeft;
+      shakeX = (Math.random() - 0.5) * a;
+      shakeY = (Math.random() - 0.5) * a;
+    }
+    camera.position.set(cameraLerpRef.current.x + shakeX, cameraLerpRef.current.y + shakeY, cameraLerpRef.current.z);
     cameraTargetRef.current.set(player.pos.x, player.pos.y + 1.2, player.pos.z);
     camera.lookAt(cameraTargetRef.current);
-
     // ---------- HUD bridge (throttle to ~10Hz) ----------
     if (now - lastHudPushRef.current > 100) {
       lastHudPushRef.current = now;
