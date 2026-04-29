@@ -40,7 +40,7 @@ const GROUND_OFFSET = 0.95;
 // Scaling the rendered group up multiplies all bone-driven offsets, making
 // limb motion clearly visible. Tune RENDER_SCALE to taste; if it makes the
 // character too big vs the world, reduce it (or rebuild GLB at native scale).
-const RENDER_SCALE = 0.35;
+const RENDER_SCALE = 1.25;
 
 const animCache: Partial<Record<AnimStateName, THREE.AnimationClip>> = {};
 let animCachePromise: Promise<void> | null = null;
@@ -341,7 +341,11 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
 
   return (
     <group ref={groupRef}>
-      <group position={[0, GROUND_OFFSET, 0]} scale={RENDER_SCALE}>
+      <group
+        position={[0, GROUND_OFFSET, 0]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        scale={RENDER_SCALE}
+      >
         <primitive object={loadedScene} />
       </group>
     </group>
