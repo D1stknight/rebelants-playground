@@ -1,6 +1,7 @@
 // components/HiveDescent/FactionCharacter.tsx
 // Hive Descent rigged faction character.
 // Restored to stable visual setup: Samurai model, correct scale, rotation, and ground height.
+// Restore marker: stable visual-only character loader, no animation mixer active.
 
 import { useEffect, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
