@@ -1,6 +1,6 @@
 // components/HiveDescent/FactionCharacter.tsx
 // Hive Descent rigged faction character.
-// Current test: load, auto-center, ground, and auto-scale the new samurai.glb with no animation mixer.
+// Current test: show a temporary debug marker while testing the new samurai.glb load.
 
 import { useEffect, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -17,7 +17,7 @@ interface FactionCharacterProps {
 
 const TARGET_HEIGHT = 2.2;
 
-export default function FactionCharacter({ factionId, onMissingAssets }: FactionCharacterProps) {
+export default function FactionCharacter({ factionId }: FactionCharacterProps) {
   const groupRef = useRef<THREE.Group>(null);
   const [loadedScene, setLoadedScene] = useState<THREE.Group | null>(null);
   const [renderScale, setRenderScale] = useState(1);
@@ -28,7 +28,7 @@ export default function FactionCharacter({ factionId, onMissingAssets }: Faction
     const loader = new GLTFLoader();
     const modelPath = `/descent/models/factions/${factionId}.glb`;
 
-    console.log(`[HiveDescent GLB auto-fit test] Loading ${modelPath}`);
+    console.log(`[HiveDescent GLB debug marker test] Loading ${modelPath}`);
 
     loader.load(
       modelPath,
@@ -55,23 +55,21 @@ export default function FactionCharacter({ factionId, onMissingAssets }: Faction
         box.getSize(size);
         box.getCenter(center);
 
-        console.log('[HiveDescent GLB auto-fit test] meshCount:', meshCount);
-        console.log('[HiveDescent GLB auto-fit test] skinnedMesh:', foundSkinned);
-        console.log('[HiveDescent GLB auto-fit test] box size:', size.toArray());
-        console.log('[HiveDescent GLB auto-fit test] box center:', center.toArray());
+        console.log('[HiveDescent GLB debug marker test] meshCount:', meshCount);
+        console.log('[HiveDescent GLB debug marker test] skinnedMesh:', foundSkinned);
+        console.log('[HiveDescent GLB debug marker test] box size:', size.toArray());
+        console.log('[HiveDescent GLB debug marker test] box center:', center.toArray());
 
         if (meshCount === 0 || !Number.isFinite(size.y) || size.y <= 0) {
-          console.warn('[HiveDescent GLB auto-fit test] Model loaded but no usable mesh bounds found');
+          console.warn('[HiveDescent GLB debug marker test] Model loaded but no usable mesh bounds found');
           setLoadFailed(true);
-          onMissingAssets?.();
           return;
         }
 
-        // Move the model so it is centered on X/Z and its lowest point sits on y=0.
         scene.position.set(-center.x, -box.min.y, -center.z);
 
         const nextScale = TARGET_HEIGHT / size.y;
-        console.log('[HiveDescent GLB auto-fit test] auto scale:', nextScale);
+        console.log('[HiveDescent GLB debug marker test] auto scale:', nextScale);
 
         setRenderScale(nextScale);
         setLoadedScene(scene);
@@ -79,30 +77,41 @@ export default function FactionCharacter({ factionId, onMissingAssets }: Faction
       undefined,
       (err: any) => {
         if (cancelled) return;
-        console.warn('[HiveDescent GLB auto-fit test] GLB load failed:', err);
+        console.warn('[HiveDescent GLB debug marker test] GLB load failed:', err);
         setLoadFailed(true);
-        onMissingAssets?.();
       }
     );
 
     return () => {
       cancelled = true;
     };
-  }, [factionId, onMissingAssets]);
+  }, [factionId]);
 
   useFrame(() => undefined);
 
-  if (loadFailed || !loadedScene) return null;
-
   return (
     <group ref={groupRef}>
-      <group
-        position={[0, 0, 0]}
-        rotation={[0, 0, 0]}
-        scale={renderScale}
-      >
-        <primitive object={loadedScene} />
-      </group>
+      <mesh position={[0, 1.1, 0]}>
+        <boxGeometry args={[0.5, 2.2, 0.5]} />
+        <meshBasicMaterial color="#00ff00" wireframe />
+      </mesh>
+
+      {loadFailed && (
+        <mesh position={[0, 2.5, 0]}>
+          <sphereGeometry args={[0.35, 16, 16]} />
+          <meshBasicMaterial color="#ff0000" />
+        </mesh>
+      )}
+
+      {loadedScene && (
+        <group
+          position={[0, 0, 0]}
+          rotation={[0, 0, 0]}
+          scale={renderScale}
+        >
+          <primitive object={loadedScene} />
+        </group>
+      )}
     </group>
   );
 }
