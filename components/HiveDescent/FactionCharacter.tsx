@@ -1,23 +1,18 @@
 // components/HiveDescent/FactionCharacter.tsx
-// Phase D: load a rigged GLB character and apply Mixamo animations from FBX files.
+// Phase D v2: load a rigged GLB character + retarget Mixamo FBX animations.
 //
-// Usage:
-//   <FactionCharacter
-//     factionId="samurai"
-//     animState="walk"         // 'idle' | 'walk' | 'run' | 'attack' | 'hurt' | 'die'
-//     onMissingAssets={() => /* fallback to procedural */}
-//   />
+// Key fix in v2: when an FBX animation is loaded, three.js treats its track names as
+// the bone names from the FBX file's internal skeleton (e.g. "mixamorig:LeftArm.position").
+// If the GLB skeleton uses different bone names or hierarchy, the AnimationMixer can't
+// find matching nodes and silently does nothing. The fix is to:
+//   1. Find the GLB's actual skeleton bones
+//   2. Walk each animation track and rewrite the prefix to match a real bone
+//   3. Drop tracks that have no matching bone in the GLB
 //
-// Behavior:
-// - Loads /descent/models/factions/${factionId}.glb on mount
-// - Loads /descent/models/animations/{idle,walk,run,attack,hurt,die}.fbx ONCE (shared across all factions)
-// - Retargets animations onto the loaded skeleton at runtime
-// - Crossfades between animations smoothly (200ms)
-// - One-shot animations (attack/hurt) auto-return to idle when finished
-// - Falls back gracefully if any asset fails to load
+// Also adds console logging so we can verify what's happening.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useFrame, useLoader } from '@react-three/fiber';
+import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
@@ -31,17 +26,16 @@ interface FactionCharacterProps {
   onMissingAssets?: () => void;
 }
 
-// One-shot animations (don't loop, return to idle when done)
 const ONE_SHOT: Record<AnimStateName, boolean> = {
   idle: false,
   walk: false,
   run: false,
   attack: true,
   hurt: true,
-  die: true, // die holds final pose
+  die: true,
 };
 
-// Module-level cache so animations are loaded only once globally (shared across factions)
+// Module-level cache: animations are loaded once globally
 const animCache: Partial<Record<AnimStateName, THREE.AnimationClip>> = {};
 let animCachePromise: Promise<void> | null = null;
 
@@ -49,27 +43,89 @@ function loadAnimationsOnce(): Promise<void> {
   if (animCachePromise) return animCachePromise;
   const fbxLoader = new FBXLoader();
   const names: AnimStateName[] = ['idle', 'walk', 'run', 'attack', 'hurt', 'die'];
+  console.log('[FactionCharacter] Loading 6 animations from /descent/models/animations/');
   animCachePromise = Promise.all(names.map(name => {
     return new Promise<void>((resolve) => {
       fbxLoader.load(
         `/descent/models/animations/${name}.fbx`,
-        (fbx) => {
+        (fbx: any) => {
           if (fbx.animations && fbx.animations.length > 0) {
             const clip = fbx.animations[0];
             clip.name = name;
             animCache[name] = clip;
+            console.log(`[FactionCharacter] Loaded ${name}: ${clip.tracks.length} tracks, ${clip.duration.toFixed(2)}s duration`);
+            if (clip.tracks.length > 0) {
+              console.log(`  First track: ${clip.tracks[0].name}`);
+            }
+          } else {
+            console.warn(`[FactionCharacter] ${name}.fbx has no animations`);
           }
           resolve();
         },
         undefined,
-        (err) => {
-          console.warn(`[FactionCharacter] Failed to load animation ${name}:`, err);
-          resolve(); // resolve even on failure — fallback handles it
+        (err: any) => {
+          console.warn(`[FactionCharacter] Failed to load ${name}:`, err);
+          resolve();
         }
       );
     });
-  })).then(() => undefined);
+  })).then(() => {
+    console.log(`[FactionCharacter] All animations loaded. Cache:`, Object.keys(animCache));
+  });
   return animCachePromise;
+}
+
+/**
+ * Retarget an animation clip to a new skeleton.
+ * Mixamo FBX clips have track names like "mixamorigHips.position" (no colon, prefix concatenated).
+ * The GLB skeleton has bones named "mixamorig:Hips" (with colon, original Mixamo naming).
+ * We rewrite tracks to match the GLB's bone names by:
+ *   1. Stripping any "mixamorig" prefix from the FBX track name
+ *   2. Looking for a matching bone in the GLB by base name (e.g. "Hips")
+ */
+function retargetClip(clip: THREE.AnimationClip, targetSkeleton: THREE.Bone[]): THREE.AnimationClip {
+  // Build a lookup of GLB bone basename -> full name
+  // GLB bones might be "mixamorig:Hips" or "Hips" or "mixamorigHips" — be flexible
+  const targetBoneByBase: Map<string, string> = new Map();
+  targetSkeleton.forEach(bone => {
+    const fullName = bone.name;
+    // Strip any "mixamorig:" or "mixamorig" prefix
+    let base = fullName.replace(/^mixamorig:?/, '');
+    targetBoneByBase.set(base.toLowerCase(), fullName);
+    targetBoneByBase.set(fullName.toLowerCase(), fullName); // also try full match
+  });
+
+  const newTracks: THREE.KeyframeTrack[] = [];
+  let kept = 0;
+  let dropped = 0;
+  for (const track of clip.tracks) {
+    // Track name format: "BoneName.property" e.g. "mixamorigHips.position"
+    const lastDot = track.name.lastIndexOf('.');
+    if (lastDot === -1) {
+      newTracks.push(track);
+      continue;
+    }
+    const fbxBoneName = track.name.substring(0, lastDot);
+    const property = track.name.substring(lastDot); // ".position"
+    
+    // Strip mixamorig prefix from fbxBoneName
+    const baseName = fbxBoneName.replace(/^mixamorig:?/, '');
+    const targetName = targetBoneByBase.get(baseName.toLowerCase()) || targetBoneByBase.get(fbxBoneName.toLowerCase());
+    
+    if (targetName) {
+      // Clone the track with the new name
+      const newTrack = track.clone();
+      newTrack.name = targetName + property;
+      newTracks.push(newTrack);
+      kept++;
+    } else {
+      dropped++;
+    }
+  }
+  console.log(`[retarget] ${clip.name}: kept ${kept}/${clip.tracks.length} tracks (${dropped} dropped — no matching bone)`);
+
+  const newClip = new THREE.AnimationClip(clip.name, clip.duration, newTracks);
+  return newClip;
 }
 
 export default function FactionCharacter({ factionId, animState, onMissingAssets }: FactionCharacterProps) {
@@ -77,33 +133,36 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
   const mixerRef = useRef<THREE.AnimationMixer | null>(null);
   const actionsRef = useRef<Partial<Record<AnimStateName, THREE.AnimationAction>>>({});
   const currentActionRef = useRef<AnimStateName | null>(null);
-  const lastStateRef = useRef<AnimStateName>(animState);
 
-  const [gltf, setGltf] = useState<{ scene: THREE.Group } | null>(null);
+  const [gltfScene, setGltfScene] = useState<THREE.Group | null>(null);
   const [animsReady, setAnimsReady] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
 
   // Load the GLB
   useEffect(() => {
     let cancelled = false;
+    console.log(`[FactionCharacter] Loading /descent/models/factions/${factionId}.glb`);
     const loader = new GLTFLoader();
     loader.load(
       `/descent/models/factions/${factionId}.glb`,
-      (loaded) => {
+      (loaded: any) => {
         if (cancelled) return;
-        // Clone the scene so each instance has its own skeleton (SkeletonUtils handles bone uniqueness)
         const cloned = cloneSkeleton(loaded.scene) as THREE.Group;
-        // Ensure all materials cast/receive shadows
+        // Collect bones for debug
+        const bones: string[] = [];
         cloned.traverse((obj: any) => {
           if (obj.isMesh) {
             obj.castShadow = true;
             obj.receiveShadow = true;
+            obj.frustumCulled = false; // skinned meshes can have wrong bounds
           }
+          if (obj.isBone) bones.push(obj.name);
         });
-        setGltf({ scene: cloned });
+        console.log(`[FactionCharacter] GLB loaded. Bones (${bones.length}):`, bones.slice(0, 10).join(', '), bones.length > 10 ? '...' : '');
+        setGltfScene(cloned);
       },
       undefined,
-      (err) => {
+      (err: any) => {
         if (cancelled) return;
         console.warn(`[FactionCharacter] Failed to load ${factionId}.glb:`, err);
         setLoadFailed(true);
@@ -113,14 +172,13 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
     return () => { cancelled = true; };
   }, [factionId, onMissingAssets]);
 
-  // Load all animations once globally
+  // Load all animations once
   useEffect(() => {
     let cancelled = false;
     loadAnimationsOnce().then(() => {
       if (!cancelled) {
-        // Check that at least idle exists
         if (!animCache.idle) {
-          console.warn('[FactionCharacter] No idle animation loaded — falling back to procedural');
+          console.warn('[FactionCharacter] No idle animation — falling back to procedural');
           setLoadFailed(true);
           onMissingAssets?.();
         } else {
@@ -131,15 +189,30 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
     return () => { cancelled = true; };
   }, [onMissingAssets]);
 
-  // Set up the mixer + actions when both GLB and animations are ready
+  // Wire up mixer + actions when both are ready
   useEffect(() => {
-    if (!gltf || !animsReady) return;
-    const mixer = new THREE.AnimationMixer(gltf.scene);
+    if (!gltfScene || !animsReady) return;
+    
+    // Collect target skeleton bones
+    const bones: THREE.Bone[] = [];
+    gltfScene.traverse((obj: any) => {
+      if (obj.isBone) bones.push(obj);
+    });
+    console.log(`[FactionCharacter] Setting up mixer with ${bones.length} bones in target skeleton`);
+
+    const mixer = new THREE.AnimationMixer(gltfScene);
     mixerRef.current = mixer;
     const actions: Partial<Record<AnimStateName, THREE.AnimationAction>> = {};
+    
     (Object.keys(animCache) as AnimStateName[]).forEach(name => {
-      const clip = animCache[name];
-      if (!clip) return;
+      const rawClip = animCache[name];
+      if (!rawClip) return;
+      // Retarget the clip to our skeleton's bone names
+      const clip = retargetClip(rawClip, bones);
+      if (clip.tracks.length === 0) {
+        console.warn(`[FactionCharacter] ${name} has no usable tracks after retargeting — skipping`);
+        return;
+      }
       const action = mixer.clipAction(clip);
       if (ONE_SHOT[name]) {
         action.setLoop(THREE.LoopOnce, 1);
@@ -150,11 +223,14 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
       actions[name] = action;
     });
     actionsRef.current = actions;
+    console.log(`[FactionCharacter] Actions ready:`, Object.keys(actions));
 
-    // Start with idle
     if (actions.idle) {
       actions.idle.play();
       currentActionRef.current = 'idle';
+      console.log(`[FactionCharacter] Started idle animation`);
+    } else {
+      console.warn(`[FactionCharacter] No idle action created — character will be stiff`);
     }
 
     return () => {
@@ -163,12 +239,11 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
       actionsRef.current = {};
       currentActionRef.current = null;
     };
-  }, [gltf, animsReady]);
+  }, [gltfScene, animsReady]);
 
-  // Watch animState and crossfade when it changes
+  // Watch animState and crossfade
   useEffect(() => {
-    if (!mixerRef.current || !actionsRef.current) return;
-    const mixer = mixerRef.current;
+    if (!mixerRef.current) return;
     const actions = actionsRef.current;
     const target = animState;
     const current = currentActionRef.current;
@@ -177,7 +252,6 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
     const targetAction = actions[target];
     const currentAction = current ? actions[current] : null;
     if (!targetAction) {
-      // Animation missing — try idle as a fallback
       if (target !== 'idle' && actions.idle && current !== 'idle') {
         actions.idle.reset().fadeIn(0.2).play();
         if (currentAction) currentAction.fadeOut(0.2);
@@ -186,20 +260,16 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
       return;
     }
 
-    // Crossfade: target fades in, current fades out, both over 200ms
     targetAction.reset().fadeIn(0.2).play();
     if (currentAction && currentAction !== targetAction) {
       currentAction.fadeOut(0.2);
     }
     currentActionRef.current = target;
-    lastStateRef.current = target;
 
-    // Auto-return to idle for one-shot animations (except 'die')
     if (ONE_SHOT[target] && target !== 'die') {
       const clip = animCache[target];
       const duration = clip ? clip.duration * 1000 : 800;
       const handle = setTimeout(() => {
-        // Only auto-return if we haven't moved on already
         if (currentActionRef.current === target && actions.idle) {
           actions.idle.reset().fadeIn(0.15).play();
           targetAction.fadeOut(0.15);
@@ -210,19 +280,17 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
     }
   }, [animState]);
 
-  // Tick the mixer every frame
   useFrame((_, dt) => {
     if (mixerRef.current) mixerRef.current.update(dt);
   });
 
-  // If asset load failed, render nothing — parent handles fallback
-  if (loadFailed || !gltf) {
+  if (loadFailed || !gltfScene) {
     return null;
   }
 
   return (
     <group ref={groupRef}>
-      <primitive object={gltf.scene} />
+      <primitive object={gltfScene} />
     </group>
   );
 }

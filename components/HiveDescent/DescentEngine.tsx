@@ -628,6 +628,7 @@ const DescentEngine: React.FC<Props> = ({
   useEffect(() => {
     const onDown = (e: KeyboardEvent) => {
       if (e.repeat) return;
+      if (e.code === "Space") e.preventDefault();
       const k = e.key.toLowerCase();
       if (k === "w" || k === "arrowup") inputRef.current.up = true;
       if (k === "s" || k === "arrowdown") inputRef.current.down = true;
@@ -635,7 +636,7 @@ const DescentEngine: React.FC<Props> = ({
       if (k === "d" || k === "arrowright") inputRef.current.right = true;
       if (k === " ") { e.preventDefault(); inputRef.current.specialPulse++; }
       if (k === "shift") inputRef.current.dodgePulse++;
-      if (k === "f" || k === "e") inputRef.current.attackPulse++;
+      if (k === "f" || k === "e" || k === " ") inputRef.current.attackPulse++;
     };
     const onUp = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase();
