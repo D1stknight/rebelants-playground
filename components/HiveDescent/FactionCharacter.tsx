@@ -216,20 +216,24 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
     // Build bone lookup from the SkinnedMesh's actual skeleton
     const boneMap = buildBoneMap(skinnedMesh);
     
-    // Mount mixer on the LOADED SCENE (the root that contains both the mesh and bones)
-    // Mount on the scene root. AnimationMixer will resolve track names via PropertyBinding.findNode().
-    const mixer = new THREE.AnimationMixer(loadedScene);
+    // v5: Mount mixer on the SkinnedMesh itself (not the scene root). When you mount on a
+    // SkinnedMesh, three.js's PropertyBinding uses skeleton.getBoneByName() to resolve track
+    // targets, which guarantees the same Bone instances the mesh uses for vertex deformation.
+    // Mounting on a Group/scene root resolves via traversal, which can return different bone
+    // instances if the loader produced a duplicated or reparented skeleton — those would
+    // animate but never deform the mesh.
+    const mixer = new THREE.AnimationMixer(skinnedMesh);
     mixerRef.current = mixer;
-    console.log(`[v3] Mixer created on loadedScene`);
+    console.log(`[v5] Mixer created on skinnedMesh (${skinnedMesh.name})`);
 
-    // Verify at least one bone is findable from the mixer's root
+    // Identity check: is the bone reachable from the scene root the SAME object as the skeleton's bone?
     const firstBone = skinnedMesh.skeleton?.bones[0];
     if (firstBone) {
-      const found = loadedScene.getObjectByName(firstBone.name);
-      console.log(`[v3] getObjectByName('${firstBone.name}') from scene root: ${found ? 'FOUND' : 'NOT FOUND'}`);
-      if (!found) {
-        // Bones live outside the scene — try parenting them
-        console.warn('[v3] Bones not under scene root. Skeleton bones may be detached.');
+      const sceneFound = loadedScene.getObjectByName(firstBone.name);
+      const sameInstance = sceneFound === firstBone;
+      console.log(`[v5] scene.getObjectByName('${firstBone.name}') === skeleton.bones[0]: ${sameInstance}`);
+      if (!sameInstance) {
+        console.warn('[v5] Bone identity mismatch — mounting on SkinnedMesh fixes this.');
       }
     }
 
@@ -239,7 +243,7 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
       if (!raw) return;
       const clip = retargetClip(raw, boneMap);
       if (clip.tracks.length === 0) {
-        console.warn(`[v3] ${name} has no tracks after retarget; skipping`);
+        console.warn(`[v5] ${name} has no tracks after retarget; skipping`);
         return;
       }
       const action = mixer.clipAction(clip);
@@ -256,12 +260,23 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
     if (actions.idle) {
       actions.idle.play();
       currentActionRef.current = 'idle';
-      console.log('[v3] Started idle animation');
-      // Force one update so we can verify the mixer evaluates
-      mixer.update(0.016);
-      const firstBoneNow = skinnedMesh.skeleton?.bones[0];
-      if (firstBoneNow) {
-        console.log(`[v3] After 1 frame, ${firstBoneNow.name}.position:`, firstBoneNow.position.x.toFixed(3), firstBoneNow.position.y.toFixed(3), firstBoneNow.position.z.toFixed(3));
+      console.log('[v5] Started idle animation');
+
+      // Multi-frame rotation probe: sample the same bone's quaternion across 5 simulated frames.
+      // If quaternion values change between frames, rotations ARE driving bones (and the mesh
+      // should visibly deform). If they stay identical, the mixer isn't binding tracks at all.
+      const probeBone = skinnedMesh.skeleton?.bones.find(b => /spine|arm|leg|hip/i.test(b.name)) || skinnedMesh.skeleton?.bones[1];
+      if (probeBone) {
+        const samples: string[] = [];
+        for (let i = 0; i < 5; i++) {
+          mixer.update(0.1);
+          const q = probeBone.quaternion;
+          samples.push(`(${q.x.toFixed(4)}, ${q.y.toFixed(4)}, ${q.z.toFixed(4)}, ${q.w.toFixed(4)})`);
+        }
+        console.log(`[v5] 5-frame quaternion probe on ${probeBone.name}:`);
+        for (const s of samples) console.log('  ' + s);
+        const allEqual = samples.every(s => s === samples[0]);
+        console.log(`[v5] Bone quaternion ${allEqual ? 'STATIC (mixer NOT binding)' : 'CHANGING (mixer driving bone)'}`);
       }
     }
 
