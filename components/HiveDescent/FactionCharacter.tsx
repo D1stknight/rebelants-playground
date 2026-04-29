@@ -33,6 +33,15 @@ const ONE_SHOT: Record<AnimStateName, boolean> = {
 // Tune this if a faction's GLB has a different rest-pose hip height.
 const GROUND_OFFSET = 0.95;
 
+// Render-time scale multiplier for the loaded GLB. Path A workaround:
+// Mixamo animation rotations are scale-independent (degrees stay the same),
+// but they sweep through tiny world-space distances when applied to a model
+// that's been baked at 0.01× scale — visible motion looks like a 'blip'.
+// Scaling the rendered group up multiplies all bone-driven offsets, making
+// limb motion clearly visible. Tune RENDER_SCALE to taste; if it makes the
+// character too big vs the world, reduce it (or rebuild GLB at native scale).
+const RENDER_SCALE = 5;
+
 const animCache: Partial<Record<AnimStateName, THREE.AnimationClip>> = {};
 let animCachePromise: Promise<void> | null = null;
 
@@ -332,7 +341,7 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
 
   return (
     <group ref={groupRef}>
-      <group position={[0, GROUND_OFFSET, 0]}>
+      <group position={[0, GROUND_OFFSET, 0]} scale={RENDER_SCALE}>
         <primitive object={loadedScene} />
       </group>
     </group>
