@@ -15,7 +15,7 @@ interface FactionCharacterProps {
   onMissingAssets?: () => void;
 }
 
-const TARGET_HEIGHT = 1.75;
+const TARGET_HEIGHT = 1.25;
 const MODEL_Y_OFFSET = 1.05;
 
 export default function FactionCharacter({ factionId }: FactionCharacterProps) {
