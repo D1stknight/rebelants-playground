@@ -21,7 +21,7 @@ import { useFrame, useLoader } from '@react-three/fiber';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
-import { SkeletonUtils } from 'three/examples/jsm/utils/SkeletonUtils.js';
+import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 export type AnimStateName = 'idle' | 'walk' | 'run' | 'attack' | 'hurt' | 'die';
 
@@ -92,7 +92,7 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
       (loaded) => {
         if (cancelled) return;
         // Clone the scene so each instance has its own skeleton (SkeletonUtils handles bone uniqueness)
-        const cloned = SkeletonUtils.clone(loaded.scene) as THREE.Group;
+        const cloned = cloneSkeleton(loaded.scene) as THREE.Group;
         // Ensure all materials cast/receive shadows
         cloned.traverse((obj: any) => {
           if (obj.isMesh) {
