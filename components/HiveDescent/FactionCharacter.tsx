@@ -31,7 +31,7 @@ const ONE_SHOT: Record<AnimStateName, boolean> = {
 // In Mixamo's rest pose, the hips bone is ~1m above the skeleton origin, which
 // would put the feet below y=0 if the model is mounted at the parent's origin.
 // Tune this if a faction's GLB has a different rest-pose hip height.
-const GROUND_OFFSET = 0.95;
+const GROUND_OFFSET = 1.25;
 
 // Render-time scale multiplier for the loaded GLB. Path A workaround:
 // Mixamo animation rotations are scale-independent (degrees stay the same),
