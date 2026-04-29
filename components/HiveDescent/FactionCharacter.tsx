@@ -1,6 +1,6 @@
 // components/HiveDescent/FactionCharacter.tsx
 // Hive Descent rigged faction character.
-// Visual-only rotation test: flipped wrapper rotation, no animation mixer active.
+// Visual-only rotation test: no wrapper rotation, no animation mixer active.
 
 import { useEffect, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -74,7 +74,7 @@ export default function FactionCharacter({ factionId, onMissingAssets }: Faction
     <group ref={groupRef}>
       <group
         position={[0, GROUND_OFFSET, 0]}
-        rotation={[Math.PI / 2, 0, 0]}
+        rotation={[0, 0, 0]}
         scale={RENDER_SCALE}
       >
         <primitive object={loadedScene} />
