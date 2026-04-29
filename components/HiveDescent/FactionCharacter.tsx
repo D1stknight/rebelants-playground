@@ -40,7 +40,7 @@ const GROUND_OFFSET = 0.95;
 // Scaling the rendered group up multiplies all bone-driven offsets, making
 // limb motion clearly visible. Tune RENDER_SCALE to taste; if it makes the
 // character too big vs the world, reduce it (or rebuild GLB at native scale).
-const RENDER_SCALE = 5;
+const RENDER_SCALE = 0.35;
 
 const animCache: Partial<Record<AnimStateName, THREE.AnimationClip>> = {};
 let animCachePromise: Promise<void> | null = null;
