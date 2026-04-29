@@ -1,12 +1,6 @@
 // components/HiveDescent/FactionCharacter.tsx
-// Phase D v3: explicit SkinnedMesh-based mixer with full diagnostic logging.
-//
-// v3 changes vs v2:
-// - Mixer is mounted on the SkinnedMesh, not the scene root
-// - Walks the loaded scene to find the SkinnedMesh and its skeleton bones explicitly
-// - Validates that each retargeted track resolves to a real bone via getObjectByName
-// - Drops cloneSkeleton (we render only one character per scene; clone is unnecessary)
-// - Logs full bone hierarchy and the result of one frame of evaluation
+// Hive Descent rigged faction character.
+// Current test: idle.fbx maps to idle, run.fbx maps to run, run slowed down.
 
 import { useEffect, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -22,45 +16,30 @@ interface FactionCharacterProps {
   onMissingAssets?: () => void;
 }
 
-const ONE_SHOT: Record<AnimStateName, boolean> = {
-  idle: false, walk: false, run: false,
-  attack: true, hurt: true, die: true,
-};
-
-// Vertical lift applied to the loaded GLB so its feet sit on the floor (y=0).
-// In Mixamo's rest pose, the hips bone is ~1m above the skeleton origin, which
-// would put the feet below y=0 if the model is mounted at the parent's origin.
-// Tune this if a faction's GLB has a different rest-pose hip height.
 const GROUND_OFFSET = 1.25;
-
-// Render-time scale multiplier for the loaded GLB. Path A workaround:
-// Mixamo animation rotations are scale-independent (degrees stay the same),
-// but they sweep through tiny world-space distances when applied to a model
-// that's been baked at 0.01× scale — visible motion looks like a 'blip'.
-// Scaling the rendered group up multiplies all bone-driven offsets, making
-// limb motion clearly visible. Tune RENDER_SCALE to taste; if it makes the
-// character too big vs the world, reduce it (or rebuild GLB at native scale).
 const RENDER_SCALE = 1.25;
+const RUN_TIME_SCALE = 0.45;
 
 const animCache: Partial<Record<AnimStateName, THREE.AnimationClip>> = {};
 let animCachePromise: Promise<void> | null = null;
 
 function loadAnimationsOnce(): Promise<void> {
   if (animCachePromise) return animCachePromise;
+
   const fbxLoader = new FBXLoader();
-  const names: AnimStateName[] = ['idle'];
-  const sourceName = 'run';
-  console.log('[FactionCharacter run-as-idle test] Loading run.fbx but assigning it to idle');
+  const names: AnimStateName[] = ['idle', 'run'];
+  console.log('[FactionCharacter movement test] Loading idle.fbx and run.fbx');
+
   animCachePromise = Promise.all(names.map(name => {
     return new Promise<void>((resolve) => {
-      fbxLoader.load(`/descent/models/animations/${sourceName}.fbx`,
+      fbxLoader.load(
+        `/descent/models/animations/${name}.fbx`,
         (fbx: any) => {
           if (fbx.animations && fbx.animations.length > 0) {
             const clip = fbx.animations[0];
             clip.name = name;
             animCache[name] = clip;
-            console.log(`[run-as-idle test] Loaded ${sourceName}.fbx as ${name}: ${clip.tracks.length} tracks, ${clip.duration.toFixed(2)}s`);
-            // Log first 3 track names so we see the EXACT format
+            console.log(`[movement test] Loaded ${name}: ${clip.tracks.length} tracks, ${clip.duration.toFixed(2)}s`);
             for (let i = 0; i < Math.min(3, clip.tracks.length); i++) {
               console.log(`  track[${i}]: ${clip.tracks[i].name}`);
             }
@@ -68,55 +47,59 @@ function loadAnimationsOnce(): Promise<void> {
           resolve();
         },
         undefined,
-        (err: any) => { console.warn(`[run-as-idle test] Failed ${sourceName}:`, err); resolve(); }
+        (err: any) => {
+          console.warn(`[movement test] Failed ${name}:`, err);
+          resolve();
+        }
       );
     });
   })).then(() => undefined);
+
   return animCachePromise;
 }
 
-/** Build a bone-name lookup map. Maps any normalized form (lowercase, no prefix) to the real bone name. */
 function buildBoneMap(skinnedMesh: THREE.SkinnedMesh): Map<string, string> {
   const map = new Map<string, string>();
   const skeleton = skinnedMesh.skeleton;
-  if (!skeleton) {
-    console.warn('[v3] SkinnedMesh has no skeleton');
-    return map;
-  }
-  console.log(`[v3] Skeleton has ${skeleton.bones.length} bones`);
+  if (!skeleton) return map;
+
+  console.log(`[movement test] Skeleton has ${skeleton.bones.length} bones`);
   for (const bone of skeleton.bones) {
     const fullName = bone.name;
     const lower = fullName.toLowerCase();
-    map.set(lower, fullName);
-    // Also strip any "mixamorig" or "mixamorig:" prefix
     const stripped = fullName.replace(/^mixamorig:?/i, '').toLowerCase();
+    map.set(lower, fullName);
     if (stripped && stripped !== lower) map.set(stripped, fullName);
   }
   return map;
 }
 
-/** Retarget animation track names to match the bones in our skeleton.
- *  v4: Drops .position and .scale tracks. Mixamo FBX position tracks are in cm
- *  and teleport bones to wildly wrong locations on differently-scaled GLB skeletons.
- *  Rotation-only is the standard cross-scale solution. The character's world
- *  position is controlled by the parent group in DescentEngine, so we don't need
- *  root motion from the clips. */
 function retargetClip(clip: THREE.AnimationClip, boneMap: Map<string, string>): THREE.AnimationClip {
   const newTracks: THREE.KeyframeTrack[] = [];
-  let kept = 0, dropped = 0, skippedPos = 0, skippedScale = 0;
-  const droppedNames: string[] = [];
+  let kept = 0;
+  let dropped = 0;
+  let skippedPos = 0;
+  let skippedScale = 0;
+
   for (const track of clip.tracks) {
     const lastDot = track.name.lastIndexOf('.');
-    if (lastDot === -1) { newTracks.push(track); continue; }
+    if (lastDot === -1) {
+      newTracks.push(track);
+      continue;
+    }
+
     const fbxBone = track.name.substring(0, lastDot);
     const property = track.name.substring(lastDot);
 
-    // Drop position and scale tracks — they are in source-skeleton units (cm)
-    // and break the visual when applied to our pre-scaled GLB skeleton.
-    if (property === '.position') { skippedPos++; continue; }
-    if (property === '.scale') { skippedScale++; continue; }
+    if (property === '.position') {
+      skippedPos++;
+      continue;
+    }
+    if (property === '.scale') {
+      skippedScale++;
+      continue;
+    }
 
-    // Try multiple forms: full, lower, stripped-prefix
     const stripped = fbxBone.replace(/^mixamorig:?/i, '').toLowerCase();
     const target = boneMap.get(fbxBone.toLowerCase()) || boneMap.get(stripped);
 
@@ -127,13 +110,10 @@ function retargetClip(clip: THREE.AnimationClip, boneMap: Map<string, string>): 
       kept++;
     } else {
       dropped++;
-      if (droppedNames.length < 3) droppedNames.push(fbxBone);
     }
   }
-  console.log(`[v4 retarget] ${clip.name}: kept ${kept}/${clip.tracks.length} rot, skipped ${skippedPos} pos + ${skippedScale} scale, dropped ${dropped}${droppedNames.length ? ' (e.g. ' + droppedNames.join(', ') + ')' : ''}`);
-  if (kept > 0 && newTracks.length > 0) {
-    console.log(`  first kept: ${newTracks[0].name}`);
-  }
+
+  console.log(`[movement test retarget] ${clip.name}: kept ${kept}/${clip.tracks.length} rot, skipped ${skippedPos} pos + ${skippedScale} scale, dropped ${dropped}`);
   return new THREE.AnimationClip(clip.name, clip.duration, newTracks);
 }
 
@@ -148,21 +128,21 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
   const [animsReady, setAnimsReady] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
 
-  // Load the GLB
   useEffect(() => {
     let cancelled = false;
-    console.log(`[v3] Loading /descent/models/factions/${factionId}.glb`);
     const loader = new GLTFLoader();
+    const modelPath = `/descent/models/factions/${factionId}.glb`;
+    console.log(`[movement test] Loading ${modelPath}`);
+
     loader.load(
-      `/descent/models/factions/${factionId}.glb`,
+      modelPath,
       (loaded: any) => {
         if (cancelled) return;
+
         const scene = loaded.scene as THREE.Group;
-        // Find the SkinnedMesh
         let foundSkinned: THREE.SkinnedMesh | null = null;
-        const allMeshes: string[] = [];
+
         scene.traverse((obj: any) => {
-          if (obj.isMesh) allMeshes.push(`${obj.name} (skinned=${!!obj.isSkinnedMesh})`);
           if (obj.isSkinnedMesh && !foundSkinned) foundSkinned = obj;
           if (obj.isMesh) {
             obj.castShadow = true;
@@ -170,119 +150,81 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
             obj.frustumCulled = false;
           }
         });
-        console.log(`[v3] GLB loaded. Meshes found: ${allMeshes.length}`);
-        for (const m of allMeshes.slice(0, 5)) console.log(`  ${m}`);
+
         if (!foundSkinned) {
-          console.warn('[v3] No SkinnedMesh — model has no rig?');
+          console.warn('[movement test] No SkinnedMesh found in GLB');
           setLoadFailed(true);
           onMissingAssets?.();
           return;
         }
+
         const sm = foundSkinned as THREE.SkinnedMesh;
-        if (sm.skeleton) {
-          console.log(`[v3] SkinnedMesh: ${sm.name}, skeleton has ${sm.skeleton.bones.length} bones`);
-          // Log first 3 bones with parent chain
-          for (let i = 0; i < Math.min(3, sm.skeleton.bones.length); i++) {
-            const b = sm.skeleton.bones[i];
-            const parents: string[] = [];
-            let p: any = b.parent;
-            while (p && parents.length < 4) { parents.push(p.name || p.type); p = p.parent; }
-            console.log(`  bone[${i}]: ${b.name} <- ${parents.join(' <- ')}`);
-          }
-        }
+        console.log(`[movement test] SkinnedMesh: ${sm.name}, bones=${sm.skeleton?.bones.length || 0}`);
         setLoadedScene(scene);
         setSkinnedMesh(sm);
       },
       undefined,
       (err: any) => {
         if (cancelled) return;
-        console.warn(`[v3] GLB load failed:`, err);
+        console.warn('[movement test] GLB load failed:', err);
         setLoadFailed(true);
         onMissingAssets?.();
       }
     );
-    return () => { cancelled = true; };
+
+    return () => {
+      cancelled = true;
+    };
   }, [factionId, onMissingAssets]);
 
-  // Load animations
   useEffect(() => {
     let cancelled = false;
     loadAnimationsOnce().then(() => {
       if (cancelled) return;
-      if (!animCache.idle) {
+      if (!animCache.idle || !animCache.run) {
+        console.warn('[movement test] Missing idle or run animation');
         setLoadFailed(true);
         onMissingAssets?.();
       } else {
         setAnimsReady(true);
       }
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [onMissingAssets]);
 
-  // Set up mixer when both are ready
   useEffect(() => {
     if (!loadedScene || !skinnedMesh || !animsReady) return;
 
-    // Build bone lookup from the SkinnedMesh's actual skeleton
     const boneMap = buildBoneMap(skinnedMesh);
-    
-    // v5: Mount mixer on the SkinnedMesh itself (not the scene root). When you mount on a
-    // SkinnedMesh, three.js's PropertyBinding uses skeleton.getBoneByName() to resolve track
-    // targets, which guarantees the same Bone instances the mesh uses for vertex deformation.
-    // Mounting on a Group/scene root resolves via traversal, which can return different bone
-    // instances if the loader produced a duplicated or reparented skeleton — those would
-    // animate but never deform the mesh.
     const mixer = new THREE.AnimationMixer(skinnedMesh);
     mixerRef.current = mixer;
-    console.log(`[v5] Mixer created on skinnedMesh (${skinnedMesh.name})`);
-
-    // Identity check: is the bone reachable from the scene root the SAME object as the skeleton's bone?
-    const firstBone = skinnedMesh.skeleton?.bones[0];
-    if (firstBone) {
-      const sceneFound = loadedScene.getObjectByName(firstBone.name);
-      const sameInstance = sceneFound === firstBone;
-      console.log(`[v5] scene.getObjectByName('${firstBone.name}') === skeleton.bones[0]: ${sameInstance}`);
-      if (!sameInstance) {
-        console.warn('[v5] Bone identity mismatch — mounting on SkinnedMesh fixes this.');
-      }
-    }
 
     const actions: Partial<Record<AnimStateName, THREE.AnimationAction>> = {};
-    const rawIdle = animCache.idle;
-    if (rawIdle) {
-      const clip = retargetClip(rawIdle, boneMap);
-      if (clip.tracks.length === 0) {
-        console.warn('[run-as-idle test] run clip has no tracks after retarget; skipping');
-      } else {
-        const action = mixer.clipAction(clip);
-        action.setLoop(THREE.LoopRepeat, Infinity);
-        actions.idle = action;
-        console.log('[run-as-idle test] run clip action created and assigned to idle state');
-      }
+
+    const idleClip = animCache.idle ? retargetClip(animCache.idle, boneMap) : null;
+    if (idleClip && idleClip.tracks.length > 0) {
+      const idleAction = mixer.clipAction(idleClip);
+      idleAction.setLoop(THREE.LoopRepeat, Infinity);
+      idleAction.timeScale = 1;
+      actions.idle = idleAction;
     }
+
+    const runClip = animCache.run ? retargetClip(animCache.run, boneMap) : null;
+    if (runClip && runClip.tracks.length > 0) {
+      const runAction = mixer.clipAction(runClip);
+      runAction.setLoop(THREE.LoopRepeat, Infinity);
+      runAction.timeScale = RUN_TIME_SCALE;
+      actions.run = runAction;
+    }
+
     actionsRef.current = actions;
 
     if (actions.idle) {
       actions.idle.play();
       currentActionRef.current = 'idle';
-      console.log('[v5] Started idle animation');
-
-      // Multi-frame rotation probe: sample the same bone's quaternion across 5 simulated frames.
-      // If quaternion values change between frames, rotations ARE driving bones (and the mesh
-      // should visibly deform). If they stay identical, the mixer isn't binding tracks at all.
-      const probeBone = skinnedMesh.skeleton?.bones.find(b => /spine|arm|leg|hip/i.test(b.name)) || skinnedMesh.skeleton?.bones[1];
-      if (probeBone) {
-        const samples: string[] = [];
-        for (let i = 0; i < 5; i++) {
-          mixer.update(0.1);
-          const q = probeBone.quaternion;
-          samples.push(`(${q.x.toFixed(4)}, ${q.y.toFixed(4)}, ${q.z.toFixed(4)}, ${q.w.toFixed(4)})`);
-        }
-        console.log(`[v5] 5-frame quaternion probe on ${probeBone.name}:`);
-        for (const s of samples) console.log('  ' + s);
-        const allEqual = samples.every(s => s === samples[0]);
-        console.log(`[v5] Bone quaternion ${allEqual ? 'STATIC (mixer NOT binding)' : 'CHANGING (mixer driving bone)'}`);
-      }
+      console.log('[movement test] Started idle animation');
     }
 
     return () => {
@@ -293,40 +235,21 @@ export default function FactionCharacter({ factionId, animState, onMissingAssets
     };
   }, [loadedScene, skinnedMesh, animsReady]);
 
-  // Animation state changes — crossfade
   useEffect(() => {
     if (!mixerRef.current) return;
+
     const actions = actionsRef.current;
-    const target = animState;
+    const target: AnimStateName = animState === 'run' ? 'run' : 'idle';
     const current = currentActionRef.current;
     if (current === target) return;
 
     const targetAction = actions[target];
     const currentAction = current ? actions[current] : null;
-    if (!targetAction) {
-      if (target !== 'idle' && actions.idle && current !== 'idle') {
-        actions.idle.reset().fadeIn(0.2).play();
-        if (currentAction) currentAction.fadeOut(0.2);
-        currentActionRef.current = 'idle';
-      }
-      return;
-    }
+    if (!targetAction) return;
+
     targetAction.reset().fadeIn(0.2).play();
     if (currentAction && currentAction !== targetAction) currentAction.fadeOut(0.2);
     currentActionRef.current = target;
-
-    if (ONE_SHOT[target] && target !== 'die') {
-      const clip = animCache[target];
-      const duration = clip ? clip.duration * 1000 : 800;
-      const handle = setTimeout(() => {
-        if (currentActionRef.current === target && actions.idle) {
-          actions.idle.reset().fadeIn(0.15).play();
-          targetAction.fadeOut(0.15);
-          currentActionRef.current = 'idle';
-        }
-      }, duration);
-      return () => clearTimeout(handle);
-    }
   }, [animState]);
 
   useFrame((_, dt) => {
