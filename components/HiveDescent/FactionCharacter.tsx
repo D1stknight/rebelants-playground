@@ -1,6 +1,6 @@
 // components/HiveDescent/FactionCharacter.tsx
 // Hive Descent rigged faction character.
-// Current test: auto-fit the new samurai.glb smaller and lift it above the ground.
+// Current test: restore visible auto-fit settings for the new samurai.glb.
 
 import { useEffect, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -15,8 +15,8 @@ interface FactionCharacterProps {
   onMissingAssets?: () => void;
 }
 
-const TARGET_HEIGHT = 1.45;
-const MODEL_Y_OFFSET = 0.45;
+const TARGET_HEIGHT = 2.2;
+const MODEL_Y_OFFSET = 0.8;
 
 export default function FactionCharacter({ factionId, onMissingAssets }: FactionCharacterProps) {
   const groupRef = useRef<THREE.Group>(null);
@@ -29,7 +29,7 @@ export default function FactionCharacter({ factionId, onMissingAssets }: Faction
     const loader = new GLTFLoader();
     const modelPath = `/descent/models/factions/${factionId}.glb`;
 
-    console.log(`[HiveDescent GLB fit test] Loading ${modelPath}`);
+    console.log(`[HiveDescent GLB visible fit test] Loading ${modelPath}`);
 
     loader.load(
       modelPath,
@@ -56,13 +56,13 @@ export default function FactionCharacter({ factionId, onMissingAssets }: Faction
         box.getSize(size);
         box.getCenter(center);
 
-        console.log('[HiveDescent GLB fit test] meshCount:', meshCount);
-        console.log('[HiveDescent GLB fit test] skinnedMesh:', foundSkinned);
-        console.log('[HiveDescent GLB fit test] box size:', size.toArray());
-        console.log('[HiveDescent GLB fit test] box center:', center.toArray());
+        console.log('[HiveDescent GLB visible fit test] meshCount:', meshCount);
+        console.log('[HiveDescent GLB visible fit test] skinnedMesh:', foundSkinned);
+        console.log('[HiveDescent GLB visible fit test] box size:', size.toArray());
+        console.log('[HiveDescent GLB visible fit test] box center:', center.toArray());
 
         if (meshCount === 0 || !Number.isFinite(size.y) || size.y <= 0) {
-          console.warn('[HiveDescent GLB fit test] Model loaded but no usable mesh bounds found');
+          console.warn('[HiveDescent GLB visible fit test] Model loaded but no usable mesh bounds found');
           setLoadFailed(true);
           onMissingAssets?.();
           return;
@@ -71,7 +71,7 @@ export default function FactionCharacter({ factionId, onMissingAssets }: Faction
         scene.position.set(-center.x, -box.min.y, -center.z);
 
         const nextScale = TARGET_HEIGHT / size.y;
-        console.log('[HiveDescent GLB fit test] auto scale:', nextScale);
+        console.log('[HiveDescent GLB visible fit test] auto scale:', nextScale);
 
         setRenderScale(nextScale);
         setLoadedScene(scene);
@@ -79,7 +79,7 @@ export default function FactionCharacter({ factionId, onMissingAssets }: Faction
       undefined,
       (err: any) => {
         if (cancelled) return;
-        console.warn('[HiveDescent GLB fit test] GLB load failed:', err);
+        console.warn('[HiveDescent GLB visible fit test] GLB load failed:', err);
         setLoadFailed(true);
         onMissingAssets?.();
       }
