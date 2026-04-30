@@ -1,6 +1,6 @@
 // components/HiveDescent/FactionCharacter.tsx
 // Hive Descent rigged faction character.
-// Current test: visible GLB model plus run.fbx animation mapped to run state.
+// Current test: visible GLB model plus idle.fbx and run.fbx mapped to idle/run states.
 
 import { useEffect, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -18,40 +18,44 @@ interface FactionCharacterProps {
 
 const TARGET_HEIGHT = 0.9;
 const MODEL_Y_OFFSET = 0.55;
+const IDLE_TIME_SCALE = 1;
 const RUN_TIME_SCALE = 0.8;
 
-let runClipCache: THREE.AnimationClip | null = null;
-let runClipPromise: Promise<void> | null = null;
+const animClipCache: Partial<Record<AnimStateName, THREE.AnimationClip>> = {};
+let animClipPromise: Promise<void> | null = null;
 
-function loadRunAnimationOnce(): Promise<void> {
-  if (runClipPromise) return runClipPromise;
+function loadAnimationsOnce(): Promise<void> {
+  if (animClipPromise) return animClipPromise;
 
   const fbxLoader = new FBXLoader();
+  const names: AnimStateName[] = ['idle', 'run'];
 
-  runClipPromise = new Promise<void>((resolve) => {
-    fbxLoader.load(
-      '/descent/models/animations/run.fbx',
-      (fbx: any) => {
-        const clip = fbx.animations?.[0] as THREE.AnimationClip | undefined;
-        if (clip) {
-          clip.name = 'run';
-          runClipCache = clip;
-          console.log(`[HiveDescent animation test] Loaded run.fbx: ${clip.tracks.length} tracks, ${clip.duration.toFixed(2)}s`);
-          console.log('[HiveDescent animation test] run.fbx first tracks:', clip.tracks.slice(0, 5).map((t) => t.name));
-        } else {
-          console.warn('[HiveDescent animation test] run.fbx loaded but had no animation clip');
+  animClipPromise = Promise.all(names.map((name) => {
+    return new Promise<void>((resolve) => {
+      fbxLoader.load(
+        `/descent/models/animations/${name}.fbx`,
+        (fbx: any) => {
+          const clip = fbx.animations?.[0] as THREE.AnimationClip | undefined;
+          if (clip) {
+            clip.name = name;
+            animClipCache[name] = clip;
+            console.log(`[HiveDescent animation test] Loaded ${name}.fbx: ${clip.tracks.length} tracks, ${clip.duration.toFixed(2)}s`);
+            console.log(`[HiveDescent animation test] ${name}.fbx first tracks:`, clip.tracks.slice(0, 5).map((t) => t.name));
+          } else {
+            console.warn(`[HiveDescent animation test] ${name}.fbx loaded but had no animation clip`);
+          }
+          resolve();
+        },
+        undefined,
+        (err: any) => {
+          console.warn(`[HiveDescent animation test] Failed to load ${name}.fbx:`, err);
+          resolve();
         }
-        resolve();
-      },
-      undefined,
-      (err: any) => {
-        console.warn('[HiveDescent animation test] Failed to load run.fbx:', err);
-        resolve();
-      }
-    );
-  });
+      );
+    });
+  })).then(() => undefined);
 
-  return runClipPromise;
+  return animClipPromise;
 }
 
 function buildBoneMap(scene: THREE.Group): Map<string, string> {
@@ -96,7 +100,7 @@ function retargetClip(clip: THREE.AnimationClip, boneMap: Map<string, string>): 
     }
   }
 
-  console.log(`[HiveDescent animation test] Retargeted run clip: ${newTracks.length} usable tracks`);
+  console.log(`[HiveDescent animation test] Retargeted ${clip.name} clip: ${newTracks.length} usable tracks`);
   console.log('[HiveDescent animation test] Retargeted first tracks:', newTracks.slice(0, 5).map((t) => t.name));
   return new THREE.AnimationClip(clip.name, clip.duration, newTracks);
 }
@@ -104,13 +108,13 @@ function retargetClip(clip: THREE.AnimationClip, boneMap: Map<string, string>): 
 export default function FactionCharacter({ factionId, animState }: FactionCharacterProps) {
   const groupRef = useRef<THREE.Group>(null);
   const mixerRef = useRef<THREE.AnimationMixer | null>(null);
-  const runActionRef = useRef<THREE.AnimationAction | null>(null);
-  const isRunPlayingRef = useRef(false);
+  const actionsRef = useRef<Partial<Record<AnimStateName, THREE.AnimationAction>>>({});
+  const currentActionRef = useRef<AnimStateName | null>(null);
 
   const [loadedScene, setLoadedScene] = useState<THREE.Group | null>(null);
   const [renderScale, setRenderScale] = useState(1);
-  const [runReady, setRunReady] = useState(false);
-  const [runActionReady, setRunActionReady] = useState(false);
+  const [animationsReady, setAnimationsReady] = useState(false);
+  const [actionsReady, setActionsReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -176,9 +180,9 @@ export default function FactionCharacter({ factionId, animState }: FactionCharac
 
   useEffect(() => {
     let cancelled = false;
-    loadRunAnimationOnce().then(() => {
+    loadAnimationsOnce().then(() => {
       if (cancelled) return;
-      if (runClipCache) setRunReady(true);
+      if (animClipCache.idle && animClipCache.run) setAnimationsReady(true);
     });
     return () => {
       cancelled = true;
@@ -186,50 +190,58 @@ export default function FactionCharacter({ factionId, animState }: FactionCharac
   }, []);
 
   useEffect(() => {
-    if (!loadedScene || !runReady || !runClipCache) return;
+    if (!loadedScene || !animationsReady) return;
 
     const boneMap = buildBoneMap(loadedScene);
     const mixer = new THREE.AnimationMixer(loadedScene);
     mixerRef.current = mixer;
 
-    const runClip = retargetClip(runClipCache, boneMap);
-    if (runClip.tracks.length > 0) {
-      const action = mixer.clipAction(runClip);
+    const nextActions: Partial<Record<AnimStateName, THREE.AnimationAction>> = {};
+
+    (['idle', 'run'] as AnimStateName[]).forEach((name) => {
+      const sourceClip = animClipCache[name];
+      if (!sourceClip) return;
+
+      const retargetedClip = retargetClip(sourceClip, boneMap);
+      if (retargetedClip.tracks.length === 0) return;
+
+      const action = mixer.clipAction(retargetedClip);
       action.setLoop(THREE.LoopRepeat, Infinity);
-      action.timeScale = RUN_TIME_SCALE;
-      runActionRef.current = action;
-      setRunActionReady(true);
-      console.log('[HiveDescent animation test] Run action ready');
-    }
+      action.timeScale = name === 'run' ? RUN_TIME_SCALE : IDLE_TIME_SCALE;
+      nextActions[name] = action;
+    });
+
+    actionsRef.current = nextActions;
+    setActionsReady(true);
+    console.log('[HiveDescent animation test] Idle/run actions ready');
 
     return () => {
       mixer.stopAllAction();
       mixerRef.current = null;
-      runActionRef.current = null;
-      isRunPlayingRef.current = false;
-      setRunActionReady(false);
+      actionsRef.current = {};
+      currentActionRef.current = null;
+      setActionsReady(false);
     };
-  }, [loadedScene, runReady]);
+  }, [loadedScene, animationsReady]);
 
   useEffect(() => {
-    const runAction = runActionRef.current;
     console.log(`[HiveDescent animation test] animState: ${animState}`);
-    if (!runAction || !runActionReady) return;
+    if (!actionsReady) return;
 
-    const shouldRun = animState === 'run';
+    const target: AnimStateName = animState === 'run' ? 'run' : 'idle';
+    const actions = actionsRef.current;
+    const targetAction = actions[target];
+    const current = currentActionRef.current;
+    const currentAction = current ? actions[current] : null;
 
-    if (shouldRun && !isRunPlayingRef.current) {
-      runAction.reset().fadeIn(0.15).play();
-      isRunPlayingRef.current = true;
-      console.log('[HiveDescent animation test] Run animation started');
-    }
+    if (!targetAction || current === target) return;
 
-    if (!shouldRun && isRunPlayingRef.current) {
-      runAction.fadeOut(0.15);
-      isRunPlayingRef.current = false;
-      console.log('[HiveDescent animation test] Run animation stopped');
-    }
-  }, [animState, runActionReady]);
+    targetAction.reset().fadeIn(0.15).play();
+    if (currentAction && currentAction !== targetAction) currentAction.fadeOut(0.15);
+    currentActionRef.current = target;
+
+    console.log(`[HiveDescent animation test] Switched animation to ${target}`);
+  }, [animState, actionsReady]);
 
   useFrame((_, dt) => {
     if (mixerRef.current) mixerRef.current.update(dt);
