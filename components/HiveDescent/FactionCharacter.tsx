@@ -1,6 +1,6 @@
 // components/HiveDescent/FactionCharacter.tsx
 // Hive Descent rigged faction character.
-// Current test: visible GLB model plus idle.fbx and run.fbx mapped to idle/run states.
+// Current test: visible GLB model plus all 6 Mixamo animations mapped to game states.
 
 import { useEffect, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -19,7 +19,18 @@ interface FactionCharacterProps {
 const TARGET_HEIGHT = 0.9;
 const MODEL_Y_OFFSET = 0.55;
 const IDLE_TIME_SCALE = 1;
+const WALK_TIME_SCALE = 1;
 const RUN_TIME_SCALE = 0.8;
+const ONE_SHOT_TIME_SCALE = 1;
+
+const ONE_SHOT: Record<AnimStateName, boolean> = {
+  idle: false,
+  walk: false,
+  run: false,
+  attack: true,
+  hurt: true,
+  die: true,
+};
 
 const animClipCache: Partial<Record<AnimStateName, THREE.AnimationClip>> = {};
 let animClipPromise: Promise<void> | null = null;
@@ -28,7 +39,7 @@ function loadAnimationsOnce(): Promise<void> {
   if (animClipPromise) return animClipPromise;
 
   const fbxLoader = new FBXLoader();
-  const names: AnimStateName[] = ['idle', 'run'];
+  const names: AnimStateName[] = ['idle', 'walk', 'run', 'attack', 'hurt', 'die'];
 
   animClipPromise = Promise.all(names.map((name) => {
     return new Promise<void>((resolve) => {
@@ -105,11 +116,19 @@ function retargetClip(clip: THREE.AnimationClip, boneMap: Map<string, string>): 
   return new THREE.AnimationClip(clip.name, clip.duration, newTracks);
 }
 
+function timeScaleFor(name: AnimStateName): number {
+  if (name === 'idle') return IDLE_TIME_SCALE;
+  if (name === 'walk') return WALK_TIME_SCALE;
+  if (name === 'run') return RUN_TIME_SCALE;
+  return ONE_SHOT_TIME_SCALE;
+}
+
 export default function FactionCharacter({ factionId, animState }: FactionCharacterProps) {
   const groupRef = useRef<THREE.Group>(null);
   const mixerRef = useRef<THREE.AnimationMixer | null>(null);
   const actionsRef = useRef<Partial<Record<AnimStateName, THREE.AnimationAction>>>({});
   const currentActionRef = useRef<AnimStateName | null>(null);
+  const oneShotTimeoutRef = useRef<number | null>(null);
 
   const [loadedScene, setLoadedScene] = useState<THREE.Group | null>(null);
   const [renderScale, setRenderScale] = useState(1);
@@ -198,7 +217,7 @@ export default function FactionCharacter({ factionId, animState }: FactionCharac
 
     const nextActions: Partial<Record<AnimStateName, THREE.AnimationAction>> = {};
 
-    (['idle', 'run'] as AnimStateName[]).forEach((name) => {
+    (['idle', 'walk', 'run', 'attack', 'hurt', 'die'] as AnimStateName[]).forEach((name) => {
       const sourceClip = animClipCache[name];
       if (!sourceClip) return;
 
@@ -206,16 +225,25 @@ export default function FactionCharacter({ factionId, animState }: FactionCharac
       if (retargetedClip.tracks.length === 0) return;
 
       const action = mixer.clipAction(retargetedClip);
-      action.setLoop(THREE.LoopRepeat, Infinity);
-      action.timeScale = name === 'run' ? RUN_TIME_SCALE : IDLE_TIME_SCALE;
+      action.timeScale = timeScaleFor(name);
+
+      if (ONE_SHOT[name]) {
+        action.setLoop(THREE.LoopOnce, 1);
+        action.clampWhenFinished = true;
+      } else {
+        action.setLoop(THREE.LoopRepeat, Infinity);
+      }
+
       nextActions[name] = action;
     });
 
     actionsRef.current = nextActions;
     setActionsReady(true);
-    console.log('[HiveDescent animation test] Idle/run actions ready');
+    console.log('[HiveDescent animation test] All available actions ready');
 
     return () => {
+      if (oneShotTimeoutRef.current) window.clearTimeout(oneShotTimeoutRef.current);
+      oneShotTimeoutRef.current = null;
       mixer.stopAllAction();
       mixerRef.current = null;
       actionsRef.current = {};
@@ -228,19 +256,46 @@ export default function FactionCharacter({ factionId, animState }: FactionCharac
     console.log(`[HiveDescent animation test] animState: ${animState}`);
     if (!actionsReady) return;
 
-    const target: AnimStateName = animState === 'run' ? 'run' : 'idle';
     const actions = actionsRef.current;
+    const target: AnimStateName = actions[animState]
+      ? animState
+      : animState === 'walk' && actions.walk
+        ? 'walk'
+        : animState === 'run' && actions.run
+          ? 'run'
+          : 'idle';
+
     const targetAction = actions[target];
     const current = currentActionRef.current;
     const currentAction = current ? actions[current] : null;
 
     if (!targetAction || current === target) return;
 
+    if (oneShotTimeoutRef.current) {
+      window.clearTimeout(oneShotTimeoutRef.current);
+      oneShotTimeoutRef.current = null;
+    }
+
     targetAction.reset().fadeIn(0.15).play();
     if (currentAction && currentAction !== targetAction) currentAction.fadeOut(0.15);
     currentActionRef.current = target;
 
     console.log(`[HiveDescent animation test] Switched animation to ${target}`);
+
+    if (ONE_SHOT[target] && target !== 'die') {
+      const durationMs = Math.max(250, (animClipCache[target]?.duration || 0.7) * 1000 / timeScaleFor(target));
+      oneShotTimeoutRef.current = window.setTimeout(() => {
+        const fallback: AnimStateName = actions.run ? 'run' : 'idle';
+        const fallbackAction = actions[fallback] || actions.idle;
+        if (!fallbackAction || currentActionRef.current !== target) return;
+
+        fallbackAction.reset().fadeIn(0.15).play();
+        targetAction.fadeOut(0.15);
+        currentActionRef.current = fallback;
+        oneShotTimeoutRef.current = null;
+        console.log(`[HiveDescent animation test] One-shot ${target} finished, returned to ${fallback}`);
+      }, durationMs);
+    }
   }, [animState, actionsReady]);
 
   useFrame((_, dt) => {
