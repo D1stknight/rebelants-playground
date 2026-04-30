@@ -1,11 +1,12 @@
 // components/HiveDescent/FactionCharacter.tsx
 // Hive Descent rigged faction character.
-// Current test: GLB model visible with size and ground-height tuning.
+// Current test: visible GLB model plus run.fbx animation mapped to run state.
 
 import { useEffect, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 
 export type AnimStateName = 'idle' | 'walk' | 'run' | 'attack' | 'hurt' | 'die';
 
@@ -17,11 +18,96 @@ interface FactionCharacterProps {
 
 const TARGET_HEIGHT = 0.9;
 const MODEL_Y_OFFSET = 0.55;
+const RUN_TIME_SCALE = 0.8;
 
-export default function FactionCharacter({ factionId }: FactionCharacterProps) {
+let runClipCache: THREE.AnimationClip | null = null;
+let runClipPromise: Promise<void> | null = null;
+
+function loadRunAnimationOnce(): Promise<void> {
+  if (runClipPromise) return runClipPromise;
+
+  const fbxLoader = new FBXLoader();
+
+  runClipPromise = new Promise<void>((resolve) => {
+    fbxLoader.load(
+      '/descent/models/animations/run.fbx',
+      (fbx: any) => {
+        const clip = fbx.animations?.[0] as THREE.AnimationClip | undefined;
+        if (clip) {
+          clip.name = 'run';
+          runClipCache = clip;
+          console.log(`[HiveDescent animation test] Loaded run.fbx: ${clip.tracks.length} tracks, ${clip.duration.toFixed(2)}s`);
+          console.log('[HiveDescent animation test] run.fbx first tracks:', clip.tracks.slice(0, 5).map((t) => t.name));
+        } else {
+          console.warn('[HiveDescent animation test] run.fbx loaded but had no animation clip');
+        }
+        resolve();
+      },
+      undefined,
+      (err: any) => {
+        console.warn('[HiveDescent animation test] Failed to load run.fbx:', err);
+        resolve();
+      }
+    );
+  });
+
+  return runClipPromise;
+}
+
+function buildBoneMap(scene: THREE.Group): Map<string, string> {
+  const map = new Map<string, string>();
+
+  scene.traverse((obj: any) => {
+    if (!obj.isBone || !obj.name) return;
+    const fullName = obj.name;
+    const lower = fullName.toLowerCase();
+    const stripped = fullName.replace(/^mixamorig:?/i, '').toLowerCase();
+    map.set(lower, fullName);
+    if (stripped && stripped !== lower) map.set(stripped, fullName);
+  });
+
+  console.log(`[HiveDescent animation test] Bone map entries: ${map.size}`);
+  return map;
+}
+
+function retargetClip(clip: THREE.AnimationClip, boneMap: Map<string, string>): THREE.AnimationClip {
+  const newTracks: THREE.KeyframeTrack[] = [];
+
+  for (const track of clip.tracks) {
+    const lastDot = track.name.lastIndexOf('.');
+    if (lastDot === -1) continue;
+
+    const sourceBone = track.name.substring(0, lastDot);
+    const property = track.name.substring(lastDot);
+
+    // Keep only rotations for now. Root position/scale tracks can cause floating, flipping, or jitter.
+    if (property !== '.quaternion') continue;
+
+    const stripped = sourceBone.replace(/^mixamorig:?/i, '').toLowerCase();
+    const target = boneMap.get(sourceBone.toLowerCase()) || boneMap.get(stripped);
+
+    if (target) {
+      const newTrack = track.clone();
+      newTrack.name = target + property;
+      newTracks.push(newTrack);
+    }
+  }
+
+  console.log(`[HiveDescent animation test] Retargeted run clip: ${newTracks.length} usable tracks`);
+  console.log('[HiveDescent animation test] Retargeted first tracks:', newTracks.slice(0, 5).map((t) => t.name));
+  return new THREE.AnimationClip(clip.name, clip.duration, newTracks);
+}
+
+export default function FactionCharacter({ factionId, animState }: FactionCharacterProps) {
   const groupRef = useRef<THREE.Group>(null);
+  const mixerRef = useRef<THREE.AnimationMixer | null>(null);
+  const runActionRef = useRef<THREE.AnimationAction | null>(null);
+  const isRunPlayingRef = useRef(false);
+
   const [loadedScene, setLoadedScene] = useState<THREE.Group | null>(null);
   const [renderScale, setRenderScale] = useState(1);
+  const [runReady, setRunReady] = useState(false);
+  const [runActionReady, setRunActionReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -85,7 +171,66 @@ export default function FactionCharacter({ factionId }: FactionCharacterProps) {
     };
   }, [factionId]);
 
-  useFrame(() => undefined);
+  useEffect(() => {
+    let cancelled = false;
+    loadRunAnimationOnce().then(() => {
+      if (cancelled) return;
+      if (runClipCache) setRunReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!loadedScene || !runReady || !runClipCache) return;
+
+    const boneMap = buildBoneMap(loadedScene);
+    const mixer = new THREE.AnimationMixer(loadedScene);
+    mixerRef.current = mixer;
+
+    const runClip = retargetClip(runClipCache, boneMap);
+    if (runClip.tracks.length > 0) {
+      const action = mixer.clipAction(runClip);
+      action.setLoop(THREE.LoopRepeat, Infinity);
+      action.timeScale = RUN_TIME_SCALE;
+      runActionRef.current = action;
+      setRunActionReady(true);
+      console.log('[HiveDescent animation test] Run action ready');
+    }
+
+    return () => {
+      mixer.stopAllAction();
+      mixerRef.current = null;
+      runActionRef.current = null;
+      isRunPlayingRef.current = false;
+      setRunActionReady(false);
+    };
+  }, [loadedScene, runReady]);
+
+  useEffect(() => {
+    const runAction = runActionRef.current;
+    console.log(`[HiveDescent animation test] animState: ${animState}`);
+    if (!runAction || !runActionReady) return;
+
+    const shouldRun = animState === 'run';
+
+    if (shouldRun && !isRunPlayingRef.current) {
+      runAction.reset().fadeIn(0.15).play();
+      isRunPlayingRef.current = true;
+      console.log('[HiveDescent animation test] Run animation started');
+    }
+
+    if (!shouldRun && isRunPlayingRef.current) {
+      runAction.fadeOut(0.15);
+      isRunPlayingRef.current = false;
+      console.log('[HiveDescent animation test] Run animation stopped');
+    }
+  }, [animState, runActionReady]);
+
+  useFrame((_, dt) => {
+    if (mixerRef.current) mixerRef.current.update(dt);
+  });
 
   return (
     <group ref={groupRef}>
