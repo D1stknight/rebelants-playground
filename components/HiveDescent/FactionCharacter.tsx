@@ -16,7 +16,7 @@ interface FactionCharacterProps {
 }
 
 const TARGET_HEIGHT = 0.9;
-const MODEL_Y_OFFSET = 0.65;
+const MODEL_Y_OFFSET = 0.55;
 
 export default function FactionCharacter({ factionId }: FactionCharacterProps) {
   const groupRef = useRef<THREE.Group>(null);
