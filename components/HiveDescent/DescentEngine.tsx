@@ -285,9 +285,10 @@ const Scene: React.FC<SceneProps> = ({
   // Phase D: animation state machine for the rigged character
   const [animState, setAnimState] = useState<"idle" | "walk" | "run" | "attack" | "hurt" | "die">("idle");
   const [useGLB, setUseGLB] = useState(true); // false if GLB load fails — falls back to procedural
-  const lastAnimUpdateRef = useRef(0);
+    const lastAnimUpdateRef = useRef(0);
   const lastHpRef = useRef(100);
   const lastAttackAtRef = useRef(0);
+  const deathTriggeredRef = useRef(false);
 
   // Set initial camera
   useEffect(() => {
@@ -298,9 +299,14 @@ const Scene: React.FC<SceneProps> = ({
   useFrame((state, dtRaw) => {
     const dt = Math.min(dtRaw, 0.033); // clamp dt so a hitch doesn't teleport entities
     const now = state.clock.elapsedTime * 1000;
-    const player = playerRef.current;
+       const player = playerRef.current;
     const enemies = enemiesRef.current;
     const input = inputRef.current;
+
+    if (player.alive && deathTriggeredRef.current) {
+      deathTriggeredRef.current = false;
+    }
+
     if (!player.alive) return;
 
     // ---------- Player movement (Phase C: camera-relative) ----------
@@ -504,10 +510,18 @@ const Scene: React.FC<SceneProps> = ({
 
     // ---------- End conditions ----------
     if (!player.alive) {
-      hudPushRef.current(player, aliveCount, now);
+  hudPushRef.current(player, aliveCount, now);
+  setAnimState("die");
+
+  if (!deathTriggeredRef.current) {
+    deathTriggeredRef.current = true;
+    window.setTimeout(() => {
       onPlayerDeath();
-      return;
-    }
+    }, 1800);
+  }
+
+  return;
+}
     if (aliveCount === 0 && !allClearFiredRef.current) {
       allClearFiredRef.current = true;
       hudPushRef.current(player, 0, now);
