@@ -95,15 +95,20 @@ function retargetClip(clip: THREE.AnimationClip, boneMap: Map<string, string>): 
     const sourceBone = track.name.substring(0, lastDot);
     const property = track.name.substring(lastDot);
 
-    // Keep only rotations for now. Root position/scale tracks can cause floating, flipping, or jitter.
-    if (property !== '.quaternion') continue;
+       const normalizedSourceBone = sourceBone.replace(/^mixamorig:?/i, '').toLowerCase();
+    const allowDieHipsPosition =
+      clip.name === 'die' &&
+      normalizedSourceBone === 'hips' &&
+      property === '.position';
 
-    // Do not copy the Hips rotation. Mixamo's hips quaternion can rotate the whole model onto its stomach.
-    const normalizedSourceBone = sourceBone.replace(/^mixamorig:?/i, '').toLowerCase();
-    if (normalizedSourceBone === 'hips') continue;
+    // Keep only rotations for most animations.
+    // For die only, also allow the Hips.position track so the body can drop toward the ground.
+    if (property !== '.quaternion' && !allowDieHipsPosition) continue;
+
+    // Still skip Hips rotation so the character does not flip onto his stomach.
+    if (normalizedSourceBone === 'hips' && property === '.quaternion') continue;
 
     const target = boneMap.get(sourceBone.toLowerCase()) || boneMap.get(normalizedSourceBone);
-
     if (target) {
       const newTrack = track.clone();
       newTrack.name = target + property;
