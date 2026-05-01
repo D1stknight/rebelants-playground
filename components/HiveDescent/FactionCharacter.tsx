@@ -303,9 +303,7 @@ export default function FactionCharacter({ factionId, animState }: FactionCharac
     if (mixerRef.current) mixerRef.current.update(dt);
   });
 
-   const effectiveYOffset = animState === 'die' ? 0.35 : MODEL_Y_OFFSET;
-
-   const effectiveYOffset = animState === 'die' ? DIE_Y_OFFSET : MODEL_Y_OFFSET;
+     const effectiveYOffset = animState === 'die' ? DIE_Y_OFFSET : MODEL_Y_OFFSET;
 
   return (
     <group ref={groupRef}>
