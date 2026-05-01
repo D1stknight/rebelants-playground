@@ -18,7 +18,7 @@ interface FactionCharacterProps {
 
 const TARGET_HEIGHT = 0.9;
 const MODEL_Y_OFFSET = 0.42;
-const DIE_Y_OFFSET = 0.12;
+const GROUND_CLEARANCE = 0.02;
 const IDLE_TIME_SCALE = 1;
 const WALK_TIME_SCALE = 1;
 const RUN_TIME_SCALE = 0.8;
@@ -95,8 +95,7 @@ function retargetClip(clip: THREE.AnimationClip, boneMap: Map<string, string>): 
 
     const sourceBone = track.name.substring(0, lastDot);
     const property = track.name.substring(lastDot);
-
-         const normalizedSourceBone = sourceBone.replace(/^mixamorig:?/i, '').toLowerCase();
+    const normalizedSourceBone = sourceBone.replace(/^mixamorig:?/i, '').toLowerCase();
 
     // Keep only rotations. Root position/scale tracks can cause floating, flipping, or jitter.
     if (property !== '.quaternion') continue;
@@ -126,6 +125,8 @@ function timeScaleFor(name: AnimStateName): number {
 
 export default function FactionCharacter({ factionId, animState }: FactionCharacterProps) {
   const groupRef = useRef<THREE.Group>(null);
+  const modelWrapperRef = useRef<THREE.Group>(null);
+  const groundBoxRef = useRef(new THREE.Box3());
   const mixerRef = useRef<THREE.AnimationMixer | null>(null);
   const actionsRef = useRef<Partial<Record<AnimStateName, THREE.AnimationAction>>>({});
   const currentActionRef = useRef<AnimStateName | null>(null);
@@ -301,15 +302,24 @@ export default function FactionCharacter({ factionId, animState }: FactionCharac
 
   useFrame((_, dt) => {
     if (mixerRef.current) mixerRef.current.update(dt);
-  });
 
-     const effectiveYOffset = animState === 'die' ? DIE_Y_OFFSET : MODEL_Y_OFFSET;
+    if (!loadedScene || !modelWrapperRef.current) return;
+
+    const box = groundBoxRef.current.setFromObject(loadedScene);
+    if (!Number.isFinite(box.min.y)) return;
+
+    const deltaY = GROUND_CLEARANCE - box.min.y;
+    if (Math.abs(deltaY) > 0.001) {
+      modelWrapperRef.current.position.y += deltaY;
+    }
+  });
 
   return (
     <group ref={groupRef}>
       {loadedScene && (
         <group
-          position={[0, effectiveYOffset, 0]}
+          ref={modelWrapperRef}
+          position={[0, MODEL_Y_OFFSET, 0]}
           rotation={[0, 0, 0]}
           scale={renderScale}
         >
