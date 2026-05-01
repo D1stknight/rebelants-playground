@@ -18,6 +18,9 @@ interface FactionCharacterProps {
 
 const TARGET_HEIGHT = 0.9;
 const MODEL_Y_OFFSET = 0.42;
+const DEATH_FALL_DURATION_MS = 900;
+const DEATH_FINAL_Y_OFFSET = 0.1;
+const DEATH_FINAL_X_ROTATION = -Math.PI / 2;
 const IDLE_TIME_SCALE = 1;
 const WALK_TIME_SCALE = 1;
 const RUN_TIME_SCALE = 0.8;
@@ -99,8 +102,8 @@ function retargetClip(clip: THREE.AnimationClip, boneMap: Map<string, string>): 
     // Keep only rotations. Root position/scale tracks can cause floating, flipping, or jitter.
     if (property !== '.quaternion') continue;
 
-    // Keep skipping Hips rotation for normal animations, but allow it for die so the body can rotate onto its back.
-    if (normalizedSourceBone === 'hips' && clip.name !== 'die') continue;
+    // Skip Hips rotation for every clip. Death fall is handled by the wrapper so Mixamo root rotation cannot throw the model around.
+    if (normalizedSourceBone === 'hips') continue;
 
     const target = boneMap.get(sourceBone.toLowerCase()) || boneMap.get(normalizedSourceBone);
     if (target) {
@@ -122,8 +125,14 @@ function timeScaleFor(name: AnimStateName): number {
   return ONE_SHOT_TIME_SCALE;
 }
 
+function easeOutCubic(t: number): number {
+  return 1 - Math.pow(1 - t, 3);
+}
+
 export default function FactionCharacter({ factionId, animState }: FactionCharacterProps) {
   const groupRef = useRef<THREE.Group>(null);
+  const modelWrapperRef = useRef<THREE.Group>(null);
+  const deathStartedAtRef = useRef<number | null>(null);
   const mixerRef = useRef<THREE.AnimationMixer | null>(null);
   const actionsRef = useRef<Partial<Record<AnimStateName, THREE.AnimationAction>>>({});
   const currentActionRef = useRef<AnimStateName | null>(null);
@@ -253,6 +262,15 @@ export default function FactionCharacter({ factionId, animState }: FactionCharac
 
   useEffect(() => {
     console.log(`[HiveDescent animation test] animState: ${animState}`);
+
+    if (animState === 'die' && deathStartedAtRef.current === null) {
+      deathStartedAtRef.current = performance.now();
+    }
+
+    if (animState !== 'die') {
+      deathStartedAtRef.current = null;
+    }
+
     if (!actionsReady) return;
 
     const actions = actionsRef.current;
@@ -297,14 +315,29 @@ export default function FactionCharacter({ factionId, animState }: FactionCharac
     }
   }, [animState, actionsReady]);
 
-  useFrame((_, dt) => {
-    if (mixerRef.current) mixerRef.current.update(dt);
+  useFrame(() => {
+    if (mixerRef.current) mixerRef.current.update(1 / 60);
+
+    const wrapper = modelWrapperRef.current;
+    if (!wrapper) return;
+
+    if (animState === 'die' && deathStartedAtRef.current !== null) {
+      const elapsed = performance.now() - deathStartedAtRef.current;
+      const t = Math.min(1, elapsed / DEATH_FALL_DURATION_MS);
+      const eased = easeOutCubic(t);
+      wrapper.position.y = THREE.MathUtils.lerp(MODEL_Y_OFFSET, DEATH_FINAL_Y_OFFSET, eased);
+      wrapper.rotation.x = THREE.MathUtils.lerp(0, DEATH_FINAL_X_ROTATION, eased);
+    } else {
+      wrapper.position.set(0, MODEL_Y_OFFSET, 0);
+      wrapper.rotation.set(0, 0, 0);
+    }
   });
 
   return (
     <group ref={groupRef}>
       {loadedScene && (
         <group
+          ref={modelWrapperRef}
           position={[0, MODEL_Y_OFFSET, 0]}
           rotation={[0, 0, 0]}
           scale={renderScale}
