@@ -1934,7 +1934,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                                   width: isMobileView ? "135%" : "155%",
                                   height: isMobileView ? "135%" : "155%",
                                   objectFit: "contain",
-                                  transform: "translateY(3px) scale(1.45)",
+                                  transform: "translateY(3px) scale(1.55)",
                                   transformOrigin: "center center",
                                   filter: isMobileView
                                     ? "drop-shadow(0 0 4px rgba(0,0,0,0.35))"
