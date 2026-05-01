@@ -83,9 +83,15 @@ export function usePoints(playerId: string) {
     setTotalEarnRoom(Number(j?.totalEarnRoom || 0));
   }, []);
 
-  // ✅ When playerId changes, update ref AND refresh immediately
+  // ✅ When playerId changes, clear old visible balance, update ref, and refresh immediately
   useEffect(() => {
     playerIdRef.current = clampPid(playerId);
+    setBalance(0);
+    setEarnedToday(0);
+    setCapBank(0);
+    setDailyCap(0);
+    setRemainingDaily(0);
+    setTotalEarnRoom(0);
     refresh().catch(() => {});
   }, [playerId, refresh]);
 
