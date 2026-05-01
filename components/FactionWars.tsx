@@ -1314,7 +1314,6 @@ export default function FactionWars() {
                   </div>
                 )}
               </div>
-            </div>
         <div style={{ marginBottom:8 }}>
           <button onClick={()=>setShowRules(true)} style={{ fontSize:12, textDecoration:"underline", opacity:0.55, background:"none", border:"none", color:"inherit", cursor:"pointer", padding:0 }}>Official Rules</button>
         </div>
