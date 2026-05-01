@@ -1,12 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 
-function getCookie(req: NextApiRequest, name: string) {
-  const raw = req.headers.cookie || "";
-  const parts = raw.split(";").map((s) => s.trim());
-  const hit = parts.find((p) => p.startsWith(name + "="));
-  return hit ? decodeURIComponent(hit.split("=").slice(1).join("=")) : "";
-}
-
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const clientId = process.env.DISCORD_CLIENT_ID;
   const clientSecret = process.env.DISCORD_CLIENT_SECRET;
@@ -19,7 +12,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const code = String(req.query.code || "");
   const state = String(req.query.state || "");
-  const stateCookie = getCookie(req, "ra_discord_state");
+  // Use Next.js built-in cookie parser (more reliable than manual header parsing)
+  const stateCookie = req.cookies["ra_discord_state"] || "";
 
   if (!code) return res.status(400).send("Missing code");
   if (!state || !stateCookie || state !== stateCookie) {
@@ -57,14 +51,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const discordUserId = String(me.id);
   const discordName = String(me.global_name || me.username || "discord");
 
-  // ✅ set session cookie (httpOnly) so client cannot spoof
-  // also clear state cookie
+  // set session cookie (httpOnly) + clear state cookie
   res.setHeader("Set-Cookie", [
     `ra_discord_user=${encodeURIComponent(JSON.stringify({ discordUserId, discordName }))}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400`,
     `ra_discord_state=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`,
   ]);
 
-  // go back to Shuffle
   const rawReturn = (() => { try { return decodeURIComponent(String(req.cookies?.ra_return_to || "/")); } catch { return "/"; } })();
   const returnPath = (() => { try { return new URL(rawReturn).pathname || "/"; } catch { return rawReturn.startsWith("/") ? rawReturn : "/"; } })();
   res.redirect(appUrl ? `${appUrl}${returnPath}?discord=1` : `${returnPath}?discord=1`);

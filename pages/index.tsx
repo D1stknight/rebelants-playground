@@ -504,7 +504,7 @@ export default function LandingPage() {
           {/* ══ HERO ══════════════════════════════════════════════════════════ */}
           <div style={{ minHeight:'100vh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'60px 24px 80px', textAlign:'center' }}>
 
-            <div style={{ marginBottom:20, opacity: titleIn ? 1 : 0, transform: titleIn ? 'scale(1) rotate(0deg)' : 'scale(0.4) rotate(-20deg)', transition:'all 0.7s cubic-bezier(0.34,1.56,0.64,1)', width:140, height:140, margin:'0 auto 20px' }}>
+            <div style={{ marginBottom:20, opacity: titleIn ? 1 : 0, transform: titleIn ? 'scale(1) rotate(0deg)' : 'scale(0.4) rotate(-20deg)', transition:'all 0.7s cubic-bezier(0.34,1.56,0.64,1)', width:220, height:220, margin:'0 auto 20px' }}>
               <img src="/bg/rebel-ants-logo.png" alt="Rebel Ants" style={{ width:'100%', height:'100%', objectFit:'contain', mixBlendMode:'screen', filter:'drop-shadow(0 0 30px rgba(239,68,68,0.6))' }} />
             </div>
 
@@ -620,7 +620,7 @@ export default function LandingPage() {
               <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
                 <div style={{ fontFamily:'inherit', fontSize:11, letterSpacing:'0.2em', color:'rgba(255,255,255,0.35)', textTransform:'uppercase' }}>REBEL BALANCE</div>
                 <div style={{ fontFamily:'inherit', fontSize:28, fontWeight:900, color:'#fbbf24', letterSpacing:'0.05em', filter:'drop-shadow(0 0 12px rgba(251,191,36,0.4))' }}>
-                  {pts.balance !== undefined ? pts.balance.toLocaleString() : '—'}
+                  {effectiveId !== 'guest' && pts.balance !== undefined ? pts.balance.toLocaleString() : '—'}
                 </div>
                 <div style={{ fontFamily:'inherit', fontSize:10, color:'rgba(255,255,255,0.25)', letterSpacing:'0.08em' }}>REBEL TOKENS</div>
               </div>
