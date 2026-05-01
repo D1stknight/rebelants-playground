@@ -516,8 +516,8 @@ const Scene: React.FC<SceneProps> = ({
   if (!deathTriggeredRef.current) {
     deathTriggeredRef.current = true;
     window.setTimeout(() => {
-      onPlayerDeath();
-    }, 1800);
+  onPlayerDeath();
+}, 3500);
   }
 
   return;
