@@ -95,18 +95,13 @@ function retargetClip(clip: THREE.AnimationClip, boneMap: Map<string, string>): 
     const sourceBone = track.name.substring(0, lastDot);
     const property = track.name.substring(lastDot);
 
-       const normalizedSourceBone = sourceBone.replace(/^mixamorig:?/i, '').toLowerCase();
-    const allowDieHipsPosition =
-      clip.name === 'die' &&
-      normalizedSourceBone === 'hips' &&
-      property === '.position';
+         const normalizedSourceBone = sourceBone.replace(/^mixamorig:?/i, '').toLowerCase();
 
-    // Keep only rotations for most animations.
-    // For die only, also allow the Hips.position track so the body can drop toward the ground.
-    if (property !== '.quaternion' && !allowDieHipsPosition) continue;
+    // Keep only rotations. Root position/scale tracks can cause floating, flipping, or jitter.
+    if (property !== '.quaternion') continue;
 
     // Still skip Hips rotation so the character does not flip onto his stomach.
-    if (normalizedSourceBone === 'hips' && property === '.quaternion') continue;
+    if (normalizedSourceBone === 'hips') continue;
 
     const target = boneMap.get(sourceBone.toLowerCase()) || boneMap.get(normalizedSourceBone);
     if (target) {
@@ -307,11 +302,13 @@ export default function FactionCharacter({ factionId, animState }: FactionCharac
     if (mixerRef.current) mixerRef.current.update(dt);
   });
 
+   const effectiveYOffset = animState === 'die' ? 0.35 : MODEL_Y_OFFSET;
+
   return (
     <group ref={groupRef}>
       {loadedScene && (
         <group
-          position={[0, MODEL_Y_OFFSET, 0]}
+          position={[0, effectiveYOffset, 0]}
           rotation={[0, 0, 0]}
           scale={renderScale}
         >
