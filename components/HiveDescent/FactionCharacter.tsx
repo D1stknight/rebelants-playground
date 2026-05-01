@@ -19,7 +19,7 @@ interface FactionCharacterProps {
 const TARGET_HEIGHT = 0.9;
 const MODEL_Y_OFFSET = 0.42;
 const DEATH_FALL_DURATION_MS = 900;
-const DEATH_FINAL_Y_OFFSET = 0.1;
+const DEATH_FINAL_Y_OFFSET = 0.28;
 const DEATH_FINAL_X_ROTATION = -Math.PI / 2;
 const IDLE_TIME_SCALE = 1;
 const WALK_TIME_SCALE = 1;
