@@ -178,7 +178,7 @@ export default function LandingPage() {
       setShowNameClaim(false);
     } catch { setNameAvailMsg('Server error — try again'); }
     setNameClaiming(false);
-  }, [nameQuery, nameAvail]);
+  }, [nameQuery, nameAvail, pinInput]);
 
   // Sign in with existing name + PIN
   const handleSignIn = useCallback(async () => {
@@ -705,7 +705,7 @@ export default function LandingPage() {
               CHOOSE YOUR BATTLEFIELD
             </h2>
             <p style={{ fontFamily:JP, textAlign:'center', color:'rgba(255,255,255,0.35)', marginBottom:52, fontSize:12, letterSpacing:'0.2em', textTransform:'uppercase' }}>
-              FIVE GAMES. ONE UNIVERSE. INFINITE REBEL TO EARN.
+              EIGHT GAMES. ONE UNIVERSE. INFINITE REBEL TO EARN.
             </p>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(230px,1fr))', gap:18 }}>
               {GAMES.map((g, i) => (
@@ -728,6 +728,31 @@ export default function LandingPage() {
                   <h3 style={{ fontFamily:JP, fontSize:15, fontWeight:900, marginBottom:10, letterSpacing:'0.2em', color: hovered===g.id ? g.color : 'rgba(255,255,255,0.9)', transition:'color 0.2s', textTransform:'uppercase' }}>{g.title}</h3>
                   <p style={{ fontFamily:JP, fontSize:11, color:'rgba(255,255,255,0.4)', lineHeight:1.8, marginBottom:22, letterSpacing:'0.08em', textTransform:'uppercase' }}>{g.desc}</p>
                   <div style={{ fontFamily:JP, fontSize:11, fontWeight:900, color: g.color, opacity: hovered===g.id ? 1 : 0.5, transition:'opacity 0.2s', letterSpacing:'0.15em', textTransform:'uppercase' }}>PLAY NOW →</div>
+                </div>
+              ))}
+
+              {/* ── Coming Soon Games ── */}
+              {[
+                { id:'cs1', icon:'🏹', title:'BOUNTY HUNTERS', tag:'COMING SOON', color:'#a78bfa', glow:'rgba(167,139,250,0.35)', bg:'rgba(167,139,250,0.04)', desc:'TRACK TARGETS. COLLECT BOUNTIES. BECOME THE MOST FEARED HUNTER IN THE COLONY.' },
+                { id:'cs2', icon:'🧬', title:'HIVE GENETICS', tag:'COMING SOON', color:'#34d399', glow:'rgba(52,211,153,0.35)', bg:'rgba(52,211,153,0.04)', desc:'SPLICE GENES. EVOLVE YOUR ANT. BUILD THE PERFECT SUPER-SOLDIER FOR THE QUEEN.' },
+                { id:'cs3', icon:'⚡', title:'LIGHTNING RAIDS', tag:'COMING SOON', color:'#fbbf24', glow:'rgba(251,191,36,0.35)', bg:'rgba(251,191,36,0.04)', desc:'STRIKE FAST. HIT HARD. VANISH BEFORE THEY KNOW YOU WERE THERE.' },
+              ].map((g, i) => (
+                <div key={g.id}
+                  style={{
+                    position:'relative', padding:'28px 22px 24px', borderRadius:18, cursor:'default',
+                    border:'1px solid rgba(255,255,255,0.05)',
+                    background:'rgba(255,255,255,0.015)',
+                    opacity: cardsIn ? 0.65 : 0,
+                    transform: cardsIn ? 'translateY(0) scale(1)' : 'translateY(40px)',
+                    transition: `all 0.45s cubic-bezier(0.22,1,0.36,1) ${(5+i)*90}ms`,
+                    boxShadow:'0 4px 20px rgba(0,0,0,0.25)',
+                    backdropFilter:'blur(12px)',
+                  }}>
+                  <span style={{ fontFamily:JP, position:'absolute', top:14, right:14, fontSize:9, fontWeight:900, letterSpacing:'0.15em', padding:'3px 7px', borderRadius:4, background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.3)', textTransform:'uppercase' }}>{g.tag}</span>
+                  <div style={{ fontSize:40, marginBottom:18, filter:'none', transition:'filter 0.3s', opacity:0.5 }}>{g.icon}</div>
+                  <h3 style={{ fontFamily:JP, fontSize:15, fontWeight:900, marginBottom:10, letterSpacing:'0.2em', color:'rgba(255,255,255,0.4)', textTransform:'uppercase' }}>{g.title}</h3>
+                  <p style={{ fontFamily:JP, fontSize:11, color:'rgba(255,255,255,0.25)', lineHeight:1.8, marginBottom:22, letterSpacing:'0.08em', textTransform:'uppercase' }}>{g.desc}</p>
+                  <div style={{ fontFamily:JP, fontSize:11, fontWeight:900, color:'rgba(255,255,255,0.2)', letterSpacing:'0.15em', textTransform:'uppercase' }}>⏳ IN DEVELOPMENT →</div>
                 </div>
               ))}
             </div>
