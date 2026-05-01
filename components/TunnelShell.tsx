@@ -1930,11 +1930,12 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                               <img
                                                              src={getTunnelPlayerSprite()}
                                 alt="Samurai Ant"
-                                                                style={{
+                                                                                               style={{
                                   width: isMobileView ? "135%" : "155%",
                                   height: isMobileView ? "135%" : "155%",
                                   objectFit: "contain",
-                                  transform: "translateY(3px)",
+                                  transform: "translateY(3px) scale(1.45)",
+                                  transformOrigin: "center center",
                                   filter: isMobileView
                                     ? "drop-shadow(0 0 4px rgba(0,0,0,0.35))"
                                     : "drop-shadow(0 0 6px rgba(0,0,0,0.45)) drop-shadow(0 0 10px rgba(255,255,255,0.12))",
