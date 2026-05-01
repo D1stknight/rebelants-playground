@@ -58,7 +58,7 @@ export function usePoints(playerId: string) {
   // ✅ Always operate on the latest playerId (guest -> discord -> wallet)
   const playerIdRef = useRef<string>(clampPid(playerId));
 
-    const [balance, setBalance] = useState(0);
+  const [balance, setBalance] = useState(0);
   const [earnedToday, setEarnedToday] = useState(0);
   const [capBank, setCapBank] = useState(0);
   const [dailyCap, setDailyCap] = useState(0);
@@ -73,7 +73,7 @@ export function usePoints(playerId: string) {
       { cache: "no-store" }
     );
 
-        const j = (await r.json().catch(() => null)) as BalanceRes | null;
+    const j = (await r.json().catch(() => null)) as BalanceRes | null;
 
     setBalance(Number(j?.balance || 0));
     setEarnedToday(Number(j?.earnedToday || 0));
@@ -89,6 +89,27 @@ export function usePoints(playerId: string) {
     refresh().catch(() => {});
   }, [playerId, refresh]);
 
+  // ✅ OAuth/profile changes can happen right after navigation returns.
+  // Refresh once immediately and once shortly after so Discord-linked points appear without a manual page refresh.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const delayedRefresh = () => {
+      refresh().catch(() => {});
+      window.setTimeout(() => refresh().catch(() => {}), 300);
+    };
+
+    window.addEventListener("ra:identity-changed", delayedRefresh);
+    window.addEventListener("pageshow", delayedRefresh);
+    window.addEventListener("focus", delayedRefresh);
+
+    return () => {
+      window.removeEventListener("ra:identity-changed", delayedRefresh);
+      window.removeEventListener("pageshow", delayedRefresh);
+      window.removeEventListener("focus", delayedRefresh);
+    };
+  }, [refresh]);
+
   const spend = useCallback(
     async (cost: number, reason?: string) => {
       const pid = clampPid(playerIdRef.current);
@@ -101,7 +122,7 @@ export function usePoints(playerId: string) {
 
       const j = (await r.json().catch(() => null)) as SpendRes | null;
 
-           if (r.ok && j && typeof j.balance === "number") {
+      if (r.ok && j && typeof j.balance === "number") {
         setBalance(j.balance);
         setEarnedToday(Number(j.earnedToday ?? earnedToday));
         setCapBank(Number(j.capBank || 0));
@@ -130,7 +151,7 @@ export function usePoints(playerId: string) {
 
       const j = (await r.json().catch(() => null)) as EarnRes | null;
 
-           if (r.ok && j && typeof j.balance === "number") {
+      if (r.ok && j && typeof j.balance === "number") {
         setBalance(j.balance);
         setEarnedToday(Number(j.earnedToday ?? earnedToday));
         setCapBank(Number(j.capBank || 0));
