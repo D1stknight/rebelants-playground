@@ -1344,7 +1344,21 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     return () => window.clearTimeout(id);
   }, [countdown]);
 
-  dpadActionRef.current = handleTunnelAction;
+   dpadActionRef.current = handleTunnelAction;
+
+  const getTunnelPlayerSprite = () => {
+    if (hitFlash || hitShake) return "/tunnel/samurai/hit.png";
+    if (didWinRun) return "/tunnel/samurai/win.png";
+    if (lastRunResult && !lastRunResult.wasFullClear) return "/tunnel/samurai/death.png";
+
+    if (!isPlaying) return "/tunnel/samurai/idle.png";
+
+    if (facing === "left") return "/tunnel/samurai/left.png";
+    if (facing === "right") return "/tunnel/samurai/right.png";
+
+    return "/tunnel/samurai/run.png";
+  };
+
   return (
     <>
           {countdown !== null && (
@@ -1914,7 +1928,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                               }}
                             >
                               <img
-                                src="/ants/samurai.png"
+                                                             src={getTunnelPlayerSprite()}
                                 alt="Samurai Ant"
                                 style={{
                                   width: isMobileView ? "110%" : "125%",
