@@ -239,7 +239,7 @@ const Chamber: React.FC<{ biome: Biome }> = ({ biome }) => {
             <sphereGeometry args={[0.25, 12, 8]} />
             <meshBasicMaterial color={biome.particleColor} />
           </mesh>
-          <pointLight position={[0, p.h + 0.2, 0]} color={biome.keyLightColor} intensity={1.5} distance={10} decay={2} />
+                  <pointLight position={[0, p.h + 0.2, 0]} color={biome.keyLightColor} intensity={2.4} distance={14} decay={2} />
         </group>
       ))}
       {/* Central focus dais */}
@@ -533,10 +533,11 @@ const Scene: React.FC<SceneProps> = ({
   return (
     <>
       {/* Lighting */}
-      <ambientLight color={biome.ambientColor} intensity={0.4} />
-      <directionalLight color={biome.keyLightColor} intensity={1.1} position={[8, 12, 5]} castShadow shadow-mapSize={[1024, 1024]} />
-      <hemisphereLight color={biome.skyTop} groundColor={biome.skyBottom} intensity={0.4} />
-      <fog attach="fog" args={[biome.fogColor, 8, 30]} />
+          {/* Lighting */}
+      <ambientLight color={biome.ambientColor} intensity={0.9} />
+      <directionalLight color={biome.keyLightColor} intensity={1.6} position={[8, 12, 5]} castShadow shadow-mapSize={[1024, 1024]} />
+      <hemisphereLight color={biome.skyTop} groundColor={biome.skyBottom} intensity={0.8} />
+      <fog attach="fog" args={[biome.fogColor, 12, 38]} />
       {/* Sky background plane */}
       <color attach="background" args={[biome.skyBottom]} />
 
