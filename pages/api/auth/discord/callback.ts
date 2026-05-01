@@ -3,10 +3,9 @@ import type { NextApiRequest, NextApiResponse } from "next";
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const clientId = process.env.DISCORD_CLIENT_ID;
   const clientSecret = process.env.DISCORD_CLIENT_SECRET;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
 
   if (!clientId || !clientSecret) {
-    return res.status(500).send("Missing Discord env vars");
+    return res.status(500).send("Missing DISCORD_CLIENT_ID or DISCORD_CLIENT_SECRET");
   }
 
   const code = String(req.query.code || "");
@@ -18,15 +17,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).send("Invalid state");
   }
 
-  // Use the redirect URI that was stored during login (must match exactly)
-  const proto = req.headers["x-forwarded-proto"] || "https";
-  const host = req.headers["x-forwarded-host"] || req.headers.host || "";
-  const storedRedirect = req.cookies["ra_discord_redirect"];
-  const redirectUri = storedRedirect
-    ? decodeURIComponent(storedRedirect)
-    : process.env.DISCORD_REDIRECT_URI || `${proto}://${host}/api/auth/discord/callback`;
+  // Use the exact redirect URI that was stored during login
+  const storedRedir = req.cookies["ra_discord_redir"];
+  const redirectUri = storedRedir
+    ? decodeURIComponent(storedRedir)
+    : process.env.DISCORD_REDIRECT_URI || "";
 
-  // Exchange code for token
+  if (!redirectUri) return res.status(500).send("Missing redirect URI");
+
   const tokenRes = await fetch("https://discord.com/api/oauth2/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -44,7 +42,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).send("Token exchange failed: " + JSON.stringify(tokenJson));
   }
 
-  // Fetch user identity
   const meRes = await fetch("https://discord.com/api/users/@me", {
     headers: { Authorization: `Bearer ${tokenJson.access_token}` },
   });
@@ -57,17 +54,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const discordUserId = String(me.id);
   const discordName = String(me.global_name || me.username || "discord");
 
-  // Set session cookie, clear state + redirect cookies
   res.setHeader("Set-Cookie", [
     `ra_discord_user=${encodeURIComponent(JSON.stringify({ discordUserId, discordName }))}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400`,
     `ra_discord_state=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`,
-    `ra_discord_redirect=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`,
+    `ra_discord_redir=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`,
   ]);
 
+  // Always redirect back to the host the callback came in on
+  const host = String(req.headers["x-forwarded-host"] || req.headers.host || "");
+  const proto = req.headers["x-forwarded-proto"] || "https";
   const rawReturn = (() => { try { return decodeURIComponent(String(req.cookies?.ra_return_to || "/")); } catch { return "/"; } })();
   const returnPath = (() => { try { return new URL(rawReturn).pathname || "/"; } catch { return rawReturn.startsWith("/") ? rawReturn : "/"; } })();
 
-  // Always redirect back to the same host (not the production URL)
-  const returnBase = appUrl || `${proto}://${host}`;
-  res.redirect(`${returnBase}${returnPath}?discord=1`);
+  res.redirect(`${proto}://${host}${returnPath}?discord=1`);
 }
