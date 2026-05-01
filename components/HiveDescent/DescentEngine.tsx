@@ -322,8 +322,8 @@ const Scene: React.FC<SceneProps> = ({
       const cf = new THREE.Vector3();
       camera.getWorldDirection(cf);
       cf.y = 0; cf.normalize();
-      // Right = world up cross forward
-      const cr = new THREE.Vector3(cf.z, 0, -cf.x); // perpendicular on XZ
+          // Right = forward cross world up
+      const cr = new THREE.Vector3(-cf.z, 0, cf.x); // perpendicular on XZ
       // Build world-space velocity: "up" = forward, "right" = strafe right
       const wx = cf.x * mz + cr.x * mx;
       const wz = cf.z * mz + cr.z * mx;
