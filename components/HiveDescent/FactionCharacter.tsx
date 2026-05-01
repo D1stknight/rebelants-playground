@@ -17,7 +17,8 @@ interface FactionCharacterProps {
 }
 
 const TARGET_HEIGHT = 0.9;
-const MODEL_Y_OFFSET = 0.55;
+const MODEL_Y_OFFSET = 0.42;
+const DIE_Y_OFFSET = 0.12;
 const IDLE_TIME_SCALE = 1;
 const WALK_TIME_SCALE = 1;
 const RUN_TIME_SCALE = 0.8;
@@ -303,6 +304,8 @@ export default function FactionCharacter({ factionId, animState }: FactionCharac
   });
 
    const effectiveYOffset = animState === 'die' ? 0.35 : MODEL_Y_OFFSET;
+
+   const effectiveYOffset = animState === 'die' ? DIE_Y_OFFSET : MODEL_Y_OFFSET;
 
   return (
     <group ref={groupRef}>
