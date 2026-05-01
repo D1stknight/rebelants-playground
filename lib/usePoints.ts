@@ -75,6 +75,10 @@ export function usePoints(playerId: string) {
 
     const j = (await r.json().catch(() => null)) as BalanceRes | null;
 
+    // ✅ Ignore stale balance responses from an older identity.
+    // This prevents guest/name/discord balances from overwriting each other after fast login/logout changes.
+    if (pid !== clampPid(playerIdRef.current)) return;
+
     setBalance(Number(j?.balance || 0));
     setEarnedToday(Number(j?.earnedToday || 0));
     setCapBank(Number(j?.capBank || 0));
@@ -128,6 +132,8 @@ export function usePoints(playerId: string) {
 
       const j = (await r.json().catch(() => null)) as SpendRes | null;
 
+      if (pid !== clampPid(playerIdRef.current)) return (j || { ok: false, playerId: pid, balance, earnedToday }) as SpendRes;
+
       if (r.ok && j && typeof j.balance === "number") {
         setBalance(j.balance);
         setEarnedToday(Number(j.earnedToday ?? earnedToday));
@@ -156,6 +162,8 @@ export function usePoints(playerId: string) {
       });
 
       const j = (await r.json().catch(() => null)) as EarnRes | null;
+
+      if (pid !== clampPid(playerIdRef.current)) return (j || { ok: false, playerId: pid, balance, earnedToday }) as EarnRes;
 
       if (r.ok && j && typeof j.balance === "number") {
         setBalance(j.balance);
@@ -189,6 +197,8 @@ export function usePoints(playerId: string) {
       });
 
       const j = (await r.json().catch(() => null)) as DevGrantRes | null;
+
+      if (pid !== clampPid(playerIdRef.current)) return (j || { ok: false, dev: true, playerId: pid, added: 0, balance }) as DevGrantRes;
 
       if (r.ok && j && typeof j.balance === "number") {
         setBalance(j.balance);
