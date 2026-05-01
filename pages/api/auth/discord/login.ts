@@ -1,16 +1,23 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 
+const TESTING_HOST = "rebel-ants-playground-testing.vercel.app";
+const TESTING_REDIRECT_URI = `https://${TESTING_HOST}/api/auth/discord/callback`;
+
 // Map of known hosts to their registered Discord redirect URIs
 // Add any new deployment URLs here as needed
 const REDIRECT_URI_MAP: Record<string, string> = {
   "play.rebelants.io": "https://play.rebelants.io/api/auth/discord/callback",
   "rebelants-playground-d1stknight.vercel.app": "https://rebelants-playground-d1stknight.vercel.app/api/auth/discord/callback",
-  "rebel-ants-playground-testing.vercel.app": "https://rebel-ants-playground-testing.vercel.app/api/auth/discord/callback",
+  [TESTING_HOST]: TESTING_REDIRECT_URI,
 };
 
 function getRequestOrigin(req: NextApiRequest, host: string): string {
   const proto = String(req.headers["x-forwarded-proto"] || "https").split(",")[0];
   return `${proto}://${host}`;
+}
+
+function isVercelBranchPreviewHost(host: string): boolean {
+  return host.endsWith(".vercel.app") && host.includes("git-");
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -26,16 +33,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   ).split(":")[0]; // strip port if any
 
   const requestOrigin = getRequestOrigin(req, host);
+  const mappedRedirectUri = REDIRECT_URI_MAP[host];
+
+  // Random Vercel branch preview URLs are not registered in Discord.
+  // Send them through the stable Testing domain, which is registered.
+  if (!mappedRedirectUri && isVercelBranchPreviewHost(host)) {
+    const returnTo = String(
+      Array.isArray(req.headers.referer) ? req.headers.referer[0] : req.headers.referer || "/descent"
+    );
+    const canonicalLoginUrl = new URL("/api/auth/discord/login", `https://${TESTING_HOST}`);
+    canonicalLoginUrl.searchParams.set("returnTo", returnTo);
+    return res.redirect(canonicalLoginUrl.toString());
+  }
 
   // Look up registered redirect URI for this host, fall back to env var
-  const mappedRedirectUri = REDIRECT_URI_MAP[host];
   const envRedirectUri = process.env.DISCORD_REDIRECT_URI || "";
   const redirectUri =
     mappedRedirectUri ||
     envRedirectUri ||
     `https://${host}/api/auth/discord/callback`;
 
-  // If a preview/unknown host falls back to a different callback host, bounce the login
+  // If an unknown host falls back to a different callback host, bounce the login
   // to that callback host first. Otherwise the state cookie is set on one domain, but
   // Discord returns to another domain, causing "Invalid state".
   if (!mappedRedirectUri && envRedirectUri) {
