@@ -1176,82 +1176,107 @@ export default function FactionWars() {
         </div>
       )}
 
-      {/* Header */}
-      <div style={{ position:"relative", zIndex:1 }}>
-        <div style={{ maxWidth:900, margin:"0 auto", padding:"16px 12px", overflowX:"hidden", width:"100%" }}>
-          <div style={{ fontSize:26, fontWeight:900, marginBottom:12, display:"flex", alignItems:"center", gap:10 }}>
-            <Link href="/" style={{ textDecoration:"none", color:"inherit" }}>Rebel Ants Playground</Link>
-            <button onPointerDown={e=>{e.preventDefault();toggleMute();}} title={muted?"Unmute":"Mute"} style={{ background:"rgba(0,0,0,0.4)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:20, padding:"8px 14px", cursor:"pointer", fontSize:16, color:"rgba(255,255,255,0.8)", lineHeight:1, minWidth:44, minHeight:44, touchAction:"manipulation" }}>{muted?"🔇":"🔊"}</button>
+      {/* ── HEADER (cleaned up Shuffle-style) ── */}
+      <header style={{ position:'relative', zIndex:20, maxWidth:980, margin:'0 auto', padding:'16px 20px 0', display:'flex', alignItems:'center', justifyContent:'space-between', fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif" }}>
+        <Link href="/" style={{ display:'flex', alignItems:'center', gap:10, textDecoration:'none', color:'white' }}>
+          <span style={{ fontSize:20, filter:'drop-shadow(0 0 8px rgba(251,191,36,0.6))' }}>←</span>
+          <span style={{ fontSize:11, fontWeight:900, letterSpacing:'0.2em', textTransform:'uppercase', color:'rgba(255,255,255,0.5)' }}>REBEL ANTS</span>
+        </Link>
+        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+          <div style={{ fontSize:13, fontWeight:900, letterSpacing:'0.1em', color:'#fbbf24', filter:'drop-shadow(0 0 8px rgba(251,191,36,0.5))' }}>
+            ⚡ {balance} <span style={{ fontSize:10, color:'rgba(251,191,36,0.6)' }}>{currency}</span>
           </div>
-          <nav style={{ display:"flex", gap:6, flexWrap:"wrap", fontSize:12 }}>
-            {([["tunnel","🐜 Ant Tunnel"],["hatch","⚔️ Faction Wars"],["expedition","⚔️ The Raid"],["shuffle","🃏 Shuffle"]] as [string,string][]).map(([href,label])=>(
-              <Link key={href} href={`/${href}`} onClick={href === 'faction-wars' ? () => { setTimeout(() => sfx.startTheme(), 100); } : undefined} style={{ padding:"8px 14px", borderRadius:20, textDecoration:"none", fontSize:13, fontWeight:700, background:href==="hatch"?"rgba(251,191,36,0.15)":"rgba(255,255,255,0.07)", border:`1px solid ${href==="hatch"?"rgba(251,191,36,0.4)":"rgba(255,255,255,0.12)"}`, color:href==="hatch"?"#fbbf24":"rgba(255,255,255,0.8)" }}>{label}</Link>
-            ))}
-          </nav>
+          <button onPointerDown={e=>{e.preventDefault();toggleMute();}} title={muted?"Unmute":"Mute"}
+            style={{ background:'rgba(0,0,0,0.4)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:20, padding:'6px 12px', cursor:'pointer', fontSize:15, color:'rgba(255,255,255,0.8)', minWidth:40 }}>
+            {muted ? '🔇' : '🔊'}
+          </button>
         </div>
-      </div>
+      </header>
 
       <div style={{ maxWidth:900, margin:"0 auto", padding:"16px 12px", overflowX:"hidden", width:"100%", position:"relative", zIndex:1 }}>
         {phase === "idle" && (
           <div>
-            <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:16, padding:"24px 20px", marginBottom:18 }}>
-              {/* Title */}
-              <div style={{ textAlign:"center", marginBottom:14 }}>
-                <div style={{ fontSize:28, fontWeight:900, letterSpacing:"0.06em", background:"linear-gradient(135deg,#fbbf24,#f87171,#c084fc)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", marginBottom:4 }}>⚔️ FACTION WARS</div>
-                <div style={{ fontSize:13, opacity:0.65, letterSpacing:"0.04em" }}>🏰 Assemble 5 faction warriors. Battle 5 territories. Know your factions or fall.</div>
+              {/* Title (Shuffle-style centered gradient) */}
+              <div style={{ textAlign:'center', marginBottom:18, marginTop:14 }}>
+                <div style={{ fontSize:'clamp(22px,4vw,38px)', fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase',
+                  background:'linear-gradient(135deg,#fbbf24,#f87171,#c084fc)',
+                  WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text',
+                  filter:'drop-shadow(0 0 20px rgba(251,191,36,0.4))',
+                }}>⚔️ FACTION WARS</div>
+                <div style={{ fontSize:12, letterSpacing:'0.25em', color:'rgba(255,255,255,0.35)', textTransform:'uppercase', marginTop:4 }}>
+                  ASSEMBLE 5 · CONQUER 5 · KNOW YOUR FACTIONS
+                </div>
               </div>
 
-              {/* Launch button */}
-              <div style={{ marginTop:16, display:"flex", gap:10, flexWrap:"wrap", alignItems:"center" }}>
+              {/* Primary action row */}
+              <div style={{ display:'flex', gap:10, flexWrap:'wrap', alignItems:'center', justifyContent:'center', marginBottom:14 }}>
                 <button onClick={startCampaign} disabled={team.length<TEAM_SIZE||busy||balance<fwCost}
-                  style={{ minWidth:240, height:48, fontSize:14, fontWeight:900, display:"inline-flex", alignItems:"center", justifyContent:"center", borderRadius:12, border:"1px solid rgba(251,191,36,0.35)", cursor:team.length<TEAM_SIZE||busy||balance<fwCost?"not-allowed":"pointer", background:team.length<TEAM_SIZE?"rgba(15,23,42,.7)":"linear-gradient(135deg,rgba(251,191,36,.18),rgba(192,132,252,.18))", color:"#fbbf24" }}>
-                  {team.length<TEAM_SIZE?`⚔️ Select ${TEAM_SIZE-team.length} more warriors`:busy?"Assembling...":`⚔️ Launch Campaign (-${team.includes("ashigaru") ? Math.max(0, fwCost-25) : fwCost} ${currency})`}
+                  style={{ minWidth:240, height:46, fontSize:13, fontWeight:900, letterSpacing:'0.1em', textTransform:'uppercase',
+                    display:'inline-flex', alignItems:'center', justifyContent:'center', borderRadius:24, border:'1px solid rgba(251,191,36,0.4)',
+                    background:team.length<TEAM_SIZE||busy||balance<fwCost?'rgba(255,255,255,0.05)':'linear-gradient(135deg,rgba(251,191,36,0.25),rgba(248,113,113,0.25))',
+                    color:team.length<TEAM_SIZE||busy||balance<fwCost?'rgba(255,255,255,0.4)':'#fbbf24',
+                    cursor:team.length<TEAM_SIZE||busy||balance<fwCost?'not-allowed':'pointer',
+                    filter:team.length<TEAM_SIZE||busy||balance<fwCost?'none':'drop-shadow(0 0 12px rgba(251,191,36,0.3))' }}>
+                  {team.length<TEAM_SIZE?`Select ${TEAM_SIZE-team.length} more`:busy?"Assembling…":`⚔️ Launch Campaign (${team.includes("ashigaru") ? Math.max(0, fwCost-25) : fwCost} ${currency})`}
                 </button>
-                <button onClick={()=>setShowBuyPoints(true)} style={{ padding:"10px 14px", fontSize:12, borderRadius:10, border:"1px solid rgba(255,255,255,0.15)", background:"rgba(255,255,255,0.07)", color:"white", cursor:"pointer", fontWeight:700 }}>💳 Buy Points</button>
-                {isDiscordConnected
-                  ? <button onClick={disconnectDiscord} style={{ padding:"10px 14px", fontSize:12, borderRadius:10, border:"1px solid rgba(255,255,255,0.15)", background:"rgba(255,255,255,0.07)", color:"white", cursor:"pointer", fontWeight:700 }}>Disconnect Discord</button>
-                  : <button onClick={()=>{ try{saveProfile({discordSkipLink:false});window.dispatchEvent(new Event("ra:identity-changed"));}catch{} window.location.href="/api/auth/discord/login"; }} style={{ padding:"10px 14px", fontSize:12, borderRadius:10, border:"1px solid rgba(88,101,242,0.4)", background:"rgba(88,101,242,0.15)", color:"#818cf8", cursor:"pointer", fontWeight:700 }}>🔗 Connect Discord</button>
-                }
+                <button onClick={()=>setShowBuyPoints(true)}
+                  style={{ padding:'10px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.1em', textTransform:'uppercase', borderRadius:20, border:'1px solid rgba(255,255,255,0.15)', background:'rgba(0,0,0,0.4)', color:'rgba(255,255,255,0.8)', cursor:'pointer' }}>
+                  💎 Buy Points
+                </button>
+                {isDiscordConnected ? (
+                  <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 14px', borderRadius:20, border:'1px solid rgba(88,101,242,0.3)', background:'rgba(88,101,242,0.08)', fontSize:11, fontWeight:700, letterSpacing:'0.1em', textTransform:'uppercase' }}>
+                    <span style={{ color:'#a5b4fc' }}>✓ Discord</span>
+                    <button onClick={disconnectDiscord} style={{ background:'none', border:'none', fontSize:10, color:'rgba(255,255,255,0.4)', cursor:'pointer', padding:0, textDecoration:'underline' }}>disconnect</button>
+                  </div>
+                ) : (
+                  <button onClick={()=>{ try{saveProfile({discordSkipLink:false});window.dispatchEvent(new Event("ra:identity-changed"));}catch{} window.location.href="/api/auth/discord/login"; }}
+                    style={{ padding:'10px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.1em', textTransform:'uppercase', borderRadius:20, border:'1px solid rgba(88,101,242,0.4)', background:'rgba(88,101,242,0.12)', color:'#a5b4fc', cursor:'pointer' }}>
+                    Connect Discord
+                  </button>
+                )}
                 <button onClick={async()=>{ if(!isDiscordConnected)return; await openDripModal(); }} disabled={dripBusy||!isDiscordConnected}
-                  style={{ padding:"10px 14px", fontSize:12, borderRadius:10, border:"1px solid rgba(255,255,255,0.15)", background:"rgba(255,255,255,0.07)", color:"white", cursor:"pointer", fontWeight:700, opacity:isDiscordConnected?1:0.5 }}
+                  style={{ padding:'10px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.1em', textTransform:'uppercase', borderRadius:20, border:'1px solid rgba(255,255,255,0.15)', background:'rgba(0,0,0,0.4)', color:'rgba(255,255,255,0.6)', cursor:isDiscordConnected?'pointer':'not-allowed', opacity:isDiscordConnected?1:0.5 }}
                   title={isDiscordConnected?"Move points from Discord (DRIP) into the game":"Connect Discord to migrate DRIP points"}>
-                  {dripBusy?"Loading DRIP…":isDiscordConnected?"Migrate DRIP Points":"Connect Discord for DRIP"}
+                  {dripBusy?"Loading…":"Migrate DRIP"}
                 </button>
-                <div style={{ fontSize:11, opacity:0.65 }}>Discord: <b>{isDiscordConnected?"✅":"❌"}</b></div>
               </div>
 
-              {/* Balance info */}
-              <div style={{ marginTop:10, fontSize:12, opacity:0.8, display:"flex", gap:14, flexWrap:"wrap" }}>
-                <span>⚔️ Balance: <b>{balance}</b> {currency}</span>
-                <span>🏰 Cost: <b>{fwCost}</b> {currency}</span>
-                {balance < fwCost && <span style={{ color:"#f87171" }}>Need {fwCost - balance} more {currency}</span>}
-              </div>
-              <div style={{ marginTop:6, fontSize:11, opacity:0.55, display:"flex", gap:10, flexWrap:"wrap" }}>
-                <span>🏆 Ultra: +{cfg?.rewards?.ultra}</span>
-                <span>⚔️ Rare: +{cfg?.rewards?.rare}</span>
-                <span>✅ Common: +{cfg?.rewards?.common}</span>
-                <span>📅 Daily cap: {cfg?.dailyEarnCap}</span>
-              </div>
-
-              {/* Name + daily claim */}
-              <div style={{ marginTop:12, display:"flex", gap:10, flexWrap:"wrap", alignItems:"center" }}>
-                <label style={{ fontSize:12, opacity:0.85 }}>
-                  ⚔️ Commander:&nbsp;
-                  <input value={playerName}
-                    onChange={e=>{ const v=(e.target.value.slice(0,18)||"guest").trim()||"guest"; setPlayerName(v); const p=loadProfile(); saveProfile({name:v,id:(p?.id||playerId||"guest").trim()||"guest"}); }}
-                    style={{ padding:"6px 10px", borderRadius:10, border:"1px solid rgba(255,255,255,.18)", background:"rgba(15,23,42,.55)", color:"inherit" }}
-                  />
-                  <div style={{ fontSize:10, opacity:0.55, marginTop:3 }}>ID: {profile?.discordName || playerName}</div>
-                </label>
+              {/* Stats row (Shuffle-style) */}
+              <div style={{ display:'flex', gap:14, flexWrap:'wrap', justifyContent:'center', alignItems:'center', padding:'10px 14px', borderRadius:14, border:'1px solid rgba(255,255,255,0.06)', background:'rgba(255,255,255,0.02)', fontSize:11, fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", letterSpacing:'0.05em', marginBottom:12 }}>
+                <span style={{ color:'rgba(255,255,255,0.5)', textTransform:'uppercase' }}>Cost: <b style={{color:'#fbbf24'}}>{fwCost}</b> {currency}</span>
+                <span style={{ color:'rgba(255,255,255,0.4)', textTransform:'uppercase' }}>Common <b style={{color:'#86efac'}}>+{cfg?.rewards?.common}</b></span>
+                <span style={{ color:'rgba(255,255,255,0.4)', textTransform:'uppercase' }}>Rare <b style={{color:'#93c5fd'}}>+{cfg?.rewards?.rare}</b></span>
+                <span style={{ color:'rgba(255,255,255,0.4)', textTransform:'uppercase' }}>Ultra <b style={{color:'#fbbf24'}}>+{cfg?.rewards?.ultra}</b></span>
+                <span style={{ color:'rgba(255,255,255,0.3)', textTransform:'uppercase', borderLeft:'1px solid rgba(255,255,255,0.1)', paddingLeft:14 }}>Daily Cap <b style={{color:'rgba(255,255,255,0.6)'}}>{cfg?.dailyEarnCap}</b></span>
                 <button onClick={claimDailyNow} disabled={claimBusy||dailyClaimed}
-                  style={{ padding:"8px 12px", fontSize:12, borderRadius:10, border:"1px solid rgba(251,191,36,0.3)", background:"rgba(251,191,36,0.12)", color:"#fbbf24", cursor:claimBusy||dailyClaimed?"not-allowed":"pointer", fontWeight:700, opacity:claimBusy||dailyClaimed?0.6:1 }}>
-                  {dailyClaimed ? (countdownStr ? `⏱ Next claim in ${countdownStr}` : "✅ Claimed Today") : `⚔️ Daily +${cfg?.dailyClaim} ${currency}`}
+                  style={{ padding:'5px 12px', fontSize:10, fontWeight:900, letterSpacing:'0.1em', textTransform:'uppercase', borderRadius:14, border:'1px solid rgba(251,191,36,0.3)', background:dailyClaimed?'rgba(255,255,255,0.04)':'rgba(251,191,36,0.12)', color:dailyClaimed?'rgba(255,255,255,0.4)':'#fbbf24', cursor:claimBusy||dailyClaimed?'not-allowed':'pointer' }}>
+                  {dailyClaimed ? (countdownStr ? `⏱ ${countdownStr}` : "✓ Claimed") : `Claim +${cfg?.dailyClaim}`}
                 </button>
                 {process.env.NODE_ENV!=="production" && (
-                  <button onClick={async()=>{ await devGrant(5000); await refresh(); alert("Dev grant ✅"); }} style={{ padding:"8px 12px", fontSize:12, borderRadius:10, border:"1px solid rgba(255,255,255,0.15)", background:"rgba(255,255,255,0.07)", color:"white", cursor:"pointer" }}>Dev +5000</button>
+                  <button onClick={async()=>{ await devGrant(5000); await refresh(); alert("Dev grant ✅"); }}
+                    style={{ padding:'5px 10px', fontSize:10, borderRadius:14, border:'1px dashed rgba(255,255,255,0.2)', background:'transparent', color:'rgba(255,255,255,0.5)', cursor:'pointer' }}>
+                    +5k (dev)
+                  </button>
                 )}
-                {claimStatus && <div style={{ fontSize:11, opacity:0.85 }}>{claimStatus}</div>}
+                {claimStatus && <span style={{ fontSize:10, opacity:0.7 }}>{claimStatus}</span>}
               </div>
+
+              {/* Commander name (compact, optional reveal) */}
+              <details style={{ marginBottom:14 }}>
+                <summary style={{ fontSize:10, letterSpacing:'0.15em', textTransform:'uppercase', color:'rgba(255,255,255,0.35)', cursor:'pointer', padding:'4px 0' }}>
+                  Commander: <b style={{color:'rgba(255,255,255,0.7)'}}>{profile?.discordName || playerName}</b>
+                </summary>
+                <div style={{ marginTop:8, display:'flex', gap:10, flexWrap:'wrap', alignItems:'center', padding:'10px 14px', borderRadius:10, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.05)' }}>
+                  <label style={{ fontSize:11, opacity:0.85 }}>
+                    Name:&nbsp;
+                    <input value={playerName}
+                      onChange={e=>{ const v=(e.target.value.slice(0,18)||"guest").trim()||"guest"; setPlayerName(v); const p=loadProfile(); saveProfile({name:v,id:(p?.id||playerId||`p_${Date.now().toString(36)}`)}); window.dispatchEvent(new Event("ra:identity-changed")); }}
+                      style={{ padding:'5px 10px', borderRadius:8, border:'1px solid rgba(255,255,255,.18)', background:'rgba(15,23,42,.55)', color:'inherit', fontSize:11 }}
+                    />
+                  </label>
+                  <span style={{ fontSize:10, opacity:0.5 }}>ID: {profile?.discordName || playerName}</span>
+                </div>
+              </details>
 
               {runMessage && <div style={{ color:"#f87171", fontSize:13, marginTop:10 }}>{runMessage}</div>}
 
