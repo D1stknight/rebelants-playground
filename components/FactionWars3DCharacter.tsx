@@ -13,9 +13,30 @@ function SamuraiModel({ side = "player" }: { side?: "player" | "enemy" }) {
   const groupRef = useRef<Group | null>(null);
   const gltf = useGLTF("/faction-wars/characters/samurai/samurai.glb") as any;
 
-  const clonedScene = useMemo(() => {
-    return clone(gltf.scene);
-  }, [gltf.scene]);
+   const clonedScene = useMemo(() => {
+    const scene = clone(gltf.scene);
+
+    const meshes: string[] = [];
+    scene.traverse((obj: any) => {
+      if (obj.isMesh || obj.isSkinnedMesh) {
+        meshes.push(obj.name || "(unnamed mesh)");
+        obj.visible = true;
+        if (obj.material) {
+          obj.material.transparent = false;
+          obj.material.opacity = 1;
+          obj.material.needsUpdate = true;
+        }
+      }
+    });
+
+    console.log("[FactionWars3D] Samurai GLB scene", {
+      children: scene.children.length,
+      meshes,
+      animations: gltf.animations?.map((a: any) => a.name) || [],
+    });
+
+    return scene;
+  }, [gltf.scene, gltf.animations]);
 
   useFrame(({ clock }) => {
     if (!groupRef.current) return;
@@ -72,12 +93,7 @@ export default function FactionWars3DCharacter({
         <directionalLight position={[2, 4, 4]} intensity={1.55} />
         <directionalLight position={[-3, 2, 3]} intensity={0.65} />
 
-               <mesh position={[0, 0, 0]}>
-          <boxGeometry args={[0.8, 0.8, 0.8]} />
-          <meshStandardMaterial color="red" />
-        </mesh>
-
-        <Suspense fallback={null}>
+                     <Suspense fallback={null}>
           <SamuraiModel side={side} />
         </Suspense>
       </Canvas>
