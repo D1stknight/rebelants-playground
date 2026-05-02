@@ -86,7 +86,18 @@ type Phase = "idle" | "battle" | "territory_result" | "final_result";
 type Rarity = "none" | "common" | "rare" | "ultra";
 type FactionId = "samurai"|"ronin"|"warrior"|"ashigaru"|"shogun"|"buke"|"kenshi"|"wokou"|"sohei"|"yamabushi"|"bushi";
 
+type SamuraiAnimState = "idle" | "attack" | "magic" | "trick" | "defend" | "hit" | "win" | "lose";
+
 interface Move { id: string; label: string; emoji: string; desc: string; power: number; type: "attack"|"defend"|"magic"|"trick"; oneTime?: boolean; }
+
+function getSamuraiAnimForMove(move: Move | null): SamuraiAnimState {
+  if (!move) return "idle";
+  if (move.type === "attack") return "attack";
+  if (move.type === "magic") return "magic";
+  if (move.type === "trick") return "trick";
+  if (move.type === "defend") return "defend";
+  return "idle";
+}
 interface Faction { id: FactionId; name: string; emoji: string; color: string; bgColor: string; borderColor: string; role: string; passive: string; passiveDesc: string; weapon: string; moves: Move[]; weakTo: FactionId[]; strongVs: FactionId[]; }
 interface RoundResult { round:number; playerMove:Move; enemyMove:Move; playerDmg:number; enemyDmg:number; playerHpAfter:number; enemyHpAfter:number; }
 interface TerritoryResult { territory:number; defender:FactionId; playerFaction:FactionId; rounds:RoundResult[]; playerHpFinal:number; enemyHpFinal:number; won:boolean; }
@@ -639,7 +650,8 @@ export default function FactionWars() {
   const [defenders, setDefenders]       = useState<FactionId[]>([]);
   const [currentTerritory, setCurrentT] = useState(0);
   const [currentFactionIdx, setCurrentFI] = useState(0);
-  const [selectedMove, setSelectedMove] = useState<Move|null>(null);
+ const [selectedMove, setSelectedMove] = useState<Move|null>(null);
+const [player3DAnim, setPlayer3DAnim] = useState<SamuraiAnimState>("idle");
   const [results, setResults]           = useState<TerritoryResult[]>([]);
   const [finalRarity, setFinalRarity]   = useState<Rarity>("none");
   const [runMessage, setRunMessage]     = useState("");
@@ -760,8 +772,12 @@ export default function FactionWars() {
     if (meditationStacks > 0) { setPowerBuffAmt(meditationStacks * 2); setPowerBuffRounds(99); }
   };
 
-  const fightTerritory = async () => {
-    if (!selectedMove || busy) return;
+ const fightTerritory = async () => {
+  if (!selectedMove || busy) return;
+
+  const nextPlayerAnim = getSamuraiAnimForMove(selectedMove);
+  setPlayer3DAnim(nextPlayerAnim);
+  window.setTimeout(() => setPlayer3DAnim("idle"), 950);
     setShowHowToPlay(false); // auto-collapse once battle begins
     const playerFaction = team[currentFactionIdx] || team[0];
     const defender = defenders[currentTerritory];
@@ -1408,9 +1424,17 @@ export default function FactionWars() {
                      {currentPlayerFD.id === "samurai" ? (
   <FactionWars3DCharacter factionId={currentPlayerFD.id} side="player" />
 ) : (
+ {currentPlayerFD.id === "samurai" ? (
+  <FactionWars3DCharacter
+    factionId={currentPlayerFD.id}
+    side="player"
+    animState={player3DAnim}
+  />
+) : (
   <img src={factionImgPath(currentPlayerFD.id,"char")} alt={currentPlayerFD.name}
     style={{ width:"100%", height:"100%", objectFit:"cover", objectPosition:"top" }}
     onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
+)}
 )}
                       <div style={{ position:"absolute", bottom:4, right:4, width:26, height:26, borderRadius:5, overflow:"hidden", background:"rgba(0,0,0,0.75)", border:`1px solid ${currentPlayerFD.borderColor}` }}>
                         <img src={factionImgPath(currentPlayerFD.id,"symbol")} alt="" style={{ width:"100%", height:"100%", objectFit:"contain", padding:2 }} />
