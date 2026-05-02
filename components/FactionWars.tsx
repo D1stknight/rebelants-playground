@@ -651,6 +651,7 @@ export default function FactionWars() {
   const [currentTerritory, setCurrentT] = useState(0);
   const [currentFactionIdx, setCurrentFI] = useState(0);
  const [selectedMove, setSelectedMove] = useState<Move|null>(null);
+  const [enemy3DAnim, setEnemy3DAnim] = useState<SamuraiAnimState>("idle");
 const [player3DAnim, setPlayer3DAnim] = useState<SamuraiAnimState>("idle");
   const [results, setResults]           = useState<TerritoryResult[]>([]);
   const [finalRarity, setFinalRarity]   = useState<Rarity>("none");
