@@ -22,12 +22,16 @@ type FactionWars3DCharacterProps = {
 function retargetMixamoClipToUnderscoreBones(clip: AnimationClip) {
   const retargetedClip = clip.clone();
 
-  retargetedClip.tracks.forEach((track) => {
-    track.name = track.name.replace(
-      /^mixamorig(?!_)([A-Z][^.]*)(\..+)$/,
-      "mixamorig_$1$2"
-    );
-  });
+  retargetedClip.tracks = retargetedClip.tracks
+    .map((track) => {
+      track.name = track.name.replace(
+        /^mixamorig(?!_)([A-Z][^.]*)(\..+)$/,
+        "mixamorig_$1$2"
+      );
+
+      return track;
+    })
+    .filter((track) => track.name !== "mixamorig_Hips.position");
 
   return retargetedClip;
 }
