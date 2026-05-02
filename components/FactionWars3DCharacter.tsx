@@ -72,6 +72,11 @@ export default function FactionWars3DCharacter({
         <directionalLight position={[2, 4, 4]} intensity={1.55} />
         <directionalLight position={[-3, 2, 3]} intensity={0.65} />
 
+               <mesh position={[0, 0, 0]}>
+          <boxGeometry args={[0.8, 0.8, 0.8]} />
+          <meshStandardMaterial color="red" />
+        </mesh>
+
         <Suspense fallback={null}>
           <SamuraiModel side={side} />
         </Suspense>
