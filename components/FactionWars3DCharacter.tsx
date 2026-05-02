@@ -182,9 +182,12 @@ function SamuraiModel({
 
     mixer.addEventListener("finished", handleFinished);
 
-    (window as any).__fw3dPlay = (nextAnim: SamuraiAnimState) => {
-      playAnimation(nextAnim);
-    };
+   const triggerName =
+  side === "enemy" ? "__fw3dPlayEnemy" : "__fw3dPlayPlayer";
+
+(window as any)[triggerName] = (nextAnim: SamuraiAnimState) => {
+  playAnimation(nextAnim);
+};
 
     console.log("[FactionWars3D] Console animation trigger ready. Try:");
     console.log('window.__fw3dPlay("attack")');
@@ -201,7 +204,7 @@ function SamuraiModel({
       mixer.removeEventListener("finished", handleFinished);
       mixer.stopAllAction();
 
-      delete (window as any).__fw3dPlay;
+     delete (window as any)[triggerName];
 
       mixerRef.current = null;
       actionsRef.current = {};
