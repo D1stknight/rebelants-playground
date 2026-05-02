@@ -807,9 +807,21 @@ const [player3DAnim, setPlayer3DAnim] = useState<SamuraiAnimState>("idle");
     await new Promise(r=>setTimeout(r,450));
 
     const imperialDecreeFlag = selectedMove.id === "imperial_decree" || selectedMove.id === "final_command";
-    const enemyMove = imperialDecreeFlag
-      ? FACTIONS[defender].moves.reduce((a,b)=>a.power<b.power?a:b)
-      : pickEnemyMove(defender, selectedMove, difficulty, enemyHp, playerHp, currentTerritory);
+   const enemyMove = imperialDecreeFlag
+  ? FACTIONS[defender].moves.reduce((a,b)=>a.power<b.power?a:b)
+  : pickEnemyMove(defender, selectedMove, difficulty, enemyHp, playerHp, currentTerritory);
+
+const nextEnemyAnim = getSamuraiAnimForMove(enemyMove);
+setEnemy3DAnim(nextEnemyAnim);
+
+if (typeof window !== "undefined") {
+  (window as any).__fw3dPlayEnemy?.(nextEnemyAnim);
+
+  window.setTimeout(() => {
+    setEnemy3DAnim("idle");
+    (window as any).__fw3dPlayEnemy?.("idle");
+  }, 950);
+}
     const timesUsed = usedMoves[selectedMove.id] || 0;
     const degradedMove: Move = { ...selectedMove, power: Math.max(1, selectedMove.power - timesUsed) };
     setUsedMoves(prev => ({ ...prev, [selectedMove.id]: (prev[selectedMove.id]||0)+1 }));
@@ -1473,9 +1485,17 @@ const [player3DAnim, setPlayer3DAnim] = useState<SamuraiAnimState>("idle");
                      {currentDefenderFD.id === "samurai" ? (
   <FactionWars3DCharacter factionId={currentDefenderFD.id} side="enemy" />
 ) : (
+ {currentDefenderFD.id === "samurai" ? (
+  <FactionWars3DCharacter
+    factionId={currentDefenderFD.id}
+    side="enemy"
+    animState={enemy3DAnim}
+  />
+) : (
   <img src={factionImgPath(currentDefenderFD.id,"char")} alt={currentDefenderFD.name}
     style={{ width:"100%", height:"100%", objectFit:"cover", objectPosition:"top" }}
     onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
+)}
 )}
                       <div style={{ position:"absolute", bottom:4, left:4, width:26, height:26, borderRadius:5, overflow:"hidden", background:"rgba(0,0,0,0.75)", border:`1px solid ${currentDefenderFD.borderColor}` }}>
                         <img src={factionImgPath(currentDefenderFD.id,"symbol")} alt="" style={{ width:"100%", height:"100%", objectFit:"contain", padding:2 }} />
