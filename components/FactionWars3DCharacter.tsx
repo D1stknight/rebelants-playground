@@ -52,8 +52,8 @@ function SamuraiModel({ side = "player" }: { side?: "player" | "enemy" }) {
 
     // Your GLB has strange huge bounds, so for now we use manual placement.
     // We are intentionally NOT doing scene.position.sub(center) in this test.
-    scene.position.set(0, -1.2, 0);
-    scene.scale.setScalar(0.00022);
+      scene.position.set(0, -1.2, 0);
+    scene.scale.setScalar(0.003);
 
     return scene;
   }, [gltf.scene]);
