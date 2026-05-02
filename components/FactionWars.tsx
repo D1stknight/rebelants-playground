@@ -776,8 +776,17 @@ const [player3DAnim, setPlayer3DAnim] = useState<SamuraiAnimState>("idle");
   if (!selectedMove || busy) return;
 
   const nextPlayerAnim = getSamuraiAnimForMove(selectedMove);
+
   setPlayer3DAnim(nextPlayerAnim);
-  window.setTimeout(() => setPlayer3DAnim("idle"), 950);
+
+  if (typeof window !== "undefined") {
+    (window as any).__fw3dPlay?.(nextPlayerAnim);
+
+    window.setTimeout(() => {
+      setPlayer3DAnim("idle");
+      (window as any).__fw3dPlay?.("idle");
+    }, 950);
+  }
     setShowHowToPlay(false); // auto-collapse once battle begins
     const playerFaction = team[currentFactionIdx] || team[0];
     const defender = defenders[currentTerritory];
