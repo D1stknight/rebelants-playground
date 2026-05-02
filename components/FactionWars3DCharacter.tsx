@@ -31,7 +31,9 @@ function retargetMixamoClipToUnderscoreBones(clip: AnimationClip) {
 
       return track;
     })
-    .filter((track) => track.name !== "mixamorig_Hips.position");
+    // For card battles, keep the character locked in place.
+    // Mixamo position tracks can move the hips/root upward or out of frame.
+    .filter((track) => track.name.endsWith(".quaternion"));
 
   return retargetedClip;
 }
@@ -90,10 +92,13 @@ function SamuraiModel({ side = "player" }: { side?: "player" | "enemy" }) {
     const sourceIdleClip = idleFbx.animations[0];
     const idleClip = retargetMixamoClipToUnderscoreBones(sourceIdleClip);
 
-    console.log("[FactionWars3D] Retargeted idle animation", {
-      sourceFirstTracks: sourceIdleClip.tracks?.slice(0, 8).map((track: any) => track.name),
-      retargetedFirstTracks: idleClip.tracks?.slice(0, 8).map((track: any) => track.name),
-    });
+  console.log("[FactionWars3D] Retargeted idle animation", {
+  sourceTracks: sourceIdleClip.tracks?.length,
+  retargetedTracks: idleClip.tracks?.length,
+  sourceFirstTracks: sourceIdleClip.tracks?.slice(0, 8).map((track: any) => track.name),
+  retargetedFirstTracks: idleClip.tracks?.slice(0, 8).map((track: any) => track.name),
+  hasPositionTracks: idleClip.tracks?.some((track: any) => track.name.endsWith(".position")),
+});
 
     const idleAction = mixer.clipAction(idleClip);
     idleAction.reset();
