@@ -33,7 +33,7 @@ const SAMURAI_ANIMATION_PATHS: Record<SamuraiAnimState, string> = {
   idle: "/faction-wars/characters/samurai/idle.fbx",
   attack: "/faction-wars/characters/samurai/attack.fbx",
   magic: "/faction-wars/characters/samurai/magic.fbx",
-  trick: "/faction-wars/characters/samurai/trick.fbx",
+    trick: "/faction-wars/characters/samurai/special.fbx",
   defend: "/faction-wars/characters/samurai/defend.fbx",
   hit: "/faction-wars/characters/samurai/hit.fbx",
   win: "/faction-wars/characters/samurai/win.fbx",
