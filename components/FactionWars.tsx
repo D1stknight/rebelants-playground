@@ -1421,10 +1421,7 @@ const [player3DAnim, setPlayer3DAnim] = useState<SamuraiAnimState>("idle");
                       transform: battleAnim==="clash"?"scale(1.1) translateX(14px) rotate(-3deg)":battleAnim==="win"?"scale(1.06)":battleAnim==="lose"?"scale(0.9) rotate(4deg)":"scale(1)",
                       filter: battleAnim==="lose"?"grayscale(0.7) brightness(0.55)":playerHp<25?"brightness(0.8)":"none",
                       transition:"all 0.35s cubic-bezier(0.34,1.56,0.64,1)" }}>
-                     {currentPlayerFD.id === "samurai" ? (
-  <FactionWars3DCharacter factionId={currentPlayerFD.id} side="player" />
-) : (
- {currentPlayerFD.id === "samurai" ? (
+                    {currentPlayerFD.id === "samurai" ? (
   <FactionWars3DCharacter
     factionId={currentPlayerFD.id}
     side="player"
@@ -1434,7 +1431,6 @@ const [player3DAnim, setPlayer3DAnim] = useState<SamuraiAnimState>("idle");
   <img src={factionImgPath(currentPlayerFD.id,"char")} alt={currentPlayerFD.name}
     style={{ width:"100%", height:"100%", objectFit:"cover", objectPosition:"top" }}
     onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
-)}
 )}
                       <div style={{ position:"absolute", bottom:4, right:4, width:26, height:26, borderRadius:5, overflow:"hidden", background:"rgba(0,0,0,0.75)", border:`1px solid ${currentPlayerFD.borderColor}` }}>
                         <img src={factionImgPath(currentPlayerFD.id,"symbol")} alt="" style={{ width:"100%", height:"100%", objectFit:"contain", padding:2 }} />
