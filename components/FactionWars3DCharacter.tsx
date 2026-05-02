@@ -22,20 +22,20 @@ function SamuraiModel({ side = "player" }: { side?: "player" | "enemy" }) {
 
     const t = clock.getElapsedTime();
 
-    groupRef.current.position.y = -0.85 + Math.sin(t * 2.1) * 0.025;
+    groupRef.current.position.y = -1.0 + Math.sin(t * 2.1) * 0.03;
     groupRef.current.rotation.y =
-      (side === "enemy" ? -0.25 : 0.25) + Math.sin(t * 1.4) * 0.035;
+      (side === "enemy" ? -0.28 : 0.28) + Math.sin(t * 1.4) * 0.04;
 
-    const breath = 0.38 + Math.sin(t * 2.2) * 0.006;
+    const breath = 0.65 + Math.sin(t * 2.2) * 0.01;
     groupRef.current.scale.setScalar(breath);
   });
 
   return (
     <group
       ref={groupRef}
-      position={[0, -0.85, 0]}
-      rotation={[0, side === "enemy" ? -0.25 : 0.25, 0]}
-      scale={0.38}
+      position={[0, -1.0, 0]}
+      rotation={[0, side === "enemy" ? -0.28 : 0.28, 0]}
+      scale={0.65}
     >
       <primitive object={clonedScene} />
     </group>
@@ -61,7 +61,7 @@ export default function FactionWars3DCharacter({
       <Canvas
         dpr={[1, 1.5]}
         gl={{ alpha: true, antialias: true }}
-              camera={{ position: [0, 0.35, 6.2], fov: 32 }}
+                     camera={{ position: [0, 0.45, 4.8], fov: 34 }}
         style={{
           width: "100%",
           height: "100%",
