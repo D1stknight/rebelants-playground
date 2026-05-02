@@ -1,7 +1,7 @@
 import React, { Suspense, useMemo, useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
-import type { Group } from "three";
+import { Box3, Vector3, type Group } from "three";
 import { clone } from "three/examples/jsm/utils/SkeletonUtils.js";
 
 type FactionWars3DCharacterProps = {
@@ -13,14 +13,14 @@ function SamuraiModel({ side = "player" }: { side?: "player" | "enemy" }) {
   const groupRef = useRef<Group | null>(null);
   const gltf = useGLTF("/faction-wars/characters/samurai/samurai.glb") as any;
 
-   const clonedScene = useMemo(() => {
+    const clonedScene = useMemo(() => {
     const scene = clone(gltf.scene);
 
-    const meshes: string[] = [];
     scene.traverse((obj: any) => {
       if (obj.isMesh || obj.isSkinnedMesh) {
-        meshes.push(obj.name || "(unnamed mesh)");
         obj.visible = true;
+        obj.frustumCulled = false;
+
         if (obj.material) {
           obj.material.transparent = false;
           obj.material.opacity = 1;
@@ -29,34 +29,44 @@ function SamuraiModel({ side = "player" }: { side?: "player" | "enemy" }) {
       }
     });
 
-    console.log("[FactionWars3D] Samurai GLB scene", {
-      children: scene.children.length,
-      meshes,
-      animations: gltf.animations?.map((a: any) => a.name) || [],
+    const box = new Box3().setFromObject(scene);
+    const size = box.getSize(new Vector3());
+    const center = box.getCenter(new Vector3());
+
+    scene.position.sub(center);
+
+    const maxDim = Math.max(size.x, size.y, size.z) || 1;
+    scene.scale.setScalar(2.2 / maxDim);
+
+    console.log("[FactionWars3D] Samurai GLB bounds", {
+      size: { x: size.x, y: size.y, z: size.z },
+      center: { x: center.x, y: center.y, z: center.z },
+      maxDim,
+      appliedScale: 2.2 / maxDim,
     });
 
     return scene;
-  }, [gltf.scene, gltf.animations]);
+  }, [gltf.scene]);
 
-  useFrame(({ clock }) => {
+    useFrame(({ clock }) => {
     if (!groupRef.current) return;
 
     const t = clock.getElapsedTime();
 
-    groupRef.current.position.y = -1.0 + Math.sin(t * 2.1) * 0.03;
+    groupRef.current.position.y = Math.sin(t * 2.1) * 0.025;
     groupRef.current.rotation.y =
-      (side === "enemy" ? -0.28 : 0.28) + Math.sin(t * 1.4) * 0.04;
+      (side === "enemy" ? -0.25 : 0.25) + Math.sin(t * 1.4) * 0.035;
 
-    const breath = 0.65 + Math.sin(t * 2.2) * 0.01;
+    const breath = 1 + Math.sin(t * 2.2) * 0.012;
     groupRef.current.scale.setScalar(breath);
   });
 
   return (
     <group
       ref={groupRef}
-      position={[0, -1.0, 0]}
-      rotation={[0, side === "enemy" ? -0.28 : 0.28, 0]}
-      scale={0.65}
+      position={[0, 0, 0]}
+      rotation={[0, side === "enemy" ? -0.25 : 0.25, 0]}
+      scale={1}
     >
       <primitive object={clonedScene} />
     </group>
@@ -82,7 +92,7 @@ export default function FactionWars3DCharacter({
       <Canvas
         dpr={[1, 1.5]}
         gl={{ alpha: true, antialias: true }}
-                     camera={{ position: [0, 0.45, 4.8], fov: 34 }}
+                            camera={{ position: [0, 0.15, 4.2], fov: 34 }}
         style={{
           width: "100%",
           height: "100%",
