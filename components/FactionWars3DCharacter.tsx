@@ -4,7 +4,6 @@ import { useGLTF } from "@react-three/drei";
 import {
   Box3,
   DoubleSide,
-  MeshStandardMaterial,
   Vector3,
   type Group,
 } from "three";
@@ -31,11 +30,14 @@ function SamuraiModel({ side = "player" }: { side?: "player" | "enemy" }) {
         obj.visible = true;
         obj.frustumCulled = false;
 
-        obj.material = new MeshStandardMaterial({
-          color: "#00ff66",
-          roughness: 0.55,
-          metalness: 0.05,
-          side: DoubleSide,
+               const materials = Array.isArray(obj.material) ? obj.material : [obj.material];
+
+        materials.forEach((mat: any) => {
+          if (!mat) return;
+          mat.transparent = false;
+          mat.opacity = 1;
+          mat.side = DoubleSide;
+          mat.needsUpdate = true;
         });
       }
     });
@@ -90,35 +92,29 @@ export default function FactionWars3DCharacter({
 
   return (
     <div
-      style={{
+           style={{
         width: "100%",
         height: "100%",
         position: "absolute",
         inset: 0,
-        background: "transparent",
+        background: "#ffffff",
       }}
     >
       <Canvas
         dpr={[1, 1.5]}
         gl={{ alpha: true, antialias: true }}
         camera={{ position: [0, 0.4, 5.5], fov: 42 }}
-        style={{
+               style={{
           width: "100%",
           height: "100%",
-          background: "transparent",
+          background: "#ffffff",
         }}
       >
         <ambientLight intensity={1.6} />
         <directionalLight position={[2, 4, 4]} intensity={1.8} />
         <directionalLight position={[-3, 2, 3]} intensity={0.9} />
 
-        {/* Temporary debug cube. If you see this but not the Samurai, the GLB placement/scale is the issue. */}
-        <mesh position={[1.2, 0, 0]}>
-          <boxGeometry args={[0.35, 0.35, 0.35]} />
-          <meshStandardMaterial color="red" />
-        </mesh>
-
-        <Suspense fallback={null}>
+               <Suspense fallback={null}>
           <SamuraiModel side={side} />
         </Suspense>
       </Canvas>
