@@ -1,6 +1,6 @@
-import React, { Suspense, useMemo, useRef } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
-import { useGLTF } from "@react-three/drei";
+import React, { Suspense, useEffect, useMemo, useRef } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { OrbitControls, useGLTF } from "@react-three/drei";
 import { Box3, Vector3, type Group } from "three";
 import { clone } from "three/examples/jsm/utils/SkeletonUtils.js";
 
@@ -8,6 +8,46 @@ type FactionWars3DCharacterProps = {
   factionId: string;
   side?: "player" | "enemy";
 };
+
+function FactionWarsCameraDebugger() {
+  const { camera, gl } = useThree();
+
+  useEffect(() => {
+    (window as any).__fw3dCamera = camera;
+    (window as any).__fw3dPrintCamera = () => {
+      console.log("[FactionWars3D] Camera", {
+        position: {
+          x: camera.position.x,
+          y: camera.position.y,
+          z: camera.position.z,
+        },
+        rotation: {
+          x: camera.rotation.x,
+          y: camera.rotation.y,
+          z: camera.rotation.z,
+        },
+        zoom: (camera as any).zoom,
+      });
+    };
+
+    console.log("[FactionWars3D] Camera debugger ready. Use window.__fw3dPrintCamera()");
+
+    return () => {
+      delete (window as any).__fw3dCamera;
+      delete (window as any).__fw3dPrintCamera;
+    };
+  }, [camera]);
+
+  return (
+    <OrbitControls
+      args={[camera, gl.domElement]}
+      makeDefault
+      enablePan
+      enableZoom
+      enableRotate
+    />
+  );
+}
 
 function SamuraiModel({ side = "player" }: { side?: "player" | "enemy" }) {
   const groupRef = useRef<Group | null>(null);
@@ -98,11 +138,13 @@ export default function FactionWars3DCharacter({
           background: "transparent",
         }}
       >
-        <ambientLight intensity={1.25} />
+               <ambientLight intensity={1.25} />
         <directionalLight position={[2, 4, 4]} intensity={1.55} />
         <directionalLight position={[-3, 2, 3]} intensity={0.65} />
 
-                     <Suspense fallback={null}>
+        <FactionWarsCameraDebugger />
+
+        <Suspense fallback={null}>
           <SamuraiModel side={side} />
         </Suspense>
       </Canvas>
