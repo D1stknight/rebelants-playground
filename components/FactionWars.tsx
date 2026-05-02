@@ -6,6 +6,7 @@ import { usePoints } from "../lib/usePoints";
 import { loadProfile, saveProfile, getEffectivePlayerId } from "../lib/profile";
 import { addWin } from "../lib/winsStore";
 import BuyPointsModal from "./BuyPointsModal";
+import FactionWars3DCharacter from "./FactionWars3DCharacter";
 
 function useFWAudio() {
   const [muted, setMuted] = React.useState<boolean>(() => {
@@ -1404,9 +1405,13 @@ export default function FactionWars() {
                       transform: battleAnim==="clash"?"scale(1.1) translateX(14px) rotate(-3deg)":battleAnim==="win"?"scale(1.06)":battleAnim==="lose"?"scale(0.9) rotate(4deg)":"scale(1)",
                       filter: battleAnim==="lose"?"grayscale(0.7) brightness(0.55)":playerHp<25?"brightness(0.8)":"none",
                       transition:"all 0.35s cubic-bezier(0.34,1.56,0.64,1)" }}>
-                      <img src={factionImgPath(currentPlayerFD.id,"char")} alt={currentPlayerFD.name}
-                        style={{ width:"100%", height:"100%", objectFit:"cover", objectPosition:"top" }}
-                        onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
+                     {currentPlayerFD.id === "samurai" ? (
+  <FactionWars3DCharacter factionId={currentPlayerFD.id} side="player" />
+) : (
+  <img src={factionImgPath(currentPlayerFD.id,"char")} alt={currentPlayerFD.name}
+    style={{ width:"100%", height:"100%", objectFit:"cover", objectPosition:"top" }}
+    onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
+)}
                       <div style={{ position:"absolute", bottom:4, right:4, width:26, height:26, borderRadius:5, overflow:"hidden", background:"rgba(0,0,0,0.75)", border:`1px solid ${currentPlayerFD.borderColor}` }}>
                         <img src={factionImgPath(currentPlayerFD.id,"symbol")} alt="" style={{ width:"100%", height:"100%", objectFit:"contain", padding:2 }} />
                       </div>
@@ -1436,9 +1441,13 @@ export default function FactionWars() {
                       transform: battleAnim==="clash"?"scale(1.1) translateX(-14px) rotate(3deg)":battleAnim==="lose"?"scale(1.06)":battleAnim==="win"?"scale(0.9) rotate(-4deg)":"scale(1)",
                       filter: battleAnim==="win"?"grayscale(0.7) brightness(0.55)":enemyHp<25?"brightness(0.8)":"none",
                       transition:"all 0.35s cubic-bezier(0.34,1.56,0.64,1)" }}>
-                      <img src={factionImgPath(currentDefenderFD.id,"char")} alt={currentDefenderFD.name}
-                        style={{ width:"100%", height:"100%", objectFit:"cover", objectPosition:"top" }}
-                        onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
+                     {currentDefenderFD.id === "samurai" ? (
+  <FactionWars3DCharacter factionId={currentDefenderFD.id} side="enemy" />
+) : (
+  <img src={factionImgPath(currentDefenderFD.id,"char")} alt={currentDefenderFD.name}
+    style={{ width:"100%", height:"100%", objectFit:"cover", objectPosition:"top" }}
+    onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
+)}
                       <div style={{ position:"absolute", bottom:4, left:4, width:26, height:26, borderRadius:5, overflow:"hidden", background:"rgba(0,0,0,0.75)", border:`1px solid ${currentDefenderFD.borderColor}` }}>
                         <img src={factionImgPath(currentDefenderFD.id,"symbol")} alt="" style={{ width:"100%", height:"100%", objectFit:"contain", padding:2 }} />
                       </div>
