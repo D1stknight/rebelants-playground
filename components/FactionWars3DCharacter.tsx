@@ -2,6 +2,7 @@ import React, { Suspense, useEffect, useMemo, useRef } from "react";
 import { Canvas, useFrame, useLoader } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import {
+  AnimationClip,
   AnimationMixer,
   Box3,
   DoubleSide,
@@ -17,6 +18,19 @@ type FactionWars3DCharacterProps = {
   factionId: string;
   side?: "player" | "enemy";
 };
+
+function retargetMixamoClipToUnderscoreBones(clip: AnimationClip) {
+  const retargetedClip = clip.clone();
+
+  retargetedClip.tracks.forEach((track) => {
+    track.name = track.name.replace(
+      /^mixamorig(?!_)([A-Z][^.]*)(\..+)$/,
+      "mixamorig_$1$2"
+    );
+  });
+
+  return retargetedClip;
+}
 
 function SamuraiModel({ side = "player" }: { side?: "player" | "enemy" }) {
   const groupRef = useRef<Group | null>(null);
@@ -68,8 +82,14 @@ function SamuraiModel({ side = "player" }: { side?: "player" | "enemy" }) {
   useEffect(() => {
     if (!clonedScene || !idleFbx?.animations?.length) return;
 
-    const mixer = new AnimationMixer(clonedScene);
-    const idleClip = idleFbx.animations[0];
+        const mixer = new AnimationMixer(clonedScene);
+    const sourceIdleClip = idleFbx.animations[0];
+    const idleClip = retargetMixamoClipToUnderscoreBones(sourceIdleClip);
+
+    console.log("[FactionWars3D] Retargeted idle animation", {
+      sourceFirstTracks: sourceIdleClip.tracks?.slice(0, 8).map((track: any) => track.name),
+      retargetedFirstTracks: idleClip.tracks?.slice(0, 8).map((track: any) => track.name),
+    });
 
     const idleAction = mixer.clipAction(idleClip);
     idleAction.reset();
