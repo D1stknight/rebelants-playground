@@ -35,14 +35,13 @@ function SamuraiModel({ side = "player" }: { side?: "player" | "enemy" }) {
 
     scene.position.sub(center);
 
-    const maxDim = Math.max(size.x, size.y, size.z) || 1;
-    scene.scale.setScalar(2.2 / maxDim);
+       const manualScale = 0.0009;
+    scene.scale.setScalar(manualScale);
 
     console.log("[FactionWars3D] Samurai GLB bounds", {
       size: { x: size.x, y: size.y, z: size.z },
       center: { x: center.x, y: center.y, z: center.z },
-      maxDim,
-      appliedScale: 2.2 / maxDim,
+      manualScale,
     });
 
     return scene;
