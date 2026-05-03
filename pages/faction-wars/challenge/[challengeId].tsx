@@ -678,11 +678,25 @@ export default function ChallengePage() {
             <span style={{ fontSize: 20, filter: "drop-shadow(0 0 8px rgba(251,191,36,0.6))" }}>←</span>
             <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.5)" }}>PvP Lobby</span>
           </Link>
+          {/* Mute toggle — lives in header so it never overlaps title text */}
+          <button
+            onClick={audio.toggleMute}
+            aria-label={audio.muted ? "Unmute" : "Mute"}
+            style={{
+              background: "rgba(0,0,0,0.4)",
+              border: "1px solid rgba(255,255,255,0.12)",
+              borderRadius: 8, padding: "6px 10px",
+              cursor: "pointer", color: "rgba(255,255,255,0.8)",
+              fontSize: 14, lineHeight: 1,
+            }}
+          >
+            {audio.muted ? "🔇" : "🔊"}
+          </button>
         </header>
 
         <div style={{ maxWidth: 720, margin: "0 auto", padding: "12px 16px 40px", fontFamily: JP }}>
           {/* Title */}
-          <div style={{ textAlign: "center", marginBottom: 24, marginTop: 14, position: "relative" }}>
+          <div style={{ textAlign: "center", marginBottom: 24, marginTop: 14 }}>
             <div style={{
               fontSize: "clamp(20px,3.5vw,32px)", fontWeight: 900, letterSpacing: "0.15em", textTransform: "uppercase",
               background: "linear-gradient(135deg,#fbbf24,#f87171,#c084fc)",
@@ -690,21 +704,6 @@ export default function ChallengePage() {
             }}>
               {match ? `${match.challengerDisplayName} vs ${match.opponentDisplayName || "?"}` : "Loading match…"}
             </div>
-            {/* Mute toggle (top-right of title block) */}
-            <button
-              onClick={audio.toggleMute}
-              aria-label={audio.muted ? "Unmute" : "Mute"}
-              style={{
-                position: "absolute", top: 14, right: 14,
-                background: "rgba(0,0,0,0.4)",
-                border: "1px solid rgba(255,255,255,0.12)",
-                borderRadius: 8, padding: "6px 10px",
-                cursor: "pointer", color: "rgba(255,255,255,0.8)",
-                fontSize: 14, lineHeight: 1,
-              }}
-            >
-              {audio.muted ? "🔇" : "🔊"}
-            </button>
           </div>
 
           {error && (
