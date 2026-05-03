@@ -5,6 +5,7 @@ import Head from "next/head";
 import { loadProfile, type Profile } from "../../../lib/profile";
 import type { PvpMatch, PvpRound } from "../../../lib/types/fwpvp";
 import { FACTIONS, FACTION_IDS, TEAM_SIZE, type FactionId, type Move } from "../../../lib/factionWarsCore";
+import FactionWarsBattleScene, { type BattleSceneState, type BattleSceneActions } from "../../../components/FactionWarsBattleScene";
 
 const JP = `'Noto Serif JP', 'Hiragino Mincho ProN', serif`;
 
@@ -110,6 +111,7 @@ function TeamPicker({ team, setTeam, onSubmit, busy }: { team: FactionId[]; setT
 
 // ── Active match view (Step 2: read-only, no move submission yet) ───────────
 function ActiveMatchView({ match, mePlayerId, challengeId, onSubmitMove, busy }: { match: PvpMatch; mePlayerId: string; challengeId: string; onSubmitMove: (moveId: string) => Promise<void>; busy: boolean }) {
+  // ── Perspective math ───────────────────────────────────────────────────────
   const isChallenger = match.challengerPlayerId === mePlayerId;
   const mySide = isChallenger ? "challenger" : "opponent";
   const myTeam = isChallenger ? match.challengerTeam : match.opponentTeam;
@@ -125,6 +127,82 @@ function ActiveMatchView({ match, mePlayerId, challengeId, onSubmitMove, busy }:
   const myF = myFighter ? FACTIONS[myFighter] : null;
   const oppF = oppFighter ? FACTIONS[oppFighter] : null;
 
+  // ── Map PvP match → BattleSceneState ───────────────────────────────────────
+  // The BattleScene component is a pure presentation layer. We render it from
+  // MY perspective (so my fighter is the "player" and the opponent is the "enemy").
+  const roundsThisTerritory = match.roundHistory.filter(r => r.territory === match.currentTerritory);
+  const currentRoundNumber = roundsThisTerritory.length === 0 ? 1 : roundsThisTerritory[roundsThisTerritory.length - 1].roundInTerritory + 1;
+  const myTerritoriesWon = isChallenger ? match.challengerTerritoriesWon : match.opponentTerritoriesWon;
+
+  // Map PvP rounds → AI-mode roundLog shape. Each PvP round is a half-round
+  // (one side acted), so we render it as a one-sided entry where the
+  // non-acting side shows "—".
+  const roundLog = roundsThisTerritory.slice().reverse().slice(0, 6).map(r => {
+    const wasMine = r.attackerSide === mySide;
+    return {
+      playerMove: wasMine ? r.moveId : "—",
+      enemyMove: wasMine ? "—" : r.moveId,
+      playerDmg: wasMine ? r.damageDealt : 0,
+      enemyDmg: wasMine ? 0 : r.damageDealt,
+      effect: undefined,
+    };
+  });
+
+  const battleSceneState: BattleSceneState = {
+    phase: "battle",
+    team: myTeam,
+    defenders: oppTeam,
+    currentTerritory: match.currentTerritory,
+    currentFactionIdx: myIdx,
+    currentPlayerFD: myF,
+    currentDefenderFD: oppF,
+    playerHp: myHp,
+    enemyHp: oppHp,
+    currentRound: currentRoundNumber,
+    roundLog,
+    currentTerritoryRounds: [],
+    dmgFloats: [],
+    battleAnim: "idle",
+    enemy3DAnim: "idle",
+    player3DAnim: "idle",
+    selectedMove: null,
+    usedMoves: {},
+    sacrificeBonus: 0,
+    powerBuffRounds: 0,
+    powerBuffAmt: 0,
+    comboBonus: 0,
+    commandActive: false,
+    berserkerActive: false,
+    meditationStacks: 0,
+    oneTimeUsed: [],
+    results: [],
+    finalRarity: "none",
+    territoriesWon: myTerritoriesWon,
+    showHowToPlay: false,
+    busy: false,
+    healBusy: false,
+    healUsed: 0,
+    cfg: null,
+    currency: "REBEL",
+    balance: 0,
+  };
+
+  // Inert callbacks — the BattleScene's "battle phase" usually drives the game,
+  // but in PvP the parent (this component) owns all interactivity. We pass
+  // showMovePicker={false} and enableHealing={false} so none of these fire.
+  const inertActions: BattleSceneActions = {
+    setSelectedMove: (() => {}) as any,
+    setShowHowToPlay: (() => {}) as any,
+    fightTerritory: () => {},
+    nextTerritory: () => {},
+    resetGame: () => {},
+    setHealBusy: (() => {}) as any,
+    setHealUsed: (() => {}) as any,
+    setPlayerHp: (() => {}) as any,
+    spend: async () => null,
+    refresh: async () => undefined,
+  };
+
   return (
     <div>
       {/* Turn indicator */}
@@ -134,66 +212,23 @@ function ActiveMatchView({ match, mePlayerId, challengeId, onSubmitMove, busy }:
         border: `1px solid ${isMyTurn ? "rgba(251,191,36,0.5)" : "rgba(255,255,255,0.08)"}`,
       }}>
         <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: "0.15em", textTransform: "uppercase", color: isMyTurn ? "#fbbf24" : "rgba(255,255,255,0.6)" }}>
-          {isMyTurn ? "⚔️ Your Turn" : "Waiting for opponent…"}
+          {isMyTurn ? "⚔️ YOUR TURN" : "⏳ Opponent is thinking…"}
         </div>
-        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", marginTop: 4, letterSpacing: "0.1em", textTransform: "uppercase" }}>
-          Territory {Math.min(match.currentTerritory + 1, 5)} / 5 · {match.challengerTerritoriesWon}–{match.opponentTerritoriesWon}
-        </div>
-      </div>
-
-      {/* Fighters */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: 12, alignItems: "center", marginBottom: 18 }}>
-        {/* Me */}
-        <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", marginBottom: 6, letterSpacing: "0.15em", textTransform: "uppercase" }}>You</div>
-          {myF && (
-            <>
-              <div style={{ position: "relative", width: 110, height: 130, borderRadius: 12, overflow: "hidden", border: `3px solid ${myF.borderColor}`, margin: "0 auto" }}>
-                <img src={factionImgPath(myF.id, "char")} alt={myF.name} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top" }} onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-              </div>
-              <div style={{ fontWeight: 900, fontSize: 12, color: myF.color, marginTop: 6 }}>{myF.name.toUpperCase()}</div>
-              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)" }}>HP {myHp}/100</div>
-            </>
-          )}
-        </div>
-        <div style={{ fontSize: 24, fontWeight: 900, opacity: 0.5 }}>VS</div>
-        {/* Opponent */}
-        <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", marginBottom: 6, letterSpacing: "0.15em", textTransform: "uppercase" }}>Opponent</div>
-          {oppF && (
-            <>
-              <div style={{ position: "relative", width: 110, height: 130, borderRadius: 12, overflow: "hidden", border: `3px solid ${oppF.borderColor}`, margin: "0 auto" }}>
-                <img src={factionImgPath(oppF.id, "char")} alt={oppF.name} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top" }} onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-              </div>
-              <div style={{ fontWeight: 900, fontSize: 12, color: oppF.color, marginTop: 6 }}>{oppF.name.toUpperCase()}</div>
-              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)" }}>HP {oppHp}/100</div>
-            </>
-          )}
+        <div style={{ fontSize: 11, opacity: 0.55, marginTop: 4 }}>
+          Territory {match.currentTerritory + 1} of 5 · Round {currentRoundNumber}
         </div>
       </div>
 
-      {/* Last opponent move banner — shown only when there's a previous round */}
-      {(() => {
-        // Find most recent round NOT made by me (so it's the opponent's last move)
-        const oppRounds = match.roundHistory.filter((r) => r.byPlayerId !== mePlayerId);
-        if (oppRounds.length === 0) return null;
-        const last = oppRounds[oppRounds.length - 1];
-        const lastFaction = FACTIONS[last.attackerFaction];
-        const lastMove = lastFaction?.moves.find((m) => m.id === last.moveId);
-        if (!lastFaction || !lastMove) return null;
-        return (
-          <div style={{ padding: "12px 14px", borderRadius: 10, border: "1px solid rgba(248,113,113,0.25)", background: "rgba(248,113,113,0.06)", marginBottom: 14 }}>
-            <div style={{ fontSize: 9, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(248,113,113,0.7)", marginBottom: 4 }}>
-              Last opponent move
-            </div>
-            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.85)" }}>
-              <span style={{ color: lastFaction.color, fontWeight: 900 }}>{lastFaction.name}</span> used <b>{lastMove.emoji} {lastMove.label}</b> · <span style={{ color: "#f87171", fontWeight: 700 }}>{last.damageDealt} dmg</span>
-            </div>
-          </div>
-        );
-      })()}
+      {/* Visual chrome from AI mode — HP bars, fighter cards, round history, buff badges */}
+      <FactionWarsBattleScene
+        state={battleSceneState}
+        actions={inertActions}
+        enableHealing={false}
+        showMovePicker={false}
+        leaderboardSlot={null}
+      />
 
-      {/* Move picker */}
+      {/* PvP move picker — owned by this component, NOT BattleScene */}
       {(() => {
         if (!myF) return null;
         const myMoves = myF.moves;
@@ -204,65 +239,53 @@ function ActiveMatchView({ match, mePlayerId, challengeId, onSubmitMove, busy }:
           defend: "#34d399",
         };
         return (
-          <div>
+          <div style={{ marginTop: 18 }}>
             <div style={{ fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.5)", marginBottom: 10, fontWeight: 700 }}>
               {isMyTurn ? "Choose your move" : "Opponent is thinking…"}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 8, marginBottom: 12 }}>
               {myMoves.map((mv) => {
                 const tColor = moveTypeColor[mv.type] || "rgba(255,255,255,0.6)";
+                const disabled = !isMyTurn || busy;
                 return (
                   <button
                     key={mv.id}
-                    disabled={!isMyTurn || busy}
-                    onClick={() => { if (!busy && isMyTurn) onSubmitMove(mv.id); }}
+                    onClick={() => onSubmitMove(mv.id)}
+                    disabled={disabled}
                     style={{
-                      padding: "10px 12px",
+                      background: "rgba(0,0,0,0.4)",
+                      border: `1px solid ${tColor}55`,
                       borderRadius: 10,
-                      border: `1px solid ${isMyTurn && !busy ? tColor + "66" : "rgba(255,255,255,0.08)"}`,
-                      background: isMyTurn && !busy ? `${tColor}11` : "rgba(255,255,255,0.02)",
-                      color: isMyTurn && !busy ? "white" : "rgba(255,255,255,0.4)",
-                      cursor: isMyTurn && !busy ? "pointer" : "not-allowed",
+                      padding: "10px 12px",
+                      cursor: disabled ? "not-allowed" : "pointer",
+                      opacity: disabled ? 0.4 : 1,
+                      color: "white",
                       textAlign: "left",
                       transition: "all 0.15s",
-                      opacity: busy ? 0.6 : 1,
                     }}
-                    onMouseEnter={(e) => {
-                      if (isMyTurn && !busy) {
-                        (e.currentTarget as HTMLButtonElement).style.background = `${tColor}22`;
-                        (e.currentTarget as HTMLButtonElement).style.borderColor = tColor;
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (isMyTurn && !busy) {
-                        (e.currentTarget as HTMLButtonElement).style.background = `${tColor}11`;
-                        (e.currentTarget as HTMLButtonElement).style.borderColor = tColor + "66";
-                      }
-                    }}
+                    onMouseEnter={(e) => { if (!disabled) (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.06)"; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(0,0,0,0.4)"; }}
                   >
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-                      <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: "0.05em" }}>
-                        {mv.emoji} {mv.label}
-                      </div>
-                      <div style={{ fontSize: 9, fontWeight: 900, letterSpacing: "0.1em", textTransform: "uppercase", color: tColor, padding: "2px 6px", borderRadius: 4, background: `${tColor}11` }}>
-                        {mv.type} · {mv.power}
-                      </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                      <span style={{ fontSize: 16 }}>{mv.emoji}</span>
+                      <span style={{ fontWeight: 900, fontSize: 13, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{mv.label}</span>
                     </div>
-                    <div style={{ fontSize: 10, color: "rgba(255,255,255,0.55)", lineHeight: 1.4 }}>
-                      {mv.desc}
+                    <div style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 4 }}>
+                      <span style={{ fontSize: 9, fontWeight: 800, padding: "2px 6px", borderRadius: 8, background: `${tColor}22`, color: tColor, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                        {mv.type}
+                      </span>
+                      <span style={{ fontSize: 9, fontWeight: 800, padding: "2px 6px", borderRadius: 8, background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.7)" }}>
+                        ⚡{mv.power}
+                      </span>
                     </div>
+                    <div style={{ fontSize: 10, opacity: 0.55, lineHeight: 1.3 }}>{mv.desc}</div>
                   </button>
                 );
               })}
             </div>
             {!isMyTurn && (
-              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", textAlign: "center", letterSpacing: "0.1em", padding: "8px 0", fontStyle: "italic" }}>
-                You can see your moves but cannot play until it's your turn.
-              </div>
-            )}
-            {busy && (
-              <div style={{ fontSize: 11, color: "#fbbf24", textAlign: "center", letterSpacing: "0.1em", textTransform: "uppercase", padding: "6px 0" }}>
-                ⚔️ Resolving move…
+              <div style={{ fontSize: 11, opacity: 0.5, textAlign: "center", marginTop: 8 }}>
+                You'll be notified when it's your turn. This page polls automatically.
               </div>
             )}
           </div>

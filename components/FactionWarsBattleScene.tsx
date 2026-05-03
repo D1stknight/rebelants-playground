@@ -157,12 +157,16 @@ export interface BattleSceneProps {
   actions: BattleSceneActions;
   // PvP passes false; AI mode passes true (or omits to default true).
   enableHealing?: boolean;
+  // PvP passes false (it has its own move picker); AI mode passes true (default).
+  // When false, the "Choose move" 4-button grid + "Strike" button are hidden.
+  // The HP bars, fighter cards, round history, and buff badges still render.
+  showMovePicker?: boolean;
   // Optional slot for leaderboard rendered inside final_result.
   // PvP passes null; AI mode passes its <FWLeaderboardPanel /> here.
   leaderboardSlot?: React.ReactNode;
 }
 
-export function FactionWarsBattleScene({ state, actions, enableHealing = true, leaderboardSlot = null }: BattleSceneProps) {
+export function FactionWarsBattleScene({ state, actions, enableHealing = true, showMovePicker = true, leaderboardSlot = null }: BattleSceneProps) {
   // Destructure state into local names so the original JSX doesn't need rewriting
   const {
     phase,
@@ -472,7 +476,8 @@ export function FactionWarsBattleScene({ state, actions, enableHealing = true, l
               );
             })()}
 
-            {/* Move selector */}
+            {/* Move selector (move grid + Strike button) — hidden in PvP via showMovePicker={false} */}
+            {showMovePicker && (
             <div style={{ borderTop:"1px solid rgba(255,255,255,0.08)", paddingTop:16 }}>
               <div style={{ fontSize:12, fontWeight:800, marginBottom:10, opacity:0.7, letterSpacing:"0.04em" }}>
                 ⚔️ CHOOSE {currentPlayerFD.name.toUpperCase()}'S MOVE
@@ -535,6 +540,7 @@ export function FactionWarsBattleScene({ state, actions, enableHealing = true, l
               </button>
             </div>
           </div>
+            )}
         </div>
       </div>
     );
