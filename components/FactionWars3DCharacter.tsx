@@ -13,7 +13,7 @@ import {
 import { clone } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 
-type SamuraiAnimState =
+type FactionAnimState =
   | "idle"
   | "attack"
   | "magic"
@@ -23,26 +23,39 @@ type SamuraiAnimState =
   | "win"
   | "lose";
 
+type SupportedFaction3D = "samurai" | "bushi";
+
 type FactionWars3DCharacterProps = {
   factionId: string;
   side?: "player" | "enemy";
-  animState?: SamuraiAnimState;
+  animState?: FactionAnimState;
 };
 
-const SAMURAI_ANIMATION_PATHS: Record<SamuraiAnimState, string> = {
-  idle: "/faction-wars/characters/samurai/idle.fbx",
-  attack: "/faction-wars/characters/samurai/attack.fbx",
-  magic: "/faction-wars/characters/samurai/magic.fbx",
-    trick: "/faction-wars/characters/samurai/special.fbx",
-  defend: "/faction-wars/characters/samurai/defend.fbx",
-  hit: "/faction-wars/characters/samurai/hit.fbx",
-  win: "/faction-wars/characters/samurai/win.fbx",
-  lose: "/faction-wars/characters/samurai/lose.fbx",
-};
+const SUPPORTED_3D_FACTIONS: SupportedFaction3D[] = ["samurai", "bushi"];
 
-const SAMURAI_ANIMATION_KEYS = Object.keys(
-  SAMURAI_ANIMATION_PATHS
-) as SamuraiAnimState[];
+const ANIMATION_KEYS: FactionAnimState[] = [
+  "idle",
+  "attack",
+  "magic",
+  "trick",
+  "defend",
+  "hit",
+  "win",
+  "lose",
+];
+
+function isSupported3DFaction(factionId: string): factionId is SupportedFaction3D {
+  return SUPPORTED_3D_FACTIONS.includes(factionId as SupportedFaction3D);
+}
+
+function getModelPath(factionId: SupportedFaction3D) {
+  return `/faction-wars/characters/${factionId}/${factionId}.glb`;
+}
+
+function getAnimationPath(factionId: SupportedFaction3D, anim: FactionAnimState) {
+  const fileName = anim === "trick" ? "special" : anim;
+  return `/faction-wars/characters/${factionId}/${fileName}.fbx`;
+}
 
 function retargetMixamoClipToUnderscoreBones(clip: AnimationClip) {
   const retargetedClip = clip.clone();
@@ -63,24 +76,29 @@ function retargetMixamoClipToUnderscoreBones(clip: AnimationClip) {
   return retargetedClip;
 }
 
-function SamuraiModel({
+function FactionModel({
+  factionId,
   side = "player",
   animState = "idle",
 }: {
+  factionId: SupportedFaction3D;
   side?: "player" | "enemy";
-  animState?: SamuraiAnimState;
+  animState?: FactionAnimState;
 }) {
   const groupRef = useRef<Group | null>(null);
   const mixerRef = useRef<AnimationMixer | null>(null);
-  const actionsRef = useRef<Partial<Record<SamuraiAnimState, AnimationAction>>>({});
+  const actionsRef = useRef<Partial<Record<FactionAnimState, AnimationAction>>>({});
   const currentActionRef = useRef<AnimationAction | null>(null);
 
-  const gltf = useGLTF("/faction-wars/characters/samurai/samurai.glb") as any;
+  const modelPath = getModelPath(factionId);
+  const animationPaths = useMemo(
+    () => ANIMATION_KEYS.map((key) => getAnimationPath(factionId, key)),
+    [factionId]
+  );
 
-  const animationFbxs = useLoader(
-    FBXLoader,
-    SAMURAI_ANIMATION_KEYS.map((key) => SAMURAI_ANIMATION_PATHS[key])
-  ) as any[];
+  const gltf = useGLTF(modelPath) as any;
+
+  const animationFbxs = useLoader(FBXLoader, animationPaths) as any[];
 
   const clonedScene = useMemo(() => {
     const scene = clone(gltf.scene);
@@ -102,6 +120,8 @@ function SamuraiModel({
       }
     });
 
+    // Shared sweet spot from the Samurai battle card setup.
+    // New factions should use the same Meshy/Mixamo export scale whenever possible.
     scene.position.set(0, 0.05, 0);
     scene.scale.setScalar(0.020);
 
@@ -112,14 +132,14 @@ function SamuraiModel({
     if (!clonedScene || !animationFbxs?.length) return;
 
     const mixer = new AnimationMixer(clonedScene);
-    const actions: Partial<Record<SamuraiAnimState, AnimationAction>> = {};
+    const actions: Partial<Record<FactionAnimState, AnimationAction>> = {};
 
-    SAMURAI_ANIMATION_KEYS.forEach((key, index) => {
+    ANIMATION_KEYS.forEach((key, index) => {
       const fbx = animationFbxs[index];
       const sourceClip = fbx?.animations?.[0];
 
       if (!sourceClip) {
-        console.warn("[FactionWars3D] Missing animation clip", key);
+        console.warn("[FactionWars3D] Missing animation clip", { factionId, key });
         return;
       }
 
@@ -134,28 +154,16 @@ function SamuraiModel({
       }
 
       actions[key] = action;
-
-      console.log("[FactionWars3D] Animation ready", {
-        key,
-        sourceName: sourceClip.name,
-        duration: clip.duration,
-        sourceTracks: sourceClip.tracks?.length,
-        retargetedTracks: clip.tracks?.length,
-        hasPositionTracks: clip.tracks?.some((track: any) =>
-          track.name.endsWith(".position")
-        ),
-        firstTracks: clip.tracks?.slice(0, 5).map((track: any) => track.name),
-      });
     });
 
     mixerRef.current = mixer;
     actionsRef.current = actions;
 
-    const playAnimation = (nextAnim: SamuraiAnimState) => {
+    const playAnimation = (nextAnim: FactionAnimState) => {
       const nextAction = actionsRef.current[nextAnim];
 
       if (!nextAction) {
-        console.warn("[FactionWars3D] Missing action", nextAnim);
+        console.warn("[FactionWars3D] Missing action", { factionId, nextAnim });
         return;
       }
 
@@ -170,8 +178,6 @@ function SamuraiModel({
       nextAction.play();
 
       currentActionRef.current = nextAction;
-
-      console.log("[FactionWars3D] Playing animation", nextAnim);
     };
 
     const handleFinished = () => {
@@ -182,21 +188,11 @@ function SamuraiModel({
 
     mixer.addEventListener("finished", handleFinished);
 
-   const triggerName =
-  side === "enemy" ? "__fw3dPlayEnemy" : "__fw3dPlayPlayer";
+    const triggerName = side === "enemy" ? "__fw3dPlayEnemy" : "__fw3dPlayPlayer";
 
-(window as any)[triggerName] = (nextAnim: SamuraiAnimState) => {
-  playAnimation(nextAnim);
-};
-
-    console.log("[FactionWars3D] Console animation trigger ready. Try:");
-    console.log('window.__fw3dPlay("attack")');
-    console.log('window.__fw3dPlay("magic")');
-    console.log('window.__fw3dPlay("trick")');
-    console.log('window.__fw3dPlay("defend")');
-    console.log('window.__fw3dPlay("hit")');
-    console.log('window.__fw3dPlay("win")');
-    console.log('window.__fw3dPlay("lose")');
+    (window as any)[triggerName] = (nextAnim: FactionAnimState) => {
+      playAnimation(nextAnim);
+    };
 
     playAnimation("idle");
 
@@ -204,21 +200,22 @@ function SamuraiModel({
       mixer.removeEventListener("finished", handleFinished);
       mixer.stopAllAction();
 
-     delete (window as any)[triggerName];
+      delete (window as any)[triggerName];
 
       mixerRef.current = null;
       actionsRef.current = {};
       currentActionRef.current = null;
     };
-  }, [clonedScene, animationFbxs]);
+  }, [clonedScene, animationFbxs, factionId, side]);
 
   useEffect(() => {
+    const triggerName = side === "enemy" ? "__fw3dPlayEnemy" : "__fw3dPlayPlayer";
     const action = actionsRef.current[animState];
 
-    if (!action || !(window as any).__fw3dPlay) return;
+    if (!action || !(window as any)[triggerName]) return;
 
-    (window as any).__fw3dPlay(animState);
-  }, [animState]);
+    (window as any)[triggerName](animState);
+  }, [animState, side]);
 
   useFrame(({ clock }, delta) => {
     mixerRef.current?.update(delta);
@@ -251,7 +248,7 @@ export default function FactionWars3DCharacter({
   side = "player",
   animState = "idle",
 }: FactionWars3DCharacterProps) {
-  if (factionId !== "samurai") return null;
+  if (!isSupported3DFaction(factionId)) return null;
 
   return (
     <div
@@ -278,11 +275,13 @@ export default function FactionWars3DCharacter({
         <directionalLight position={[-3, 2, 3]} intensity={0.9} />
 
         <Suspense fallback={null}>
-          <SamuraiModel side={side} animState={animState} />
+          <FactionModel factionId={factionId} side={side} animState={animState} />
         </Suspense>
       </Canvas>
     </div>
   );
 }
 
-useGLTF.preload("/faction-wars/characters/samurai/samurai.glb");
+SUPPORTED_3D_FACTIONS.forEach((factionId) => {
+  useGLTF.preload(getModelPath(factionId));
+});
