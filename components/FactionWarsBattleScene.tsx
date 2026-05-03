@@ -93,12 +93,12 @@ export interface BattleSceneState {
 
   // Round state within the current territory
   currentRound: number;
-  roundLog: string[];
+  roundLog: Array<{ playerMove: string; enemyMove: string; playerDmg: number; enemyDmg: number; effect?: string }>;
   currentTerritoryRounds: RoundResult[];
 
   // Visual effect state
-  dmgFloats: Array<{ id: string; side: "player" | "enemy"; amount: number; kind: "dmg" | "heal" | "miss" }>;
-  battleAnim: "idle" | "clash" | "playerHit" | "enemyHit";
+  dmgFloats: Array<{ id: number; side: "player" | "enemy" | "plunder"; dmg: number }>;
+  battleAnim: "idle" | "clash" | "win" | "lose";
   enemy3DAnim: "idle" | "attack" | "magic" | "trick" | "defend" | "hit" | "win" | "lose";
   player3DAnim: "idle" | "attack" | "magic" | "trick" | "defend" | "hit" | "win" | "lose";
 
@@ -113,7 +113,6 @@ export interface BattleSceneState {
   comboBonus: number;
   commandActive: boolean;
   berserkerActive: boolean;
-  plunderBonus: number;
 
   // Match outcome state
   results: TerritoryResult[];
@@ -172,7 +171,7 @@ export function FactionWarsBattleScene({ state, actions, enableHealing = true, l
     dmgFloats, battleAnim, enemy3DAnim, player3DAnim,
     selectedMove, usedMoves,
     sacrificeBonus, powerBuffRounds, powerBuffAmt, comboBonus,
-    commandActive, berserkerActive, plunderBonus,
+    commandActive, berserkerActive,
     results, finalRarity, territoriesWon,
     showHowToPlay, busy,
     healBusy, healUsed,
