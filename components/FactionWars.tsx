@@ -98,6 +98,10 @@ function getSamuraiAnimForMove(move: Move | null): SamuraiAnimState {
   if (move.type === "defend") return "defend";
   return "idle";
 }
+
+function hasFaction3DCharacter(factionId: string): boolean {
+  return factionId === "samurai" || factionId === "bushi";
+}
 interface Faction { id: FactionId; name: string; emoji: string; color: string; bgColor: string; borderColor: string; role: string; passive: string; passiveDesc: string; weapon: string; moves: Move[]; weakTo: FactionId[]; strongVs: FactionId[]; }
 interface RoundResult { round:number; playerMove:Move; enemyMove:Move; playerDmg:number; enemyDmg:number; playerHpAfter:number; enemyHpAfter:number; }
 interface TerritoryResult { territory:number; defender:FactionId; playerFaction:FactionId; rounds:RoundResult[]; playerHpFinal:number; enemyHpFinal:number; won:boolean; }
@@ -1459,7 +1463,7 @@ if (over) {
                       transform: battleAnim==="clash"?"scale(1.1) translateX(14px) rotate(-3deg)":battleAnim==="win"?"scale(1.06)":battleAnim==="lose"?"scale(0.9) rotate(4deg)":"scale(1)",
                       filter: battleAnim==="lose"?"grayscale(0.7) brightness(0.55)":playerHp<25?"brightness(0.8)":"none",
                       transition:"all 0.35s cubic-bezier(0.34,1.56,0.64,1)" }}>
-                    {currentPlayerFD.id === "samurai" ? (
+                   {hasFaction3DCharacter(currentPlayerFD.id) ? (
   <FactionWars3DCharacter
     factionId={currentPlayerFD.id}
     side="player"
@@ -1499,7 +1503,7 @@ if (over) {
                       transform: battleAnim==="clash"?"scale(1.1) translateX(-14px) rotate(3deg)":battleAnim==="lose"?"scale(1.06)":battleAnim==="win"?"scale(0.9) rotate(-4deg)":"scale(1)",
                       filter: battleAnim==="win"?"grayscale(0.7) brightness(0.55)":enemyHp<25?"brightness(0.8)":"none",
                       transition:"all 0.35s cubic-bezier(0.34,1.56,0.64,1)" }}>
-                    {currentDefenderFD.id === "samurai" ? (
+                   {hasFaction3DCharacter(currentDefenderFD.id) ? (
   <FactionWars3DCharacter
     factionId={currentDefenderFD.id}
     side="enemy"
