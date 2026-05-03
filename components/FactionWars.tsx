@@ -1298,6 +1298,9 @@ if (over) {
                   title={isDiscordConnected?"Move points from Discord (DRIP) into the game":"Connect Discord to migrate DRIP points"}>
                   {dripBusy?"Loading…":"Migrate DRIP"}
                 </button>
+                <Link href="/faction-wars/pvp" style={{ padding: '10px 16px', fontSize: 11, fontWeight: 900, letterSpacing: '0.1em', textTransform: 'uppercase', borderRadius: 20, border: '1px solid rgba(192,132,252,0.4)', background: 'rgba(192,132,252,0.08)', color: '#c084fc', cursor: 'pointer', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  ⚔️ Challenge a Friend
+                </Link>
               </div>
 
               {/* Stats row (Shuffle-style) */}
