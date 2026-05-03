@@ -539,8 +539,8 @@ export function FactionWarsBattleScene({ state, actions, enableHealing = true, s
                 {busy?"⚔️ Fighting...":selectedMove?`⚔️ Strike with ${selectedMove.label}!`:"← Select a move above"}
               </button>
             </div>
+          )}
           </div>
-            )}
         </div>
       </div>
     );
