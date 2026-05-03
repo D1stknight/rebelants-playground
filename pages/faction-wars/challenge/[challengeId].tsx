@@ -3,8 +3,8 @@ import { useRouter } from "next/router";
 import Link from "next/link";
 import Head from "next/head";
 import { loadProfile, type Profile } from "../../../lib/profile";
-import type { PvpMatch } from "../../../lib/types/fwpvp";
-import { FACTIONS, FACTION_IDS, TEAM_SIZE, type FactionId } from "../../../lib/factionWarsCore";
+import type { PvpMatch, PvpRound } from "../../../lib/types/fwpvp";
+import { FACTIONS, FACTION_IDS, TEAM_SIZE, type FactionId, type Move } from "../../../lib/factionWarsCore";
 
 const JP = `'Noto Serif JP', 'Hiragino Mincho ProN', serif`;
 
@@ -109,7 +109,7 @@ function TeamPicker({ team, setTeam, onSubmit, busy }: { team: FactionId[]; setT
 }
 
 // ── Active match view (Step 2: read-only, no move submission yet) ───────────
-function ActiveMatchView({ match, mePlayerId }: { match: PvpMatch; mePlayerId: string }) {
+function ActiveMatchView({ match, mePlayerId, challengeId, onSubmitMove, busy }: { match: PvpMatch; mePlayerId: string; challengeId: string; onSubmitMove: (moveId: string) => Promise<void>; busy: boolean }) {
   const isChallenger = match.challengerPlayerId === mePlayerId;
   const mySide = isChallenger ? "challenger" : "opponent";
   const myTeam = isChallenger ? match.challengerTeam : match.opponentTeam;
@@ -172,10 +172,102 @@ function ActiveMatchView({ match, mePlayerId }: { match: PvpMatch; mePlayerId: s
         </div>
       </div>
 
-      {/* Step 3 placeholder */}
-      <div style={{ padding: "16px 20px", borderRadius: 12, border: "1px dashed rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.02)", textAlign: "center", color: "rgba(255,255,255,0.5)", fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase" }}>
-        Move submission coming in Step 3
-      </div>
+      {/* Last opponent move banner — shown only when there's a previous round */}
+      {(() => {
+        // Find most recent round NOT made by me (so it's the opponent's last move)
+        const oppRounds = match.roundHistory.filter((r) => r.byPlayerId !== mePlayerId);
+        if (oppRounds.length === 0) return null;
+        const last = oppRounds[oppRounds.length - 1];
+        const lastFaction = FACTIONS[last.attackerFaction];
+        const lastMove = lastFaction?.moves.find((m) => m.id === last.moveId);
+        if (!lastFaction || !lastMove) return null;
+        return (
+          <div style={{ padding: "12px 14px", borderRadius: 10, border: "1px solid rgba(248,113,113,0.25)", background: "rgba(248,113,113,0.06)", marginBottom: 14 }}>
+            <div style={{ fontSize: 9, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(248,113,113,0.7)", marginBottom: 4 }}>
+              Last opponent move
+            </div>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.85)" }}>
+              <span style={{ color: lastFaction.color, fontWeight: 900 }}>{lastFaction.name}</span> used <b>{lastMove.emoji} {lastMove.label}</b> · <span style={{ color: "#f87171", fontWeight: 700 }}>{last.damageDealt} dmg</span>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Move picker */}
+      {(() => {
+        if (!myF) return null;
+        const myMoves = myF.moves;
+        const moveTypeColor: Record<string, string> = {
+          attack: "#f87171",
+          magic: "#c084fc",
+          trick: "#fbbf24",
+          defend: "#34d399",
+        };
+        return (
+          <div>
+            <div style={{ fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.5)", marginBottom: 10, fontWeight: 700 }}>
+              {isMyTurn ? "Choose your move" : "Opponent is thinking…"}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 8, marginBottom: 12 }}>
+              {myMoves.map((mv) => {
+                const tColor = moveTypeColor[mv.type] || "rgba(255,255,255,0.6)";
+                return (
+                  <button
+                    key={mv.id}
+                    disabled={!isMyTurn || busy}
+                    onClick={() => { if (!busy && isMyTurn) onSubmitMove(mv.id); }}
+                    style={{
+                      padding: "10px 12px",
+                      borderRadius: 10,
+                      border: `1px solid ${isMyTurn && !busy ? tColor + "66" : "rgba(255,255,255,0.08)"}`,
+                      background: isMyTurn && !busy ? `${tColor}11` : "rgba(255,255,255,0.02)",
+                      color: isMyTurn && !busy ? "white" : "rgba(255,255,255,0.4)",
+                      cursor: isMyTurn && !busy ? "pointer" : "not-allowed",
+                      textAlign: "left",
+                      transition: "all 0.15s",
+                      opacity: busy ? 0.6 : 1,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (isMyTurn && !busy) {
+                        (e.currentTarget as HTMLButtonElement).style.background = `${tColor}22`;
+                        (e.currentTarget as HTMLButtonElement).style.borderColor = tColor;
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (isMyTurn && !busy) {
+                        (e.currentTarget as HTMLButtonElement).style.background = `${tColor}11`;
+                        (e.currentTarget as HTMLButtonElement).style.borderColor = tColor + "66";
+                      }
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                      <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: "0.05em" }}>
+                        {mv.emoji} {mv.label}
+                      </div>
+                      <div style={{ fontSize: 9, fontWeight: 900, letterSpacing: "0.1em", textTransform: "uppercase", color: tColor, padding: "2px 6px", borderRadius: 4, background: `${tColor}11` }}>
+                        {mv.type} · {mv.power}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 10, color: "rgba(255,255,255,0.55)", lineHeight: 1.4 }}>
+                      {mv.desc}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            {!isMyTurn && (
+              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", textAlign: "center", letterSpacing: "0.1em", padding: "8px 0", fontStyle: "italic" }}>
+                You can see your moves but cannot play until it's your turn.
+              </div>
+            )}
+            {busy && (
+              <div style={{ fontSize: 11, color: "#fbbf24", textAlign: "center", letterSpacing: "0.1em", textTransform: "uppercase", padding: "6px 0" }}>
+                ⚔️ Resolving move…
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -273,6 +365,20 @@ export default function ChallengePage() {
       });
       const j = await r.json();
       if (!j.ok) setError(j.error || "Cancel failed");
+      else setMatch(j.match);
+    } catch (e: any) { setError(e?.message || "Network error"); } finally { setBusy(false); }
+  };
+
+  const handleSubmitMove = async (moveId: string) => {
+    if (!identity || !match) return;
+    setBusy(true); setError(null);
+    try {
+      const r = await fetch("/api/faction-wars/pvp/submit-move", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ challengeId, playerId: identity.playerId, moveId }),
+      });
+      const j = await r.json();
+      if (!j.ok) setError(j.error || "Move submission failed");
       else setMatch(j.match);
     } catch (e: any) { setError(e?.message || "Network error"); } finally { setBusy(false); }
   };
@@ -399,7 +505,7 @@ export default function ChallengePage() {
 
               {/* ACTIVE */}
               {match.status === "active" && isParticipant && (
-                <ActiveMatchView match={match} mePlayerId={identity.playerId} />
+                <ActiveMatchView match={match} mePlayerId={identity.playerId} challengeId={challengeId} onSubmitMove={handleSubmitMove} busy={busy} />
               )}
 
               {/* COMPLETED */}
