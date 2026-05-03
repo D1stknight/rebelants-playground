@@ -782,11 +782,6 @@ setPlayer3DAnim(nextPlayerAnim);
 
 if (typeof window !== "undefined") {
   (window as any).__fw3dPlayPlayer?.(nextPlayerAnim);
-
-  window.setTimeout(() => {
-    setPlayer3DAnim("idle");
-    (window as any).__fw3dPlayPlayer?.("idle");
-  }, 950);
 }
     setShowHowToPlay(false); // auto-collapse once battle begins
     const playerFaction = team[currentFactionIdx] || team[0];
@@ -817,11 +812,6 @@ setEnemy3DAnim(nextEnemyAnim);
 
 if (typeof window !== "undefined") {
   (window as any).__fw3dPlayEnemy?.(nextEnemyAnim);
-
-  window.setTimeout(() => {
-    setEnemy3DAnim("idle");
-    (window as any).__fw3dPlayEnemy?.("idle");
-  }, 950);
 }
     const timesUsed = usedMoves[selectedMove.id] || 0;
     const degradedMove: Move = { ...selectedMove, power: Math.max(1, selectedMove.power - timesUsed) };
@@ -951,8 +941,34 @@ if (typeof window !== "undefined") {
     setRoundLog(prev => [{playerMove:selectedMove.label, enemyMove:enemyMove.label, playerDmg, enemyDmg, effect:effectTag}, ...prev.slice(0,5)]);
 
     // endure: can't lose this territory — but also can't win by using it alone
-    const over = endureFlag ? false : (newPlayerHp <= 0 || newEnemyHp <= 0);
-    setBattleAnim(newEnemyHp <= 0 ? "win" : newPlayerHp <= 0 ? "lose" : "idle");
+const over = endureFlag ? false : (newPlayerHp <= 0 || newEnemyHp <= 0);
+
+if (typeof window !== "undefined") {
+  window.setTimeout(() => {
+    if (over && newEnemyHp <= 0) {
+      setPlayer3DAnim("win");
+      setEnemy3DAnim("lose");
+      (window as any).__fw3dPlayPlayer?.("win");
+      (window as any).__fw3dPlayEnemy?.("lose");
+      return;
+    }
+
+    if (over && newPlayerHp <= 0) {
+      setPlayer3DAnim("lose");
+      setEnemy3DAnim("win");
+      (window as any).__fw3dPlayPlayer?.("lose");
+      (window as any).__fw3dPlayEnemy?.("win");
+      return;
+    }
+
+    setPlayer3DAnim("idle");
+    setEnemy3DAnim("idle");
+    (window as any).__fw3dPlayPlayer?.("idle");
+    (window as any).__fw3dPlayEnemy?.("idle");
+  }, 950);
+}
+
+setBattleAnim(newEnemyHp <= 0 ? "win" : newPlayerHp <= 0 ? "lose" : "idle");
     await new Promise(r=>setTimeout(r, over ? 700 : 250));
     if (!over) { setBattleAnim("idle"); }
 
