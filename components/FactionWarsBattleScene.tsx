@@ -196,6 +196,9 @@ export function FactionWarsBattleScene({ state, actions, enableHealing = true, l
     none: "💀 DEFEAT — YOUR FORCES FELL",
   };
 
+  // Derived from cfg — mirrors FactionWars.tsx line 646
+  const fwPlunderBonus = Number(cfg?.factionWarsPlunderBonus ?? 50);
+
   // ── PHASE: battle ──────────────────────────────────────────────────────────
   if (phase === "battle") {
     if (!currentPlayerFD || !currentDefenderFD) return null;
