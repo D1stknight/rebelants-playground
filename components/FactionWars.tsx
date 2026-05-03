@@ -976,7 +976,7 @@ setBattleAnim(newEnemyHp <= 0 ? "win" : newPlayerHp <= 0 ? "lose" : "idle");
     setBusy(false);
 
 if (over) {
-  await new Promise(r=>setTimeout(r,3200));
+  await new Promise(r=>setTimeout(r,3500));
   setBattleAnim("idle");
   const playerWon = newEnemyHp <= 0;
       // Plunder bonus on win
