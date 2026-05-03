@@ -135,16 +135,18 @@ export interface BattleSceneState {
 }
 
 export interface BattleSceneActions {
-  setSelectedMove: (move: Move | null) => void;
-  setShowHowToPlay: (show: boolean) => void;
+  // State setters use React.Dispatch<SetStateAction<T>> so callers can pass
+  // either a value OR an updater function (h => !h, n => n + 1, etc).
+  setSelectedMove: React.Dispatch<React.SetStateAction<Move | null>>;
+  setShowHowToPlay: React.Dispatch<React.SetStateAction<boolean>>;
   fightTerritory: () => void;
   nextTerritory: () => void;
   resetGame: () => void;
 
   // Healing potion callbacks (no-ops if enableHealing=false)
-  setHealBusy: (busy: boolean) => void;
-  setHealUsed: (updater: (n: number) => number) => void;
-  setPlayerHp: (hp: number) => void;
+  setHealBusy: React.Dispatch<React.SetStateAction<boolean>>;
+  setHealUsed: React.Dispatch<React.SetStateAction<number>>;
+  setPlayerHp: React.Dispatch<React.SetStateAction<number>>;
   spend: (amount: number, reason: string) => Promise<any>;
   refresh: () => Promise<any> | void;
 }
