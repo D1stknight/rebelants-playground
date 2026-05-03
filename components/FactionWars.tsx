@@ -975,10 +975,10 @@ setBattleAnim(newEnemyHp <= 0 ? "win" : newPlayerHp <= 0 ? "lose" : "idle");
     setSelectedMove(null);
     setBusy(false);
 
-    if (over) {
-      await new Promise(r=>setTimeout(r,500));
-      setBattleAnim("idle");
-      const playerWon = newEnemyHp <= 0;
+if (over) {
+  await new Promise(r=>setTimeout(r,2400));
+  setBattleAnim("idle");
+  const playerWon = newEnemyHp <= 0;
       // Plunder bonus on win
       if (playerWon && plunderPendingRef.current) {
         const plunderAmt = Number(cfg?.factionWarsPlunderBonus ?? 50);
