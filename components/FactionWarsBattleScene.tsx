@@ -113,6 +113,8 @@ export interface BattleSceneState {
   comboBonus: number;
   commandActive: boolean;
   berserkerActive: boolean;
+  meditationStacks: number;
+  oneTimeUsed: string[];
 
   // Match outcome state
   results: TerritoryResult[];
@@ -171,7 +173,7 @@ export function FactionWarsBattleScene({ state, actions, enableHealing = true, l
     dmgFloats, battleAnim, enemy3DAnim, player3DAnim,
     selectedMove, usedMoves,
     sacrificeBonus, powerBuffRounds, powerBuffAmt, comboBonus,
-    commandActive, berserkerActive,
+    commandActive, berserkerActive, meditationStacks, oneTimeUsed,
     results, finalRarity, territoriesWon,
     showHowToPlay, busy,
     healBusy, healUsed,
