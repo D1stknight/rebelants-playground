@@ -1,11 +1,12 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import Head from "next/head";
 import { loadProfile, type Profile } from "../../../lib/profile";
 import type { PvpMatch, PvpRound } from "../../../lib/types/fwpvp";
-import { FACTIONS, FACTION_IDS, TEAM_SIZE, type FactionId, type Move } from "../../../lib/factionWarsCore";
+import { FACTIONS, FACTION_IDS, TEAM_SIZE, TERRITORY_COUNT, type FactionId, type Move, type RoundResult, type TerritoryResult, type Rarity } from "../../../lib/factionWarsCore";
 import FactionWarsBattleScene, { type BattleSceneState, type BattleSceneActions } from "../../../components/FactionWarsBattleScene";
+import { useFWAudio } from "../../../lib/useFWAudio";
 
 const JP = `'Noto Serif JP', 'Hiragino Mincho ProN', serif`;
 
@@ -109,11 +110,33 @@ function TeamPicker({ team, setTeam, onSubmit, busy }: { team: FactionId[]; setT
   );
 }
 
-// ── Active match view (Step 2: read-only, no move submission yet) ───────────
-function ActiveMatchView({ match, mePlayerId, challengeId, onSubmitMove, busy }: { match: PvpMatch; mePlayerId: string; challengeId: string; onSubmitMove: (moveId: string) => Promise<void>; busy: boolean }) {
+// ── Active match view + completed match view ──────────────────────────────
+// ── Animation state type (mirrors private SamuraiAnimState in factionWarsCore) ─
+type AnimState = "idle" | "attack" | "magic" | "trick" | "defend" | "hit" | "win" | "lose";
+
+// Maps a Move's type to the animation state used by FactionWars3DCharacter.
+// Mirrors getSamuraiAnimForMove() in lib/factionWarsCore.ts.
+function moveToAnim(mv: Move | null | undefined): AnimState {
+  if (!mv) return "idle";
+  if (mv.type === "attack") return "attack";
+  if (mv.type === "magic") return "magic";
+  if (mv.type === "trick") return "trick";
+  if (mv.type === "defend") return "defend";
+  return "idle";
+}
+
+// Looks up a Move by id within a given faction. Returns null if not found.
+function findMove(factionId: FactionId | null | undefined, moveId: string): Move | null {
+  if (!factionId) return null;
+  const f = FACTIONS[factionId];
+  if (!f) return null;
+  return f.moves.find(m => m.id === moveId) ?? null;
+}
+
+function ActiveMatchView({ match, mePlayerId, challengeId, onSubmitMove, busy, sfx }: { match: PvpMatch; mePlayerId: string; challengeId: string; onSubmitMove: (moveId: string) => Promise<void>; busy: boolean; sfx: ReturnType<typeof useFWAudio>["sfx"] }) {
   // ── Perspective math ───────────────────────────────────────────────────────
   const isChallenger = match.challengerPlayerId === mePlayerId;
-  const mySide = isChallenger ? "challenger" : "opponent";
+  const mySide: "challenger" | "opponent" = isChallenger ? "challenger" : "opponent";
   const myTeam = isChallenger ? match.challengerTeam : match.opponentTeam;
   const oppTeam = isChallenger ? match.opponentTeam : match.challengerTeam;
   const myIdx = isChallenger ? match.challengerCurrentFactionIndex : match.opponentCurrentFactionIndex;
@@ -127,16 +150,12 @@ function ActiveMatchView({ match, mePlayerId, challengeId, onSubmitMove, busy }:
   const myF = myFighter ? FACTIONS[myFighter] : null;
   const oppF = oppFighter ? FACTIONS[oppFighter] : null;
 
-  // ── Map PvP match → BattleSceneState ───────────────────────────────────────
-  // The BattleScene component is a pure presentation layer. We render it from
-  // MY perspective (so my fighter is the "player" and the opponent is the "enemy").
+  // ── Round and territory mapping ────────────────────────────────────────────
   const roundsThisTerritory = match.roundHistory.filter(r => r.territory === match.currentTerritory);
   const currentRoundNumber = roundsThisTerritory.length === 0 ? 1 : roundsThisTerritory[roundsThisTerritory.length - 1].roundInTerritory + 1;
   const myTerritoriesWon = isChallenger ? match.challengerTerritoriesWon : match.opponentTerritoriesWon;
 
-  // Map PvP rounds → AI-mode roundLog shape. Each PvP round is a half-round
-  // (one side acted), so we render it as a one-sided entry where the
-  // non-acting side shows "—".
+  // Map PvP rounds → AI-mode roundLog shape
   const roundLog = roundsThisTerritory.slice().reverse().slice(0, 6).map(r => {
     const wasMine = r.attackerSide === mySide;
     return {
@@ -148,6 +167,98 @@ function ActiveMatchView({ match, mePlayerId, challengeId, onSubmitMove, busy }:
     };
   });
 
+  // Map PvP territoryResults → AI-mode TerritoryResult[] for territory icons.
+  // The BattleScene renders results[i].won as a checkmark/x on each territory icon.
+  const mappedResults: TerritoryResult[] = match.territoryResults.map(tr => {
+    const myFactionForT = isChallenger ? tr.challengerFaction : tr.opponentFaction;
+    const oppFactionForT = isChallenger ? tr.opponentFaction : tr.challengerFaction;
+    const won = tr.winnerSide === mySide;
+    const myHpFinal = isChallenger ? tr.challengerHpFinal : tr.opponentHpFinal;
+    const oppHpFinal = isChallenger ? tr.opponentHpFinal : tr.challengerHpFinal;
+    return {
+      territory: tr.territory,
+      defender: oppFactionForT,
+      playerFaction: myFactionForT,
+      rounds: [],
+      playerHpFinal: myHpFinal,
+      enemyHpFinal: oppHpFinal,
+      won,
+    };
+  });
+
+  // ── 3D animation state (per-side, transient) ───────────────────────────────
+  const [enemy3DAnim, setEnemy3DAnim] = useState<AnimState>("idle");
+  const [player3DAnim, setPlayer3DAnim] = useState<AnimState>("idle");
+
+  // Track previous values to detect changes
+  const prevRoundCountRef = useRef(match.roundHistory.length);
+  const prevTerritoryCountRef = useRef(match.territoryResults.length);
+
+  // ── Watch for new rounds → fire SFX + 3D anims ────────────────────────────
+  useEffect(() => {
+    const prevCount = prevRoundCountRef.current;
+    const currCount = match.roundHistory.length;
+    if (currCount <= prevCount) {
+      prevRoundCountRef.current = currCount;
+      return;
+    }
+    // One or more new rounds since last render. Process the most recent one.
+    const newest = match.roundHistory[currCount - 1];
+    if (newest) {
+      const wasMine = newest.attackerSide === mySide;
+      const moveObj = findMove(newest.attackerFaction, newest.moveId);
+      const animForAction = moveToAnim(moveObj);
+
+      // Animation: the actor performs their move animation; the defender plays "hit"
+      if (wasMine) {
+        setPlayer3DAnim(animForAction);
+        setEnemy3DAnim("hit");
+      } else {
+        setEnemy3DAnim(animForAction);
+        setPlayer3DAnim("hit");
+      }
+
+      // SFX cascade: clash → move-type → hit-light/heavy
+      try {
+        sfx.clash();
+        if (moveObj?.type === "attack") sfx.attackHit();
+        else if (moveObj?.type === "defend") sfx.defendBlock();
+        else if (moveObj?.type === "magic") sfx.magicCast();
+        else if (moveObj?.type === "trick") sfx.trickDodge();
+        if (newest.damageDealt > 18) sfx.hitHeavy();
+        else if (newest.damageDealt > 0 && newest.damageDealt < 10) sfx.hitLight();
+      } catch {}
+
+      // Reset to idle after 1.2s
+      const timer = setTimeout(() => {
+        setPlayer3DAnim("idle");
+        setEnemy3DAnim("idle");
+      }, 1200);
+      prevRoundCountRef.current = currCount;
+      return () => clearTimeout(timer);
+    }
+    prevRoundCountRef.current = currCount;
+  }, [match.roundHistory.length, mySide, sfx]);
+
+  // ── Watch for new territory results → fire territory SFX ──────────────────
+  useEffect(() => {
+    const prevCount = prevTerritoryCountRef.current;
+    const currCount = match.territoryResults.length;
+    if (currCount <= prevCount) {
+      prevTerritoryCountRef.current = currCount;
+      return;
+    }
+    const newest = match.territoryResults[currCount - 1];
+    if (newest) {
+      try {
+        if (newest.winnerSide === mySide) sfx.territoryWin();
+        else sfx.territoryLose();
+      } catch {}
+    }
+    prevTerritoryCountRef.current = currCount;
+  }, [match.territoryResults.length, mySide, sfx]);
+
+  // ── Build BattleSceneState ─────────────────────────────────────────────────
   const battleSceneState: BattleSceneState = {
     phase: "battle",
     team: myTeam,
@@ -163,8 +274,8 @@ function ActiveMatchView({ match, mePlayerId, challengeId, onSubmitMove, busy }:
     currentTerritoryRounds: [],
     dmgFloats: [],
     battleAnim: "idle",
-    enemy3DAnim: "idle",
-    player3DAnim: "idle",
+    enemy3DAnim,
+    player3DAnim,
     selectedMove: null,
     usedMoves: {},
     sacrificeBonus: 0,
@@ -175,7 +286,7 @@ function ActiveMatchView({ match, mePlayerId, challengeId, onSubmitMove, busy }:
     berserkerActive: false,
     meditationStacks: 0,
     oneTimeUsed: [],
-    results: [],
+    results: mappedResults,
     finalRarity: "none",
     territoriesWon: myTerritoriesWon,
     showHowToPlay: false,
@@ -187,9 +298,6 @@ function ActiveMatchView({ match, mePlayerId, challengeId, onSubmitMove, busy }:
     balance: 0,
   };
 
-  // Inert callbacks — the BattleScene's "battle phase" usually drives the game,
-  // but in PvP the parent (this component) owns all interactivity. We pass
-  // showMovePicker={false} and enableHealing={false} so none of these fire.
   const inertActions: BattleSceneActions = {
     setSelectedMove: (() => {}) as any,
     setShowHowToPlay: (() => {}) as any,
@@ -219,16 +327,16 @@ function ActiveMatchView({ match, mePlayerId, challengeId, onSubmitMove, busy }:
         </div>
       </div>
 
-      {/* Visual chrome from AI mode — HP bars, fighter cards, round history, buff badges */}
       <FactionWarsBattleScene
         state={battleSceneState}
         actions={inertActions}
         enableHealing={false}
         showMovePicker={false}
+        enableHowToPlay={false}
         leaderboardSlot={null}
       />
 
-      {/* PvP move picker — owned by this component, NOT BattleScene */}
+      {/* PvP move picker */}
       {(() => {
         if (!myF) return null;
         const myMoves = myF.moves;
@@ -250,7 +358,7 @@ function ActiveMatchView({ match, mePlayerId, challengeId, onSubmitMove, busy }:
                 return (
                   <button
                     key={mv.id}
-                    onClick={() => onSubmitMove(mv.id)}
+                    onClick={() => { try { sfx.cardSelect(); } catch {} onSubmitMove(mv.id); }}
                     disabled={disabled}
                     style={{
                       background: "rgba(0,0,0,0.4)",
@@ -295,6 +403,121 @@ function ActiveMatchView({ match, mePlayerId, challengeId, onSubmitMove, busy }:
   );
 }
 
+function CompletedMatchView({ match, mePlayerId, sfx, stopMusic }: { match: PvpMatch; mePlayerId: string; sfx: ReturnType<typeof useFWAudio>["sfx"]; stopMusic: () => void }) {
+  const router = useRouter();
+  const isChallenger = match.challengerPlayerId === mePlayerId;
+  const mySide: "challenger" | "opponent" = isChallenger ? "challenger" : "opponent";
+  const myTeam = isChallenger ? match.challengerTeam : match.opponentTeam;
+  const oppTeam = isChallenger ? match.opponentTeam : match.challengerTeam;
+  const myWon = isChallenger ? match.challengerTerritoriesWon : match.opponentTerritoriesWon;
+  const iWon = match.winnerPlayerId === mePlayerId;
+
+  // finalRarity: when I'm the winner, use match.winnerCrateRarity. When I lost, "none".
+  const finalRarity: Rarity = iWon && match.winnerCrateRarity ? match.winnerCrateRarity : "none";
+
+  // Map territoryResults → AI-mode TerritoryResult[] from my perspective.
+  const mappedResults: TerritoryResult[] = match.territoryResults.map(tr => {
+    const myFactionForT = isChallenger ? tr.challengerFaction : tr.opponentFaction;
+    const oppFactionForT = isChallenger ? tr.opponentFaction : tr.challengerFaction;
+    const won = tr.winnerSide === mySide;
+    const myHpFinal = isChallenger ? tr.challengerHpFinal : tr.opponentHpFinal;
+    const oppHpFinal = isChallenger ? tr.opponentHpFinal : tr.challengerHpFinal;
+    return {
+      territory: tr.territory,
+      defender: oppFactionForT,
+      playerFaction: myFactionForT,
+      rounds: [],
+      playerHpFinal: myHpFinal,
+      enemyHpFinal: oppHpFinal,
+      won,
+    };
+  });
+
+  // Fire end-of-match SFX exactly once
+  const firedRef = useRef(false);
+  useEffect(() => {
+    if (firedRef.current) return;
+    firedRef.current = true;
+    try {
+      stopMusic();
+      if (finalRarity === "ultra") sfx.ultra();
+      else if (finalRarity !== "none") sfx.win();
+      else sfx.lose();
+      // Crate sounds for winners
+      if (iWon && finalRarity !== "none") {
+        sfx.crateOpen();
+        setTimeout(() => { try { sfx.crateReward(); } catch {} }, 1000);
+      }
+    } catch {}
+  }, [finalRarity, iWon, sfx, stopMusic]);
+
+  const battleSceneState: BattleSceneState = {
+    phase: "final_result",
+    team: myTeam,
+    defenders: oppTeam,
+    currentTerritory: 0,
+    currentFactionIdx: 0,
+    currentPlayerFD: null,
+    currentDefenderFD: null,
+    playerHp: 0,
+    enemyHp: 0,
+    currentRound: 0,
+    roundLog: [],
+    currentTerritoryRounds: [],
+    dmgFloats: [],
+    battleAnim: "idle",
+    enemy3DAnim: "idle",
+    player3DAnim: "idle",
+    selectedMove: null,
+    usedMoves: {},
+    sacrificeBonus: 0,
+    powerBuffRounds: 0,
+    powerBuffAmt: 0,
+    comboBonus: 0,
+    commandActive: false,
+    berserkerActive: false,
+    meditationStacks: 0,
+    oneTimeUsed: [],
+    results: mappedResults,
+    finalRarity,
+    territoriesWon: myWon,
+    showHowToPlay: false,
+    busy: false,
+    healBusy: false,
+    healUsed: 0,
+    cfg: null,
+    currency: "REBEL",
+    balance: 0,
+  };
+
+  // resetGame in PvP context = navigate back to PvP lobby
+  const inertActions: BattleSceneActions = {
+    setSelectedMove: (() => {}) as any,
+    setShowHowToPlay: (() => {}) as any,
+    fightTerritory: () => {},
+    nextTerritory: () => {},
+    resetGame: () => { router.push("/faction-wars/pvp"); },
+    setHealBusy: (() => {}) as any,
+    setHealUsed: (() => {}) as any,
+    setPlayerHp: (() => {}) as any,
+    spend: async () => null,
+    refresh: async () => undefined,
+  };
+
+  return (
+    <div>
+      <FactionWarsBattleScene
+        state={battleSceneState}
+        actions={inertActions}
+        enableHealing={false}
+        showMovePicker={false}
+        enableHowToPlay={false}
+        leaderboardSlot={null}
+      />
+    </div>
+  );
+}
+
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function ChallengePage() {
   const router = useRouter();
@@ -308,6 +531,25 @@ export default function ChallengePage() {
   const [busy, setBusy] = useState(false);
   const [team, setTeam] = useState<FactionId[]>([]);
   const [copied, setCopied] = useState(false);
+
+  // Audio hook (provides muted/toggleMute/SFX/music control). Lives on the
+  // page (not ActiveMatchView) so music persists across status transitions.
+  const audio = useFWAudio();
+
+  // Start/stop battle music based on match status. Use epic music for
+  // territory 4-5 to mirror AI mode's "final push" feel.
+  useEffect(() => {
+    if (!match) return;
+    if (match.status === "active") {
+      if (match.currentTerritory >= 3) audio.startEpic();
+      else audio.startMusic();
+    } else if (match.status === "completed" || match.status === "cancelled") {
+      audio.stopMusic();
+    }
+    // We intentionally don't depend on audio.* refs (they'd cause re-runs and
+    // restart music). The hook's internal refs handle idempotency.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [match?.status, match?.currentTerritory]);
 
   // Load profile + identity once
   useEffect(() => {
@@ -440,7 +682,7 @@ export default function ChallengePage() {
 
         <div style={{ maxWidth: 720, margin: "0 auto", padding: "12px 16px 40px", fontFamily: JP }}>
           {/* Title */}
-          <div style={{ textAlign: "center", marginBottom: 24, marginTop: 14 }}>
+          <div style={{ textAlign: "center", marginBottom: 24, marginTop: 14, position: "relative" }}>
             <div style={{
               fontSize: "clamp(20px,3.5vw,32px)", fontWeight: 900, letterSpacing: "0.15em", textTransform: "uppercase",
               background: "linear-gradient(135deg,#fbbf24,#f87171,#c084fc)",
@@ -448,6 +690,21 @@ export default function ChallengePage() {
             }}>
               {match ? `${match.challengerDisplayName} vs ${match.opponentDisplayName || "?"}` : "Loading match…"}
             </div>
+            {/* Mute toggle (top-right of title block) */}
+            <button
+              onClick={audio.toggleMute}
+              aria-label={audio.muted ? "Unmute" : "Mute"}
+              style={{
+                position: "absolute", top: 14, right: 14,
+                background: "rgba(0,0,0,0.4)",
+                border: "1px solid rgba(255,255,255,0.12)",
+                borderRadius: 8, padding: "6px 10px",
+                cursor: "pointer", color: "rgba(255,255,255,0.8)",
+                fontSize: 14, lineHeight: 1,
+              }}
+            >
+              {audio.muted ? "🔇" : "🔊"}
+            </button>
           </div>
 
           {error && (
@@ -528,25 +785,17 @@ export default function ChallengePage() {
 
               {/* ACTIVE */}
               {match.status === "active" && isParticipant && (
-                <ActiveMatchView match={match} mePlayerId={identity.playerId} challengeId={challengeId} onSubmitMove={handleSubmitMove} busy={busy} />
+                <ActiveMatchView match={match} mePlayerId={identity.playerId} challengeId={challengeId} onSubmitMove={handleSubmitMove} busy={busy} sfx={audio.sfx} />
               )}
 
               {/* COMPLETED */}
-              {match.status === "completed" && (
-                <div style={{ padding: "28px 22px", borderRadius: 14, border: "1px solid rgba(251,191,36,0.3)", background: "rgba(251,191,36,0.05)", textAlign: "center" }}>
-                  <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 8 }}>Match Complete</div>
-                  <div style={{ fontSize: 24, fontWeight: 900, color: "#fbbf24", marginBottom: 6 }}>
-                    {match.winnerPlayerId === identity.playerId ? "🏆 Victory" : match.loserPlayerId === identity.playerId ? "💀 Defeat" : "Draw"}
-                  </div>
-                  <div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", marginBottom: 14 }}>
-                    Final: {match.challengerTerritoriesWon}–{match.opponentTerritoriesWon}
-                  </div>
-                  {match.winnerPlayerId === identity.playerId && match.winnerCrateRarity && (
-                    <div style={{ fontSize: 12, color: "#fbbf24", letterSpacing: "0.1em", textTransform: "uppercase" }}>
-                      🎁 {match.winnerCrateRarity} crate earned
-                    </div>
-                  )}
-                </div>
+              {match.status === "completed" && identity && (
+                <CompletedMatchView
+                  match={match}
+                  mePlayerId={identity.playerId}
+                  sfx={audio.sfx}
+                  stopMusic={audio.stopMusic}
+                />
               )}
 
               {/* CANCELLED */}

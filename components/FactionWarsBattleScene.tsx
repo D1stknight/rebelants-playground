@@ -161,12 +161,16 @@ export interface BattleSceneProps {
   // When false, the "Choose move" 4-button grid + "Strike" button are hidden.
   // The HP bars, fighter cards, round history, and buff badges still render.
   showMovePicker?: boolean;
+  // PvP passes false (PvP players already know the rules from AI mode);
+  // AI mode passes true (default). When false, the "How to Play" collapsible
+  // section is completely hidden.
+  enableHowToPlay?: boolean;
   // Optional slot for leaderboard rendered inside final_result.
   // PvP passes null; AI mode passes its <FWLeaderboardPanel /> here.
   leaderboardSlot?: React.ReactNode;
 }
 
-export function FactionWarsBattleScene({ state, actions, enableHealing = true, showMovePicker = true, leaderboardSlot = null }: BattleSceneProps) {
+export function FactionWarsBattleScene({ state, actions, enableHealing = true, showMovePicker = true, enableHowToPlay = true, leaderboardSlot = null }: BattleSceneProps) {
   // Destructure state into local names so the original JSX doesn't need rewriting
   const {
     phase,
@@ -224,6 +228,7 @@ export function FactionWarsBattleScene({ state, actions, enableHealing = true, s
         </div>
 
         {/* HOW TO PLAY — collapsible */}
+        {enableHowToPlay && (
         <div style={{ marginBottom:12 }}>
           <button onClick={()=>setShowHowToPlay(h=>!h)} style={{ display:"flex", alignItems:"center", gap:8, background:"rgba(251,191,36,0.08)", border:"1px solid rgba(251,191,36,0.2)", borderRadius:10, padding:"8px 14px", cursor:"pointer", width:"100%", color:"white" }}>
             <span style={{ fontSize:14 }}>📖</span>
@@ -259,6 +264,7 @@ export function FactionWarsBattleScene({ state, actions, enableHealing = true, s
             </div>
           )}
         </div>
+        )}
 
         {/* MAIN BATTLE ARENA */}
         <div style={{ position:"relative", borderRadius:18, overflow:"hidden", marginBottom:16, border:"1px solid rgba(255,255,255,0.1)" }}>
