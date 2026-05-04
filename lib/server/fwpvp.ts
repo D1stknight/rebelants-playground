@@ -75,3 +75,131 @@ export async function markActive(challengeId: string): Promise<void> {
 export async function unmarkActive(challengeId: string): Promise<void> {
   await redis.srem(ACTIVE_INDEX_KEY, challengeId);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PvP Economy helpers (Commit C)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// REBEL balance is shared with the rest of the playground (points/spend.ts,
+// points/earn.ts both use the same key prefix). We mirror that key shape here
+// so PvP transactions show up in player balance immediately.
+//
+// Balance key: ra:points:bal:${playerId}  — same as pages/api/points/spend.ts
+//
+// We deliberately do NOT touch points/spend.ts's "shuffle" or "tunnel" daily-cap
+// logic — PvP is a wallet transfer between players, not earning. The pot
+// circulates: 300 in from challenger + 300 from opponent = 600 out to winner
+// (loser gets 0). Net flow is zero across the two players.
+
+const REBEL_BAL_KEY = (pid: string) => `ra:points:bal:${pid}`;
+
+// Default values used when admin config is absent or partially populated.
+const PVP_COST_DEFAULT = 300;
+const PVP_PAYOUT_MODE_DEFAULT: "pot" = "pot";
+const PVP_ENABLED_DEFAULT = true;
+
+export interface PvpEconomyConfig {
+  factionWarsPvpCost: number;
+  factionWarsPvpPayoutMode: "pot";
+  factionWarsPvpEnabled: boolean;
+}
+
+// Reads the live admin config from Redis and returns the PvP economy slice.
+// Falls back to defaults for any missing keys. Mirrors the read pattern in
+// pages/api/points/spend.ts so admin saves are picked up without redeploy.
+export async function getPvpEconomyConfig(): Promise<PvpEconomyConfig> {
+  const keysToTry = [
+    "ra:config:economy",   // primary key Admin writes to
+    "ra:points:config",
+    "ra:config:points",
+    "ra:pointsConfig",
+    "ra:config",
+  ];
+
+  const normalize = (raw: any) => {
+    if (typeof raw === "string") {
+      try { return JSON.parse(raw); } catch { return null; }
+    }
+    if (raw && typeof raw === "object") return raw;
+    return null;
+  };
+
+  for (const k of keysToTry) {
+    try {
+      const raw = await redis.get<any>(k);
+      const v = normalize(raw);
+      if (!v) continue;
+
+      // Some admin saves wrap the config under a "pointsConfig" key.
+      const cfg = (v as any).pointsConfig && typeof (v as any).pointsConfig === "object"
+        ? (v as any).pointsConfig
+        : v;
+
+      const cost = Number((cfg as any).factionWarsPvpCost);
+      const enabled = (cfg as any).factionWarsPvpEnabled;
+      // We accept the row even if cost is unset (use default). The presence of
+      // ANY key in the cfg means it's valid live config — we just fill blanks.
+      if (cfg && typeof cfg === "object") {
+        return {
+          factionWarsPvpCost: Number.isFinite(cost) && cost >= 0 ? cost : PVP_COST_DEFAULT,
+          factionWarsPvpPayoutMode: PVP_PAYOUT_MODE_DEFAULT,
+          factionWarsPvpEnabled: enabled === false ? false : PVP_ENABLED_DEFAULT,
+        };
+      }
+    } catch {
+      // ignore and try next key
+    }
+  }
+
+  return {
+    factionWarsPvpCost: PVP_COST_DEFAULT,
+    factionWarsPvpPayoutMode: PVP_PAYOUT_MODE_DEFAULT,
+    factionWarsPvpEnabled: PVP_ENABLED_DEFAULT,
+  };
+}
+
+// Reads a player's current REBEL balance.
+export async function getREBELBalance(playerId: string): Promise<number> {
+  if (!playerId) return 0;
+  try {
+    const raw = await redis.get<number>(REBEL_BAL_KEY(playerId));
+    return Number(raw || 0);
+  } catch {
+    return 0;
+  }
+}
+
+// Atomically deduct REBEL from a player's balance. Returns the new balance
+// on success, or null if the player has insufficient funds.
+//
+// Note: Upstash Redis doesn't support multi-step transactions cleanly, so we
+// do a check-then-decrement. Two simultaneous spends from the same player
+// could race past the check, but the 300-REBEL stakes here mean the worst case
+// is a player going slightly negative. We guard create/accept against this by
+// rejecting matches if balance is too low BEFORE the spend.
+export async function spendREBEL(playerId: string, amount: number): Promise<number | null> {
+  if (!playerId) return null;
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  const bal = await getREBELBalance(playerId);
+  if (bal < amount) return null;
+  try {
+    const newBal = await redis.incrby(REBEL_BAL_KEY(playerId), -amount);
+    return Number(newBal || 0);
+  } catch {
+    return null;
+  }
+}
+
+// Credit REBEL to a player's balance. Used for refunds (cancel) and pot
+// payouts (winner on completion). Returns new balance on success.
+export async function creditREBEL(playerId: string, amount: number): Promise<number | null> {
+  if (!playerId) return null;
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  try {
+    const newBal = await redis.incrby(REBEL_BAL_KEY(playerId), amount);
+    return Number(newBal || 0);
+  } catch {
+    return null;
+  }
+}
+

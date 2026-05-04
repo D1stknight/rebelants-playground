@@ -6,7 +6,7 @@
 // identity. In production UI we'll require commander name or Discord linked.
 
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getMatch, saveMatch, addPlayerMatch } from "../../../../lib/server/fwpvp";
+import { getMatch, saveMatch, addPlayerMatch, getPvpEconomyConfig, spendREBEL, getREBELBalance } from "../../../../lib/server/fwpvp";
 import type { AcceptChallengeRequest } from "../../../../lib/types/fwpvp";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -31,6 +31,35 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     if (match.challengerPlayerId === opponentPlayerId) {
       return res.status(400).json({ ok: false, error: "Cannot accept your own challenge" });
+    }
+
+    // ── Economy gate ─────────────────────────────────────────────────────
+    // Re-check the live "enabled" flag (admin may have killed PvP since the
+    // challenge was created — accept should refuse and let challenger cancel).
+    // Cost comes from the match snapshot (match.pvpCost), NOT live config —
+    // the challenger already paid this exact amount, so the opponent must too.
+    const econCfg = await getPvpEconomyConfig();
+    if (!econCfg.factionWarsPvpEnabled) {
+      return res.status(403).json({ ok: false, error: "PvP is currently disabled" });
+    }
+    const ante = Number(match.pvpCost ?? 0);
+    if (ante > 0) {
+      const bal = await getREBELBalance(opponentPlayerId);
+      if (bal < ante) {
+        return res.status(400).json({
+          ok: false,
+          error: `Insufficient REBEL. Need ${ante}, have ${bal}.`,
+          balance: bal,
+          required: ante,
+        });
+      }
+      const newBal = await spendREBEL(opponentPlayerId, ante);
+      if (newBal === null) {
+        return res.status(400).json({ ok: false, error: "Could not deduct ante (try again)" });
+      }
+      // Track the new pot total + opponent paid flag.
+      match.opponentPaid = true;
+      match.pvpPotPaid = Number(match.pvpPotPaid ?? 0) + ante;
     }
 
     const now = Date.now();

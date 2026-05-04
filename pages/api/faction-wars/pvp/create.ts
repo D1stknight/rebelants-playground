@@ -10,7 +10,7 @@
 // frontend will hit this.
 
 import type { NextApiRequest, NextApiResponse } from "next";
-import { generateChallengeId, saveMatch, addPlayerMatch } from "../../../../lib/server/fwpvp";
+import { generateChallengeId, saveMatch, addPlayerMatch, getPvpEconomyConfig, spendREBEL, getREBELBalance } from "../../../../lib/server/fwpvp";
 import { TEAM_SIZE, MAX_HP, FACTIONS, FACTION_IDS } from "../../../../lib/factionWarsCore";
 import type { PvpMatch, CreateChallengeRequest } from "../../../../lib/types/fwpvp";
 import type { FactionId } from "../../../../lib/factionWarsCore";
@@ -51,6 +51,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       challengerTeam = t;
     }
 
+    // ── Economy gate ─────────────────────────────────────────────────────
+    // Check live admin config. Reject if PvP is disabled, OR if challenger
+    // can't afford the ante. Snapshot the cost on the match so admin tweaks
+    // mid-game don't break refund / payout math later.
+    const econCfg = await getPvpEconomyConfig();
+    if (!econCfg.factionWarsPvpEnabled) {
+      return res.status(403).json({ ok: false, error: "PvP is currently disabled" });
+    }
+    const ante = econCfg.factionWarsPvpCost;
+    if (ante > 0) {
+      const bal = await getREBELBalance(challengerPlayerId);
+      if (bal < ante) {
+        return res.status(400).json({
+          ok: false,
+          error: `Insufficient REBEL. Need ${ante}, have ${bal}.`,
+          balance: bal,
+          required: ante,
+        });
+      }
+      const newBal = await spendREBEL(challengerPlayerId, ante);
+      if (newBal === null) {
+        // Race / network glitch — balance changed between check and spend.
+        return res.status(400).json({ ok: false, error: "Could not deduct ante (try again)" });
+      }
+    }
+
     const challengeId = generateChallengeId();
     const now = Date.now();
 
@@ -77,6 +103,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       winnerPlayerId: null,
       loserPlayerId: null,
       winnerCrateRarity: null,
+      // PvP economy snapshot (Commit C). challenger has paid by now (or ante=0).
+      pvpCost: ante,
+      pvpPayoutMode: econCfg.factionWarsPvpPayoutMode,
+      pvpPotPaid: ante,
+      challengerPaid: ante > 0,
+      opponentPaid: false,
       createdAt: now,
       updatedAt: now,
       lastActionAt: now,

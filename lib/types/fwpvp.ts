@@ -100,6 +100,21 @@ export interface PvpMatch {
   // Determined by territories the WINNER won: 3=common, 4=rare, 5=ultra
   winnerCrateRarity: "common" | "rare" | "ultra" | null;
 
+  // ── PvP Economy (Commit C) ──────────────────────────────────────────────
+  // REBEL ante per side, snapshotted at match creation so admin config changes
+  // mid-match don't break refund / payout math. 0 means PvP was free at the
+  // time the match was created.
+  pvpCost: number;
+  // Payout mode. V1 only supports "pot" (winner takes both antes); future
+  // values could include "split", "house_fee", etc.
+  pvpPayoutMode: "pot";
+  // Running total of REBEL on the table. challenger pays `pvpCost` on create
+  // (=> pvpPotPaid = pvpCost), opponent pays on accept (=> pvpPotPaid = 2 * pvpCost).
+  // The winner gets credited this amount when the match completes.
+  pvpPotPaid: number;
+  challengerPaid: boolean;
+  opponentPaid: boolean;
+
   // ── Timestamps ─────────────────────────────────────────────────────────
   createdAt: number;
   updatedAt: number;

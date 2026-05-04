@@ -126,6 +126,14 @@ export default function PvpLobbyPage() {
   const [createError, setCreateError] = useState<string | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
 
+  // ── PvP economy state (Commit C) ──────────────────────────────────────────
+  // Pulled from GET /api/config (public endpoint that exposes admin-saved
+  // economy config, including factionWarsPvpCost / factionWarsPvpEnabled).
+  // Balance comes from GET /api/points/balance?playerId=…
+  const [pvpCost, setPvpCost] = useState<number | null>(null);
+  const [pvpEnabled, setPvpEnabled] = useState<boolean>(true);
+  const [balance, setBalance] = useState<number | null>(null);
+
   // Initial profile + identity load
   useEffect(() => {
     const p = loadProfile();
@@ -151,6 +159,34 @@ export default function PvpLobbyPage() {
     const t = setInterval(refreshMatches, 10000);
     return () => clearInterval(t);
   }, [identity, refreshMatches]);
+
+  // ── Fetch PvP cost / enabled flag + player balance ──────────────────────
+  // Called once when identity is known. We don't bother polling — admin tweaks
+  // are infrequent and stale cost just means the create call may reject; UX
+  // shows the up-to-date "insufficient funds" error from the API in that case.
+  useEffect(() => {
+    if (!identity) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [cfgRes, balRes] = await Promise.all([
+          fetch("/api/config").then(r => r.json()).catch(() => null),
+          fetch(`/api/points/balance?playerId=${encodeURIComponent(identity.playerId)}`).then(r => r.json()).catch(() => null),
+        ]);
+        if (cancelled) return;
+        if (cfgRes?.ok && cfgRes.pointsConfig) {
+          const cost = Number(cfgRes.pointsConfig.factionWarsPvpCost);
+          const enabled = cfgRes.pointsConfig.factionWarsPvpEnabled;
+          setPvpCost(Number.isFinite(cost) && cost >= 0 ? cost : 300);
+          setPvpEnabled(enabled === false ? false : true);
+        }
+        if (balRes?.ok || (balRes && typeof balRes.balance === "number")) {
+          setBalance(Number(balRes.balance ?? 0));
+        }
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, [identity]);
 
   const handleCreate = async () => {
     if (!identity) return;
@@ -235,20 +271,45 @@ export default function PvpLobbyPage() {
                 <div style={{ fontSize: 12, lineHeight: 1.7, color: "rgba(255,255,255,0.6)", marginBottom: 14 }}>
                   Generate a shareable link. Send it to a friend. They click, accept, pick their 5 factions, and the match starts.
                 </div>
-                <button
-                  onClick={handleCreate}
-                  disabled={creating}
-                  style={{
-                    minWidth: 240, height: 44, fontSize: 13, fontWeight: 900, letterSpacing: "0.1em", textTransform: "uppercase",
-                    borderRadius: 22, border: "1px solid rgba(251,191,36,0.5)",
-                    background: creating ? "rgba(255,255,255,0.05)" : "linear-gradient(135deg,rgba(251,191,36,0.3),rgba(248,113,113,0.3))",
-                    color: creating ? "rgba(255,255,255,0.4)" : "#fbbf24",
-                    cursor: creating ? "wait" : "pointer",
-                    filter: creating ? "none" : "drop-shadow(0 0 12px rgba(251,191,36,0.3))",
-                  }}
-                >
-                  {creating ? "Creating…" : "⚔️ Create Challenge"}
-                </button>
+                {(() => {
+                  // Compute affordability + state of the Create button
+                  const cost = pvpCost ?? 0;
+                  const bal = balance ?? 0;
+                  const cantAfford = pvpCost !== null && balance !== null && bal < cost;
+                  const disabled = creating || !pvpEnabled || cantAfford;
+                  const label = creating
+                    ? "Creating…"
+                    : !pvpEnabled
+                    ? "PvP Disabled"
+                    : cantAfford
+                    ? `Need ${cost} REBEL (you have ${bal})`
+                    : cost > 0
+                    ? `⚔️ Create Challenge — ${cost} REBEL`
+                    : "⚔️ Create Challenge";
+                  return (
+                    <>
+                      <button
+                        onClick={handleCreate}
+                        disabled={disabled}
+                        style={{
+                          minWidth: 240, height: 44, fontSize: 13, fontWeight: 900, letterSpacing: "0.1em", textTransform: "uppercase",
+                          borderRadius: 22, border: `1px solid ${disabled ? "rgba(255,255,255,0.18)" : "rgba(251,191,36,0.5)"}`,
+                          background: disabled ? "rgba(255,255,255,0.04)" : "linear-gradient(135deg,rgba(251,191,36,0.3),rgba(248,113,113,0.3))",
+                          color: disabled ? "rgba(255,255,255,0.4)" : "#fbbf24",
+                          cursor: creating ? "wait" : disabled ? "not-allowed" : "pointer",
+                          filter: disabled ? "none" : "drop-shadow(0 0 12px rgba(251,191,36,0.3))",
+                        }}
+                      >
+                        {label}
+                      </button>
+                      {pvpEnabled && cost > 0 && balance !== null && !cantAfford && (
+                        <div style={{ fontSize: 10, opacity: 0.5, marginTop: 6 }}>
+                          Winner takes both antes ({cost * 2} REBEL pot). Refunded if you cancel before opponent accepts.
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
                 {createError && <div style={{ marginTop: 10, fontSize: 11, color: "#f87171" }}>{createError}</div>}
                 <div style={{ marginTop: 14, fontSize: 10, color: "rgba(255,255,255,0.4)", letterSpacing: "0.1em" }}>
                   Playing as <b style={{ color: "rgba(255,255,255,0.7)" }}>{identity.displayName}</b>

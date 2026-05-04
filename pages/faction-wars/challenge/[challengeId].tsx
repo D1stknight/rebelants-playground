@@ -504,8 +504,55 @@ function CompletedMatchView({ match, mePlayerId, sfx, stopMusic }: { match: PvpM
     refresh: async () => undefined,
   };
 
+  // PvP economy: how much did the winner take? Only show if I'm the winner
+  // AND the match had a real cost (free PvP shows nothing).
+  const ante = Number(match.pvpCost ?? 0);
+  const winnings = ante > 0 ? ante * 2 : 0;
+
   return (
     <div>
+      {iWon && winnings > 0 && (
+        <div style={{
+          padding: "16px 20px",
+          marginBottom: 16,
+          borderRadius: 14,
+          border: "1px solid rgba(251,191,36,0.5)",
+          background: "linear-gradient(135deg,rgba(251,191,36,0.15),rgba(248,113,113,0.1))",
+          textAlign: "center",
+          boxShadow: "0 0 24px rgba(251,191,36,0.2)",
+        }}>
+          <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.6)", marginBottom: 4 }}>
+            Pot won
+          </div>
+          <div style={{
+            fontSize: 32,
+            fontWeight: 900,
+            background: "linear-gradient(135deg,#fbbf24,#f87171)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+          }}>
+            +{winnings} REBEL
+          </div>
+          <div style={{ fontSize: 10, opacity: 0.5, marginTop: 4 }}>
+            Credited to your wallet · Both antes ({ante} × 2) won
+          </div>
+        </div>
+      )}
+      {!iWon && ante > 0 && (
+        <div style={{
+          padding: "10px 16px",
+          marginBottom: 16,
+          borderRadius: 10,
+          border: "1px solid rgba(248,113,113,0.25)",
+          background: "rgba(248,113,113,0.05)",
+          textAlign: "center",
+          fontSize: 11,
+          color: "rgba(255,255,255,0.5)",
+        }}>
+          Lost {ante} REBEL ante to the winner
+        </div>
+      )}
       <FactionWarsBattleScene
         state={battleSceneState}
         actions={inertActions}

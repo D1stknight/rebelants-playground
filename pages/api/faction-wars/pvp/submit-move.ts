@@ -20,7 +20,7 @@
 // currently-active faction. This prevents move spoofing.
 
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getMatch, saveMatch } from "../../../../lib/server/fwpvp";
+import { getMatch, saveMatch, creditREBEL } from "../../../../lib/server/fwpvp";
 import {
   FACTIONS,
   MAX_HP,
@@ -198,6 +198,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         match.winnerPlayerId = null;
         match.loserPlayerId = null;
         match.winnerCrateRarity = null;
+      }
+
+      // ── Pot payout ──────────────────────────────────────────────────────
+      // Pay the winner the full pvpPotPaid (challenger ante + opponent ante).
+      // For ties (winnerPlayerId === null), refund both sides equally.
+      // Defensive: only pay out if pvpPotPaid > 0 (handles legacy matches and
+      // free-mode matches where pvpCost was 0).
+      const potOnTable = Number(match.pvpPotPaid ?? 0);
+      if (potOnTable > 0) {
+        if (match.winnerPlayerId) {
+          // Winner takes all. Loser gets nothing — that's the whole point.
+          await creditREBEL(match.winnerPlayerId, potOnTable);
+        } else if (match.challengerPlayerId && match.opponentPlayerId) {
+          // True tie: refund each side their own ante so the books balance.
+          // Half the pot to each side. (With 300/300 antes, this is exactly
+          // what they paid in.)
+          const refundEach = Math.floor(potOnTable / 2);
+          if (refundEach > 0) {
+            await creditREBEL(match.challengerPlayerId, refundEach);
+            await creditREBEL(match.opponentPlayerId, refundEach);
+          }
+        }
+        // Mark the pot as drained so a re-trigger of completion logic
+        // (e.g. retry on a flaky save) doesn't double-pay.
+        match.pvpPotPaid = 0;
       }
     } else {
       // Match continues — flip turn
