@@ -20,7 +20,7 @@
 // currently-active faction. This prevents move spoofing.
 
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getMatch, saveMatch, creditREBEL } from "../../../../lib/server/fwpvp";
+import { getMatch, saveMatch, creditREBEL, getCrateRewards } from "../../../../lib/server/fwpvp";
 import {
   FACTIONS,
   MAX_HP,
@@ -224,6 +224,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // (e.g. retry on a flaky save) doesn't double-pay.
         match.pvpPotPaid = 0;
       }
+
+      // ── Crate reward (Commit F) ───────────────────────────────────────
+      // On TOP of the pot, the winner gets a crate REBEL bonus matching what
+      // AI mode pays for the same rarity. Loser gets nothing. Tie gets nothing.
+      // The amount is read live from cfg.rewards (admin-configurable) and
+      // snapshotted to match.pvpCrateRewardPaid for client display.
+      let crateReward = 0;
+      if (match.winnerPlayerId && match.winnerCrateRarity) {
+        try {
+          const rewards = await getCrateRewards();
+          if (match.winnerCrateRarity === "ultra") crateReward = rewards.ultra;
+          else if (match.winnerCrateRarity === "rare") crateReward = rewards.rare;
+          else if (match.winnerCrateRarity === "common") crateReward = rewards.common;
+          if (crateReward > 0) {
+            await creditREBEL(match.winnerPlayerId, crateReward);
+          }
+        } catch {
+          // If rewards lookup fails, don't crash completion. Set 0; admin
+          // can manually adjust later via wallet endpoint.
+          crateReward = 0;
+        }
+      }
+      match.pvpCrateRewardPaid = crateReward;
     } else {
       // Match continues — flip turn
       match.currentTurnSide = defenderSide;

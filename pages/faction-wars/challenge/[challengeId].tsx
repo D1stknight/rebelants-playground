@@ -584,6 +584,81 @@ function PendingCompletionView({ match, mePlayerId }: { match: PvpMatch; mePlaye
         enableHowToPlay={false}
         leaderboardSlot={null}
       />
+
+      {/* ── Crate Reveal Modal (Commit F) ──────────────────────────────────
+          Modeled on AI mode's prize modal. Pops up on mount for winners
+          (rarity != "none"). Sparkles + aura + crate art + REBEL bonus +
+          dismiss button. Uses inline <style> for keyframes since this is
+          self-contained. */}
+      {crateModalOpen && showCrate && (
+        <>
+          <style>{`
+            @keyframes fwpvp-pop { 0% { transform: scale(0.7); opacity: 0; } 60% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(1); } }
+            @keyframes fwpvp-sparkle { 0%,100% { opacity: 0; transform: scale(0.4) rotate(0deg); } 50% { opacity: 1; transform: scale(1.2) rotate(180deg); } }
+            @keyframes fwpvp-aura-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+            @keyframes fwpvp-crate-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+            .fwpvp-modal { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,0.75); z-index: 2147483647; padding: 16px; backdrop-filter: blur(4px); }
+            .fwpvp-card { position: relative; min-width: 300px; max-width: 420px; width: 90vw; padding: 24px 24px 20px; border-radius: 18px; text-align: center; background: linear-gradient(180deg, rgba(20,15,30,0.95), rgba(8,4,16,0.98)); border: 1px solid rgba(251,191,36,0.3); box-shadow: 0 30px 80px rgba(0,0,0,0.6), 0 0 60px rgba(251,191,36,0.15); animation: fwpvp-pop 0.5s ease-out; overflow: hidden; }
+            .fwpvp-aura { position: absolute; inset: -20%; background: radial-gradient(circle, rgba(251,191,36,0.25), transparent 60%); animation: fwpvp-aura-spin 8s linear infinite; pointer-events: none; }
+            .fwpvp-aura[data-rarity="rare"] { background: radial-gradient(circle, rgba(96,165,250,0.25), transparent 60%); }
+            .fwpvp-aura[data-rarity="common"] { background: radial-gradient(circle, rgba(52,211,153,0.22), transparent 60%); }
+            .fwpvp-sparkle { position: absolute; pointer-events: none; background: radial-gradient(circle, #fff8e0, transparent 70%); border-radius: 50%; opacity: 0; animation: fwpvp-sparkle 2.4s ease-in-out infinite; }
+            .fwpvp-sparkle.rare { background: radial-gradient(circle, #c7e3ff, transparent 70%); }
+            .fwpvp-sparkle.common { background: radial-gradient(circle, #c7ffe3, transparent 70%); }
+            .fwpvp-crate { width: 140px; height: 140px; object-fit: contain; margin: 8px auto 14px; animation: fwpvp-crate-bob 2.4s ease-in-out infinite; filter: drop-shadow(0 8px 20px rgba(0,0,0,0.6)); position: relative; z-index: 1; }
+          `}</style>
+          <div className="fwpvp-modal" role="dialog" aria-modal="true">
+            <div className="fwpvp-card">
+              <div className="fwpvp-aura" data-rarity={finalRarity} />
+              {sparkles.map((sp, i) => (
+                <span
+                  key={i}
+                  className={"fwpvp-sparkle " + finalRarity}
+                  style={{ left: sp.left, top: sp.top, width: sp.size + "px", height: sp.size + "px", animationDelay: sp.delay + "s" }}
+                />
+              ))}
+              <div style={{ position: "relative", fontSize: 22, fontWeight: 900, color: crateTitleColor, marginBottom: 4, zIndex: 1, letterSpacing: "0.02em" }}>
+                {crateTitle}
+              </div>
+              <div style={{ position: "relative", fontSize: 12, opacity: 0.6, marginBottom: 4, zIndex: 1 }}>
+                {crateSubLine}
+              </div>
+              <img className="fwpvp-crate" src={"/crates/" + finalRarity + ".png"} alt={finalRarity + " crate"} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+              <div style={{ position: "relative", fontSize: 13, opacity: 0.85, marginBottom: 4, zIndex: 1 }}>
+                You won
+              </div>
+              <div style={{
+                position: "relative", zIndex: 1,
+                fontSize: 36, fontWeight: 900,
+                background: `linear-gradient(135deg, ${crateTitleColor}, #fbbf24)`,
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+                marginBottom: 6,
+              }}>
+                +{crateReward} REBEL
+              </div>
+              <div style={{ position: "relative", fontSize: 10, opacity: 0.55, marginBottom: 18, zIndex: 1 }}>
+                Crate bonus credited to your wallet
+              </div>
+              <button
+                onClick={() => setCrateModalOpen(false)}
+                style={{
+                  position: "relative", zIndex: 1,
+                  padding: "10px 28px", borderRadius: 22,
+                  border: "1px solid rgba(251,191,36,0.5)",
+                  background: "linear-gradient(135deg, rgba(251,191,36,0.25), rgba(248,113,113,0.2))",
+                  color: "#fbbf24",
+                  fontSize: 13, fontWeight: 900, letterSpacing: "0.1em", textTransform: "uppercase",
+                  cursor: "pointer",
+                }}
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -694,6 +769,52 @@ function CompletedMatchView({ match, mePlayerId, sfx, stopMusic }: { match: PvpM
   const ante = Number(match.pvpCost ?? 0);
   const winnings = ante > 0 ? ante * 2 : 0;
 
+  // ── Crate reward (Commit F) ──────────────────────────────────────────────
+  // Server credits the winner cfg.rewards[rarity] REBEL on completion.
+  // Snapshot is on match.pvpCrateRewardPaid for display.
+  const crateReward = Number(match.pvpCrateRewardPaid ?? 0);
+  const showCrate = iWon && finalRarity !== "none" && crateReward > 0;
+
+  // Modal toggles open on mount for winners and stays until they dismiss.
+  // We use a ref-driven init pattern so the value of `showCrate` at first
+  // render is what seeds the state (matches AI mode's prize modal flow).
+  const [crateModalOpen, setCrateModalOpen] = useState<boolean>(false);
+  useEffect(() => {
+    if (showCrate) setCrateModalOpen(true);
+    // Only run on mount; dismissal is user-driven.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Sparkle data — generated once and reused across re-renders. 24 sparkles
+  // with deterministic-but-varied positions, sizes, and animation delays.
+  const sparkles = React.useMemo(() => Array.from({ length: 24 }, (_, i) => ({
+    left: (8 + (i * 4.1) % 84) + "%",
+    top: (10 + (i * 7.3) % 62) + "%",
+    size: 10 + (i * 3) % 14,
+    delay: (i * 0.18) % 3.2,
+  })), []);
+
+  // Crate display copy by rarity
+  const crateTitle = finalRarity === "ultra"
+    ? "🏆 ULTRA CRATE!"
+    : finalRarity === "rare"
+    ? "⚔️ Rare Crate!"
+    : finalRarity === "common"
+    ? "✅ Crate Unlocked"
+    : "";
+  const crateSubLine = finalRarity === "ultra"
+    ? "5/5 territories — Legendary!"
+    : finalRarity === "rare"
+    ? "3–4 territories — Strong campaign!"
+    : finalRarity === "common"
+    ? "1–2 territories — Soldiers hold!"
+    : "";
+  const crateTitleColor = finalRarity === "ultra"
+    ? "#fbbf24"
+    : finalRarity === "rare"
+    ? "#60a5fa"
+    : "#34d399";
+
   return (
     <div>
       {iWon && winnings > 0 && (
@@ -720,7 +841,9 @@ function CompletedMatchView({ match, mePlayerId, sfx, stopMusic }: { match: PvpM
             +{winnings} REBEL
           </div>
           <div style={{ fontSize: 10, opacity: 0.5, marginTop: 4 }}>
-            Credited to your wallet · Both antes ({ante} × 2) won
+            {crateReward > 0
+              ? `Credited: ${winnings} pot + ${crateReward} ${finalRarity} crate bonus`
+              : `Credited to your wallet · Both antes (${ante} × 2) won`}
           </div>
         </div>
       )}

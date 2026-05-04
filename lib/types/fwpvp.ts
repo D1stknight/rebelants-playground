@@ -123,6 +123,17 @@ export interface PvpMatch {
   challengerHealsUsed: number;
   opponentHealsUsed: number;
 
+  // ── Crate reward (Commit F) ─────────────────────────────────────────────
+  // REBEL bonus credited to the winner on completion, on TOP of the pot.
+  // Comes from cfg.rewards[rarity] (same admin config AI mode uses):
+  //   rarity = "common" → cfg.rewards.common (default 50)
+  //   rarity = "rare"   → cfg.rewards.rare   (default 100)
+  //   rarity = "ultra"  → cfg.rewards.ultra  (default 300)
+  //   rarity = "none"   → 0
+  // Snapshotted on completion so client can display the exact amount; survives
+  // admin tweaks. Not zeroed after payout (pot does that) — kept for display.
+  pvpCrateRewardPaid: number;
+
   // ── Timestamps ─────────────────────────────────────────────────────────
   createdAt: number;
   updatedAt: number;

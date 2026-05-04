@@ -219,6 +219,68 @@ export async function getHealConfig(): Promise<HealConfig> {
   };
 }
 
+// ── Crate rewards (Commit F) ─────────────────────────────────────────────────
+// Reads cfg.rewards (same admin config AI mode uses) for the per-rarity REBEL
+// payout. The winner of a PvP match gets cfg.rewards[rarity] REBEL on TOP of
+// the pot when the match completes. Defaults match what AI mode uses.
+export interface CrateRewards {
+  common: number;
+  rare: number;
+  ultra: number;
+}
+
+const CRATE_COMMON_DEFAULT = 50;
+const CRATE_RARE_DEFAULT = 100;
+const CRATE_ULTRA_DEFAULT = 300;
+
+export async function getCrateRewards(): Promise<CrateRewards> {
+  const keysToTry = [
+    "ra:config:economy",
+    "ra:points:config",
+    "ra:config:points",
+    "ra:pointsConfig",
+    "ra:config",
+  ];
+
+  const normalize = (raw: any) => {
+    if (typeof raw === "string") {
+      try { return JSON.parse(raw); } catch { return null; }
+    }
+    if (raw && typeof raw === "object") return raw;
+    return null;
+  };
+
+  for (const k of keysToTry) {
+    try {
+      const raw = await redis.get<any>(k);
+      const v = normalize(raw);
+      if (!v) continue;
+      const cfg = (v as any).pointsConfig && typeof (v as any).pointsConfig === "object"
+        ? (v as any).pointsConfig
+        : v;
+      const rewards = (cfg as any)?.rewards;
+      if (rewards && typeof rewards === "object") {
+        const common = Number((rewards as any).common);
+        const rare = Number((rewards as any).rare);
+        const ultra = Number((rewards as any).ultra);
+        return {
+          common: Number.isFinite(common) && common >= 0 ? common : CRATE_COMMON_DEFAULT,
+          rare: Number.isFinite(rare) && rare >= 0 ? rare : CRATE_RARE_DEFAULT,
+          ultra: Number.isFinite(ultra) && ultra >= 0 ? ultra : CRATE_ULTRA_DEFAULT,
+        };
+      }
+    } catch {
+      // try next key
+    }
+  }
+
+  return {
+    common: CRATE_COMMON_DEFAULT,
+    rare: CRATE_RARE_DEFAULT,
+    ultra: CRATE_ULTRA_DEFAULT,
+  };
+}
+
 // Reads a player's current REBEL balance.
 export async function getREBELBalance(playerId: string): Promise<number> {
   if (!playerId) return 0;
