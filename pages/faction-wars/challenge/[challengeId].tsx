@@ -244,16 +244,50 @@ function ActiveMatchView({
         else if (newest.damageDealt > 0 && newest.damageDealt < 10) sfx.hitLight();
       } catch {}
 
-      // Reset to idle after 1.2s
+      // After 1.2s, transition to win/lose if this was a killing blow,
+      // or idle otherwise. Killing blow = defenderHpAfter <= 0. The win/lose
+      // anims play for the remaining ~2.3s of the per-territory hold (handled
+      // upstream in handleSubmitMove via a 3.5s setTimeout before applying
+      // the rotated match state).
+      const wasKillingBlow = newest.defenderHpAfter <= 0;
       const timer = setTimeout(() => {
-        setPlayer3DAnim("idle");
-        setEnemy3DAnim("idle");
+        if (wasKillingBlow) {
+          // Attacker wins this territory; defender loses.
+          if (wasMine) {
+            setPlayer3DAnim("win");
+            setEnemy3DAnim("lose");
+          } else {
+            setPlayer3DAnim("lose");
+            setEnemy3DAnim("win");
+          }
+        } else {
+          setPlayer3DAnim("idle");
+          setEnemy3DAnim("idle");
+        }
       }, 1200);
       prevRoundCountRef.current = currCount;
       return () => clearTimeout(timer);
     }
     prevRoundCountRef.current = currCount;
   }, [match.roundHistory.length, mySide, sfx]);
+
+  // ── Reset 3D anims when fighters rotate ────────────────────────────────
+  // After the per-territory animation hold ends, handleSubmitMove applies the
+  // rotated match state (currentFactionIndex advances, HPs reset). The win/lose
+  // anims set at 1.2s via the round-watcher are now stale — the new fighters
+  // should start in idle. Watching myIdx/oppIdx catches both same-territory
+  // advances (no-op since AI mode doesn't rotate within a territory) and
+  // cross-territory rotations.
+  const prevMyIdxRef = useRef(myIdx);
+  const prevOppIdxRef = useRef(oppIdx);
+  useEffect(() => {
+    if (prevMyIdxRef.current !== myIdx || prevOppIdxRef.current !== oppIdx) {
+      setPlayer3DAnim("idle");
+      setEnemy3DAnim("idle");
+      prevMyIdxRef.current = myIdx;
+      prevOppIdxRef.current = oppIdx;
+    }
+  }, [myIdx, oppIdx]);
 
   // ── Watch for new territory results → fire territory SFX ──────────────────
   useEffect(() => {
@@ -1096,16 +1130,60 @@ export default function ChallengePage() {
         body: JSON.stringify({ challengeId, playerId: identity.playerId, moveId }),
       });
       const j = await r.json();
-      if (!j.ok) setError(j.error || "Move submission failed");
-      else {
-        setMatch(j.match);
-        // If this move ended the match, the server credited the winner
-        // (and possibly any tie refund). Refresh balance so the user sees it.
-        if (j.match?.status === "completed") {
-          refreshBalance();
+      if (!j.ok) {
+        setError(j.error || "Move submission failed");
+        setBusy(false);
+        return;
+      }
+
+      const newMatch = j.match;
+      const territoryEnded: boolean = j.territoryEnded === true;
+      const matchStillActive: boolean = newMatch?.status === "active";
+
+      // ── Per-territory animation hold ────────────────────────────────────
+      // When a territory ends but the match continues, the server has already
+      // rotated to the next fighter and reset HPs. If we apply that immediately,
+      // the killing-blow animation gets cut off and the user misses the win/lose
+      // beat. Hold for 3.5s on a "stage" view that shows the previous fighters
+      // at their final HPs (loser at 0, winner at whatever they had), then
+      // apply the rotation. Match-completion delays are handled separately by
+      // <PendingCompletionView> via the completionPending effect.
+      if (territoryEnded && matchStillActive && match) {
+        const lastResult = newMatch.territoryResults[newMatch.territoryResults.length - 1];
+        if (lastResult) {
+          // Build the "stage" match: same as newMatch (so the killing-blow round
+          // is visible in roundHistory and animation effects fire), but with
+          // pre-rotation positions/HPs/territory.
+          const stageMatch = {
+            ...newMatch,
+            challengerCurrentFactionIndex: match.challengerCurrentFactionIndex,
+            opponentCurrentFactionIndex: match.opponentCurrentFactionIndex,
+            challengerHp: lastResult.challengerHpFinal,
+            opponentHp: lastResult.opponentHpFinal,
+            currentTerritory: match.currentTerritory,
+          };
+          setMatch(stageMatch);
+          // Hold the stage view, then apply the real (rotated) match.
+          setTimeout(() => {
+            setMatch(newMatch);
+            setBusy(false);
+          }, 3500);
+          return;
         }
       }
-    } catch (e: any) { setError(e?.message || "Network error"); } finally { setBusy(false); }
+
+      // Default path: apply immediately.
+      setMatch(newMatch);
+      // If this move ended the match, the server credited the winner
+      // (and possibly any tie refund). Refresh balance so the user sees it.
+      if (newMatch?.status === "completed") {
+        refreshBalance();
+      }
+      setBusy(false);
+    } catch (e: any) {
+      setError(e?.message || "Network error");
+      setBusy(false);
+    }
   };
 
   const copyShareLink = () => {
