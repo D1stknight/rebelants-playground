@@ -403,6 +403,139 @@ function ActiveMatchView({ match, mePlayerId, challengeId, onSubmitMove, busy, s
   );
 }
 
+// ── Pending Completion View ──────────────────────────────────────────────────
+// Rendered for ~3.5s after match.status flips to "completed", BEFORE the
+// CompletedMatchView crate reveal. Shows the final battle state with a
+// "Battle complete!" banner so the win/lose moment can sink in instead of
+// jumping straight to results.
+function PendingCompletionView({ match, mePlayerId }: { match: PvpMatch; mePlayerId: string }) {
+  const isChallenger = match.challengerPlayerId === mePlayerId;
+  const mySide: "challenger" | "opponent" = isChallenger ? "challenger" : "opponent";
+  const myTeam = isChallenger ? match.challengerTeam : match.opponentTeam;
+  const oppTeam = isChallenger ? match.opponentTeam : match.challengerTeam;
+  const myWon = isChallenger ? match.challengerTerritoriesWon : match.opponentTerritoriesWon;
+  const iWon = match.winnerPlayerId === mePlayerId;
+
+  // Map territory results to AI-mode shape so BattleScene shows ✓/✗ badges.
+  const mappedResults: TerritoryResult[] = match.territoryResults.map(tr => {
+    const myFactionForT = isChallenger ? tr.challengerFaction : tr.opponentFaction;
+    const oppFactionForT = isChallenger ? tr.opponentFaction : tr.challengerFaction;
+    const won = tr.winnerSide === mySide;
+    const myHpFinal = isChallenger ? tr.challengerHpFinal : tr.opponentHpFinal;
+    const oppHpFinal = isChallenger ? tr.opponentHpFinal : tr.challengerHpFinal;
+    return {
+      territory: tr.territory,
+      defender: oppFactionForT,
+      playerFaction: myFactionForT,
+      rounds: [],
+      playerHpFinal: myHpFinal,
+      enemyHpFinal: oppHpFinal,
+      won,
+    };
+  });
+
+  // Render BattleScene with phase: "battle" so HP bars, fighter cards, and
+  // territory progress strip are all visible. Final HPs come from the last
+  // territory result. Move picker is suppressed.
+  const lastTerritory = match.territoryResults[match.territoryResults.length - 1];
+  const finalMyHp = lastTerritory
+    ? (isChallenger ? lastTerritory.challengerHpFinal : lastTerritory.opponentHpFinal)
+    : (isChallenger ? match.challengerHp : match.opponentHp);
+  const finalOppHp = lastTerritory
+    ? (isChallenger ? lastTerritory.opponentHpFinal : lastTerritory.challengerHpFinal)
+    : (isChallenger ? match.opponentHp : match.challengerHp);
+
+  const myIdx = isChallenger ? match.challengerCurrentFactionIndex : match.opponentCurrentFactionIndex;
+  const oppIdx = isChallenger ? match.opponentCurrentFactionIndex : match.challengerCurrentFactionIndex;
+  const myFighter = myTeam[Math.min(myIdx, myTeam.length - 1)];
+  const oppFighter = oppTeam[Math.min(oppIdx, oppTeam.length - 1)];
+  const myF = myFighter ? FACTIONS[myFighter] : null;
+  const oppF = oppFighter ? FACTIONS[oppFighter] : null;
+
+  const battleSceneState: BattleSceneState = {
+    phase: "battle",
+    team: myTeam,
+    defenders: oppTeam,
+    currentTerritory: Math.max(0, match.currentTerritory - 1),
+    currentFactionIdx: myIdx,
+    currentPlayerFD: myF,
+    currentDefenderFD: oppF,
+    playerHp: finalMyHp,
+    enemyHp: finalOppHp,
+    currentRound: 0,
+    roundLog: [],
+    currentTerritoryRounds: [],
+    dmgFloats: [],
+    battleAnim: iWon ? "win" : "lose",
+    enemy3DAnim: iWon ? "lose" : "win",
+    player3DAnim: iWon ? "win" : "lose",
+    selectedMove: null,
+    usedMoves: {},
+    sacrificeBonus: 0,
+    powerBuffRounds: 0,
+    powerBuffAmt: 0,
+    comboBonus: 0,
+    commandActive: false,
+    berserkerActive: false,
+    meditationStacks: 0,
+    oneTimeUsed: [],
+    results: mappedResults,
+    finalRarity: "none",
+    territoriesWon: myWon,
+    showHowToPlay: false,
+    busy: false,
+    healBusy: false,
+    healUsed: 0,
+    cfg: null,
+    currency: "REBEL",
+    balance: 0,
+  };
+
+  const inertActions: BattleSceneActions = {
+    setSelectedMove: (() => {}) as any,
+    setShowHowToPlay: (() => {}) as any,
+    fightTerritory: () => {},
+    nextTerritory: () => {},
+    resetGame: () => {},
+    setHealBusy: (() => {}) as any,
+    setHealUsed: (() => {}) as any,
+    setPlayerHp: (() => {}) as any,
+    spend: async () => null,
+    refresh: async () => undefined,
+  };
+
+  return (
+    <div>
+      {/* "Battle complete!" banner */}
+      <div style={{
+        textAlign: "center", padding: "14px 18px", borderRadius: 12, marginBottom: 18,
+        background: iWon
+          ? "linear-gradient(135deg,rgba(251,191,36,0.25),rgba(248,113,113,0.15))"
+          : "rgba(255,255,255,0.04)",
+        border: `1px solid ${iWon ? "rgba(251,191,36,0.5)" : "rgba(255,255,255,0.12)"}`,
+      }}>
+        <div style={{
+          fontSize: 14, fontWeight: 900, letterSpacing: "0.15em", textTransform: "uppercase",
+          color: iWon ? "#fbbf24" : "rgba(255,255,255,0.7)",
+        }}>
+          {iWon ? "🏆 Victory! Calculating rewards…" : "💀 Defeat — Tallying the damage…"}
+        </div>
+        <div style={{ fontSize: 11, opacity: 0.55, marginTop: 4 }}>
+          Final: {match.challengerTerritoriesWon}–{match.opponentTerritoriesWon} territories
+        </div>
+      </div>
+      <FactionWarsBattleScene
+        state={battleSceneState}
+        actions={inertActions}
+        enableHealing={false}
+        showMovePicker={false}
+        enableHowToPlay={false}
+        leaderboardSlot={null}
+      />
+    </div>
+  );
+}
+
 function CompletedMatchView({ match, mePlayerId, sfx, stopMusic }: { match: PvpMatch; mePlayerId: string; sfx: ReturnType<typeof useFWAudio>["sfx"]; stopMusic: () => void }) {
   const router = useRouter();
   const isChallenger = match.challengerPlayerId === mePlayerId;
@@ -582,6 +715,34 @@ export default function ChallengePage() {
   // Audio hook (provides muted/toggleMute/SFX/music control). Lives on the
   // page (not ActiveMatchView) so music persists across status transitions.
   const audio = useFWAudio();
+
+  // ── Completion delay ──────────────────────────────────────────────────────
+  // When match.status flips active→completed, we hold on the active view for a
+  // few seconds so the final hit's animation, SFX, and music finish before the
+  // CompletedMatchView crate reveal takes over. Without this delay, the screen
+  // jumps instantly and players miss the moment.
+  const [completionPending, setCompletionPending] = useState(false);
+  const prevStatusRef = useRef<string | null>(null);
+
+  // Detect active→completed transition; hold on completion-pending state.
+  // The 3.5s window covers: the final round's animation reset (~1.2s),
+  // the territoryWin/Lose SFX cascade, and breathing room before crate reveal.
+  useEffect(() => {
+    const prev = prevStatusRef.current;
+    const curr = match?.status ?? null;
+    prevStatusRef.current = curr;
+    if (prev === "active" && curr === "completed") {
+      setCompletionPending(true);
+      const timer = setTimeout(() => setCompletionPending(false), 3500);
+      return () => clearTimeout(timer);
+    }
+    // If we land on a completed match from a fresh page load (no prior "active"
+    // state seen by this client), skip the delay — the player wasn't watching
+    // when it ended, so going straight to results is correct.
+    if (prev === null && curr === "completed") {
+      setCompletionPending(false);
+    }
+  }, [match?.status]);
 
   // Start/stop battle music based on match status. Use epic music for
   // territory 4-5 to mirror AI mode's "final push" feel.
@@ -834,8 +995,14 @@ export default function ChallengePage() {
                 <ActiveMatchView match={match} mePlayerId={identity.playerId} challengeId={challengeId} onSubmitMove={handleSubmitMove} busy={busy} sfx={audio.sfx} />
               )}
 
-              {/* COMPLETED */}
-              {match.status === "completed" && identity && (
+              {/* COMPLETED — but hold for 3.5s so animations play out */}
+              {match.status === "completed" && identity && completionPending && (
+                <PendingCompletionView
+                  match={match}
+                  mePlayerId={identity.playerId}
+                />
+              )}
+              {match.status === "completed" && identity && !completionPending && (
                 <CompletedMatchView
                   match={match}
                   mePlayerId={identity.playerId}
