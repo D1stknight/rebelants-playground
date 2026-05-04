@@ -4,7 +4,7 @@ import Link from "next/link";
 import Head from "next/head";
 import { loadProfile, type Profile } from "../../../lib/profile";
 import type { PvpMatch, PvpRound } from "../../../lib/types/fwpvp";
-import { FACTIONS, FACTION_IDS, TEAM_SIZE, TERRITORY_COUNT, type FactionId, type Move, type RoundResult, type TerritoryResult, type Rarity } from "../../../lib/factionWarsCore";
+import { FACTIONS, FACTION_IDS, TEAM_SIZE, TERRITORY_COUNT, MAX_HP, type FactionId, type Move, type RoundResult, type TerritoryResult, type Rarity } from "../../../lib/factionWarsCore";
 import FactionWarsBattleScene, { type BattleSceneState, type BattleSceneActions } from "../../../components/FactionWarsBattleScene";
 import { useFWAudio } from "../../../lib/useFWAudio";
 
@@ -133,7 +133,22 @@ function findMove(factionId: FactionId | null | undefined, moveId: string): Move
   return f.moves.find(m => m.id === moveId) ?? null;
 }
 
-function ActiveMatchView({ match, mePlayerId, challengeId, onSubmitMove, busy, sfx }: { match: PvpMatch; mePlayerId: string; challengeId: string; onSubmitMove: (moveId: string) => Promise<void>; busy: boolean; sfx: ReturnType<typeof useFWAudio>["sfx"] }) {
+function ActiveMatchView({
+  match, mePlayerId, challengeId, onSubmitMove, onHeal, busy, healBusy, healCost, healAmt, healMax, balance, sfx,
+}: {
+  match: PvpMatch;
+  mePlayerId: string;
+  challengeId: string;
+  onSubmitMove: (moveId: string) => Promise<void>;
+  onHeal: () => Promise<void>;
+  busy: boolean;
+  healBusy: boolean;
+  healCost: number;
+  healAmt: number;
+  healMax: number;
+  balance: number | null;
+  sfx: ReturnType<typeof useFWAudio>["sfx"];
+}) {
   // ── Perspective math ───────────────────────────────────────────────────────
   const isChallenger = match.challengerPlayerId === mePlayerId;
   const mySide: "challenger" | "opponent" = isChallenger ? "challenger" : "opponent";
@@ -346,10 +361,47 @@ function ActiveMatchView({ match, mePlayerId, challengeId, onSubmitMove, busy, s
           trick: "#fbbf24",
           defend: "#34d399",
         };
+        // ── Heal button state computation ─────────────────────────────────
+        // Mirrors AI mode logic: heal eligible if my turn, hp < MAX, healsUsed
+        // < max, balance >= cost. healsUsed is read from match per side.
+        const myHealsUsed = isChallenger
+          ? Number(match.challengerHealsUsed ?? 0)
+          : Number(match.opponentHealsUsed ?? 0);
+        const atMaxHp = myHp >= MAX_HP;
+        const atMaxHeals = myHealsUsed >= healMax;
+        const cantAffordHeal = balance !== null && balance < healCost;
+        const healDisabled = !isMyTurn || busy || healBusy || atMaxHp || atMaxHeals || cantAffordHeal;
+
         return (
           <div style={{ marginTop: 18 }}>
-            <div style={{ fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.5)", marginBottom: 10, fontWeight: 700 }}>
-              {isMyTurn ? "Choose your move" : "Opponent is thinking…"}
+            {/* Heal button row (Commit E) — sits above the move grid, mirrors AI mode */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <div style={{ fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.5)", fontWeight: 700 }}>
+                {isMyTurn ? "Choose your move" : "Opponent is thinking…"}
+              </div>
+              <button
+                onClick={() => { if (!healDisabled) { try { sfx.cardSelect(); } catch {} onHeal(); } }}
+                disabled={healDisabled}
+                title={
+                  atMaxHp ? "Already at full HP" :
+                  atMaxHeals ? `Heal limit reached (${myHealsUsed}/${healMax})` :
+                  cantAffordHeal ? `Need ${healCost} REBEL (you have ${balance ?? "?"})` :
+                  !isMyTurn ? "Wait for your turn" :
+                  `Spend ${healCost} REBEL to restore ${healAmt} HP`
+                }
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  padding: "6px 14px", borderRadius: 20,
+                  border: `1px solid ${healDisabled ? "rgba(255,255,255,0.12)" : "rgba(52,211,153,0.4)"}`,
+                  background: healDisabled ? "rgba(255,255,255,0.04)" : "rgba(52,211,153,0.12)",
+                  color: healDisabled ? "rgba(255,255,255,0.4)" : "#34d399",
+                  fontSize: 11, fontWeight: 800,
+                  cursor: healDisabled ? "not-allowed" : "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {healBusy ? "Healing…" : `💚 Heal · ${healCost} REBEL · ${myHealsUsed}/${healMax}`}
+              </button>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 8, marginBottom: 12 }}>
               {myMoves.map((mv) => {
@@ -712,6 +764,17 @@ export default function ChallengePage() {
   const [team, setTeam] = useState<FactionId[]>([]);
   const [copied, setCopied] = useState(false);
 
+  // ── Heal config + balance (Commit E) ───────────────────────────────────
+  // Pulled from /api/config + /api/points/balance on identity load. Used to:
+  //  - render heal button label/cost
+  //  - decide if heal is affordable (greys out the button)
+  //  - clamp healsUsed UI display
+  const [healCost, setHealCost] = useState<number>(25);
+  const [healAmt, setHealAmt] = useState<number>(30);
+  const [healMax, setHealMax] = useState<number>(2);
+  const [balance, setBalance] = useState<number | null>(null);
+  const [healBusy, setHealBusy] = useState(false);
+
   // Audio hook (provides muted/toggleMute/SFX/music control). Lives on the
   // page (not ActiveMatchView) so music persists across status transitions.
   const audio = useFWAudio();
@@ -842,6 +905,65 @@ export default function ChallengePage() {
     } catch (e: any) { setError(e?.message || "Network error"); } finally { setBusy(false); }
   };
 
+  // ── Fetch heal config + balance ──────────────────────────────────────
+  // Refetch balance after every action that spends/credits REBEL (heal,
+  // submit-move, ante deduction at create/accept) so the heal button reflects
+  // current balance immediately.
+  const refreshBalance = useCallback(async () => {
+    if (!identity) return;
+    try {
+      const r = await fetch(`/api/points/balance?playerId=${encodeURIComponent(identity.playerId)}`);
+      const j = await r.json();
+      if (j && typeof j.balance === "number") setBalance(j.balance);
+    } catch {}
+  }, [identity]);
+
+  useEffect(() => {
+    if (!identity) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch("/api/config");
+        const j = await r.json();
+        if (cancelled) return;
+        if (j?.ok && j.pointsConfig) {
+          const c = j.pointsConfig;
+          const cost = Number(c.factionWarsHealCost);
+          const amt = Number(c.factionWarsHealAmt);
+          const max = Number(c.factionWarsHealMax);
+          if (Number.isFinite(cost) && cost >= 0) setHealCost(cost);
+          if (Number.isFinite(amt) && amt > 0) setHealAmt(amt);
+          if (Number.isFinite(max) && max >= 0) setHealMax(max);
+        }
+      } catch {}
+      await refreshBalance();
+    })();
+    return () => { cancelled = true; };
+  }, [identity, refreshBalance]);
+
+  const handleHeal = async () => {
+    if (!identity || !match) return;
+    setHealBusy(true);
+    setError(null);
+    try {
+      const r = await fetch("/api/faction-wars/pvp/heal", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ challengeId, playerId: identity.playerId }),
+      });
+      const j = await r.json();
+      if (!j.ok) {
+        setError(j.error || "Heal failed");
+      } else {
+        setMatch(j.match);
+        if (typeof j.balance === "number") setBalance(j.balance);
+      }
+    } catch (e: any) {
+      setError(e?.message || "Network error");
+    } finally {
+      setHealBusy(false);
+    }
+  };
+
   const handleSubmitMove = async (moveId: string) => {
     if (!identity || !match) return;
     setBusy(true); setError(null);
@@ -852,7 +974,14 @@ export default function ChallengePage() {
       });
       const j = await r.json();
       if (!j.ok) setError(j.error || "Move submission failed");
-      else setMatch(j.match);
+      else {
+        setMatch(j.match);
+        // If this move ended the match, the server credited the winner
+        // (and possibly any tie refund). Refresh balance so the user sees it.
+        if (j.match?.status === "completed") {
+          refreshBalance();
+        }
+      }
     } catch (e: any) { setError(e?.message || "Network error"); } finally { setBusy(false); }
   };
 
@@ -992,7 +1121,20 @@ export default function ChallengePage() {
 
               {/* ACTIVE */}
               {match.status === "active" && isParticipant && (
-                <ActiveMatchView match={match} mePlayerId={identity.playerId} challengeId={challengeId} onSubmitMove={handleSubmitMove} busy={busy} sfx={audio.sfx} />
+                <ActiveMatchView
+                  match={match}
+                  mePlayerId={identity.playerId}
+                  challengeId={challengeId}
+                  onSubmitMove={handleSubmitMove}
+                  onHeal={handleHeal}
+                  busy={busy}
+                  healBusy={healBusy}
+                  healCost={healCost}
+                  healAmt={healAmt}
+                  healMax={healMax}
+                  balance={balance}
+                  sfx={audio.sfx}
+                />
               )}
 
               {/* COMPLETED — but hold for 3.5s so animations play out */}

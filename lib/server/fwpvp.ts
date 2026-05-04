@@ -158,6 +158,67 @@ export async function getPvpEconomyConfig(): Promise<PvpEconomyConfig> {
   };
 }
 
+// ── Heal config (Commit E) ───────────────────────────────────────────────────
+// Heal mechanic mirrors AI mode exactly: same cost / amount / max from the
+// SAME admin config keys. We reuse keys (not factionWarsPvpHeal*) so admins
+// have one place to tune heal economy across both modes.
+export interface HealConfig {
+  factionWarsHealCost: number;   // REBEL spent per heal
+  factionWarsHealAmt: number;    // HP restored per heal (capped at MAX_HP)
+  factionWarsHealMax: number;    // Max heals per side per match
+}
+
+const HEAL_COST_DEFAULT = 25;
+const HEAL_AMT_DEFAULT = 30;
+const HEAL_MAX_DEFAULT = 2;
+
+export async function getHealConfig(): Promise<HealConfig> {
+  const keysToTry = [
+    "ra:config:economy",
+    "ra:points:config",
+    "ra:config:points",
+    "ra:pointsConfig",
+    "ra:config",
+  ];
+
+  const normalize = (raw: any) => {
+    if (typeof raw === "string") {
+      try { return JSON.parse(raw); } catch { return null; }
+    }
+    if (raw && typeof raw === "object") return raw;
+    return null;
+  };
+
+  for (const k of keysToTry) {
+    try {
+      const raw = await redis.get<any>(k);
+      const v = normalize(raw);
+      if (!v) continue;
+      const cfg = (v as any).pointsConfig && typeof (v as any).pointsConfig === "object"
+        ? (v as any).pointsConfig
+        : v;
+      if (cfg && typeof cfg === "object") {
+        const cost = Number((cfg as any).factionWarsHealCost);
+        const amt = Number((cfg as any).factionWarsHealAmt);
+        const max = Number((cfg as any).factionWarsHealMax);
+        return {
+          factionWarsHealCost: Number.isFinite(cost) && cost >= 0 ? cost : HEAL_COST_DEFAULT,
+          factionWarsHealAmt: Number.isFinite(amt) && amt > 0 ? amt : HEAL_AMT_DEFAULT,
+          factionWarsHealMax: Number.isFinite(max) && max >= 0 ? max : HEAL_MAX_DEFAULT,
+        };
+      }
+    } catch {
+      // try next key
+    }
+  }
+
+  return {
+    factionWarsHealCost: HEAL_COST_DEFAULT,
+    factionWarsHealAmt: HEAL_AMT_DEFAULT,
+    factionWarsHealMax: HEAL_MAX_DEFAULT,
+  };
+}
+
 // Reads a player's current REBEL balance.
 export async function getREBELBalance(playerId: string): Promise<number> {
   if (!playerId) return 0;

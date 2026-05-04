@@ -115,6 +115,14 @@ export interface PvpMatch {
   challengerPaid: boolean;
   opponentPaid: boolean;
 
+  // ── Heal counters (Commit E) ───────────────────────────────────────────
+  // Tracks how many heals each side has used. Capped at factionWarsHealMax
+  // (default 2 from admin config). Each heal costs factionWarsHealCost REBEL
+  // and restores factionWarsHealAmt HP. Decoupled per side so each player has
+  // their own independent budget.
+  challengerHealsUsed: number;
+  opponentHealsUsed: number;
+
   // ── Timestamps ─────────────────────────────────────────────────────────
   createdAt: number;
   updatedAt: number;

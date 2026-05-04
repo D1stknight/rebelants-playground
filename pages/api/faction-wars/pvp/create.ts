@@ -109,6 +109,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       pvpPotPaid: ante,
       challengerPaid: ante > 0,
       opponentPaid: false,
+      // Heal counters (Commit E). Capped at factionWarsHealMax per side.
+      challengerHealsUsed: 0,
+      opponentHealsUsed: 0,
       createdAt: now,
       updatedAt: now,
       lastActionAt: now,
