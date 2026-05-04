@@ -585,80 +585,6 @@ function PendingCompletionView({ match, mePlayerId }: { match: PvpMatch; mePlaye
         leaderboardSlot={null}
       />
 
-      {/* ── Crate Reveal Modal (Commit F) ──────────────────────────────────
-          Modeled on AI mode's prize modal. Pops up on mount for winners
-          (rarity != "none"). Sparkles + aura + crate art + REBEL bonus +
-          dismiss button. Uses inline <style> for keyframes since this is
-          self-contained. */}
-      {crateModalOpen && showCrate && (
-        <>
-          <style>{`
-            @keyframes fwpvp-pop { 0% { transform: scale(0.7); opacity: 0; } 60% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(1); } }
-            @keyframes fwpvp-sparkle { 0%,100% { opacity: 0; transform: scale(0.4) rotate(0deg); } 50% { opacity: 1; transform: scale(1.2) rotate(180deg); } }
-            @keyframes fwpvp-aura-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-            @keyframes fwpvp-crate-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
-            .fwpvp-modal { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,0.75); z-index: 2147483647; padding: 16px; backdrop-filter: blur(4px); }
-            .fwpvp-card { position: relative; min-width: 300px; max-width: 420px; width: 90vw; padding: 24px 24px 20px; border-radius: 18px; text-align: center; background: linear-gradient(180deg, rgba(20,15,30,0.95), rgba(8,4,16,0.98)); border: 1px solid rgba(251,191,36,0.3); box-shadow: 0 30px 80px rgba(0,0,0,0.6), 0 0 60px rgba(251,191,36,0.15); animation: fwpvp-pop 0.5s ease-out; overflow: hidden; }
-            .fwpvp-aura { position: absolute; inset: -20%; background: radial-gradient(circle, rgba(251,191,36,0.25), transparent 60%); animation: fwpvp-aura-spin 8s linear infinite; pointer-events: none; }
-            .fwpvp-aura[data-rarity="rare"] { background: radial-gradient(circle, rgba(96,165,250,0.25), transparent 60%); }
-            .fwpvp-aura[data-rarity="common"] { background: radial-gradient(circle, rgba(52,211,153,0.22), transparent 60%); }
-            .fwpvp-sparkle { position: absolute; pointer-events: none; background: radial-gradient(circle, #fff8e0, transparent 70%); border-radius: 50%; opacity: 0; animation: fwpvp-sparkle 2.4s ease-in-out infinite; }
-            .fwpvp-sparkle.rare { background: radial-gradient(circle, #c7e3ff, transparent 70%); }
-            .fwpvp-sparkle.common { background: radial-gradient(circle, #c7ffe3, transparent 70%); }
-            .fwpvp-crate { width: 140px; height: 140px; object-fit: contain; margin: 8px auto 14px; animation: fwpvp-crate-bob 2.4s ease-in-out infinite; filter: drop-shadow(0 8px 20px rgba(0,0,0,0.6)); position: relative; z-index: 1; }
-          `}</style>
-          <div className="fwpvp-modal" role="dialog" aria-modal="true">
-            <div className="fwpvp-card">
-              <div className="fwpvp-aura" data-rarity={finalRarity} />
-              {sparkles.map((sp, i) => (
-                <span
-                  key={i}
-                  className={"fwpvp-sparkle " + finalRarity}
-                  style={{ left: sp.left, top: sp.top, width: sp.size + "px", height: sp.size + "px", animationDelay: sp.delay + "s" }}
-                />
-              ))}
-              <div style={{ position: "relative", fontSize: 22, fontWeight: 900, color: crateTitleColor, marginBottom: 4, zIndex: 1, letterSpacing: "0.02em" }}>
-                {crateTitle}
-              </div>
-              <div style={{ position: "relative", fontSize: 12, opacity: 0.6, marginBottom: 4, zIndex: 1 }}>
-                {crateSubLine}
-              </div>
-              <img className="fwpvp-crate" src={"/crates/" + finalRarity + ".png"} alt={finalRarity + " crate"} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
-              <div style={{ position: "relative", fontSize: 13, opacity: 0.85, marginBottom: 4, zIndex: 1 }}>
-                You won
-              </div>
-              <div style={{
-                position: "relative", zIndex: 1,
-                fontSize: 36, fontWeight: 900,
-                background: `linear-gradient(135deg, ${crateTitleColor}, #fbbf24)`,
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-                marginBottom: 6,
-              }}>
-                +{crateReward} REBEL
-              </div>
-              <div style={{ position: "relative", fontSize: 10, opacity: 0.55, marginBottom: 18, zIndex: 1 }}>
-                Crate bonus credited to your wallet
-              </div>
-              <button
-                onClick={() => setCrateModalOpen(false)}
-                style={{
-                  position: "relative", zIndex: 1,
-                  padding: "10px 28px", borderRadius: 22,
-                  border: "1px solid rgba(251,191,36,0.5)",
-                  background: "linear-gradient(135deg, rgba(251,191,36,0.25), rgba(248,113,113,0.2))",
-                  color: "#fbbf24",
-                  fontSize: 13, fontWeight: 900, letterSpacing: "0.1em", textTransform: "uppercase",
-                  cursor: "pointer",
-                }}
-              >
-                Continue
-              </button>
-            </div>
-          </div>
-        </>
-      )}
     </div>
   );
 }
@@ -869,6 +795,80 @@ function CompletedMatchView({ match, mePlayerId, sfx, stopMusic }: { match: PvpM
         enableHowToPlay={false}
         leaderboardSlot={null}
       />
+      {/* ── Crate Reveal Modal (Commit F) ──────────────────────────────────
+          Modeled on AI mode's prize modal. Pops up on mount for winners
+          (rarity != "none"). Sparkles + aura + crate art + REBEL bonus +
+          dismiss button. Uses inline <style> for keyframes since this is
+          self-contained. */}
+      {crateModalOpen && showCrate && (
+        <>
+          <style>{`
+            @keyframes fwpvp-pop { 0% { transform: scale(0.7); opacity: 0; } 60% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(1); } }
+            @keyframes fwpvp-sparkle { 0%,100% { opacity: 0; transform: scale(0.4) rotate(0deg); } 50% { opacity: 1; transform: scale(1.2) rotate(180deg); } }
+            @keyframes fwpvp-aura-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+            @keyframes fwpvp-crate-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+            .fwpvp-modal { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,0.75); z-index: 2147483647; padding: 16px; backdrop-filter: blur(4px); }
+            .fwpvp-card { position: relative; min-width: 300px; max-width: 420px; width: 90vw; padding: 24px 24px 20px; border-radius: 18px; text-align: center; background: linear-gradient(180deg, rgba(20,15,30,0.95), rgba(8,4,16,0.98)); border: 1px solid rgba(251,191,36,0.3); box-shadow: 0 30px 80px rgba(0,0,0,0.6), 0 0 60px rgba(251,191,36,0.15); animation: fwpvp-pop 0.5s ease-out; overflow: hidden; }
+            .fwpvp-aura { position: absolute; inset: -20%; background: radial-gradient(circle, rgba(251,191,36,0.25), transparent 60%); animation: fwpvp-aura-spin 8s linear infinite; pointer-events: none; }
+            .fwpvp-aura[data-rarity="rare"] { background: radial-gradient(circle, rgba(96,165,250,0.25), transparent 60%); }
+            .fwpvp-aura[data-rarity="common"] { background: radial-gradient(circle, rgba(52,211,153,0.22), transparent 60%); }
+            .fwpvp-sparkle { position: absolute; pointer-events: none; background: radial-gradient(circle, #fff8e0, transparent 70%); border-radius: 50%; opacity: 0; animation: fwpvp-sparkle 2.4s ease-in-out infinite; }
+            .fwpvp-sparkle.rare { background: radial-gradient(circle, #c7e3ff, transparent 70%); }
+            .fwpvp-sparkle.common { background: radial-gradient(circle, #c7ffe3, transparent 70%); }
+            .fwpvp-crate { width: 140px; height: 140px; object-fit: contain; margin: 8px auto 14px; animation: fwpvp-crate-bob 2.4s ease-in-out infinite; filter: drop-shadow(0 8px 20px rgba(0,0,0,0.6)); position: relative; z-index: 1; }
+          `}</style>
+          <div className="fwpvp-modal" role="dialog" aria-modal="true">
+            <div className="fwpvp-card">
+              <div className="fwpvp-aura" data-rarity={finalRarity} />
+              {sparkles.map((sp, i) => (
+                <span
+                  key={i}
+                  className={"fwpvp-sparkle " + finalRarity}
+                  style={{ left: sp.left, top: sp.top, width: sp.size + "px", height: sp.size + "px", animationDelay: sp.delay + "s" }}
+                />
+              ))}
+              <div style={{ position: "relative", fontSize: 22, fontWeight: 900, color: crateTitleColor, marginBottom: 4, zIndex: 1, letterSpacing: "0.02em" }}>
+                {crateTitle}
+              </div>
+              <div style={{ position: "relative", fontSize: 12, opacity: 0.6, marginBottom: 4, zIndex: 1 }}>
+                {crateSubLine}
+              </div>
+              <img className="fwpvp-crate" src={"/crates/" + finalRarity + ".png"} alt={finalRarity + " crate"} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+              <div style={{ position: "relative", fontSize: 13, opacity: 0.85, marginBottom: 4, zIndex: 1 }}>
+                You won
+              </div>
+              <div style={{
+                position: "relative", zIndex: 1,
+                fontSize: 36, fontWeight: 900,
+                background: `linear-gradient(135deg, ${crateTitleColor}, #fbbf24)`,
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+                marginBottom: 6,
+              }}>
+                +{crateReward} REBEL
+              </div>
+              <div style={{ position: "relative", fontSize: 10, opacity: 0.55, marginBottom: 18, zIndex: 1 }}>
+                Crate bonus credited to your wallet
+              </div>
+              <button
+                onClick={() => setCrateModalOpen(false)}
+                style={{
+                  position: "relative", zIndex: 1,
+                  padding: "10px 28px", borderRadius: 22,
+                  border: "1px solid rgba(251,191,36,0.5)",
+                  background: "linear-gradient(135deg, rgba(251,191,36,0.25), rgba(248,113,113,0.2))",
+                  color: "#fbbf24",
+                  fontSize: 13, fontWeight: 900, letterSpacing: "0.1em", textTransform: "uppercase",
+                  cursor: "pointer",
+                }}
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
