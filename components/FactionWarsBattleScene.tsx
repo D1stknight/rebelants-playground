@@ -207,18 +207,6 @@ export function FactionWarsBattleScene({ state, actions, enableHealing = true, s
   // Derived from cfg — mirrors FactionWars.tsx line 646
   const fwPlunderBonus = Number(cfg?.factionWarsPlunderBonus ?? 50);
 
-  // Mobile-aware grid: on phones (~380px viewport) the 2-column move grid
-  // clips the right column. Use a single column under 480px.
-  const [isSmallScreen, setIsSmallScreen] = React.useState(false);
-  React.useEffect(() => {
-    if (typeof window === "undefined") return;
-    const mq = window.matchMedia("(max-width: 480px)");
-    const update = () => setIsSmallScreen(mq.matches);
-    update();
-    mq.addEventListener?.("change", update);
-    return () => mq.removeEventListener?.("change", update);
-  }, []);
-
   // ── PHASE: battle ──────────────────────────────────────────────────────────
   if (phase === "battle") {
     if (!currentPlayerFD || !currentDefenderFD) return null;
@@ -500,7 +488,7 @@ export function FactionWarsBattleScene({ state, actions, enableHealing = true, s
               <div style={{ fontSize:12, fontWeight:800, marginBottom:10, opacity:0.7, letterSpacing:"0.04em" }}>
                 ⚔️ CHOOSE {currentPlayerFD.name.toUpperCase()}'S MOVE
               </div>
-              <div style={{ display:"grid", gridTemplateColumns: isSmallScreen ? "1fr" : "1fr 1fr", gap:8 }}>
+              <div style={{ display:"grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))", gap:8 }}>
               {currentPlayerFD.moves.map(m=>{
                 const tc: Record<string,string> = { attack:"#f87171", defend:"#34d399", magic:"#c084fc", trick:"#fbbf24" };
                 const isSel = selectedMove?.id===m.id;

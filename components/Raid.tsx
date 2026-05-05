@@ -1358,8 +1358,19 @@ export default function Raid() {
               transition:'all 0.2s',
             }}>
             <span style={{ visibility:'hidden', position:'absolute' }}>LAUNCH RAID (cost: {totalCost} REBEL)</span>
-            <span style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
-              {phase==='launching' ? '🐜 MARCHING…' : phase==='battling' ? '⚔️ BATTLE IN PROGRESS…' : squad.length<SQUAD_SIZE ? `SQUAD NEEDS ${SQUAD_SIZE-squad.length} MORE` : `⚔️ LAUNCH RAID · COST: ${totalCost} ${cfg?.currency}`}
+            <span style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:2 }}>
+              {phase==='launching' ? (
+                <span>🐜 MARCHING…</span>
+              ) : phase==='battling' ? (
+                <span>⚔️ BATTLE IN PROGRESS…</span>
+              ) : squad.length<SQUAD_SIZE ? (
+                <span>{`SQUAD NEEDS ${SQUAD_SIZE-squad.length} MORE`}</span>
+              ) : (
+                <>
+                  <span style={{ fontSize:14, lineHeight:1 }}>⚔️ LAUNCH RAID</span>
+                  <span style={{ fontSize:9, opacity:0.85, fontWeight:700, letterSpacing:'0.15em', lineHeight:1 }}>{`COST: ${totalCost} ${cfg?.currency}`}</span>
+                </>
+              )}
             </span>
           </button>
 

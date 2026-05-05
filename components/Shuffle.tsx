@@ -1540,8 +1540,15 @@ async function submitShipping() {
             }}
           >
             <span style={{ visibility:'hidden', position:'absolute' }}>`SHUFFLE (cost: ${cost} REBEL)`</span>
-            <span style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
-              {phase === "shuffling" ? "✦ SHUFFLING..." : `⚔️ SHUFFLE (cost: ${cost} REBEL)`}
+            <span style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:2 }}>
+              {phase === "shuffling" ? (
+                <span>✦ SHUFFLING...</span>
+              ) : (
+                <>
+                  <span style={{ fontSize:14, lineHeight:1 }}>⚔️ SHUFFLE</span>
+                  <span style={{ fontSize:9, opacity:0.85, fontWeight:700, letterSpacing:'0.15em', lineHeight:1 }}>{`COST: ${cost} REBEL`}</span>
+                </>
+              )}
             </span>
           </button>
 

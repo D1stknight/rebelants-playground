@@ -149,24 +149,6 @@ function ActiveMatchView({
   balance: number | null;
   sfx: ReturnType<typeof useFWAudio>["sfx"];
 }) {
-  // ── Mobile detection for move grid (Commit H item 2) ───────────────────────
-  // Single column on phones so move cards aren't clipped off the right edge.
-  // Lives here (not in parent ChallengePage) because the consuming JSX is in
-  // this component — declaring in the parent would put isSmallScreen out of
-  // scope at line 440 and break the build (see commit 8eea292 → this fix).
-  const [isSmallScreen, setIsSmallScreen] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 480px)");
-    const update = () => setIsSmallScreen(mq.matches);
-    update();
-    if (mq.addEventListener) mq.addEventListener("change", update);
-    else (mq as any).addListener(update);
-    return () => {
-      if (mq.removeEventListener) mq.removeEventListener("change", update);
-      else (mq as any).removeListener(update);
-    };
-  }, []);
-
   // ── Perspective math ───────────────────────────────────────────────────────
   const isChallenger = match.challengerPlayerId === mePlayerId;
   const mySide: "challenger" | "opponent" = isChallenger ? "challenger" : "opponent";
@@ -478,7 +460,7 @@ function ActiveMatchView({
                 {healBusy ? "Healing…" : `💚 Heal · ${healCost} REBEL · ${myHealsUsed}/${healMax}`}
               </button>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: isSmallScreen ? "1fr" : "repeat(auto-fit,minmax(140px,1fr))", gap: 8, marginBottom: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))", gap: 8, marginBottom: 12 }}>
               {myMoves.map((mv) => {
                 const tColor = moveTypeColor[mv.type] || "rgba(255,255,255,0.6)";
                 const disabled = !isMyTurn || busy;

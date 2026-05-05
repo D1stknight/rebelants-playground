@@ -62,13 +62,34 @@ export function useFWAudio() {
     currentTrackRef.current = null;
   }, []);
   const resetLowHp = React.useCallback(() => { lowHpFiredRef.current = false; }, []);
+  // iOS Safari requires audio actions to occur in the SYNCHRONOUS user-gesture
+  // frame. Wrapping play()/pause() inside a setMuted(m => ...) updater pushes
+  // them out of that frame and Safari silently ignores them — that's the
+  // "sometimes the mute toggle does nothing" bug.
+  //
+  // Fix: read the current value via mutedRef, perform the DOM ops on the
+  // sync path, THEN call setMuted. Also: if no music element exists yet
+  // (e.g. user toggled mute before any music started), unmuting still does
+  // nothing here — but that's fine because the next music start call will
+  // see mutedRef=false and play normally.
   const toggleMute = React.useCallback(() => {
-    setMuted(m => {
-      const next = !m;
-      try { localStorage.setItem("ra:fw:muted", next ? "1" : "0"); } catch {}
-      if (musicRef.current) { if (next) { musicRef.current.volume = 0; musicRef.current.pause(); } else { musicRef.current.volume = 0.35; musicRef.current.play().catch(()=>{}); } }
-      return next;
-    });
+    const next = !mutedRef.current;
+    try { localStorage.setItem("ra:fw:muted", next ? "1" : "0"); } catch {}
+    // Update the ref synchronously so any follow-up music start sees the new value.
+    mutedRef.current = next;
+    if (musicRef.current) {
+      if (next) {
+        try { musicRef.current.pause(); } catch {}
+        try { musicRef.current.volume = 0; } catch {}
+      } else {
+        try { musicRef.current.volume = 0.35; } catch {}
+        // play() returns a Promise; we MUST call it on the sync gesture frame.
+        try { void musicRef.current.play().catch(() => {}); } catch {}
+      }
+    }
+    // Now update React state so the UI 🔊/🔇 icon flips. This may run async
+    // but the audio op already happened on the gesture frame above.
+    setMuted(next);
   }, []);
   const sfx = React.useMemo(() => ({
     startTheme:    () => startTheme(),

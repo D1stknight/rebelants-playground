@@ -22,7 +22,7 @@ const GAMES = [
   { id:'raid',   title:'THE RAID',           desc:'DEPLOY YOUR SQUAD. SURVIVE THE COLONY. BRING HOME THE LOOT.',  icon:'🗡️',  path:'/the-raid',     color:'#f97316', glow:'rgba(249,115,22,0.4)',  badge:'SQUAD',    bg:'rgba(249,115,22,0.08)'  },
   { id:'tunnel', title:'ANT TUNNEL',         desc:'NAVIGATE THE UNDERGROUND. COLLECT CRYSTALS. OUTRUN THE SPIDER.', icon:'🐜', path:'/tunnel',       color:'#3b82f6', glow:'rgba(59,130,246,0.4)', badge:'ARCADE',   bg:'rgba(59,130,246,0.08)'  },
   { id:'shuffle',title:"QUEEN'S EGG SHUFFLE",desc:"FIND THE QUEEN'S EGG. BEAT THE ODDS. WIN BIG.",               icon:'🥚',  path:'/shuffle',       color:'#a855f7', glow:'rgba(168,85,247,0.4)', badge:'LUCK',     bg:'rgba(168,85,247,0.08)'  },
-  { id:'descent',title:'HIVE DESCENT',        desc:'DESCEND THROUGH 10 FLOORS. FACE THE QUEEN. WIN OR DIE.', icon:'🐜',  path:'/descent',     color:'#ff3399', glow:'rgba(255,51,153,0.45)',badge:'3D · ROGUELIKE', bg:'rgba(255,51,153,0.08)' },
+  { id:'descent',title:'HIVE DESCENT',        desc:'DESCEND THROUGH 10 FLOORS. FACE THE QUEEN. WIN OR DIE.', icon:'🐜',  path:'/descent',     color:'#ff3399', glow:'rgba(255,51,153,0.45)',badge:'COMING SOON', bg:'rgba(255,51,153,0.08)', comingSoon:true },
 ];
 
 const ECONOMY = [
@@ -709,11 +709,19 @@ export default function LandingPage() {
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(230px,1fr))', gap:18 }}>
               {GAMES.map((g, i) => (
                 <div key={g.id}
-                  onClick={() => router.push(g.path)}
+                  onClick={() => {
+                    if ((g as any).comingSoon) {
+                      // Admin bypass: anyone with ra_admin_token in sessionStorage can still enter.
+                      let isAdmin = false;
+                      try { isAdmin = !!sessionStorage.getItem('ra_admin_token'); } catch {}
+                      if (!isAdmin) return;
+                    }
+                    router.push(g.path);
+                  }}
                   onMouseEnter={() => setHovered(g.id)}
                   onMouseLeave={() => setHovered('')}
                   style={{
-                    position:'relative', padding:'28px 22px 24px', borderRadius:18, cursor:'pointer',
+                    position:'relative', padding:'28px 22px 24px', borderRadius:18, cursor: (g as any).comingSoon ? 'not-allowed' : 'pointer',
                     border: `1px solid ${hovered===g.id ? g.color+'aa' : 'rgba(255,255,255,0.07)'}`,
                     background: hovered===g.id ? g.bg : 'rgba(255,255,255,0.025)',
                     opacity: cardsIn ? 1 : 0,
