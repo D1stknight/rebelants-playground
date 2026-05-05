@@ -223,6 +223,12 @@ function ActiveMatchView({
   const [enemy3DAnim, setEnemy3DAnim] = useState<AnimState>("idle");
   const [player3DAnim, setPlayer3DAnim] = useState<AnimState>("idle");
 
+  // ── 2D card animation state (clash flash + floating dmg numbers) ──────────
+  // Mirrors AI mode's BattleScene-driven card shake / overlay flashes.
+  const [battleAnim, setBattleAnim] = useState<"idle" | "clash" | "win" | "lose">("idle");
+  const [dmgFloats, setDmgFloats] = useState<{ id: number; side: "player" | "enemy" | "plunder"; dmg: number }[]>([]);
+  const dmgIdRef = useRef(0);
+
   // Track previous values to detect changes
   const prevRoundCountRef = useRef(match.roundHistory.length);
   const prevTerritoryCountRef = useRef(match.territoryResults.length);
@@ -262,6 +268,18 @@ function ActiveMatchView({
         else if (newest.damageDealt > 0 && newest.damageDealt < 10) sfx.hitLight();
       } catch {}
 
+      // 2D card animation: clash flash + floating damage on the defender's side
+      setBattleAnim("clash");
+      if (newest.damageDealt > 0) {
+        const fid = ++dmgIdRef.current;
+        // wasMine === attacker is me → opponent takes the damage (enemy float)
+        const floatSide: "player" | "enemy" = wasMine ? "enemy" : "player";
+        setDmgFloats((prev) => [...prev, { id: fid, side: floatSide, dmg: newest.damageDealt }]);
+        setTimeout(() => {
+          setDmgFloats((prev) => prev.filter((x) => x.id !== fid));
+        }, 1500);
+      }
+
       // After 1.2s, transition to win/lose if this was a killing blow,
       // or idle otherwise. Killing blow = defenderHpAfter <= 0. The win/lose
       // anims play for the remaining ~2.3s of the per-territory hold (handled
@@ -274,13 +292,16 @@ function ActiveMatchView({
           if (wasMine) {
             setPlayer3DAnim("win");
             setEnemy3DAnim("lose");
+            setBattleAnim("win");
           } else {
             setPlayer3DAnim("lose");
             setEnemy3DAnim("win");
+            setBattleAnim("lose");
           }
         } else {
           setPlayer3DAnim("idle");
           setEnemy3DAnim("idle");
+          setBattleAnim("idle");
         }
       }, 1200);
       prevRoundCountRef.current = currCount;
@@ -302,6 +323,8 @@ function ActiveMatchView({
     if (prevMyIdxRef.current !== myIdx || prevOppIdxRef.current !== oppIdx) {
       setPlayer3DAnim("idle");
       setEnemy3DAnim("idle");
+      setBattleAnim("idle");
+      setDmgFloats([]);
       prevMyIdxRef.current = myIdx;
       prevOppIdxRef.current = oppIdx;
     }
@@ -339,8 +362,8 @@ function ActiveMatchView({
     currentRound: currentRoundNumber,
     roundLog,
     currentTerritoryRounds: [],
-    dmgFloats: [],
-    battleAnim: "idle",
+    dmgFloats,
+    battleAnim,
     enemy3DAnim,
     player3DAnim,
     selectedMove: null,
@@ -781,11 +804,11 @@ function CompletedMatchView({ match, mePlayerId, sfx, stopMusic }: { match: PvpM
     ? "✅ Crate Unlocked"
     : "";
   const crateSubLine = finalRarity === "ultra"
-    ? "5/5 territories — Legendary!"
+    ? "5 territories — Total domination!"
     : finalRarity === "rare"
-    ? "3–4 territories — Strong campaign!"
+    ? "4 territories — Dominant performance!"
     : finalRarity === "common"
-    ? "1–2 territories — Soldiers hold!"
+    ? "3 territories — Hard-fought victory!"
     : "";
   const crateTitleColor = finalRarity === "ultra"
     ? "#fbbf24"
@@ -1196,6 +1219,8 @@ export default function ChallengePage() {
   // ── Actions ────────────────────────────────────────────────────────────────
   const handleAccept = async () => {
     if (!identity || !match) return;
+    // Kick audio under the gesture (iOS) so the upcoming match has music.
+    try { audio.startMusic(); } catch {}
     setBusy(true); setError(null);
     try {
       const r = await fetch("/api/faction-wars/pvp/accept", {
@@ -1210,6 +1235,7 @@ export default function ChallengePage() {
 
   const handleSubmitTeam = async () => {
     if (!identity || !match || team.length !== TEAM_SIZE) return;
+    try { audio.startMusic(); } catch {}
     setBusy(true); setError(null);
     try {
       const r = await fetch("/api/faction-wars/pvp/select-team", {
@@ -1298,6 +1324,15 @@ export default function ChallengePage() {
 
   const handleSubmitMove = async (moveId: string) => {
     if (!identity || !match) return;
+    // iOS / Safari requires a user gesture to start audio. Music start in
+    // useEffect doesn't qualify, so we kick here too — switchMusic is now
+    // idempotent (lib/useFWAudio.ts) so this is safe to call every move.
+    try {
+      if (match.status === "active") {
+        if (match.currentTerritory >= 3) audio.startEpic();
+        else audio.startMusic();
+      }
+    } catch {}
     setBusy(true); setError(null);
     try {
       const r = await fetch("/api/faction-wars/pvp/submit-move", {

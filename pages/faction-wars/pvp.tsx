@@ -125,6 +125,8 @@ export default function PvpLobbyPage() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
+  const [clearBusy, setClearBusy] = useState(false);
+  const [clearError, setClearError] = useState<string | null>(null);
 
   // ── PvP economy state (Commit C) ──────────────────────────────────────────
   // Pulled from GET /api/config (public endpoint that exposes admin-saved
@@ -152,6 +154,37 @@ export default function PvpLobbyPage() {
       setLoading(false);
     }
   }, [identity]);
+
+  // Clear all completed/cancelled matches from MY view (other player still sees them).
+  const clearCompleted = useCallback(async () => {
+    if (!identity) return;
+    if (clearBusy) return;
+    const ids = matches
+      .filter((m) => m.status === "completed" || m.status === "cancelled")
+      .map((m) => m.challengeId);
+    if (ids.length === 0) return;
+    if (typeof window !== "undefined" && !window.confirm(`Clear ${ids.length} completed match${ids.length === 1 ? "" : "es"} from your view? Your opponents will still see them in their history.`)) return;
+    setClearBusy(true);
+    setClearError(null);
+    try {
+      const r = await fetch("/api/faction-wars/pvp/hide-completed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerId: identity.playerId, challengeIds: ids }),
+      });
+      const j = await r.json();
+      if (!j?.ok) {
+        setClearError(j?.error || "Failed to clear");
+      } else {
+        await refreshMatches();
+        setShowCompleted(false);
+      }
+    } catch (e: any) {
+      setClearError(e?.message || "Network error");
+    } finally {
+      setClearBusy(false);
+    }
+  }, [identity, matches, clearBusy, refreshMatches]);
 
   useEffect(() => {
     if (!identity) return;
@@ -292,8 +325,8 @@ export default function PvpLobbyPage() {
                         onClick={handleCreate}
                         disabled={disabled}
                         style={{
-                          minWidth: 240, height: 44, fontSize: 13, fontWeight: 900, letterSpacing: "0.1em", textTransform: "uppercase",
-                          borderRadius: 22, border: `1px solid ${disabled ? "rgba(255,255,255,0.18)" : "rgba(251,191,36,0.5)"}`,
+                          minWidth: 280, height: 48, padding: "0 28px", fontSize: 13, fontWeight: 900, letterSpacing: "0.1em", textTransform: "uppercase",
+                          borderRadius: 24, border: `1px solid ${disabled ? "rgba(255,255,255,0.18)" : "rgba(251,191,36,0.5)"}`,
                           background: disabled ? "rgba(255,255,255,0.04)" : "linear-gradient(135deg,rgba(251,191,36,0.3),rgba(248,113,113,0.3))",
                           color: disabled ? "rgba(255,255,255,0.4)" : "#fbbf24",
                           cursor: creating ? "wait" : disabled ? "not-allowed" : "pointer",
@@ -335,16 +368,37 @@ export default function PvpLobbyPage() {
               {/* Completed matches (collapsed) */}
               {completedMatches.length > 0 && (
                 <div>
-                  <button
-                    onClick={() => setShowCompleted((v) => !v)}
-                    style={{
-                      background: "none", border: "none", color: "rgba(255,255,255,0.5)",
-                      fontSize: 11, letterSpacing: "0.25em", textTransform: "uppercase", fontWeight: 700,
-                      fontFamily: JP, cursor: "pointer", padding: 0, marginBottom: 12,
-                    }}
-                  >
-                    {showCompleted ? "▼" : "▶"} Completed ({completedMatches.length})
-                  </button>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
+                    <button
+                      onClick={() => setShowCompleted((v) => !v)}
+                      style={{
+                        background: "none", border: "none", color: "rgba(255,255,255,0.5)",
+                        fontSize: 11, letterSpacing: "0.25em", textTransform: "uppercase", fontWeight: 700,
+                        fontFamily: JP, cursor: "pointer", padding: 0,
+                      }}
+                    >
+                      {showCompleted ? "▼" : "▶"} Completed ({completedMatches.length})
+                    </button>
+                    <button
+                      onClick={clearCompleted}
+                      disabled={clearBusy}
+                      title="Hide all completed matches from your view (your opponent still sees them)"
+                      style={{
+                        background: clearBusy ? "rgba(255,255,255,0.04)" : "rgba(248,113,113,0.08)",
+                        border: `1px solid ${clearBusy ? "rgba(255,255,255,0.12)" : "rgba(248,113,113,0.3)"}`,
+                        borderRadius: 50, padding: "4px 12px",
+                        fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", fontWeight: 700,
+                        fontFamily: JP,
+                        color: clearBusy ? "rgba(255,255,255,0.4)" : "#fca5a5",
+                        cursor: clearBusy ? "wait" : "pointer",
+                      }}
+                    >
+                      {clearBusy ? "Clearing…" : "🗑 Clear"}
+                    </button>
+                    {clearError && (
+                      <span style={{ fontSize: 10, color: "#fca5a5", opacity: 0.8 }}>{clearError}</span>
+                    )}
+                  </div>
                   {showCompleted && completedMatches.map((m) => <MatchCard key={m.challengeId} match={m} mePlayerId={identity.playerId} />)}
                 </div>
               )}

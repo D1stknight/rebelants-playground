@@ -532,7 +532,6 @@ function FWLeaderboardPanel({ lb }: { lb: FWLeaderboards }) {
                     <span style={rankStyle(i)}>#{i+1}</span>
                     <span style={{ flex: 1, fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.playerName || shorten(e.playerId)}</span>
                     <span style={{ fontSize: 13, fontWeight: 800, color: "#c084fc" }}>{e.score.toLocaleString()}</span>
-                    <span style={{ fontSize: 9, opacity: 0.45, marginLeft: 2 }}>WINS</span>
                   </div>
                 ))}
             </div>
@@ -550,7 +549,6 @@ function FWLeaderboardPanel({ lb }: { lb: FWLeaderboards }) {
                     <span style={rankStyle(i)}>#{i+1}</span>
                     <span style={{ flex: 1, fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.playerName || shorten(e.playerId)}</span>
                     <span style={{ fontSize: 13, fontWeight: 800, color: "#f87171" }}>{e.score.toLocaleString()}</span>
-                    <span style={{ fontSize: 9, opacity: 0.45, marginLeft: 2 }}>🔥</span>
                   </div>
                 ))}
             </div>
@@ -568,7 +566,6 @@ function FWLeaderboardPanel({ lb }: { lb: FWLeaderboards }) {
                     <span style={rankStyle(i)}>#{i+1}</span>
                     <span style={{ flex: 1, fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.playerName || shorten(e.playerId)}</span>
                     <span style={{ fontSize: 13, fontWeight: 800, color: "#fbbf24" }}>{e.score.toLocaleString()}</span>
-                    <span style={{ fontSize: 9, opacity: 0.45, marginLeft: 2 }}>REBEL</span>
                   </div>
                 ))}
             </div>

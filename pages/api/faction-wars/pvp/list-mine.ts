@@ -10,7 +10,7 @@
 // matters for "who can see the player's full match list."
 
 import type { NextApiRequest, NextApiResponse } from "next";
-import { listPlayerMatchIds, getMatch } from "../../../../lib/server/fwpvp";
+import { listPlayerMatchIds, listHiddenMatchIds, getMatch } from "../../../../lib/server/fwpvp";
 import type { PvpMatch, PvpStatus } from "../../../../lib/types/fwpvp";
 
 const STATUS_ORDER: Record<PvpStatus, number> = {
@@ -29,11 +29,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const playerId = String(req.query.playerId || "").trim().slice(0, 64);
   if (!playerId) return res.status(400).json({ ok: false, error: "Missing playerId" });
 
-  const ids = await listPlayerMatchIds(playerId);
+  const [ids, hidden] = await Promise.all([
+    listPlayerMatchIds(playerId),
+    listHiddenMatchIds(playerId),
+  ]);
   if (ids.length === 0) return res.status(200).json({ ok: true, matches: [] });
 
-  // Fetch all in parallel. Cap at 100 to keep payload bounded.
-  const capped = ids.slice(0, 100);
+  // Filter out matches the user has hidden from their own view. Match still
+  // exists for the other player. Hidden filter only applies to completed/
+  // cancelled matches — active/pending always show even if hidden.
+  // Cap at 100 to keep payload bounded.
+  const capped = ids.filter((id) => !hidden.has(id)).slice(0, 100);
   const matches = (await Promise.all(capped.map((id) => getMatch(id))))
     .filter((m): m is PvpMatch => m !== null);
 

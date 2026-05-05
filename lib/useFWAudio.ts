@@ -25,14 +25,33 @@ export function useFWAudio() {
     if (typeof window === "undefined" || mutedRef.current) return;
     try { const a = new Audio("/audio/" + file + ".mp3"); a.volume = vol; void a.play().catch(() => {}); } catch {}
   }, []);
+  // Track which file is currently loaded so we can no-op on re-requests.
+  // This is critical for PvP where useEffect deps cause the music start
+  // call to fire on every territory transition. Without this guard, every
+  // transition restarts the same track from 0:00 — which on iOS leaks
+  // audio elements and on PC can layer tracks if pause() is async.
+  const currentTrackRef = React.useRef<string | null>(null);
   const switchMusic = React.useCallback((file: string, vol = 0.35) => {
     if (typeof window === "undefined") return;
+    if (mutedRef.current) {
+      // Stop whatever is playing if the user toggled mute since the last call.
+      if (musicRef.current) { musicRef.current.pause(); musicRef.current = null; }
+      currentTrackRef.current = null;
+      return;
+    }
+    // Idempotency: if the requested track is already playing, just nudge the
+    // volume and bail. Re-creating the Audio element would restart it from 0.
+    if (currentTrackRef.current === file && musicRef.current && !musicRef.current.paused) {
+      try { musicRef.current.volume = vol; } catch {}
+      return;
+    }
     if (musicRef.current) { musicRef.current.pause(); musicRef.current = null; }
-    if (mutedRef.current) return;
     try {
       const a = new Audio("/audio/" + file + ".mp3");
       a.loop = true; a.volume = vol;
-      void a.play().catch(() => {}); musicRef.current = a;
+      void a.play().catch(() => {});
+      musicRef.current = a;
+      currentTrackRef.current = file;
     } catch {}
   }, []);
   const startTheme = React.useCallback(() => switchMusic("fw-theme-intro", 0.4), [switchMusic]);
@@ -40,6 +59,7 @@ export function useFWAudio() {
   const startEpic  = React.useCallback(() => switchMusic("fw-battle-epic", 0.5), [switchMusic]);
   const stopMusic  = React.useCallback(() => {
     if (musicRef.current) { musicRef.current.pause(); musicRef.current.currentTime = 0; musicRef.current = null; }
+    currentTrackRef.current = null;
   }, []);
   const resetLowHp = React.useCallback(() => { lowHpFiredRef.current = false; }, []);
   const toggleMute = React.useCallback(() => {

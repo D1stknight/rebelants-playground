@@ -68,6 +68,28 @@ export async function listPlayerMatchIds(playerId: string): Promise<string[]> {
   }
 }
 
+// Per-player hidden matches: lets a user clear their completed list view
+// without affecting the OTHER side's history. Matches stay in Redis; we
+// just filter them out for the player who hid them.
+const PLAYER_HIDDEN_KEY = (pid: string) => `ra:fwpvp:hidden:${pid}`;
+
+export async function addHiddenMatches(playerId: string, challengeIds: string[]): Promise<void> {
+  if (!playerId || !Array.isArray(challengeIds) || challengeIds.length === 0) return;
+  try {
+    await redis.sadd(PLAYER_HIDDEN_KEY(playerId), ...challengeIds.slice(0, 200));
+  } catch {}
+}
+
+export async function listHiddenMatchIds(playerId: string): Promise<Set<string>> {
+  if (!playerId) return new Set();
+  try {
+    const ids = await redis.smembers(PLAYER_HIDDEN_KEY(playerId));
+    return new Set(Array.isArray(ids) ? ids.map(String) : []);
+  } catch {
+    return new Set();
+  }
+}
+
 // Light "active" registry — useful later for matchmaking / spectator. Kept tiny.
 export async function markActive(challengeId: string): Promise<void> {
   await redis.sadd(ACTIVE_INDEX_KEY, challengeId);
