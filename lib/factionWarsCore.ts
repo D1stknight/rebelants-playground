@@ -35,7 +35,22 @@ export function getSamuraiAnimForMove(move: Move | null): SamuraiAnimState {
 }
 
 export function hasFaction3DCharacter(factionId: string): boolean {
-  return factionId === "samurai" || factionId === "bushi";
+  // Updated 2026-05: all 11 factions now have 3D character GLBs available.
+  // Mirrors the local copy in components/FactionWars.tsx (AI mode); shared by
+  // FactionWarsBattleScene (PvP) so PvP picks up the same set of 3D characters.
+  return [
+    "ashigaru",
+    "buke",
+    "bushi",
+    "kenshi",
+    "ronin",
+    "samurai",
+    "shogun",
+    "sohei",
+    "warrior",
+    "wokou",
+    "yamabushi",
+  ].includes(factionId);
 }
 export interface Faction { id: FactionId; name: string; emoji: string; color: string; bgColor: string; borderColor: string; role: string; passive: string; passiveDesc: string; weapon: string; moves: Move[]; weakTo: FactionId[]; strongVs: FactionId[]; }
 export interface RoundResult { round:number; playerMove:Move; enemyMove:Move; playerDmg:number; enemyDmg:number; playerHpAfter:number; enemyHpAfter:number; }
