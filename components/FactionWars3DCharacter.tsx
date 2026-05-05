@@ -23,7 +23,18 @@ type FactionAnimState =
   | "win"
   | "lose";
 
-type SupportedFaction3D = "samurai" | "bushi";
+type SupportedFaction3D =
+  | "ashigaru"
+  | "buke"
+  | "bushi"
+  | "kenshi"
+  | "ronin"
+  | "samurai"
+  | "shogun"
+  | "sohei"
+  | "warrior"
+  | "wokou"
+  | "yamabushi";
 
 type FactionWars3DCharacterProps = {
   factionId: string;
@@ -31,7 +42,19 @@ type FactionWars3DCharacterProps = {
   animState?: FactionAnimState;
 };
 
-const SUPPORTED_3D_FACTIONS: SupportedFaction3D[] = ["samurai", "bushi"];
+const SUPPORTED_3D_FACTIONS: SupportedFaction3D[] = [
+  "ashigaru",
+  "buke",
+  "bushi",
+  "kenshi",
+  "ronin",
+  "samurai",
+  "shogun",
+  "sohei",
+  "warrior",
+  "wokou",
+  "yamabushi",
+];
 
 const ANIMATION_KEYS: FactionAnimState[] = [
   "idle",
