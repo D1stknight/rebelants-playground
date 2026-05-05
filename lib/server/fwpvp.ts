@@ -75,8 +75,12 @@ const PLAYER_HIDDEN_KEY = (pid: string) => `ra:fwpvp:hidden:${pid}`;
 
 export async function addHiddenMatches(playerId: string, challengeIds: string[]): Promise<void> {
   if (!playerId || !Array.isArray(challengeIds) || challengeIds.length === 0) return;
+  const capped = challengeIds.slice(0, 200);
   try {
-    await redis.sadd(PLAYER_HIDDEN_KEY(playerId), ...challengeIds.slice(0, 200));
+    // Upstash sadd typing rejects spread; call per-id (small N).
+    for (const id of capped) {
+      await redis.sadd(PLAYER_HIDDEN_KEY(playerId), id);
+    }
   } catch {}
 }
 
