@@ -437,7 +437,7 @@ function ActiveMatchView({
                 {healBusy ? "Healing…" : `💚 Heal · ${healCost} REBEL · ${myHealsUsed}/${healMax}`}
               </button>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 8, marginBottom: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isSmallScreen ? "1fr" : "repeat(auto-fit,minmax(140px,1fr))", gap: 8, marginBottom: 12 }}>
               {myMoves.map((mv) => {
                 const tColor = moveTypeColor[mv.type] || "rgba(255,255,255,0.6)";
                 const disabled = !isMyTurn || busy;
@@ -979,13 +979,32 @@ export default function ChallengePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [match?.status, match?.currentTerritory]);
 
-  // ── Inline sign-in state (Commit G) ─────────────────────────────────────
-  // Replaces the static "go sign in" link with an inline name claim + Discord
-  // OAuth, so users coming in via a challenge URL never have to leave the page.
+  // ── Inline sign-in state (Commit G + H) ─────────────────────────────────
+  // Commit G: inline name claim + Discord OAuth so challenge URL users never leave.
+  // Commit H: third path — sign in to an EXISTING claimed name with PIN.
   const [nameInput, setNameInput] = useState("");
   const [pinInput, setPinInput] = useState("");
   const [nameClaiming, setNameClaiming] = useState(false);
   const [signInError, setSignInError] = useState<string | null>(null);
+  // Existing-name sign-in (separate inputs so users don't confuse claim vs sign-in)
+  const [signInName, setSignInName] = useState("");
+  const [signInPin, setSignInPin] = useState("");
+  const [signInBusy, setSignInBusy] = useState(false);
+  const [signInExistingError, setSignInExistingError] = useState<string | null>(null);
+  // Mobile detection for move grid (Commit H item 2 — single column on phones
+  // so the move cards aren't clipped off the right edge of the viewport).
+  const [isSmallScreen, setIsSmallScreen] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 480px)");
+    const update = () => setIsSmallScreen(mq.matches);
+    update();
+    if (mq.addEventListener) mq.addEventListener("change", update);
+    else (mq as any).addListener(update);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener("change", update);
+      else (mq as any).removeListener(update);
+    };
+  }, []);
 
   // Load profile + identity. Re-runs whenever the "ra:identity-changed" event
   // fires (after a successful name claim or Discord link), so the inline
@@ -1087,6 +1106,46 @@ export default function ChallengePage() {
       setNameClaiming(false);
     }
   }, [nameInput, pinInput]);
+
+  // ── Inline existing-name sign-in handler (Commit H) ───────────────────────
+  // Mirrors handleClaimName but POSTs to /api/commander/sign-in. Returns the
+  // existing playerId on success so the user can resume the challenge from any
+  // device where they remember their name + PIN.
+  const handleSignIn = useCallback(async () => {
+    const clean = signInName.toLowerCase().replace(/[^a-z0-9_]/g, "");
+    if (!clean || clean.length < 3) {
+      setSignInExistingError("Enter your commander name (3+ chars)");
+      return;
+    }
+    if (!signInPin.trim()) {
+      setSignInExistingError("PIN required to sign in");
+      return;
+    }
+    setSignInBusy(true);
+    setSignInExistingError(null);
+    try {
+      const r = await fetch("/api/commander/sign-in", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: clean, pin: signInPin.trim() }),
+      });
+      const j = await r.json();
+      if (!r.ok || !j.ok) {
+        setSignInExistingError(j.error || "Sign in failed");
+        return;
+      }
+      saveProfile({
+        primaryId: j.playerId || `name:${clean}`,
+        name: j.displayName || clean,
+        discordSkipLink: false,
+      });
+      window.dispatchEvent(new Event("ra:identity-changed"));
+    } catch (e: any) {
+      setSignInExistingError(e?.message || "Network error");
+    } finally {
+      setSignInBusy(false);
+    }
+  }, [signInName, signInPin]);
 
   // ── Inline Discord OAuth (Commit G) ──────────────────────────────────────
   // Sends the user to Discord login with the current challenge URL as
@@ -1435,7 +1494,88 @@ export default function ChallengePage() {
                 </div>
               </div>
 
-              {/* Divider */}
+              {/* Divider 1 */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "16px 0", opacity: 0.4 }}>
+                <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.15)" }} />
+                <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.2em", color: "rgba(255,255,255,0.55)" }}>OR</div>
+                <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.15)" }} />
+              </div>
+
+              {/* Sign in to existing claimed name (Commit H) */}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase", color: "rgba(255,255,255,0.5)", marginBottom: 6 }}>
+                  Sign in to existing name
+                </div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  <input
+                    type="text"
+                    value={signInName}
+                    onChange={(e) => { setSignInName(e.target.value); setSignInExistingError(null); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleSignIn(); }}
+                    placeholder="commander_name"
+                    maxLength={20}
+                    disabled={signInBusy}
+                    style={{
+                      flex: "1 1 180px", minWidth: 0,
+                      padding: "10px 12px", borderRadius: 8,
+                      border: "1px solid rgba(255,255,255,0.15)",
+                      background: "rgba(0,0,0,0.4)",
+                      color: "rgba(255,255,255,0.95)",
+                      fontSize: 13,
+                      fontFamily: "inherit",
+                    }}
+                  />
+                  <input
+                    type="password"
+                    value={signInPin}
+                    onChange={(e) => { setSignInPin(e.target.value); setSignInExistingError(null); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleSignIn(); }}
+                    placeholder="PIN"
+                    maxLength={20}
+                    disabled={signInBusy}
+                    style={{
+                      width: 130,
+                      padding: "10px 12px", borderRadius: 8,
+                      border: "1px solid rgba(255,255,255,0.15)",
+                      background: "rgba(0,0,0,0.4)",
+                      color: "rgba(255,255,255,0.95)",
+                      fontSize: 13,
+                      fontFamily: "inherit",
+                    }}
+                  />
+                  <button
+                    onClick={handleSignIn}
+                    disabled={signInBusy || signInName.trim().length < 3 || !signInPin.trim()}
+                    style={{
+                      padding: "10px 18px", borderRadius: 8,
+                      border: "1px solid rgba(96,165,250,0.4)",
+                      background: signInBusy || signInName.trim().length < 3 || !signInPin.trim() ? "rgba(255,255,255,0.05)" : "linear-gradient(135deg,rgba(96,165,250,0.25),rgba(167,139,250,0.25))",
+                      color: signInBusy || signInName.trim().length < 3 || !signInPin.trim() ? "rgba(255,255,255,0.4)" : "#93c5fd",
+                      fontSize: 12, fontWeight: 900, letterSpacing: "0.1em", textTransform: "uppercase",
+                      cursor: signInBusy || signInName.trim().length < 3 || !signInPin.trim() ? "not-allowed" : "pointer",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {signInBusy ? "Signing in…" : "Sign In"}
+                  </button>
+                </div>
+                <div style={{ fontSize: 10, opacity: 0.5, marginTop: 6, lineHeight: 1.4 }}>
+                  Already have a commander name from another device? Enter it with your PIN to sign back in.
+                </div>
+                {signInExistingError && (
+                  <div style={{
+                    marginTop: 8, padding: "6px 10px", borderRadius: 6,
+                    background: "rgba(248,113,113,0.1)",
+                    border: "1px solid rgba(248,113,113,0.3)",
+                    color: "#fca5a5",
+                    fontSize: 11, textAlign: "center",
+                  }}>
+                    {signInExistingError}
+                  </div>
+                )}
+              </div>
+
+              {/* Divider 2 */}
               <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "16px 0", opacity: 0.4 }}>
                 <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.15)" }} />
                 <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.2em", color: "rgba(255,255,255,0.55)" }}>OR</div>
