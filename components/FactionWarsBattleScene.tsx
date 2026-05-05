@@ -207,6 +207,21 @@ export function FactionWarsBattleScene({ state, actions, enableHealing = true, s
   // Derived from cfg — mirrors FactionWars.tsx line 646
   const fwPlunderBonus = Number(cfg?.factionWarsPlunderBonus ?? 50);
 
+  // Inject a CSS @media rule so the move-grid reliably collapses to a single
+  // column on mobile (≤600px). Inline minmax should already do this via auto-fit
+  // but iOS Safari has been observed to render 2 columns anyway, possibly due
+  // to aggressive bundle caching. The @media rule is a belt-and-suspenders
+  // defense and uses !important to win specificity.
+  React.useEffect(() => {
+    if (typeof document === "undefined") return;
+    const id = "fw-move-grid-mobile-css";
+    if (document.getElementById(id)) return;
+    const styleEl = document.createElement("style");
+    styleEl.id = id;
+    styleEl.textContent = "@media (max-width: 600px) { .fw-move-grid { grid-template-columns: 1fr !important; } }";
+    document.head.appendChild(styleEl);
+  }, []);
+
   // ── PHASE: battle ──────────────────────────────────────────────────────────
   if (phase === "battle") {
     if (!currentPlayerFD || !currentDefenderFD) return null;
@@ -488,7 +503,7 @@ export function FactionWarsBattleScene({ state, actions, enableHealing = true, s
               <div style={{ fontSize:12, fontWeight:800, marginBottom:10, opacity:0.7, letterSpacing:"0.04em" }}>
                 ⚔️ CHOOSE {currentPlayerFD.name.toUpperCase()}'S MOVE
               </div>
-              <div style={{ display:"grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))", gap:8 }}>
+              <div className="fw-move-grid" style={{ display:"grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap:8 }}>
               {currentPlayerFD.moves.map(m=>{
                 const tc: Record<string,string> = { attack:"#f87171", defend:"#34d399", magic:"#c084fc", trick:"#fbbf24" };
                 const isSel = selectedMove?.id===m.id;
