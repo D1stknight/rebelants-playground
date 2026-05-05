@@ -100,7 +100,19 @@ function getSamuraiAnimForMove(move: Move | null): SamuraiAnimState {
 }
 
 function hasFaction3DCharacter(factionId: string): boolean {
-  return factionId === "samurai" || factionId === "bushi";
+  return [
+    "ashigaru",
+    "buke",
+    "bushi",
+    "kenshi",
+    "ronin",
+    "samurai",
+    "shogun",
+    "sohei",
+    "warrior",
+    "wokou",
+    "yamabushi",
+  ].includes(factionId);
 }
 interface Faction { id: FactionId; name: string; emoji: string; color: string; bgColor: string; borderColor: string; role: string; passive: string; passiveDesc: string; weapon: string; moves: Move[]; weakTo: FactionId[]; strongVs: FactionId[]; }
 interface RoundResult { round:number; playerMove:Move; enemyMove:Move; playerDmg:number; enemyDmg:number; playerHpAfter:number; enemyHpAfter:number; }
