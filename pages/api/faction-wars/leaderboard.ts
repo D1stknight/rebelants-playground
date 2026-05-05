@@ -8,6 +8,11 @@ const LB_FW_STREAKS   = "ra:fw:lb:streaks";
 const LB_FW_RICH      = "ra:fw:lb:rich";
 const LB_FW_PERFECT   = "ra:fw:lb:perfect";
 const FW_NAMES        = "ra:fw:player_names";
+// PvP leaderboard keys (Commit J) — independent from AI mode boards
+const LB_FW_PVP_WINS    = "ra:fw:lb:pvpWins";
+const LB_FW_PVP_STREAKS = "ra:fw:lb:pvpStreaks";
+const LB_FW_PVP_RICH    = "ra:fw:lb:pvpRich";
+const FW_PVP_NAMES      = "ra:fw:pvp_player_names";
 // Per-faction player win counts: ra:fw:faction:{fid} is a sorted set playerId -> wins
 const FW_FACTION_LB   = (fid: string) => `ra:fw:faction:${fid}`;
 
@@ -36,13 +41,24 @@ async function factionTopPlayers(fid: string, names: Record<string,string>, n = 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Cache-Control", "no-store");
   try {
-    const namesRaw = await redis.hgetall(FW_NAMES).catch(() => ({}));
-    const names: Record<string, string> = (namesRaw as any) || {};
-    const [warlords, streaks, rich, perfect] = await Promise.all([
+    const [namesRaw, pvpNamesRaw] = await Promise.all([
+      redis.hgetall(FW_NAMES).catch(() => ({})),
+      redis.hgetall(FW_PVP_NAMES).catch(() => ({})),
+    ]);
+    // Merge AI-mode and PvP name maps. PvP overrides because it's more recent
+    // for active PvP players; AI-mode names still resolve for AI-only players.
+    const names: Record<string, string> = {
+      ...((namesRaw as any) || {}),
+      ...((pvpNamesRaw as any) || {}),
+    };
+    const [warlords, streaks, rich, perfect, pvpWins, pvpStreaks, pvpRich] = await Promise.all([
       topN(LB_FW_WARLORDS, names),
       topN(LB_FW_STREAKS, names),
       topN(LB_FW_RICH, names),
       topN(LB_FW_PERFECT, names),
+      topN(LB_FW_PVP_WINS, names),
+      topN(LB_FW_PVP_STREAKS, names),
+      topN(LB_FW_PVP_RICH, names),
     ]);
     const factionRaw = await redis.zrange(LB_FW_FACTIONS, 0, 49, { rev: true, withScores: true });
     const factionIds: string[] = [];
@@ -59,7 +75,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       wins: factionWins[fid],
       topPlayers: topPlayersArr[i],
     }));
-    return res.status(200).json({ ok: true, lb: { warlords, factions, streaks, rich, perfect } });
+    return res.status(200).json({ ok: true, lb: { warlords, factions, streaks, rich, perfect, pvpWins, pvpStreaks, pvpRich } });
   } catch (e: any) {
     return res.status(500).json({ ok: false, error: e?.message || "Failed" });
   }

@@ -312,6 +312,7 @@ export default function LandingPage() {
         if (lb.streaks?.[0])   e.push({ label:'LONGEST STREAK',     icon:'🔥', player: lb.streaks[0].playerName,   value: lb.streaks[0].score   + ' WINS'        });
         if (lb.richest?.[0])   e.push({ label:'RICHEST COMMANDER',  icon:'💰', player: lb.richest[0].playerName,   value: lb.richest[0].score   + ' REBEL'       });
         if (lb.perfect?.[0])   e.push({ label:'PERFECT CAMPAIGNS',  icon:'👑', player: lb.perfect[0].playerName,   value: lb.perfect[0].score   + ' PERFECT'     });
+        if (lb.pvpWins?.[0])   e.push({ label:'PVP CHAMPION',       icon:'⚔️', player: lb.pvpWins[0].playerName,   value: lb.pvpWins[0].score   + ' WINS'        });
         setLegends(e);
       }).catch(() => {});
   }, []);

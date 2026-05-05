@@ -105,7 +105,7 @@ function hasFaction3DCharacter(factionId: string): boolean {
 interface Faction { id: FactionId; name: string; emoji: string; color: string; bgColor: string; borderColor: string; role: string; passive: string; passiveDesc: string; weapon: string; moves: Move[]; weakTo: FactionId[]; strongVs: FactionId[]; }
 interface RoundResult { round:number; playerMove:Move; enemyMove:Move; playerDmg:number; enemyDmg:number; playerHpAfter:number; enemyHpAfter:number; }
 interface TerritoryResult { territory:number; defender:FactionId; playerFaction:FactionId; rounds:RoundResult[]; playerHpFinal:number; enemyHpFinal:number; won:boolean; }
-type FWLeaderboards = { warlords: {playerId:string;playerName?:string;score:number}[]; factions:{faction:FactionId;wins:number;topPlayers?:{playerId:string;playerName?:string;wins:number}[]}[]; streaks:{playerId:string;playerName?:string;score:number}[]; rich:{playerId:string;playerName?:string;score:number}[]; perfect:{playerId:string;playerName?:string;score:number}[]; };
+type FWLeaderboards = { warlords: {playerId:string;playerName?:string;score:number}[]; factions:{faction:FactionId;wins:number;topPlayers?:{playerId:string;playerName?:string;wins:number}[]}[]; streaks:{playerId:string;playerName?:string;score:number}[]; rich:{playerId:string;playerName?:string;score:number}[]; perfect:{playerId:string;playerName?:string;score:number}[]; pvpWins?:{playerId:string;playerName?:string;score:number}[]; pvpStreaks?:{playerId:string;playerName?:string;score:number}[]; pvpRich?:{playerId:string;playerName?:string;score:number}[]; };
 
 const FACTIONS: Record<FactionId, Faction> = {
   samurai: { id:"samurai", name:"Samurai", emoji:"🔴", color:"#dc2626", bgColor:"rgba(220,38,38,0.12)", borderColor:"rgba(220,38,38,0.4)", role:"Core soldiers", passive:"First Strike", passiveDesc:"1st territory: +2 bonus damage dealt per round", weapon:"Katana",
@@ -511,6 +511,71 @@ function FWLeaderboardPanel({ lb }: { lb: FWLeaderboards }) {
               </div>
           }
       </div>
+
+      {/* ⚔️ PvP Champions — full width (Commit J) */}
+      <div style={{ marginTop: 12, padding: 16, borderRadius: 14, background: "rgba(192,132,252,0.04)", border: "1px solid rgba(192,132,252,0.25)" }}>
+        <div style={{ fontSize: 13, fontWeight: 900, marginBottom: 4, letterSpacing: "0.04em", color: "#c084fc" }}>
+          ⚔️ PvP Champions
+        </div>
+        <div style={subtextStyle}>Head-to-head Faction Wars matches — wins, streaks, and REBEL plundered from opponents</div>
+        <div style={{ display: "grid", gridTemplateColumns: isSmallScreen ? "1fr" : "1fr 1fr 1fr", gap: 12, marginTop: 10 }}>
+
+          {/* 🏆 PvP Wins */}
+          <div style={cardStyle}>
+            <div style={{ ...titleStyle, color: "#c084fc" }}>🏆 Top Champions</div>
+            <div style={subtextStyle}>Most PvP victories all time</div>
+            <div style={scrollStyle}>
+              {(!lb.pvpWins || lb.pvpWins.length === 0)
+                ? <div style={emptyStyle}>No PvP matches yet — challenge a friend!</div>
+                : lb.pvpWins.slice(0, MAX).map((e, i) => (
+                  <div key={e.playerId+i} style={rowStyle}>
+                    <span style={rankStyle(i)}>#{i+1}</span>
+                    <span style={{ flex: 1, fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.playerName || shorten(e.playerId)}</span>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: "#c084fc" }}>{e.score.toLocaleString()}</span>
+                    <span style={{ fontSize: 9, opacity: 0.45, marginLeft: 2 }}>WINS</span>
+                  </div>
+                ))}
+            </div>
+          </div>
+
+          {/* 🔥 PvP Streaks */}
+          <div style={cardStyle}>
+            <div style={{ ...titleStyle, color: "#f87171" }}>🔥 Hot Streaks</div>
+            <div style={subtextStyle}>Longest PvP win streak ever</div>
+            <div style={scrollStyle}>
+              {(!lb.pvpStreaks || lb.pvpStreaks.length === 0)
+                ? <div style={emptyStyle}>No streaks yet — go on a run!</div>
+                : lb.pvpStreaks.slice(0, MAX).map((e, i) => (
+                  <div key={e.playerId+i} style={rowStyle}>
+                    <span style={rankStyle(i)}>#{i+1}</span>
+                    <span style={{ flex: 1, fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.playerName || shorten(e.playerId)}</span>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: "#f87171" }}>{e.score.toLocaleString()}</span>
+                    <span style={{ fontSize: 9, opacity: 0.45, marginLeft: 2 }}>🔥</span>
+                  </div>
+                ))}
+            </div>
+          </div>
+
+          {/* 💰 PvP Plunder */}
+          <div style={cardStyle}>
+            <div style={{ ...titleStyle, color: "#fbbf24" }}>💰 Plunder Lords</div>
+            <div style={subtextStyle}>Most REBEL won from PvP pots + crates</div>
+            <div style={scrollStyle}>
+              {(!lb.pvpRich || lb.pvpRich.length === 0)
+                ? <div style={emptyStyle}>No plunder yet — be the first to win a pot!</div>
+                : lb.pvpRich.slice(0, MAX).map((e, i) => (
+                  <div key={e.playerId+i} style={rowStyle}>
+                    <span style={rankStyle(i)}>#{i+1}</span>
+                    <span style={{ flex: 1, fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.playerName || shorten(e.playerId)}</span>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: "#fbbf24" }}>{e.score.toLocaleString()}</span>
+                    <span style={{ fontSize: 9, opacity: 0.45, marginLeft: 2 }}>REBEL</span>
+                  </div>
+                ))}
+            </div>
+          </div>
+
+        </div>
+      </div>
     </div>
   );
 }
@@ -672,7 +737,7 @@ const [player3DAnim, setPlayer3DAnim] = useState<SamuraiAnimState>("idle");
   const [prizeShipMsg, setPrizeShipMsg] = useState("");
   const [prizeShipBusy, setPrizeShipBusy] = useState(false);
   const [prizeShipForm, setPrizeShipForm] = useState({ name:"", email:"", phone:"", address1:"", address2:"", city:"", state:"", zip:"", country:"" });
-  const [lb, setLb]                     = useState<FWLeaderboards>({ warlords:[], factions:[], streaks:[], rich:[], perfect:[] });
+  const [lb, setLb]                     = useState<FWLeaderboards>({ warlords:[], factions:[], streaks:[], rich:[], perfect:[], pvpWins:[], pvpStreaks:[], pvpRich:[] });
   const [battleAnim, setBattleAnim]     = useState<"idle"|"clash"|"win"|"lose">("idle");
   const [playerHp, setPlayerHp]         = useState(MAX_HP);
   const [enemyHp, setEnemyHp]           = useState(MAX_HP);

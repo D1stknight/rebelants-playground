@@ -326,3 +326,65 @@ export async function creditREBEL(playerId: string, amount: number): Promise<num
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// PvP Leaderboards (Commit J)
+// Mirrors the AI-mode pattern in pages/api/faction-wars/record.ts but writes
+// to PvP-specific Redis sorted sets so PvP and AI are independent.
+// ─────────────────────────────────────────────────────────────────────────
+const LB_FW_PVP_WINS    = "ra:fw:lb:pvpWins";    // playerId -> total PvP match wins
+const LB_FW_PVP_STREAKS = "ra:fw:lb:pvpStreaks"; // playerId -> max consecutive PvP wins
+const LB_FW_PVP_RICH    = "ra:fw:lb:pvpRich";    // playerId -> total REBEL earned via PvP (pot + crate)
+const FW_PVP_NAMES      = "ra:fw:pvp_player_names";
+const FW_PVP_STREAK_KEY = (pid: string) => `ra:fw:pvp:streak:${pid}`;
+
+/**
+ * Record a completed PvP match for the leaderboards.
+ * Called from submit-move.ts the moment match.status flips to "completed".
+ * Idempotency: callers ensure this fires exactly once per match completion.
+ *
+ * @param winnerPlayerId  null on tie (no records updated for tie)
+ * @param loserPlayerId   null on tie
+ * @param winnerName      display name to attach to leaderboard rows
+ * @param loserName       display name to attach to leaderboard rows
+ * @param rebelEarned     pot + crate REBEL credited to winner (for "rich" board)
+ */
+export async function recordPvpResult(
+  winnerPlayerId: string | null,
+  loserPlayerId: string | null,
+  winnerName: string,
+  loserName: string,
+  rebelEarned: number,
+): Promise<void> {
+  // Tie -> no leaderboard movement (rare; needs even territories)
+  if (!winnerPlayerId || !loserPlayerId) return;
+  try {
+    // Names (best effort)
+    const updates: Record<string, string> = {};
+    if (winnerName) updates[winnerPlayerId] = winnerName;
+    if (loserName) updates[loserPlayerId] = loserName;
+    if (Object.keys(updates).length > 0) {
+      await redis.hset(FW_PVP_NAMES, updates).catch(() => {});
+    }
+
+    // Wins counter
+    await redis.zincrby(LB_FW_PVP_WINS, 1, winnerPlayerId);
+
+    // Streak: increment winner streak, snapshot to max-streak board if higher.
+    // Reset loser streak to 0.
+    const winnerStreakKey = FW_PVP_STREAK_KEY(winnerPlayerId);
+    const newStreak = await redis.incr(winnerStreakKey);
+    await redis.expire(winnerStreakKey, 60 * 60 * 24 * 30); // 30d sliding TTL
+    const currentMax = await redis.zscore(LB_FW_PVP_STREAKS, winnerPlayerId).catch(() => 0);
+    if (Number(newStreak) > Number(currentMax || 0)) {
+      await redis.zadd(LB_FW_PVP_STREAKS, { score: Number(newStreak), member: winnerPlayerId });
+    }
+    await redis.set(FW_PVP_STREAK_KEY(loserPlayerId), 0);
+
+    // REBEL earned via PvP (pot + crate)
+    if (Number.isFinite(rebelEarned) && rebelEarned > 0) {
+      await redis.zincrby(LB_FW_PVP_RICH, rebelEarned, winnerPlayerId);
+    }
+  } catch {
+    // Leaderboard writes are best-effort; do not crash match completion.
+  }
+}

@@ -20,7 +20,7 @@
 // currently-active faction. This prevents move spoofing.
 
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getMatch, saveMatch, creditREBEL, getCrateRewards } from "../../../../lib/server/fwpvp";
+import { getMatch, saveMatch, creditREBEL, getCrateRewards, recordPvpResult } from "../../../../lib/server/fwpvp";
 import {
   FACTIONS,
   MAX_HP,
@@ -247,6 +247,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       }
       match.pvpCrateRewardPaid = crateReward;
+
+      // ── Leaderboard recording (Commit J) ──────────────────────────────
+      // Record win/loss/streak/REBEL totals for the PvP leaderboards. Best-
+      // effort: helper swallows its own errors so a Redis hiccup can't break
+      // match completion.
+      try {
+        const winnerName =
+          match.winnerPlayerId === match.challengerPlayerId
+            ? (match.challengerDisplayName || "")
+            : match.winnerPlayerId === match.opponentPlayerId
+              ? (match.opponentDisplayName || "")
+              : "";
+        const loserName =
+          match.loserPlayerId === match.challengerPlayerId
+            ? (match.challengerDisplayName || "")
+            : match.loserPlayerId === match.opponentPlayerId
+              ? (match.opponentDisplayName || "")
+              : "";
+        const rebelEarned = potOnTable + crateReward;
+        await recordPvpResult(
+          match.winnerPlayerId || null,
+          match.loserPlayerId || null,
+          winnerName,
+          loserName,
+          rebelEarned,
+        );
+      } catch {}
     } else {
       // Match continues — flip turn
       match.currentTurnSide = defenderSide;
