@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import Head from "next/head";
-import { loadProfile, type Profile } from "../../../lib/profile";
+import { loadProfile, saveProfile, getEffectivePlayerId, type Profile } from "../../../lib/profile";
 import type { PvpMatch, PvpRound } from "../../../lib/types/fwpvp";
 import { FACTIONS, FACTION_IDS, TEAM_SIZE, TERRITORY_COUNT, MAX_HP, type FactionId, type Move, type RoundResult, type TerritoryResult, type Rarity } from "../../../lib/factionWarsCore";
 import FactionWarsBattleScene, { type BattleSceneState, type BattleSceneActions } from "../../../components/FactionWarsBattleScene";
@@ -979,11 +979,123 @@ export default function ChallengePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [match?.status, match?.currentTerritory]);
 
-  // Load profile + identity once
+  // ── Inline sign-in state (Commit G) ─────────────────────────────────────
+  // Replaces the static "go sign in" link with an inline name claim + Discord
+  // OAuth, so users coming in via a challenge URL never have to leave the page.
+  const [nameInput, setNameInput] = useState("");
+  const [pinInput, setPinInput] = useState("");
+  const [nameClaiming, setNameClaiming] = useState(false);
+  const [signInError, setSignInError] = useState<string | null>(null);
+
+  // Load profile + identity. Re-runs whenever the "ra:identity-changed" event
+  // fires (after a successful name claim or Discord link), so the inline
+  // sign-in widget can swap to the match without a page reload.
   useEffect(() => {
-    const p = loadProfile();
-    setProfile(p);
-    setIdentity(deriveIdentity(p));
+    const load = () => {
+      const p = loadProfile();
+      setProfile(p);
+      setIdentity(deriveIdentity(p));
+    };
+    load();
+    window.addEventListener("ra:identity-changed", load);
+    return () => window.removeEventListener("ra:identity-changed", load);
+  }, []);
+
+  // ── Discord auto-link on return from OAuth (Commit G) ────────────────────
+  // Mirrors the pattern in pages/index.tsx. After Discord OAuth completes the
+  // callback redirects back to this URL with ?discord=1. We then poll the
+  // session endpoint, link the account if needed, and dispatch the identity
+  // event so the gate flips to the match view.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const gate = loadProfile();
+      if (gate?.discordSkipLink) return;
+      try {
+        const sr = await fetch("/api/auth/discord/session", { cache: "no-store" });
+        const sj = await sr.json().catch(() => null);
+        if (cancelled || !sr.ok || !sj?.ok || !sj?.discordUserId) return;
+        const prof = loadProfile();
+        const fromId = getEffectivePlayerId(prof);
+        const toId = `discord:${sj.discordUserId}`;
+        if (String(prof.primaryId || "") === toId) {
+          // Already linked — just refresh local profile in case discordName changed.
+          saveProfile({ discordUserId: sj.discordUserId, discordName: sj.discordName });
+          window.dispatchEvent(new Event("ra:identity-changed"));
+          return;
+        }
+        // First-time link: server-side merges any guest balance/wins into the
+        // discord identity. The /api/identity/link-discord endpoint is the
+        // canonical place this happens (also used by /).
+        await fetch("/api/identity/link-discord", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fromId, toId }),
+        }).catch(() => undefined);
+        if (cancelled) return;
+        saveProfile({
+          discordUserId: sj.discordUserId,
+          discordName: sj.discordName,
+          primaryId: toId,
+          name: sj.discordName || prof.name,
+          discordSkipLink: false,
+        });
+        window.dispatchEvent(new Event("ra:identity-changed"));
+      } catch {
+        // Silent — user can manually click Connect Discord again.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // ── Inline name claim handler (Commit G) ─────────────────────────────────
+  // Same backend as pages/index.tsx. Allows letters/numbers/underscores, 3+
+  // chars. On success: save profile, dispatch identity event, gate flips.
+  const handleClaimName = useCallback(async () => {
+    const clean = nameInput.toLowerCase().replace(/[^a-z0-9_]/g, "");
+    if (!clean || clean.length < 3) {
+      setSignInError("Name must be 3+ characters (letters, numbers, _)");
+      return;
+    }
+    setNameClaiming(true);
+    setSignInError(null);
+    try {
+      const r = await fetch("/api/commander/claim-name", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: clean,
+          displayName: nameInput.trim(),
+          pin: pinInput.trim(),
+        }),
+      });
+      const j = await r.json();
+      if (!r.ok || !j.ok) {
+        setSignInError(j.error || "Failed — try another name");
+        return;
+      }
+      saveProfile({
+        primaryId: `name:${clean}`,
+        name: j.displayName || clean,
+        discordSkipLink: false,
+      });
+      window.dispatchEvent(new Event("ra:identity-changed"));
+      // Identity will refresh via the listener; no other action needed.
+    } catch (e: any) {
+      setSignInError(e?.message || "Network error");
+    } finally {
+      setNameClaiming(false);
+    }
+  }, [nameInput, pinInput]);
+
+  // ── Inline Discord OAuth (Commit G) ──────────────────────────────────────
+  // Sends the user to Discord login with the current challenge URL as
+  // returnTo. After OAuth, callback redirects back here with ?discord=1 and
+  // the autoLink effect picks up the session.
+  const handleConnectDiscord = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const returnTo = window.location.pathname + window.location.search;
+    window.location.href = `/api/auth/discord/login?returnTo=${encodeURIComponent(returnTo)}`;
   }, []);
 
   // Fetch match (poll while not completed/cancelled)
@@ -1250,14 +1362,114 @@ export default function ChallengePage() {
             </div>
           )}
 
-          {/* Identity gate */}
+          {/* Identity gate — inline sign-in (Commit G) */}
           {!identity && (
-            <div style={{ padding: "24px 22px", borderRadius: 14, border: "1px solid rgba(251,191,36,0.25)", background: "rgba(251,191,36,0.04)", textAlign: "center" }}>
-              <div style={{ fontSize: 14, fontWeight: 900, color: "#fbbf24", marginBottom: 10, letterSpacing: "0.1em", textTransform: "uppercase" }}>🔒 Sign in to play</div>
-              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", marginBottom: 16, lineHeight: 1.7 }}>
-                You need a commander name or Discord login to participate in PvP.
+            <div style={{ padding: "24px 22px", borderRadius: 14, border: "1px solid rgba(251,191,36,0.25)", background: "rgba(251,191,36,0.04)" }}>
+              <div style={{ fontSize: 14, fontWeight: 900, color: "#fbbf24", marginBottom: 8, letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center" }}>
+                🔒 Sign in to accept this challenge
               </div>
-              <Link href="/" style={{ display: "inline-block", padding: "10px 20px", borderRadius: 20, border: "1px solid rgba(251,191,36,0.4)", background: "linear-gradient(135deg,rgba(251,191,36,0.25),rgba(248,113,113,0.25))", color: "#fbbf24", fontWeight: 900, fontSize: 12, letterSpacing: "0.15em", textTransform: "uppercase", textDecoration: "none" }}>Go sign in</Link>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", marginBottom: 18, lineHeight: 1.6, textAlign: "center" }}>
+                Pick a commander name or connect Discord. You'll continue to the match automatically once signed in.
+              </div>
+
+              {/* Commander name claim */}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase", color: "rgba(255,255,255,0.5)", marginBottom: 6 }}>
+                  Claim a commander name
+                </div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  <input
+                    type="text"
+                    value={nameInput}
+                    onChange={(e) => { setNameInput(e.target.value); setSignInError(null); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleClaimName(); }}
+                    placeholder="commander_name"
+                    maxLength={20}
+                    disabled={nameClaiming}
+                    style={{
+                      flex: "1 1 180px", minWidth: 0,
+                      padding: "10px 12px", borderRadius: 8,
+                      border: "1px solid rgba(255,255,255,0.15)",
+                      background: "rgba(0,0,0,0.4)",
+                      color: "rgba(255,255,255,0.95)",
+                      fontSize: 13,
+                      fontFamily: "inherit",
+                    }}
+                  />
+                  <input
+                    type="password"
+                    value={pinInput}
+                    onChange={(e) => setPinInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleClaimName(); }}
+                    placeholder="PIN (optional)"
+                    maxLength={20}
+                    disabled={nameClaiming}
+                    style={{
+                      width: 130,
+                      padding: "10px 12px", borderRadius: 8,
+                      border: "1px solid rgba(255,255,255,0.15)",
+                      background: "rgba(0,0,0,0.4)",
+                      color: "rgba(255,255,255,0.95)",
+                      fontSize: 13,
+                      fontFamily: "inherit",
+                    }}
+                  />
+                  <button
+                    onClick={handleClaimName}
+                    disabled={nameClaiming || nameInput.trim().length < 3}
+                    style={{
+                      padding: "10px 18px", borderRadius: 8,
+                      border: "1px solid rgba(251,191,36,0.4)",
+                      background: nameClaiming || nameInput.trim().length < 3 ? "rgba(255,255,255,0.05)" : "linear-gradient(135deg,rgba(251,191,36,0.25),rgba(248,113,113,0.25))",
+                      color: nameClaiming || nameInput.trim().length < 3 ? "rgba(255,255,255,0.4)" : "#fbbf24",
+                      fontSize: 11, fontWeight: 900, letterSpacing: "0.1em", textTransform: "uppercase",
+                      cursor: nameClaiming || nameInput.trim().length < 3 ? "not-allowed" : "pointer",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {nameClaiming ? "Claiming…" : "Claim"}
+                  </button>
+                </div>
+                <div style={{ fontSize: 10, opacity: 0.5, marginTop: 6, lineHeight: 1.4 }}>
+                  3+ characters, letters/numbers/underscores. PIN protects the name from being claimed by others on a different device.
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "16px 0", opacity: 0.4 }}>
+                <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.15)" }} />
+                <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.2em", color: "rgba(255,255,255,0.55)" }}>OR</div>
+                <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.15)" }} />
+              </div>
+
+              {/* Discord OAuth */}
+              <button
+                onClick={handleConnectDiscord}
+                style={{
+                  width: "100%",
+                  padding: "12px 20px", borderRadius: 10,
+                  border: "1px solid rgba(88,101,242,0.5)",
+                  background: "linear-gradient(135deg,rgba(88,101,242,0.25),rgba(88,101,242,0.15))",
+                  color: "#a5b3ff",
+                  fontSize: 12, fontWeight: 900, letterSpacing: "0.1em", textTransform: "uppercase",
+                  cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                }}
+              >
+                <span style={{ fontSize: 16 }}>🎮</span> Connect Discord
+              </button>
+
+              {signInError && (
+                <div style={{
+                  marginTop: 12, padding: "8px 12px", borderRadius: 8,
+                  background: "rgba(248,113,113,0.1)",
+                  border: "1px solid rgba(248,113,113,0.3)",
+                  color: "#fca5a5",
+                  fontSize: 12, textAlign: "center",
+                }}>
+                  {signInError}
+                </div>
+              )}
             </div>
           )}
 
