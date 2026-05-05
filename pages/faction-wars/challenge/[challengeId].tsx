@@ -149,6 +149,24 @@ function ActiveMatchView({
   balance: number | null;
   sfx: ReturnType<typeof useFWAudio>["sfx"];
 }) {
+  // ── Mobile detection for move grid (Commit H item 2) ───────────────────────
+  // Single column on phones so move cards aren't clipped off the right edge.
+  // Lives here (not in parent ChallengePage) because the consuming JSX is in
+  // this component — declaring in the parent would put isSmallScreen out of
+  // scope at line 440 and break the build (see commit 8eea292 → this fix).
+  const [isSmallScreen, setIsSmallScreen] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 480px)");
+    const update = () => setIsSmallScreen(mq.matches);
+    update();
+    if (mq.addEventListener) mq.addEventListener("change", update);
+    else (mq as any).addListener(update);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener("change", update);
+      else (mq as any).removeListener(update);
+    };
+  }, []);
+
   // ── Perspective math ───────────────────────────────────────────────────────
   const isChallenger = match.challengerPlayerId === mePlayerId;
   const mySide: "challenger" | "opponent" = isChallenger ? "challenger" : "opponent";
@@ -991,20 +1009,6 @@ export default function ChallengePage() {
   const [signInPin, setSignInPin] = useState("");
   const [signInBusy, setSignInBusy] = useState(false);
   const [signInExistingError, setSignInExistingError] = useState<string | null>(null);
-  // Mobile detection for move grid (Commit H item 2 — single column on phones
-  // so the move cards aren't clipped off the right edge of the viewport).
-  const [isSmallScreen, setIsSmallScreen] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 480px)");
-    const update = () => setIsSmallScreen(mq.matches);
-    update();
-    if (mq.addEventListener) mq.addEventListener("change", update);
-    else (mq as any).addListener(update);
-    return () => {
-      if (mq.removeEventListener) mq.removeEventListener("change", update);
-      else (mq as any).removeListener(update);
-    };
-  }, []);
 
   // Load profile + identity. Re-runs whenever the "ra:identity-changed" event
   // fires (after a successful name claim or Discord link), so the inline
