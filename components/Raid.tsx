@@ -1369,10 +1369,10 @@ export default function Raid() {
           </button>
 
           {isDiscordConnected ? (
-            <button type="button" onClick={disconnectDiscord}
-              style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", padding:'10px 14px', fontSize:11, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase', background:'rgba(88,101,242,0.12)', border:'1px solid rgba(88,101,242,0.3)', borderRadius:50, color:'#a5b4fc', cursor:'pointer', whiteSpace:'nowrap' }}>
-              ✓ DISCORD
-            </button>
+            <div style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", display:'flex', alignItems:'center', gap:8, padding:'10px 14px', borderRadius:50, border:'1px solid rgba(88,101,242,0.3)', background:'rgba(88,101,242,0.08)', fontSize:11, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase', whiteSpace:'nowrap' }}>
+              <span style={{ color:'#a5b4fc' }}>✓ DISCORD</span>
+              <button type="button" onClick={disconnectDiscord} style={{ background:'none', border:'none', fontSize:10, color:'rgba(255,255,255,0.4)', cursor:'pointer', padding:0, textDecoration:'underline', textTransform:'lowercase', letterSpacing:'0.05em', fontFamily:'inherit' }}>disconnect</button>
+            </div>
           ) : (
             <button type="button"
               onClick={()=>{ try{saveProfile({discordSkipLink:false});window.dispatchEvent(new Event('ra:identity-changed'));}catch{} window.location.href='/api/auth/discord/login'; }}

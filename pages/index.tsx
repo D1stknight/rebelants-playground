@@ -655,12 +655,10 @@ export default function LandingPage() {
 
                 {/* Discord */}
                 {discordLinked ? (
-                  <button
-                    onPointerDown={e=>{e.preventDefault();handleDisconnectDiscord();}}
-                    style={{ fontFamily:'inherit', padding:'9px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background:'rgba(88,101,242,0.15)', border:'1px solid rgba(88,101,242,0.3)', borderRadius:50, color:'#a5b4fc', cursor:'pointer', whiteSpace:'nowrap' }}
-                  >
-                    ✓ DISCORD
-                  </button>
+                  <div style={{ fontFamily:'inherit', display:'flex', alignItems:'center', gap:8, padding:'9px 16px', borderRadius:50, border:'1px solid rgba(88,101,242,0.3)', background:'rgba(88,101,242,0.15)', fontSize:11, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', whiteSpace:'nowrap' }}>
+                    <span style={{ color:'#a5b4fc' }}>✓ DISCORD</span>
+                    <button onPointerDown={e=>{e.preventDefault();handleDisconnectDiscord();}} style={{ background:'none', border:'none', fontSize:10, color:'rgba(255,255,255,0.4)', cursor:'pointer', padding:0, textDecoration:'underline', textTransform:'lowercase', letterSpacing:'0.05em', fontFamily:'inherit' }}>disconnect</button>
+                  </div>
                 ) : (
                   <button
                     onPointerDown={e=>{e.preventDefault();handleConnectDiscord();}}

@@ -1468,7 +1468,10 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           {/* ── Action buttons ── */}
             <div style={{display:'flex',flexWrap:'wrap',gap:8,alignItems:'center',borderTop:'1px solid rgba(255,255,255,0.06)',paddingTop:12}}>
               {showDisconnect ? (
-                <button onClick={()=>{const p=loadProfile();const fallback=(p as any)?.walletAddress?`wallet:${(p as any).walletAddress}`:(p?.id||"guest");saveProfile({...(p as any),discordUserId:undefined,discordName:undefined,primaryId:fallback} as any);window.location.href="/api/auth/discord/logout";}} style={{padding:'8px 16px',borderRadius:20,border:'1px solid rgba(96,165,250,0.3)',cursor:'pointer',fontWeight:700,fontSize:11,background:'rgba(96,165,250,0.08)',color:'#93c5fd',letterSpacing:'0.08em',textTransform:'uppercase'}}>✓ DISCORD</button>
+                <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 14px',borderRadius:20,border:'1px solid rgba(96,165,250,0.3)',background:'rgba(96,165,250,0.08)',fontSize:11,fontWeight:700,letterSpacing:'0.08em',textTransform:'uppercase'}}>
+                  <span style={{color:'#93c5fd'}}>✓ DISCORD</span>
+                  <button onClick={()=>{const p=loadProfile();const fallback=(p as any)?.walletAddress?`wallet:${(p as any).walletAddress}`:(p?.id||"guest");saveProfile({...(p as any),discordUserId:undefined,discordName:undefined,primaryId:fallback} as any);window.location.href="/api/auth/discord/logout";}} style={{background:'none',border:'none',fontSize:10,color:'rgba(255,255,255,0.4)',cursor:'pointer',padding:0,textDecoration:'underline',textTransform:'lowercase',letterSpacing:'0.05em'}}>disconnect</button>
+                </div>
               ) : (
                 <button onClick={()=>{const p=loadProfile();saveProfile({...(p as any),discordSkipLink:false} as any);window.location.href="/api/auth/discord/login";}} style={{padding:'8px 16px',borderRadius:20,border:'none',cursor:'pointer',fontWeight:700,fontSize:11,background:'#5865F2',color:'white',letterSpacing:'0.08em',textTransform:'uppercase'}}>CONNECT DISCORD</button>
               )}

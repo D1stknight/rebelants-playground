@@ -1270,7 +1270,7 @@ if (over) {
               {/* Primary action row */}
               <div style={{ display:'flex', gap:10, flexWrap:'wrap', alignItems:'center', justifyContent:'center', marginBottom:14 }}>
                 <button onClick={startCampaign} disabled={team.length<TEAM_SIZE||busy||balance<fwCost}
-                  style={{ minWidth:240, height:46, fontSize:13, fontWeight:900, letterSpacing:'0.1em', textTransform:'uppercase',
+                  style={{ minWidth:280, height:48, padding:'0 28px', fontSize:13, fontWeight:900, letterSpacing:'0.1em', textTransform:'uppercase',
                     display:'inline-flex', alignItems:'center', justifyContent:'center', borderRadius:24, border:'1px solid rgba(251,191,36,0.4)',
                     background:team.length<TEAM_SIZE||busy||balance<fwCost?'rgba(255,255,255,0.05)':'linear-gradient(135deg,rgba(251,191,36,0.25),rgba(248,113,113,0.25))',
                     color:team.length<TEAM_SIZE||busy||balance<fwCost?'rgba(255,255,255,0.4)':'#fbbf24',
