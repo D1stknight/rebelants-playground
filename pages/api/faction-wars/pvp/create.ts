@@ -55,11 +55,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Check live admin config. Reject if PvP is disabled, OR if challenger
     // can't afford the ante. Snapshot the cost on the match so admin tweaks
     // mid-game don't break refund / payout math later.
+    //
+    // Variable wager (Layer 2A): challenger may pick a tier from
+    // factionWarsPvpWagerTiers. If body.wagerAmount is omitted or invalid,
+    // we fall back to factionWarsPvpCost (the default highlighted tier).
     const econCfg = await getPvpEconomyConfig();
     if (!econCfg.factionWarsPvpEnabled) {
       return res.status(403).json({ ok: false, error: "PvP is currently disabled" });
     }
-    const ante = econCfg.factionWarsPvpCost;
+    const tiers = econCfg.factionWarsPvpWagerTiers;
+    const requestedWager = Number(body.wagerAmount);
+    let ante: number;
+    if (Number.isFinite(requestedWager) && requestedWager >= 0) {
+      if (!tiers.includes(requestedWager)) {
+        return res.status(400).json({
+          ok: false,
+          error: `Invalid wager. Allowed tiers: ${tiers.join(", ")}.`,
+          allowedTiers: tiers,
+        });
+      }
+      ante = requestedWager;
+    } else {
+      ante = econCfg.factionWarsPvpCost;
+    }
     if (ante > 0) {
       const bal = await getREBELBalance(challengerPlayerId);
       if (bal < ante) {

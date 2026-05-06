@@ -135,6 +135,11 @@ export default function PvpLobbyPage() {
   const [pvpCost, setPvpCost] = useState<number | null>(null);
   const [pvpEnabled, setPvpEnabled] = useState<boolean>(true);
   const [balance, setBalance] = useState<number | null>(null);
+  // Variable wager (Layer 2A): tiers come from admin config
+  // factionWarsPvpWagerTiers, default [100,300,500,1000,3000,5000,10000].
+  // selectedTier defaults to factionWarsPvpCost (typically 300).
+  const [pvpTiers, setPvpTiers] = useState<number[]>([100, 300, 500, 1000, 3000, 5000, 10000]);
+  const [selectedTier, setSelectedTier] = useState<number | null>(null);
 
   // Initial profile + identity load
   useEffect(() => {
@@ -210,8 +215,21 @@ export default function PvpLobbyPage() {
         if (cfgRes?.ok && cfgRes.pointsConfig) {
           const cost = Number(cfgRes.pointsConfig.factionWarsPvpCost);
           const enabled = cfgRes.pointsConfig.factionWarsPvpEnabled;
-          setPvpCost(Number.isFinite(cost) && cost >= 0 ? cost : 300);
+          const resolvedCost = Number.isFinite(cost) && cost >= 0 ? cost : 300;
+          setPvpCost(resolvedCost);
           setPvpEnabled(enabled === false ? false : true);
+          const rawTiers = cfgRes.pointsConfig.factionWarsPvpWagerTiers;
+          const tiers: number[] = Array.isArray(rawTiers)
+            ? rawTiers.map((n: any) => Number(n)).filter((n: number) => Number.isFinite(n) && n >= 0)
+            : [];
+          const finalTiers = tiers.length > 0 ? tiers : [100, 300, 500, 1000, 3000, 5000, 10000];
+          setPvpTiers(finalTiers);
+          // Default selection: highlight the live cost if it's in the tier list,
+          // else fall back to the first tier.
+          setSelectedTier((prev) => {
+            if (prev !== null && finalTiers.includes(prev)) return prev;
+            return finalTiers.includes(resolvedCost) ? resolvedCost : finalTiers[0];
+          });
         }
         if (balRes?.ok || (balRes && typeof balRes.balance === "number")) {
           setBalance(Number(balRes.balance ?? 0));
@@ -232,6 +250,7 @@ export default function PvpLobbyPage() {
         body: JSON.stringify({
           challengerPlayerId: identity.playerId,
           challengerDisplayName: identity.displayName,
+          wagerAmount: selectedTier ?? undefined,
         }),
       });
       const j = await r.json();
@@ -304,12 +323,55 @@ export default function PvpLobbyPage() {
                 <div style={{ fontSize: 12, lineHeight: 1.7, color: "rgba(255,255,255,0.6)", marginBottom: 14 }}>
                   Generate a shareable link. Send it to a friend. They click, accept, pick their 5 factions, and the match starts.
                 </div>
+                {/* Wager tier picker (Layer 2A) */}
+                {pvpEnabled && pvpTiers.length > 0 && (
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", color: "rgba(255,255,255,0.5)", marginBottom: 8 }}>
+                      Choose Wager
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {pvpTiers.map((tier) => {
+                        const isSelected = selectedTier === tier;
+                        const bal = balance ?? 0;
+                        const tierCantAfford = balance !== null && bal < tier;
+                        return (
+                          <button
+                            key={tier}
+                            onClick={() => setSelectedTier(tier)}
+                            disabled={creating}
+                            style={{
+                              minWidth: 64,
+                              height: 36,
+                              padding: "0 12px",
+                              fontSize: 11,
+                              fontWeight: 800,
+                              letterSpacing: "0.05em",
+                              borderRadius: 18,
+                              border: `1px solid ${isSelected ? "rgba(251,191,36,0.7)" : tierCantAfford ? "rgba(248,113,113,0.3)" : "rgba(255,255,255,0.18)"}`,
+                              background: isSelected
+                                ? "linear-gradient(135deg,rgba(251,191,36,0.35),rgba(248,113,113,0.25))"
+                                : "rgba(255,255,255,0.04)",
+                              color: isSelected ? "#fbbf24" : tierCantAfford ? "rgba(248,113,113,0.7)" : "rgba(255,255,255,0.7)",
+                              cursor: creating ? "wait" : "pointer",
+                              filter: isSelected ? "drop-shadow(0 0 8px rgba(251,191,36,0.3))" : "none",
+                              transition: "all 0.15s ease",
+                            }}
+                            title={tierCantAfford ? `Need ${tier} REBEL` : `Wager ${tier} REBEL`}
+                          >
+                            {tier.toLocaleString()}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
                 {(() => {
                   // Compute affordability + state of the Create button
-                  const cost = pvpCost ?? 0;
+                  // Variable wager (Layer 2A): cost is the chosen tier (or 0 if free).
+                  const cost = selectedTier ?? pvpCost ?? 0;
                   const bal = balance ?? 0;
-                  const cantAfford = pvpCost !== null && balance !== null && bal < cost;
-                  const disabled = creating || !pvpEnabled || cantAfford;
+                  const cantAfford = selectedTier !== null && balance !== null && bal < cost;
+                  const disabled = creating || !pvpEnabled || cantAfford || selectedTier === null;
                   const label = creating
                     ? "Creating…"
                     : !pvpEnabled

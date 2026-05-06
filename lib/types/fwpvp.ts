@@ -145,6 +145,7 @@ export interface CreateChallengeRequest {
   challengerPlayerId: string;
   challengerDisplayName: string;
   challengerTeam?: FactionId[];   // optional — challenger may pick at create time or after accept
+  wagerAmount?: number;           // optional — must be one of factionWarsPvpWagerTiers; defaults to factionWarsPvpCost
 }
 
 // Body for POST /api/faction-wars/pvp/accept

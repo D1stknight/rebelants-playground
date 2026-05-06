@@ -1667,8 +1667,22 @@ export default function ChallengePage() {
                       <div style={{ fontSize: 22, fontWeight: 900, color: "#fbbf24", marginBottom: 18, letterSpacing: "0.05em" }}>
                         {match.challengerDisplayName}
                       </div>
+                      {/* Wager display (Layer 2A) */}
+                      {Number(match.pvpCost ?? 0) > 0 && (
+                        <div style={{ marginBottom: 18, padding: "14px 16px", borderRadius: 12, border: "1px solid rgba(251,191,36,0.3)", background: "rgba(0,0,0,0.3)" }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(255,255,255,0.5)", marginBottom: 6 }}>
+                            Wager
+                          </div>
+                          <div style={{ fontSize: 28, fontWeight: 900, color: "#fbbf24", letterSpacing: "0.02em", lineHeight: 1 }}>
+                            {Number(match.pvpCost).toLocaleString()} <span style={{ fontSize: 14, color: "rgba(251,191,36,0.7)", fontWeight: 700 }}>REBEL</span>
+                          </div>
+                          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.55)", marginTop: 8, lineHeight: 1.5 }}>
+                            Match {Number(match.pvpCost).toLocaleString()} REBEL to play. Winner takes the {(Number(match.pvpCost) * 2).toLocaleString()} REBEL pot.
+                          </div>
+                        </div>
+                      )}
                       <button onClick={handleAccept} disabled={busy} style={{ minWidth: 200, height: 46, fontSize: 13, fontWeight: 900, letterSpacing: "0.1em", textTransform: "uppercase", borderRadius: 24, border: "1px solid rgba(251,191,36,0.5)", background: busy ? "rgba(255,255,255,0.05)" : "linear-gradient(135deg,rgba(251,191,36,0.3),rgba(248,113,113,0.3))", color: busy ? "rgba(255,255,255,0.4)" : "#fbbf24", cursor: busy ? "wait" : "pointer" }}>
-                        {busy ? "Accepting…" : "⚔️ Accept Challenge"}
+                        {busy ? "Accepting…" : Number(match.pvpCost ?? 0) > 0 ? `⚔️ Accept — Match ${Number(match.pvpCost).toLocaleString()} REBEL` : "⚔️ Accept Challenge"}
                       </button>
                     </div>
                   )}

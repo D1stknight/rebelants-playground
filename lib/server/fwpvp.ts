@@ -123,11 +123,13 @@ const REBEL_BAL_KEY = (pid: string) => `ra:points:bal:${pid}`;
 const PVP_COST_DEFAULT = 300;
 const PVP_PAYOUT_MODE_DEFAULT: "pot" = "pot";
 const PVP_ENABLED_DEFAULT = true;
+const PVP_TIERS_DEFAULT: number[] = [100, 300, 500, 1000, 3000, 5000, 10000];
 
 export interface PvpEconomyConfig {
   factionWarsPvpCost: number;
   factionWarsPvpPayoutMode: "pot";
   factionWarsPvpEnabled: boolean;
+  factionWarsPvpWagerTiers: number[];
 }
 
 // Reads the live admin config from Redis and returns the PvP economy slice.
@@ -163,6 +165,12 @@ export async function getPvpEconomyConfig(): Promise<PvpEconomyConfig> {
 
       const cost = Number((cfg as any).factionWarsPvpCost);
       const enabled = (cfg as any).factionWarsPvpEnabled;
+      const rawTiers = (cfg as any).factionWarsPvpWagerTiers;
+      const tiers: number[] = Array.isArray(rawTiers)
+        ? rawTiers
+            .map((n: any) => Number(n))
+            .filter((n: number) => Number.isFinite(n) && n >= 0)
+        : [];
       // We accept the row even if cost is unset (use default). The presence of
       // ANY key in the cfg means it's valid live config — we just fill blanks.
       if (cfg && typeof cfg === "object") {
@@ -170,6 +178,7 @@ export async function getPvpEconomyConfig(): Promise<PvpEconomyConfig> {
           factionWarsPvpCost: Number.isFinite(cost) && cost >= 0 ? cost : PVP_COST_DEFAULT,
           factionWarsPvpPayoutMode: PVP_PAYOUT_MODE_DEFAULT,
           factionWarsPvpEnabled: enabled === false ? false : PVP_ENABLED_DEFAULT,
+          factionWarsPvpWagerTiers: tiers.length > 0 ? tiers : PVP_TIERS_DEFAULT,
         };
       }
     } catch {
@@ -181,6 +190,7 @@ export async function getPvpEconomyConfig(): Promise<PvpEconomyConfig> {
     factionWarsPvpCost: PVP_COST_DEFAULT,
     factionWarsPvpPayoutMode: PVP_PAYOUT_MODE_DEFAULT,
     factionWarsPvpEnabled: PVP_ENABLED_DEFAULT,
+    factionWarsPvpWagerTiers: PVP_TIERS_DEFAULT,
   };
 }
 
