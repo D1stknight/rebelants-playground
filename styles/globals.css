@@ -1234,3 +1234,22 @@ html, body {
     height: 100%;
   }
 }
+
+
+/* ─────────────────────────────────────────────────────────────────────
+   Queen's Egg Shuffle — mobile fit (Commit M)
+   On phones (≤600px) the existing 120-150px .egg-card declarations
+   above force the 5th egg past the right edge of the scene. Shrink
+   the cards to 64px so all 5 eggs sit comfortably inside a 430px
+   viewport (the .egg-body inside is already 60-64px so it fits).
+   min-width / max-width are pinned because earlier .egg-card rules
+   in this file would otherwise take precedence over plain 'width'.
+─────────────────────────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .egg-card {
+    width: 64px !important;
+    height: 80px !important;
+    min-width: 0 !important;
+    max-width: 64px !important;
+  }
+}
