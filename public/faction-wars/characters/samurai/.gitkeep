@@ -1,0 +1,21 @@
+placeholder for Faction Wars Samurai 3D character assets
+
+Upload the final files into this folder.
+
+Recommended files for V1:
+
+samurai_idle_with_skin.fbx
+idle.fbx
+attack.fbx
+hit.fbx
+magic.fbx
+
+Optional next files:
+
+defend.fbx
+win.fbx
+lose.fbx
+
+Later final web-ready export:
+
+samurai.glb

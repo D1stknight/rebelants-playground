@@ -58,7 +58,7 @@ export function usePoints(playerId: string) {
   // ✅ Always operate on the latest playerId (guest -> discord -> wallet)
   const playerIdRef = useRef<string>(clampPid(playerId));
 
-    const [balance, setBalance] = useState(0);
+  const [balance, setBalance] = useState(0);
   const [earnedToday, setEarnedToday] = useState(0);
   const [capBank, setCapBank] = useState(0);
   const [dailyCap, setDailyCap] = useState(0);
@@ -73,7 +73,11 @@ export function usePoints(playerId: string) {
       { cache: "no-store" }
     );
 
-        const j = (await r.json().catch(() => null)) as BalanceRes | null;
+    const j = (await r.json().catch(() => null)) as BalanceRes | null;
+
+    // ✅ Ignore stale balance responses from an older identity.
+    // This prevents guest/name/discord balances from overwriting each other after fast login/logout changes.
+    if (pid !== clampPid(playerIdRef.current)) return;
 
     setBalance(Number(j?.balance || 0));
     setEarnedToday(Number(j?.earnedToday || 0));
@@ -83,11 +87,38 @@ export function usePoints(playerId: string) {
     setTotalEarnRoom(Number(j?.totalEarnRoom || 0));
   }, []);
 
-  // ✅ When playerId changes, update ref AND refresh immediately
+  // ✅ When playerId changes, clear old visible balance, update ref, and refresh immediately
   useEffect(() => {
     playerIdRef.current = clampPid(playerId);
+    setBalance(0);
+    setEarnedToday(0);
+    setCapBank(0);
+    setDailyCap(0);
+    setRemainingDaily(0);
+    setTotalEarnRoom(0);
     refresh().catch(() => {});
   }, [playerId, refresh]);
+
+  // ✅ OAuth/profile changes can happen right after navigation returns.
+  // Refresh once immediately and once shortly after so Discord-linked points appear without a manual page refresh.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const delayedRefresh = () => {
+      refresh().catch(() => {});
+      window.setTimeout(() => refresh().catch(() => {}), 300);
+    };
+
+    window.addEventListener("ra:identity-changed", delayedRefresh);
+    window.addEventListener("pageshow", delayedRefresh);
+    window.addEventListener("focus", delayedRefresh);
+
+    return () => {
+      window.removeEventListener("ra:identity-changed", delayedRefresh);
+      window.removeEventListener("pageshow", delayedRefresh);
+      window.removeEventListener("focus", delayedRefresh);
+    };
+  }, [refresh]);
 
   const spend = useCallback(
     async (cost: number, reason?: string) => {
@@ -101,7 +132,9 @@ export function usePoints(playerId: string) {
 
       const j = (await r.json().catch(() => null)) as SpendRes | null;
 
-           if (r.ok && j && typeof j.balance === "number") {
+      if (pid !== clampPid(playerIdRef.current)) return (j || { ok: false, playerId: pid, balance, earnedToday }) as SpendRes;
+
+      if (r.ok && j && typeof j.balance === "number") {
         setBalance(j.balance);
         setEarnedToday(Number(j.earnedToday ?? earnedToday));
         setCapBank(Number(j.capBank || 0));
@@ -130,7 +163,9 @@ export function usePoints(playerId: string) {
 
       const j = (await r.json().catch(() => null)) as EarnRes | null;
 
-           if (r.ok && j && typeof j.balance === "number") {
+      if (pid !== clampPid(playerIdRef.current)) return (j || { ok: false, playerId: pid, balance, earnedToday }) as EarnRes;
+
+      if (r.ok && j && typeof j.balance === "number") {
         setBalance(j.balance);
         setEarnedToday(Number(j.earnedToday ?? earnedToday));
         setCapBank(Number(j.capBank || 0));
@@ -162,6 +197,8 @@ export function usePoints(playerId: string) {
       });
 
       const j = (await r.json().catch(() => null)) as DevGrantRes | null;
+
+      if (pid !== clampPid(playerIdRef.current)) return (j || { ok: false, dev: true, playerId: pid, added: 0, balance }) as DevGrantRes;
 
       if (r.ok && j && typeof j.balance === "number") {
         setBalance(j.balance);

@@ -21,6 +21,10 @@ type PointsConfigShape = {
   // ✅ Faction Wars settings
   factionWarsCost: number;
   factionWarsAIDifficulty: number;
+  // PvP economy (Commit C)
+  factionWarsPvpEnabled: boolean;
+  factionWarsPvpCost: number;
+  factionWarsPvpPayoutMode: "pot";
 
   // ✅ Raid settings
   raidCost: number;
@@ -152,6 +156,10 @@ const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
   raidCost: (defaultConfig as any).raidCost ?? 600,
     factionWarsCost: (defaultConfig as any).factionWarsCost ?? 150,
     factionWarsAIDifficulty: (defaultConfig as any).factionWarsAIDifficulty ?? 0.65,
+    // PvP economy defaults
+    factionWarsPvpEnabled: (defaultConfig as any).factionWarsPvpEnabled !== false,
+    factionWarsPvpCost: (defaultConfig as any).factionWarsPvpCost ?? 300,
+    factionWarsPvpPayoutMode: ((defaultConfig as any).factionWarsPvpPayoutMode === "pot" ? "pot" : "pot") as "pot",
   raidCarrierSurvival: (defaultConfig as any).raidCarrierSurvival ?? 0.20,
   raidUltraCarriers: (defaultConfig as any).raidUltraCarriers ?? 4,
   raidUltraRatio: (defaultConfig as any).raidUltraRatio ?? 0.65,
@@ -1117,6 +1125,12 @@ String(c.status).toUpperCase()==="PENDING"
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           <label style={{ fontSize: 12, opacity: 0.9 }}>FW Cost (REBEL)<input value={cfg.factionWarsCost} onChange={e => setCfg(c => ({ ...c, factionWarsCost: safeNum(e.target.value, c.factionWarsCost) }))} type="number" min="0" style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
           <label style={{ fontSize: 12, opacity: 0.9 }}>AI Difficulty (0.0–1.0)<input value={cfg.factionWarsAIDifficulty} onChange={e => setCfg(c => ({ ...c, factionWarsAIDifficulty: Math.min(1, Math.max(0, safeNum(e.target.value, c.factionWarsAIDifficulty))) }))} type="number" min="0" max="1" step="0.05" style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+          <label style={{ fontSize: 12, opacity: 0.9, gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 10, marginTop: 6, paddingTop: 10, borderTop: "1px dashed rgba(255,255,255,.12)" }}>
+            <input type="checkbox" checked={!!cfg.factionWarsPvpEnabled} onChange={e => setCfg(c => ({ ...c, factionWarsPvpEnabled: e.target.checked }))} style={{ width: 16, height: 16, cursor: "pointer" }} />
+            <span>PvP Enabled <span style={{ opacity: 0.55 }}>— uncheck to block new PvP challenges (in-progress matches keep playing)</span></span>
+          </label>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>PvP Cost / Side (REBEL)<input value={cfg.factionWarsPvpCost} onChange={e => setCfg(c => ({ ...c, factionWarsPvpCost: safeNum(e.target.value, c.factionWarsPvpCost) }))} type="number" min="0" style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>PvP Payout Mode<input value={cfg.factionWarsPvpPayoutMode} disabled type="text" style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.12)", background: "rgba(0,0,0,.15)", color: "rgba(255,255,255,.5)", cursor: "not-allowed" }} /><span style={{ fontSize: 10, opacity: 0.4 }}>Winner takes pot. (Future: split / fee modes.)</span></label>
         </div>
       </div>
     </div>

@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Hive Descent — Animation Test</title>
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #1a0f08; font-family: ui-monospace, monospace; color: #e0c8a0; overflow: hidden; }
+  #log { position: fixed; top: 10px; left: 10px; right: 10px; max-height: 40vh; overflow-y: auto;
+         background: rgba(0,0,0,0.65); padding: 10px 14px; border: 1px solid #c5852e;
+         font-size: 12px; line-height: 1.5; pointer-events: none; z-index: 10; white-space: pre-wrap; }
+  #log .ok { color: #6dd47e; }
+  #log .err { color: #ff7770; }
+  #log .warn { color: #f0c060; }
+  canvas { display: block; }
+  #title { position: fixed; bottom: 12px; left: 12px; background: rgba(0,0,0,0.55);
+           padding: 8px 14px; border-radius: 6px; font-size: 13px; color: #f0d4a0; z-index: 10; }
+</style>
+</head>
+<body>
+<div id="log">[boot] starting…</div>
+<div id="title">animation test · /descent/anim-test/test.glb · scale=5</div>
+<canvas id="c"></canvas>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const logEl = document.getElementById('log');
+function log(msg, cls) {
+  const line = document.createElement('div');
+  if (cls) line.className = cls;
+  line.textContent = msg;
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+log('[boot] three.js loaded');
+
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a0f08);
+
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 200);
+camera.position.set(0, 4, 8);
+
+const controls = new OrbitControls(camera, canvas);
+controls.target.set(0, 2, 0);
+controls.update();
+
+// Lights
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+const sun = new THREE.DirectionalLight(0xfff0d0, 1.2);
+sun.position.set(5, 10, 7);
+scene.add(sun);
+
+// Floor
+const floor = new THREE.Mesh(
+  new THREE.CircleGeometry(8, 32),
+  new THREE.MeshStandardMaterial({ color: 0x6b3a1c, roughness: 0.9 })
+);
+floor.rotation.x = -Math.PI / 2;
+scene.add(floor);
+
+// Probe scaffolding for diagnostics
+const wrapper = new THREE.Group();
+wrapper.position.y = 0;
+const inner = new THREE.Group();
+inner.scale.setScalar(5);
+wrapper.add(inner);
+scene.add(wrapper);
+log('[scene] floor + lights + scale=5 wrapper ready');
+
+let mixer = null;
+let probeBone = null;
+let probeStartQ = null;
+let frameCount = 0;
+
+const loader = new GLTFLoader();
+log('[load] fetching /descent/anim-test/test.glb …');
+loader.load(
+  '/descent/anim-test/test.glb',
+  (gltf) => {
+    log('[load] GLB loaded', 'ok');
+    log('  scene children: ' + gltf.scene.children.length);
+    log('  animations: ' + gltf.animations.length);
+    if (gltf.animations[0]) {
+      const a = gltf.animations[0];
+      log('  anim[0]: name="' + a.name + '" duration=' + a.duration.toFixed(2) + 's tracks=' + a.tracks.length);
+    } else {
+      log('[load] NO animations baked in this GLB!', 'err');
+    }
+
+    // Find the SkinnedMesh
+    let skinned = null;
+    gltf.scene.traverse((o) => {
+      if (o.isSkinnedMesh && !skinned) skinned = o;
+    });
+    if (!skinned) {
+      log('[load] no SkinnedMesh found in GLB', 'err');
+      return;
+    }
+    log('  SkinnedMesh: ' + skinned.name + ' bones=' + skinned.skeleton.bones.length, 'ok');
+    log('  bone[0]: ' + skinned.skeleton.bones[0].name);
+
+    inner.add(gltf.scene);
+
+    // Mount mixer on the SkinnedMesh (v5 lesson)
+    mixer = new THREE.AnimationMixer(skinned);
+    if (gltf.animations[0]) {
+      const action = mixer.clipAction(gltf.animations[0]);
+      action.setLoop(THREE.LoopRepeat, Infinity);
+      action.play();
+      log('[mixer] action.play() called', 'ok');
+    }
+
+    // Probe: pick spine or arm bone if available, fall back to bones[1]
+    probeBone = skinned.skeleton.bones.find(b => /spine|arm|leg/i.test(b.name)) || skinned.skeleton.bones[1] || skinned.skeleton.bones[0];
+    if (probeBone) {
+      probeStartQ = probeBone.quaternion.clone();
+      log('[probe] watching bone: ' + probeBone.name);
+    }
+  },
+  (xhr) => {
+    if (xhr.lengthComputable) {
+      const pct = ((xhr.loaded / xhr.total) * 100).toFixed(0);
+      logEl.firstChild.textContent = '[boot] downloading… ' + pct + '%';
+    }
+  },
+  (err) => {
+    log('[load] FAILED: ' + (err.message || err), 'err');
+    log('  Did you upload the GLB to /public/descent/anim-test/test.glb on the Testing branch?', 'warn');
+  }
+);
+
+const clock = new THREE.Clock();
+let lastReport = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = clock.getDelta();
+  if (mixer) mixer.update(dt);
+  controls.update();
+  renderer.render(scene, camera);
+
+  frameCount++;
+  // Every 60 frames (~1s), report bone delta
+  if (probeBone && probeStartQ && frameCount - lastReport >= 60) {
+    lastReport = frameCount;
+    const q = probeBone.quaternion;
+    const dq = Math.abs(q.x - probeStartQ.x) + Math.abs(q.y - probeStartQ.y) + Math.abs(q.z - probeStartQ.z) + Math.abs(q.w - probeStartQ.w);
+    log('[probe] delta from start (' + probeBone.name + '): ' + dq.toFixed(5) + (dq < 0.001 ? ' STATIC' : ' MOVING'), dq < 0.001 ? 'warn' : 'ok');
+  }
+}
+animate();
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>

@@ -6,6 +6,7 @@ import { usePoints } from "../lib/usePoints";
 import { loadProfile, saveProfile, getEffectivePlayerId } from "../lib/profile";
 import { addWin } from "../lib/winsStore";
 import BuyPointsModal from "./BuyPointsModal";
+import FactionWars3DCharacter from "./FactionWars3DCharacter";
 
 function useFWAudio() {
   const [muted, setMuted] = React.useState<boolean>(() => {
@@ -85,11 +86,38 @@ type Phase = "idle" | "battle" | "territory_result" | "final_result";
 type Rarity = "none" | "common" | "rare" | "ultra";
 type FactionId = "samurai"|"ronin"|"warrior"|"ashigaru"|"shogun"|"buke"|"kenshi"|"wokou"|"sohei"|"yamabushi"|"bushi";
 
+type SamuraiAnimState = "idle" | "attack" | "magic" | "trick" | "defend" | "hit" | "win" | "lose";
+
 interface Move { id: string; label: string; emoji: string; desc: string; power: number; type: "attack"|"defend"|"magic"|"trick"; oneTime?: boolean; }
+
+function getSamuraiAnimForMove(move: Move | null): SamuraiAnimState {
+  if (!move) return "idle";
+  if (move.type === "attack") return "attack";
+  if (move.type === "magic") return "magic";
+  if (move.type === "trick") return "trick";
+  if (move.type === "defend") return "defend";
+  return "idle";
+}
+
+function hasFaction3DCharacter(factionId: string): boolean {
+  return [
+    "ashigaru",
+    "buke",
+    "bushi",
+    "kenshi",
+    "ronin",
+    "samurai",
+    "shogun",
+    "sohei",
+    "warrior",
+    "wokou",
+    "yamabushi",
+  ].includes(factionId);
+}
 interface Faction { id: FactionId; name: string; emoji: string; color: string; bgColor: string; borderColor: string; role: string; passive: string; passiveDesc: string; weapon: string; moves: Move[]; weakTo: FactionId[]; strongVs: FactionId[]; }
 interface RoundResult { round:number; playerMove:Move; enemyMove:Move; playerDmg:number; enemyDmg:number; playerHpAfter:number; enemyHpAfter:number; }
 interface TerritoryResult { territory:number; defender:FactionId; playerFaction:FactionId; rounds:RoundResult[]; playerHpFinal:number; enemyHpFinal:number; won:boolean; }
-type FWLeaderboards = { warlords: {playerId:string;playerName?:string;score:number}[]; factions:{faction:FactionId;wins:number;topPlayers?:{playerId:string;playerName?:string;wins:number}[]}[]; streaks:{playerId:string;playerName?:string;score:number}[]; rich:{playerId:string;playerName?:string;score:number}[]; perfect:{playerId:string;playerName?:string;score:number}[]; };
+type FWLeaderboards = { warlords: {playerId:string;playerName?:string;score:number}[]; factions:{faction:FactionId;wins:number;topPlayers?:{playerId:string;playerName?:string;wins:number}[]}[]; streaks:{playerId:string;playerName?:string;score:number}[]; rich:{playerId:string;playerName?:string;score:number}[]; perfect:{playerId:string;playerName?:string;score:number}[]; pvpWins?:{playerId:string;playerName?:string;score:number}[]; pvpStreaks?:{playerId:string;playerName?:string;score:number}[]; pvpRich?:{playerId:string;playerName?:string;score:number}[]; };
 
 const FACTIONS: Record<FactionId, Faction> = {
   samurai: { id:"samurai", name:"Samurai", emoji:"🔴", color:"#dc2626", bgColor:"rgba(220,38,38,0.12)", borderColor:"rgba(220,38,38,0.4)", role:"Core soldiers", passive:"First Strike", passiveDesc:"1st territory: +2 bonus damage dealt per round", weapon:"Katana",
@@ -495,6 +523,68 @@ function FWLeaderboardPanel({ lb }: { lb: FWLeaderboards }) {
               </div>
           }
       </div>
+
+      {/* ⚔️ PvP Champions — full width (Commit J) */}
+      <div style={{ marginTop: 12, padding: 16, borderRadius: 14, background: "rgba(192,132,252,0.04)", border: "1px solid rgba(192,132,252,0.25)" }}>
+        <div style={{ fontSize: 13, fontWeight: 900, marginBottom: 4, letterSpacing: "0.04em", color: "#c084fc" }}>
+          ⚔️ PvP Champions
+        </div>
+        <div style={subtextStyle}>Head-to-head Faction Wars matches — wins, streaks, and REBEL plundered from opponents</div>
+        <div style={{ display: "grid", gridTemplateColumns: isSmallScreen ? "1fr" : "1fr 1fr 1fr", gap: 12, marginTop: 10 }}>
+
+          {/* 🏆 PvP Wins */}
+          <div style={cardStyle}>
+            <div style={{ ...titleStyle, color: "#c084fc" }}>🏆 Top Champions</div>
+            <div style={subtextStyle}>Most PvP victories all time</div>
+            <div style={scrollStyle}>
+              {(!lb.pvpWins || lb.pvpWins.length === 0)
+                ? <div style={emptyStyle}>No PvP matches yet — challenge a friend!</div>
+                : lb.pvpWins.slice(0, MAX).map((e, i) => (
+                  <div key={e.playerId+i} style={rowStyle}>
+                    <span style={rankStyle(i)}>#{i+1}</span>
+                    <span style={{ flex: 1, fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.playerName || shorten(e.playerId)}</span>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: "#c084fc" }}>{e.score.toLocaleString()}</span>
+                  </div>
+                ))}
+            </div>
+          </div>
+
+          {/* 🔥 PvP Streaks */}
+          <div style={cardStyle}>
+            <div style={{ ...titleStyle, color: "#f87171" }}>🔥 Hot Streaks</div>
+            <div style={subtextStyle}>Longest PvP win streak ever</div>
+            <div style={scrollStyle}>
+              {(!lb.pvpStreaks || lb.pvpStreaks.length === 0)
+                ? <div style={emptyStyle}>No streaks yet — go on a run!</div>
+                : lb.pvpStreaks.slice(0, MAX).map((e, i) => (
+                  <div key={e.playerId+i} style={rowStyle}>
+                    <span style={rankStyle(i)}>#{i+1}</span>
+                    <span style={{ flex: 1, fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.playerName || shorten(e.playerId)}</span>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: "#f87171" }}>{e.score.toLocaleString()}</span>
+                  </div>
+                ))}
+            </div>
+          </div>
+
+          {/* 💰 PvP Plunder */}
+          <div style={cardStyle}>
+            <div style={{ ...titleStyle, color: "#fbbf24" }}>💰 Plunder Lords</div>
+            <div style={subtextStyle}>Most REBEL won from PvP pots + crates</div>
+            <div style={scrollStyle}>
+              {(!lb.pvpRich || lb.pvpRich.length === 0)
+                ? <div style={emptyStyle}>No plunder yet — be the first to win a pot!</div>
+                : lb.pvpRich.slice(0, MAX).map((e, i) => (
+                  <div key={e.playerId+i} style={rowStyle}>
+                    <span style={rankStyle(i)}>#{i+1}</span>
+                    <span style={{ flex: 1, fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.playerName || shorten(e.playerId)}</span>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: "#fbbf24" }}>{e.score.toLocaleString()}</span>
+                  </div>
+                ))}
+            </div>
+          </div>
+
+        </div>
+      </div>
     </div>
   );
 }
@@ -511,6 +601,20 @@ export default function FactionWars() {
   useEffect(() => {
     const u = () => { const p = loadProfile(); const id = getEffectivePlayerId(p)||"guest"; setEffectivePlayerId(id); setPlayerName(p?.discordName||p?.name||""); };
     u(); window.addEventListener("ra:identity-changed", u); return () => window.removeEventListener("ra:identity-changed", u);
+  }, []);
+
+  // Inject a CSS @media rule so the AI move-grid reliably collapses to a single
+  // column on mobile (≤600px). Inline minmax(300px,1fr) auto-fit should already
+  // do this, but this is belt-and-suspenders for any browser/cache that ignores
+  // the inline style. !important wins specificity. Idempotent (id check).
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const id = "fw-move-grid-mobile-css";
+    if (document.getElementById(id)) return;
+    const styleEl = document.createElement("style");
+    styleEl.id = id;
+    styleEl.textContent = "@media (max-width: 600px) { .fw-move-grid { grid-template-columns: 1fr !important; } }";
+    document.head.appendChild(styleEl);
   }, []);
 
   const { balance, spend, earn, refresh, totalEarnRoom, devGrant } = usePoints(effectivePlayerId);
@@ -638,7 +742,9 @@ export default function FactionWars() {
   const [defenders, setDefenders]       = useState<FactionId[]>([]);
   const [currentTerritory, setCurrentT] = useState(0);
   const [currentFactionIdx, setCurrentFI] = useState(0);
-  const [selectedMove, setSelectedMove] = useState<Move|null>(null);
+ const [selectedMove, setSelectedMove] = useState<Move|null>(null);
+  const [enemy3DAnim, setEnemy3DAnim] = useState<SamuraiAnimState>("idle");
+const [player3DAnim, setPlayer3DAnim] = useState<SamuraiAnimState>("idle");
   const [results, setResults]           = useState<TerritoryResult[]>([]);
   const [finalRarity, setFinalRarity]   = useState<Rarity>("none");
   const [runMessage, setRunMessage]     = useState("");
@@ -654,7 +760,7 @@ export default function FactionWars() {
   const [prizeShipMsg, setPrizeShipMsg] = useState("");
   const [prizeShipBusy, setPrizeShipBusy] = useState(false);
   const [prizeShipForm, setPrizeShipForm] = useState({ name:"", email:"", phone:"", address1:"", address2:"", city:"", state:"", zip:"", country:"" });
-  const [lb, setLb]                     = useState<FWLeaderboards>({ warlords:[], factions:[], streaks:[], rich:[], perfect:[] });
+  const [lb, setLb]                     = useState<FWLeaderboards>({ warlords:[], factions:[], streaks:[], rich:[], perfect:[], pvpWins:[], pvpStreaks:[], pvpRich:[] });
   const [battleAnim, setBattleAnim]     = useState<"idle"|"clash"|"win"|"lose">("idle");
   const [playerHp, setPlayerHp]         = useState(MAX_HP);
   const [enemyHp, setEnemyHp]           = useState(MAX_HP);
@@ -759,8 +865,16 @@ export default function FactionWars() {
     if (meditationStacks > 0) { setPowerBuffAmt(meditationStacks * 2); setPowerBuffRounds(99); }
   };
 
-  const fightTerritory = async () => {
-    if (!selectedMove || busy) return;
+ const fightTerritory = async () => {
+  if (!selectedMove || busy) return;
+
+  const nextPlayerAnim = getSamuraiAnimForMove(selectedMove);
+
+setPlayer3DAnim(nextPlayerAnim);
+
+if (typeof window !== "undefined") {
+  (window as any).__fw3dPlayPlayer?.(nextPlayerAnim);
+}
     setShowHowToPlay(false); // auto-collapse once battle begins
     const playerFaction = team[currentFactionIdx] || team[0];
     const defender = defenders[currentTerritory];
@@ -781,9 +895,16 @@ export default function FactionWars() {
     await new Promise(r=>setTimeout(r,450));
 
     const imperialDecreeFlag = selectedMove.id === "imperial_decree" || selectedMove.id === "final_command";
-    const enemyMove = imperialDecreeFlag
-      ? FACTIONS[defender].moves.reduce((a,b)=>a.power<b.power?a:b)
-      : pickEnemyMove(defender, selectedMove, difficulty, enemyHp, playerHp, currentTerritory);
+   const enemyMove = imperialDecreeFlag
+  ? FACTIONS[defender].moves.reduce((a,b)=>a.power<b.power?a:b)
+  : pickEnemyMove(defender, selectedMove, difficulty, enemyHp, playerHp, currentTerritory);
+
+const nextEnemyAnim = getSamuraiAnimForMove(enemyMove);
+setEnemy3DAnim(nextEnemyAnim);
+
+if (typeof window !== "undefined") {
+  (window as any).__fw3dPlayEnemy?.(nextEnemyAnim);
+}
     const timesUsed = usedMoves[selectedMove.id] || 0;
     const degradedMove: Move = { ...selectedMove, power: Math.max(1, selectedMove.power - timesUsed) };
     setUsedMoves(prev => ({ ...prev, [selectedMove.id]: (prev[selectedMove.id]||0)+1 }));
@@ -912,18 +1033,44 @@ export default function FactionWars() {
     setRoundLog(prev => [{playerMove:selectedMove.label, enemyMove:enemyMove.label, playerDmg, enemyDmg, effect:effectTag}, ...prev.slice(0,5)]);
 
     // endure: can't lose this territory — but also can't win by using it alone
-    const over = endureFlag ? false : (newPlayerHp <= 0 || newEnemyHp <= 0);
-    setBattleAnim(newEnemyHp <= 0 ? "win" : newPlayerHp <= 0 ? "lose" : "idle");
+const over = endureFlag ? false : (newPlayerHp <= 0 || newEnemyHp <= 0);
+
+if (typeof window !== "undefined") {
+  window.setTimeout(() => {
+    if (over && newEnemyHp <= 0) {
+      setPlayer3DAnim("win");
+      setEnemy3DAnim("lose");
+      (window as any).__fw3dPlayPlayer?.("win");
+      (window as any).__fw3dPlayEnemy?.("lose");
+      return;
+    }
+
+    if (over && newPlayerHp <= 0) {
+      setPlayer3DAnim("lose");
+      setEnemy3DAnim("win");
+      (window as any).__fw3dPlayPlayer?.("lose");
+      (window as any).__fw3dPlayEnemy?.("win");
+      return;
+    }
+
+    setPlayer3DAnim("idle");
+    setEnemy3DAnim("idle");
+    (window as any).__fw3dPlayPlayer?.("idle");
+    (window as any).__fw3dPlayEnemy?.("idle");
+  }, 950);
+}
+
+setBattleAnim(newEnemyHp <= 0 ? "win" : newPlayerHp <= 0 ? "lose" : "idle");
     await new Promise(r=>setTimeout(r, over ? 700 : 250));
     if (!over) { setBattleAnim("idle"); }
 
     setSelectedMove(null);
     setBusy(false);
 
-    if (over) {
-      await new Promise(r=>setTimeout(r,500));
-      setBattleAnim("idle");
-      const playerWon = newEnemyHp <= 0;
+if (over) {
+  await new Promise(r=>setTimeout(r,3500));
+  setBattleAnim("idle");
+  const playerWon = newEnemyHp <= 0;
       // Plunder bonus on win
       if (playerWon && plunderPendingRef.current) {
         const plunderAmt = Number(cfg?.factionWarsPlunderBonus ?? 50);
@@ -1176,82 +1323,110 @@ export default function FactionWars() {
         </div>
       )}
 
-      {/* Header */}
-      <div style={{ position:"relative", zIndex:1 }}>
-        <div style={{ maxWidth:900, margin:"0 auto", padding:"16px 12px", overflowX:"hidden", width:"100%" }}>
-          <div style={{ fontSize:26, fontWeight:900, marginBottom:12, display:"flex", alignItems:"center", gap:10 }}>
-            <Link href="/" style={{ textDecoration:"none", color:"inherit" }}>Rebel Ants Playground</Link>
-            <button onPointerDown={e=>{e.preventDefault();toggleMute();}} title={muted?"Unmute":"Mute"} style={{ background:"rgba(0,0,0,0.4)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:20, padding:"8px 14px", cursor:"pointer", fontSize:16, color:"rgba(255,255,255,0.8)", lineHeight:1, minWidth:44, minHeight:44, touchAction:"manipulation" }}>{muted?"🔇":"🔊"}</button>
+      {/* ── HEADER (cleaned up Shuffle-style) ── */}
+      <header style={{ position:'relative', zIndex:20, maxWidth:980, margin:'0 auto', padding:'16px 20px 0', display:'flex', alignItems:'center', justifyContent:'space-between', fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif" }}>
+        <Link href="/" style={{ display:'flex', alignItems:'center', gap:10, textDecoration:'none', color:'white' }}>
+          <span style={{ fontSize:20, filter:'drop-shadow(0 0 8px rgba(251,191,36,0.6))' }}>←</span>
+          <span style={{ fontSize:11, fontWeight:900, letterSpacing:'0.2em', textTransform:'uppercase', color:'rgba(255,255,255,0.5)' }}>REBEL ANTS</span>
+        </Link>
+        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+          <div style={{ fontSize:13, fontWeight:900, letterSpacing:'0.1em', color:'#fbbf24', filter:'drop-shadow(0 0 8px rgba(251,191,36,0.5))' }}>
+            ⚡ {balance} <span style={{ fontSize:10, color:'rgba(251,191,36,0.6)' }}>{currency}</span>
           </div>
-          <nav style={{ display:"flex", gap:6, flexWrap:"wrap", fontSize:12 }}>
-            {([["tunnel","🐜 Ant Tunnel"],["hatch","⚔️ Faction Wars"],["expedition","⚔️ The Raid"],["shuffle","🃏 Shuffle"]] as [string,string][]).map(([href,label])=>(
-              <Link key={href} href={`/${href}`} onClick={href === 'faction-wars' ? () => { setTimeout(() => sfx.startTheme(), 100); } : undefined} style={{ padding:"8px 14px", borderRadius:20, textDecoration:"none", fontSize:13, fontWeight:700, background:href==="hatch"?"rgba(251,191,36,0.15)":"rgba(255,255,255,0.07)", border:`1px solid ${href==="hatch"?"rgba(251,191,36,0.4)":"rgba(255,255,255,0.12)"}`, color:href==="hatch"?"#fbbf24":"rgba(255,255,255,0.8)" }}>{label}</Link>
-            ))}
-          </nav>
+          <button onPointerDown={e=>{e.preventDefault();toggleMute();}} title={muted?"Unmute":"Mute"}
+            style={{ background:'rgba(0,0,0,0.4)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:20, padding:'6px 12px', cursor:'pointer', fontSize:15, color:'rgba(255,255,255,0.8)', minWidth:40 }}>
+            {muted ? '🔇' : '🔊'}
+          </button>
         </div>
-      </div>
+      </header>
 
       <div style={{ maxWidth:900, margin:"0 auto", padding:"16px 12px", overflowX:"hidden", width:"100%", position:"relative", zIndex:1 }}>
         {phase === "idle" && (
           <div>
-            <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:16, padding:"24px 20px", marginBottom:18 }}>
-              {/* Title */}
-              <div style={{ textAlign:"center", marginBottom:14 }}>
-                <div style={{ fontSize:28, fontWeight:900, letterSpacing:"0.06em", background:"linear-gradient(135deg,#fbbf24,#f87171,#c084fc)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", marginBottom:4 }}>⚔️ FACTION WARS</div>
-                <div style={{ fontSize:13, opacity:0.65, letterSpacing:"0.04em" }}>🏰 Assemble 5 faction warriors. Battle 5 territories. Know your factions or fall.</div>
+              {/* Title (Shuffle-style centered gradient) */}
+              <div style={{ textAlign:'center', marginBottom:18, marginTop:14 }}>
+                <div style={{ fontSize:'clamp(22px,4vw,38px)', fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase',
+                  background:'linear-gradient(135deg,#fbbf24,#f87171,#c084fc)',
+                  WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text',
+                  filter:'drop-shadow(0 0 20px rgba(251,191,36,0.4))',
+                }}>⚔️ FACTION WARS</div>
+                <div style={{ fontSize:12, letterSpacing:'0.25em', color:'rgba(255,255,255,0.35)', textTransform:'uppercase', marginTop:4 }}>
+                  ASSEMBLE 5 · CONQUER 5 · KNOW YOUR FACTIONS
+                </div>
               </div>
 
-              {/* Launch button */}
-              <div style={{ marginTop:16, display:"flex", gap:10, flexWrap:"wrap", alignItems:"center" }}>
+              {/* Primary action row */}
+              <div style={{ display:'flex', gap:10, flexWrap:'wrap', alignItems:'center', justifyContent:'center', marginBottom:14 }}>
                 <button onClick={startCampaign} disabled={team.length<TEAM_SIZE||busy||balance<fwCost}
-                  style={{ minWidth:240, height:48, fontSize:14, fontWeight:900, display:"inline-flex", alignItems:"center", justifyContent:"center", borderRadius:12, border:"1px solid rgba(251,191,36,0.35)", cursor:team.length<TEAM_SIZE||busy||balance<fwCost?"not-allowed":"pointer", background:team.length<TEAM_SIZE?"rgba(15,23,42,.7)":"linear-gradient(135deg,rgba(251,191,36,.18),rgba(192,132,252,.18))", color:"#fbbf24" }}>
-                  {team.length<TEAM_SIZE?`⚔️ Select ${TEAM_SIZE-team.length} more warriors`:busy?"Assembling...":`⚔️ Launch Campaign (-${team.includes("ashigaru") ? Math.max(0, fwCost-25) : fwCost} ${currency})`}
+                  style={{ minWidth:280, height:48, padding:'0 28px', fontSize:13, fontWeight:900, letterSpacing:'0.1em', textTransform:'uppercase',
+                    display:'inline-flex', alignItems:'center', justifyContent:'center', borderRadius:24, border:'1px solid rgba(251,191,36,0.4)',
+                    background:team.length<TEAM_SIZE||busy||balance<fwCost?'rgba(255,255,255,0.05)':'linear-gradient(135deg,rgba(251,191,36,0.25),rgba(248,113,113,0.25))',
+                    color:team.length<TEAM_SIZE||busy||balance<fwCost?'rgba(255,255,255,0.4)':'#fbbf24',
+                    cursor:team.length<TEAM_SIZE||busy||balance<fwCost?'not-allowed':'pointer',
+                    filter:team.length<TEAM_SIZE||busy||balance<fwCost?'none':'drop-shadow(0 0 12px rgba(251,191,36,0.3))' }}>
+                  {team.length<TEAM_SIZE?`Select ${TEAM_SIZE-team.length} more`:busy?"Assembling…":`⚔️ Launch Campaign (${team.includes("ashigaru") ? Math.max(0, fwCost-25) : fwCost} ${currency})`}
                 </button>
-                <button onClick={()=>setShowBuyPoints(true)} style={{ padding:"10px 14px", fontSize:12, borderRadius:10, border:"1px solid rgba(255,255,255,0.15)", background:"rgba(255,255,255,0.07)", color:"white", cursor:"pointer", fontWeight:700 }}>💳 Buy Points</button>
-                {isDiscordConnected
-                  ? <button onClick={disconnectDiscord} style={{ padding:"10px 14px", fontSize:12, borderRadius:10, border:"1px solid rgba(255,255,255,0.15)", background:"rgba(255,255,255,0.07)", color:"white", cursor:"pointer", fontWeight:700 }}>Disconnect Discord</button>
-                  : <button onClick={()=>{ try{saveProfile({discordSkipLink:false});window.dispatchEvent(new Event("ra:identity-changed"));}catch{} window.location.href="/api/auth/discord/login"; }} style={{ padding:"10px 14px", fontSize:12, borderRadius:10, border:"1px solid rgba(88,101,242,0.4)", background:"rgba(88,101,242,0.15)", color:"#818cf8", cursor:"pointer", fontWeight:700 }}>🔗 Connect Discord</button>
-                }
+                <button onClick={()=>setShowBuyPoints(true)}
+                  style={{ padding:'10px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.1em', textTransform:'uppercase', borderRadius:20, border:'1px solid rgba(255,255,255,0.15)', background:'rgba(0,0,0,0.4)', color:'rgba(255,255,255,0.8)', cursor:'pointer' }}>
+                  💎 Buy Points
+                </button>
+                {isDiscordConnected ? (
+                  <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 14px', borderRadius:20, border:'1px solid rgba(88,101,242,0.3)', background:'rgba(88,101,242,0.08)', fontSize:11, fontWeight:700, letterSpacing:'0.1em', textTransform:'uppercase' }}>
+                    <span style={{ color:'#a5b4fc' }}>✓ Discord</span>
+                    <button onClick={disconnectDiscord} style={{ background:'none', border:'none', fontSize:10, color:'rgba(255,255,255,0.4)', cursor:'pointer', padding:0, textDecoration:'underline' }}>disconnect</button>
+                  </div>
+                ) : (
+                  <button onClick={()=>{ try{saveProfile({discordSkipLink:false});window.dispatchEvent(new Event("ra:identity-changed"));}catch{} window.location.href="/api/auth/discord/login"; }}
+                    style={{ padding:'10px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.1em', textTransform:'uppercase', borderRadius:20, border:'1px solid rgba(88,101,242,0.4)', background:'rgba(88,101,242,0.12)', color:'#a5b4fc', cursor:'pointer' }}>
+                    Connect Discord
+                  </button>
+                )}
                 <button onClick={async()=>{ if(!isDiscordConnected)return; await openDripModal(); }} disabled={dripBusy||!isDiscordConnected}
-                  style={{ padding:"10px 14px", fontSize:12, borderRadius:10, border:"1px solid rgba(255,255,255,0.15)", background:"rgba(255,255,255,0.07)", color:"white", cursor:"pointer", fontWeight:700, opacity:isDiscordConnected?1:0.5 }}
+                  style={{ padding:'10px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.1em', textTransform:'uppercase', borderRadius:20, border:'1px solid rgba(255,255,255,0.15)', background:'rgba(0,0,0,0.4)', color:'rgba(255,255,255,0.6)', cursor:isDiscordConnected?'pointer':'not-allowed', opacity:isDiscordConnected?1:0.5 }}
                   title={isDiscordConnected?"Move points from Discord (DRIP) into the game":"Connect Discord to migrate DRIP points"}>
-                  {dripBusy?"Loading DRIP…":isDiscordConnected?"Migrate DRIP Points":"Connect Discord for DRIP"}
+                  {dripBusy?"Loading…":"Migrate DRIP"}
                 </button>
-                <div style={{ fontSize:11, opacity:0.65 }}>Discord: <b>{isDiscordConnected?"✅":"❌"}</b></div>
+                <Link href="/faction-wars/pvp" style={{ padding: '10px 16px', fontSize: 11, fontWeight: 900, letterSpacing: '0.1em', textTransform: 'uppercase', borderRadius: 20, border: '1px solid rgba(192,132,252,0.4)', background: 'rgba(192,132,252,0.08)', color: '#c084fc', cursor: 'pointer', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  ⚔️ Challenge a Friend
+                </Link>
               </div>
 
-              {/* Balance info */}
-              <div style={{ marginTop:10, fontSize:12, opacity:0.8, display:"flex", gap:14, flexWrap:"wrap" }}>
-                <span>⚔️ Balance: <b>{balance}</b> {currency}</span>
-                <span>🏰 Cost: <b>{fwCost}</b> {currency}</span>
-                {balance < fwCost && <span style={{ color:"#f87171" }}>Need {fwCost - balance} more {currency}</span>}
-              </div>
-              <div style={{ marginTop:6, fontSize:11, opacity:0.55, display:"flex", gap:10, flexWrap:"wrap" }}>
-                <span>🏆 Ultra: +{cfg?.rewards?.ultra}</span>
-                <span>⚔️ Rare: +{cfg?.rewards?.rare}</span>
-                <span>✅ Common: +{cfg?.rewards?.common}</span>
-                <span>📅 Daily cap: {cfg?.dailyEarnCap}</span>
-              </div>
-
-              {/* Name + daily claim */}
-              <div style={{ marginTop:12, display:"flex", gap:10, flexWrap:"wrap", alignItems:"center" }}>
-                <label style={{ fontSize:12, opacity:0.85 }}>
-                  ⚔️ Commander:&nbsp;
-                  <input value={playerName}
-                    onChange={e=>{ const v=(e.target.value.slice(0,18)||"guest").trim()||"guest"; setPlayerName(v); const p=loadProfile(); saveProfile({name:v,id:(p?.id||playerId||"guest").trim()||"guest"}); }}
-                    style={{ padding:"6px 10px", borderRadius:10, border:"1px solid rgba(255,255,255,.18)", background:"rgba(15,23,42,.55)", color:"inherit" }}
-                  />
-                  <div style={{ fontSize:10, opacity:0.55, marginTop:3 }}>ID: {profile?.discordName || playerName}</div>
-                </label>
+              {/* Stats row (Shuffle-style) */}
+              <div style={{ display:'flex', gap:14, flexWrap:'wrap', justifyContent:'center', alignItems:'center', padding:'10px 14px', borderRadius:14, border:'1px solid rgba(255,255,255,0.06)', background:'rgba(255,255,255,0.02)', fontSize:11, fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", letterSpacing:'0.05em', marginBottom:12 }}>
+                <span style={{ color:'rgba(255,255,255,0.5)', textTransform:'uppercase' }}>Cost: <b style={{color:'#fbbf24'}}>{fwCost}</b> {currency}</span>
+                <span style={{ color:'rgba(255,255,255,0.4)', textTransform:'uppercase' }}>Common <b style={{color:'#86efac'}}>+{cfg?.rewards?.common}</b></span>
+                <span style={{ color:'rgba(255,255,255,0.4)', textTransform:'uppercase' }}>Rare <b style={{color:'#93c5fd'}}>+{cfg?.rewards?.rare}</b></span>
+                <span style={{ color:'rgba(255,255,255,0.4)', textTransform:'uppercase' }}>Ultra <b style={{color:'#fbbf24'}}>+{cfg?.rewards?.ultra}</b></span>
+                <span style={{ color:'rgba(255,255,255,0.3)', textTransform:'uppercase', borderLeft:'1px solid rgba(255,255,255,0.1)', paddingLeft:14 }}>Daily Cap <b style={{color:'rgba(255,255,255,0.6)'}}>{cfg?.dailyEarnCap}</b></span>
                 <button onClick={claimDailyNow} disabled={claimBusy||dailyClaimed}
-                  style={{ padding:"8px 12px", fontSize:12, borderRadius:10, border:"1px solid rgba(251,191,36,0.3)", background:"rgba(251,191,36,0.12)", color:"#fbbf24", cursor:claimBusy||dailyClaimed?"not-allowed":"pointer", fontWeight:700, opacity:claimBusy||dailyClaimed?0.6:1 }}>
-                  {dailyClaimed ? (countdownStr ? `⏱ Next claim in ${countdownStr}` : "✅ Claimed Today") : `⚔️ Daily +${cfg?.dailyClaim} ${currency}`}
+                  style={{ padding:'5px 12px', fontSize:10, fontWeight:900, letterSpacing:'0.1em', textTransform:'uppercase', borderRadius:14, border:'1px solid rgba(251,191,36,0.3)', background:dailyClaimed?'rgba(255,255,255,0.04)':'rgba(251,191,36,0.12)', color:dailyClaimed?'rgba(255,255,255,0.4)':'#fbbf24', cursor:claimBusy||dailyClaimed?'not-allowed':'pointer' }}>
+                  {dailyClaimed ? (countdownStr ? `⏱ ${countdownStr}` : "✓ Claimed") : `Claim +${cfg?.dailyClaim}`}
                 </button>
                 {process.env.NODE_ENV!=="production" && (
-                  <button onClick={async()=>{ await devGrant(5000); await refresh(); alert("Dev grant ✅"); }} style={{ padding:"8px 12px", fontSize:12, borderRadius:10, border:"1px solid rgba(255,255,255,0.15)", background:"rgba(255,255,255,0.07)", color:"white", cursor:"pointer" }}>Dev +5000</button>
+                  <button onClick={async()=>{ await devGrant(5000); await refresh(); alert("Dev grant ✅"); }}
+                    style={{ padding:'5px 10px', fontSize:10, borderRadius:14, border:'1px dashed rgba(255,255,255,0.2)', background:'transparent', color:'rgba(255,255,255,0.5)', cursor:'pointer' }}>
+                    +5k (dev)
+                  </button>
                 )}
-                {claimStatus && <div style={{ fontSize:11, opacity:0.85 }}>{claimStatus}</div>}
+                {claimStatus && <span style={{ fontSize:10, opacity:0.7 }}>{claimStatus}</span>}
               </div>
+
+              {/* Commander name (compact, optional reveal) */}
+              <details style={{ marginBottom:14 }}>
+                <summary style={{ fontSize:10, letterSpacing:'0.15em', textTransform:'uppercase', color:'rgba(255,255,255,0.35)', cursor:'pointer', padding:'4px 0' }}>
+                  Commander: <b style={{color:'rgba(255,255,255,0.7)'}}>{profile?.discordName || playerName}</b>
+                </summary>
+                <div style={{ marginTop:8, display:'flex', gap:10, flexWrap:'wrap', alignItems:'center', padding:'10px 14px', borderRadius:10, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.05)' }}>
+                  <label style={{ fontSize:11, opacity:0.85 }}>
+                    Name:&nbsp;
+                    <input value={playerName}
+                      onChange={e=>{ const v=(e.target.value.slice(0,18)||"guest").trim()||"guest"; setPlayerName(v); const p=loadProfile(); saveProfile({name:v,id:(p?.id||playerId||`p_${Date.now().toString(36)}`)}); window.dispatchEvent(new Event("ra:identity-changed")); }}
+                      style={{ padding:'5px 10px', borderRadius:8, border:'1px solid rgba(255,255,255,.18)', background:'rgba(15,23,42,.55)', color:'inherit', fontSize:11 }}
+                    />
+                  </label>
+                  <span style={{ fontSize:10, opacity:0.5 }}>ID: {profile?.discordName || playerName}</span>
+                </div>
+              </details>
 
               {runMessage && <div style={{ color:"#f87171", fontSize:13, marginTop:10 }}>{runMessage}</div>}
 
@@ -1289,7 +1464,6 @@ export default function FactionWars() {
                   </div>
                 )}
               </div>
-            </div>
         <div style={{ marginBottom:8 }}>
           <button onClick={()=>setShowRules(true)} style={{ fontSize:12, textDecoration:"underline", opacity:0.55, background:"none", border:"none", color:"inherit", cursor:"pointer", padding:0 }}>Official Rules</button>
         </div>
@@ -1380,9 +1554,17 @@ export default function FactionWars() {
                       transform: battleAnim==="clash"?"scale(1.1) translateX(14px) rotate(-3deg)":battleAnim==="win"?"scale(1.06)":battleAnim==="lose"?"scale(0.9) rotate(4deg)":"scale(1)",
                       filter: battleAnim==="lose"?"grayscale(0.7) brightness(0.55)":playerHp<25?"brightness(0.8)":"none",
                       transition:"all 0.35s cubic-bezier(0.34,1.56,0.64,1)" }}>
-                      <img src={factionImgPath(currentPlayerFD.id,"char")} alt={currentPlayerFD.name}
-                        style={{ width:"100%", height:"100%", objectFit:"cover", objectPosition:"top" }}
-                        onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
+                   {hasFaction3DCharacter(currentPlayerFD.id) ? (
+  <FactionWars3DCharacter
+    factionId={currentPlayerFD.id}
+    side="player"
+    animState={player3DAnim}
+  />
+) : (
+  <img src={factionImgPath(currentPlayerFD.id,"char")} alt={currentPlayerFD.name}
+    style={{ width:"100%", height:"100%", objectFit:"cover", objectPosition:"top" }}
+    onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
+)}
                       <div style={{ position:"absolute", bottom:4, right:4, width:26, height:26, borderRadius:5, overflow:"hidden", background:"rgba(0,0,0,0.75)", border:`1px solid ${currentPlayerFD.borderColor}` }}>
                         <img src={factionImgPath(currentPlayerFD.id,"symbol")} alt="" style={{ width:"100%", height:"100%", objectFit:"contain", padding:2 }} />
                       </div>
@@ -1412,9 +1594,17 @@ export default function FactionWars() {
                       transform: battleAnim==="clash"?"scale(1.1) translateX(-14px) rotate(3deg)":battleAnim==="lose"?"scale(1.06)":battleAnim==="win"?"scale(0.9) rotate(-4deg)":"scale(1)",
                       filter: battleAnim==="win"?"grayscale(0.7) brightness(0.55)":enemyHp<25?"brightness(0.8)":"none",
                       transition:"all 0.35s cubic-bezier(0.34,1.56,0.64,1)" }}>
-                      <img src={factionImgPath(currentDefenderFD.id,"char")} alt={currentDefenderFD.name}
-                        style={{ width:"100%", height:"100%", objectFit:"cover", objectPosition:"top" }}
-                        onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
+                   {hasFaction3DCharacter(currentDefenderFD.id) ? (
+  <FactionWars3DCharacter
+    factionId={currentDefenderFD.id}
+    side="enemy"
+    animState={enemy3DAnim}
+  />
+) : (
+  <img src={factionImgPath(currentDefenderFD.id,"char")} alt={currentDefenderFD.name}
+    style={{ width:"100%", height:"100%", objectFit:"cover", objectPosition:"top" }}
+    onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
+)}
                       <div style={{ position:"absolute", bottom:4, left:4, width:26, height:26, borderRadius:5, overflow:"hidden", background:"rgba(0,0,0,0.75)", border:`1px solid ${currentDefenderFD.borderColor}` }}>
                         <img src={factionImgPath(currentDefenderFD.id,"symbol")} alt="" style={{ width:"100%", height:"100%", objectFit:"contain", padding:2 }} />
                       </div>
@@ -1556,7 +1746,7 @@ export default function FactionWars() {
                   <div style={{ fontSize:12, fontWeight:800, marginBottom:10, opacity:0.7, letterSpacing:"0.04em" }}>
                     ⚔️ CHOOSE {currentPlayerFD.name.toUpperCase()}'S MOVE
                   </div>
-                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+                  <div className="fw-move-grid" style={{ display:"grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap:8 }}>
                   {currentPlayerFD.moves.map(m=>{
                     const tc: Record<string,string> = { attack:"#f87171", defend:"#34d399", magic:"#c084fc", trick:"#fbbf24" };
                     const isSel = selectedMove?.id===m.id;

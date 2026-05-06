@@ -208,94 +208,149 @@ function calcPrize(slots: AntSlot[], cfg: any): { rarity: Rarity; prize: Prize }
 
 // ── Role Picker ───────────────────────────────────────────────────────────────
 
-function RolePicker({ squad, onChange, disabled, carrierPct, lastSquad, onLastSquad }: {
-  squad: AntRole[]; onChange: (n: AntRole[]) => void; disabled: boolean; carrierPct: number; lastSquad?: AntRole[] | null; onLastSquad?: (s: AntRole[]) => void;
+function RolePicker({ squad, onChange, disabled, carrierPct, lastSquad, onLastSquad, faction }: {
+  squad: AntRole[]; onChange: (n: AntRole[]) => void; disabled: boolean; carrierPct: number;
+  lastSquad?: AntRole[] | null; onLastSquad?: (s: AntRole[]) => void;
+  faction: import('../lib/factionConfig').FactionDef;
 }) {
   const roles = Object.keys(ROLE_META) as AntRole[];
+  const fc = faction.colors;
+  const FONT = "'Noto Serif JP', 'Hiragino Mincho ProN', serif";
 
   return (
-    <div style={{ marginTop: 16 }}>
-      <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 10, opacity: 0.9, letterSpacing: "0.05em" }}>
-        🐜 ASSEMBLE YOUR SQUAD — {squad.length}/{SQUAD_SIZE} ANTS · Squad Cost: {calcSquadCost(squad)} REBEL
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 6, marginBottom: 12 }}>
+    <div>
+      {/* Role selection cards */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:8, marginBottom:14 }}>
         {roles.map(role => {
           const m = ROLE_META[role];
           const count = squad.filter(r => r === role).length;
           const canAdd = squad.length < SQUAD_SIZE && !disabled;
+          const imgSrc = faction.roles[role as AntRole]?.img;
           return (
             <button key={role} disabled={!canAdd} title={m.desc}
               onClick={() => canAdd && onChange([...squad, role])}
               style={{
-                padding: "10px 4px", borderRadius: 12,
-                border: `1px solid ${m.color}55`,
-                background: m.bgColor, color: "white",
-                cursor: canAdd ? "pointer" : "not-allowed",
-                fontSize: 11, fontWeight: 700, textAlign: "center",
-                opacity: disabled ? 0.5 : 1,
+                position:'relative', padding:0, borderRadius:16, overflow:'hidden',
+                border: count > 0 ? `2px solid ${fc.primary}` : '2px solid rgba(255,255,255,0.08)',
+                background: count > 0 ? fc.bg : 'rgba(255,255,255,0.03)',
+                cursor: canAdd ? 'pointer' : 'not-allowed',
+                opacity: disabled ? 0.45 : 1,
+                boxShadow: count > 0 ? `0 0 20px ${fc.glow}, inset 0 0 20px ${fc.bg}` : 'none',
+                transition:'all 0.2s ease',
+                transform: count > 0 ? 'scale(1.03)' : 'scale(1)',
+                minHeight: 120,
+                display:'flex', flexDirection:'column', alignItems:'center',
               }}>
-              <div style={{ fontSize: 22, marginBottom: 2 }}>{m.emoji}</div>
-              <div style={{ color: m.color, fontSize: 10, fontWeight: 900 }}>{m.label}</div>
-              <div style={{ opacity: 0.55, fontSize: 9, marginTop: 1 }}>survive: {role === "carrier" ? carrierPct + "%" : m.survivalDisplay}</div>
-              <div style={{ color: m.color, fontSize: 9, marginTop: 1, fontWeight: 900 }}>{ROLE_COST[role]} REBEL</div>
-              <div style={{ marginTop: 4, fontSize: 13, fontWeight: 900, color: count > 0 ? m.color : "rgba(255,255,255,.3)" }}>×{count}</div>
+              {/* Character image */}
+              <div style={{ width:'100%', aspectRatio:'1', overflow:'hidden', borderRadius:'12px 12px 0 0',
+                background: count > 0 ? fc.gradient : 'rgba(0,0,0,0.3)',
+                display:'flex', alignItems:'center', justifyContent:'center', position:'relative' }}>
+                <img key={imgSrc} src={imgSrc} alt={m.label}
+                  style={{ width:'90%', height:'90%', objectFit:'contain',
+                    filter: count > 0 ? `drop-shadow(0 0 8px ${fc.glow})` : 'brightness(0.7) saturate(0.6)',
+                    transition:'all 0.3s ease' }}
+                  onError={e => { (e.target as HTMLImageElement).style.display='none'; }} />
+                {/* Faction glow overlay when selected */}
+                {count > 0 && <div style={{ position:'absolute', inset:0,
+                  background: `radial-gradient(ellipse at 50% 80%, ${fc.glow} 0%, transparent 65%)`,
+                  pointerEvents:'none' }} />}
+                {/* Count badge */}
+                {count > 0 && (
+                  <div style={{ position:'absolute', top:4, right:4,
+                    width:20, height:20, borderRadius:'50%',
+                    background: fc.primary, color:'#000',
+                    fontSize:11, fontWeight:900, display:'flex', alignItems:'center', justifyContent:'center',
+                    boxShadow: `0 0 8px ${fc.glow}`,
+                    fontFamily: FONT,
+                  }}>{count}</div>
+                )}
+              </div>
+              {/* Label + stats */}
+              <div style={{ padding:'6px 4px 8px', width:'100%', textAlign:'center' }}>
+                <div style={{ fontFamily:FONT, fontSize:10, fontWeight:900, letterSpacing:'0.12em',
+                  textTransform:'uppercase', color: count > 0 ? fc.text : 'rgba(255,255,255,0.6)',
+                  marginBottom:2 }}>{faction.roles[role as AntRole]?.label || m.label}</div>
+                <div style={{ fontFamily:FONT, fontSize:8, opacity:0.55, letterSpacing:'0.08em' }}>
+                  survive: {role === 'carrier' ? carrierPct : m.survivalDisplay}%
+                </div>
+                <div style={{ fontFamily:FONT, fontSize:9, fontWeight:900,
+                  color: count > 0 ? fc.primary : 'rgba(255,255,255,0.3)', marginTop:1 }}>
+                  {ROLE_COST[role as AntRole]} REBEL
+                </div>
+              </div>
             </button>
           );
         })}
       </div>
 
-      <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 6, fontWeight: 700, letterSpacing: "0.06em" }}>
-        🪖 MARCHING ORDER (click ant to remove)
+      {/* Marching order */}
+      <div style={{ fontFamily:FONT, fontSize:9, letterSpacing:'0.2em', textTransform:'uppercase',
+        color:'rgba(255,255,255,0.4)', marginBottom:6 }}>
+        ⚔️ MARCHING ORDER — {squad.length}/{SQUAD_SIZE} · SQUAD COST: {calcSquadCost(squad)} REBEL
       </div>
-
-      <div style={{
-        display: "flex", gap: 3, flexWrap: "wrap",
-        padding: 10, borderRadius: 12,
-        background: "rgba(0,0,0,.35)", border: "1px solid rgba(255,255,255,.08)", minHeight: 54,
-      }}>
+      <div style={{ display:'flex', gap:4, flexWrap:'wrap', padding:'10px 12px', borderRadius:14,
+        background:'rgba(0,0,0,0.4)', border:`1px solid ${fc.primary}22`, minHeight:60 }}>
         {squad.map((role, i) => {
           const m = ROLE_META[role];
+          const imgSrc = faction.roles[role as AntRole]?.img;
           return (
             <button key={i} disabled={disabled}
               title={`#${i+1} ${m.label} — click to remove`}
               onClick={() => { if (!disabled) { const n=[...squad]; n.splice(i,1); onChange(n); }}}
-              style={{
-                width: 32, height: 38, borderRadius: 8,
-                border: `1px solid ${m.color}44`, background: m.bgColor,
-                cursor: disabled ? "default" : "pointer",
-                fontSize: 14, display: "flex", flexDirection: "column",
-                alignItems: "center", justifyContent: "center", position: "relative",
+              style={{ width:40, height:52, borderRadius:10, padding:'4px 2px 3px', overflow:'hidden',
+                border: `1px solid ${fc.primary}66`,
+                background: fc.bg,
+                cursor: disabled ? 'default' : 'pointer', position:'relative',
+                boxShadow: `0 0 8px ${fc.glow}`,
+                transition:'transform 0.15s, box-shadow 0.15s',
+                display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:2,
               }}>
-              <span>{m.emoji}</span>
-              <span style={{ fontSize: 7, opacity: 0.55, marginTop: 1 }}>{i+1}</span>
+              <img key={imgSrc} src={imgSrc} alt={m.label}
+                style={{ width:'85%', height:26, objectFit:'contain' }}
+                onError={e => { (e.target as HTMLImageElement).style.display='none'; }} />
+              <div style={{ fontFamily:FONT, fontSize:6, fontWeight:900, letterSpacing:'0.05em',
+                color: fc.text, textTransform:'uppercase', lineHeight:1, marginTop:0 }}>
+                {(faction.roles[role as AntRole]?.label || m.label).slice(0,4)}
+              </div>
+              <div style={{ position:'absolute', top:2, right:2, width:12, height:12, borderRadius:'50%',
+                background:'rgba(0,0,0,0.7)', color:'rgba(255,255,255,0.5)',
+                fontSize:7, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                ✕
+              </div>
             </button>
           );
         })}
-        {Array.from({ length: Math.max(0, SQUAD_SIZE - squad.length) }, (_, i) => (
-          <div key={`e${i}`} style={{
-            width: 32, height: 38, borderRadius: 8,
-            border: "1px dashed rgba(255,255,255,.1)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 16, opacity: 0.18,
-          }}>🐜</div>
+        {Array.from({ length: Math.max(0, SQUAD_SIZE - squad.length) }, (_,i) => (
+          <div key={`e${i}`} style={{ width:40, height:48, borderRadius:10,
+            border: `1px dashed ${fc.primary}22`, display:'flex', alignItems:'center',
+            justifyContent:'center', fontSize:14, opacity:0.15 }}>🐜</div>
         ))}
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+      {/* Action buttons */}
+      <div style={{ display:'flex', gap:8, marginTop:10, flexWrap:'wrap' }}>
         <button disabled={disabled} onClick={() => onChange([...DEFAULT_SQUAD])}
-          style={{ fontSize: 11, padding: "6px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,.18)", background: "rgba(255,255,255,.08)", color: "white", cursor: disabled?"not-allowed":"pointer", opacity: disabled?0.5:1, fontWeight: 700 }}>
-          🐜 Auto-fill Squad
+          style={{ fontFamily:FONT, fontSize:10, padding:'7px 14px', borderRadius:50,
+            border: `1px solid ${fc.primary}44`, background: fc.bg,
+            color: fc.text, cursor: disabled ? 'not-allowed' : 'pointer',
+            letterSpacing:'0.12em', textTransform:'uppercase', fontWeight:900 }}>
+          ⚡ AUTO-FILL
         </button>
         <button disabled={disabled} onClick={() => onChange([])}
-          style={{ fontSize: 11, padding: "6px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,.18)", background: "rgba(255,255,255,.08)", color: "white", cursor: disabled?"not-allowed":"pointer", opacity: disabled?0.5:1, fontWeight: 700 }}>
-          ✕ Clear
+          style={{ fontFamily:FONT, fontSize:10, padding:'7px 14px', borderRadius:50,
+            border:'1px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.04)',
+            color:'rgba(255,255,255,0.5)', cursor: disabled ? 'not-allowed' : 'pointer',
+            letterSpacing:'0.12em', textTransform:'uppercase', fontWeight:900 }}>
+          ✕ CLEAR
         </button>
         {lastSquad && lastSquad.length === SQUAD_SIZE && onLastSquad && (
           <button disabled={disabled} onClick={() => onLastSquad([...lastSquad])}
-            style={{ fontSize:11, padding:"6px 12px", borderRadius:8, border:"1px solid rgba(251,191,36,.4)", background:"rgba(251,191,36,.1)", color:"#fbbf24", cursor:disabled?"not-allowed":"pointer", opacity:disabled?0.5:1, fontWeight:700 }}
-            title="Reuse your last squad — survival odds are slightly lower for repeat squads">
-            🔁 Last Squad <span style={{fontSize:9,opacity:0.65}}>(−10% survival)</span>
+            style={{ fontFamily:FONT, fontSize:10, padding:'7px 14px', borderRadius:50,
+              border:'1px solid rgba(251,191,36,0.3)', background:'rgba(251,191,36,0.08)',
+              color:'#fbbf24', cursor: disabled ? 'not-allowed' : 'pointer',
+              letterSpacing:'0.12em', textTransform:'uppercase', fontWeight:900 }}
+            title="Reuse last squad — −10% survival">
+            🔁 LAST SQUAD <span style={{fontSize:8,opacity:0.65}}>(−10%)</span>
           </button>
         )}
       </div>
@@ -305,9 +360,10 @@ function RolePicker({ squad, onChange, disabled, carrierPct, lastSquad, onLastSq
 
 // ── Battle Scene ──────────────────────────────────────────────────────────────
 
-function BattleScene({ slots, revealedCount, phase, ultraCarriers, ultraRatio }: {
+function BattleScene({ slots, revealedCount, phase, ultraCarriers, ultraRatio, faction }: {
   slots: AntSlot[]; revealedCount: number; phase: Phase;
   ultraCarriers: number; ultraRatio: number;
+  faction?: any;
 }) {
   const survivors = slots.slice(0, revealedCount).filter(s => s.survived).length;
   const carriers  = slots.slice(0, revealedCount).filter(s => s.role === "carrier" && s.survived).length;
@@ -337,7 +393,7 @@ function BattleScene({ slots, revealedCount, phase, ultraCarriers, ultraRatio }:
 
           return (
             <div key={i} style={{
-              width: 44, height: 52, borderRadius: 10,
+              width: 48, height: 64, borderRadius: 10, overflow:'hidden', padding: 0,
               border: `1px solid ${!isRevealed ? "rgba(255,255,255,.07)" : survived ? `${m.color}66` : "rgba(239,68,68,.35)"}`,
               background: !isRevealed ? "rgba(255,255,255,.03)" : survived ? m.bgColor : "rgba(239,68,68,.08)",
               display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
@@ -347,11 +403,23 @@ function BattleScene({ slots, revealedCount, phase, ultraCarriers, ultraRatio }:
               transform: isActive ? "scale(1.2)" : "scale(1)",
               boxShadow: isActive ? `0 0 24px ${m.color}aa` : survived && isRevealed ? `0 0 8px ${m.color}33` : "none",
             }}>
-              <span style={{
-                filter: !isRevealed ? "grayscale(1)" : !survived ? "grayscale(.9) brightness(.5)" : "none",
-                fontSize: isActive ? 22 : 18, transition: "font-size .2s ease",
-              }}>{m.emoji}</span>
-              {isRevealed && <span style={{ fontSize: 9, marginTop: 1, fontWeight: 900 }}>{survived ? "✅" : "💀"}</span>}
+                {faction?.roles?.[slot.role as AntRole]?.img ? (
+                  <img key={faction.roles[slot.role as AntRole].img} src={faction.roles[slot.role as AntRole].img} alt={m.label}
+                    style={{
+                      width:'100%', height:40, objectFit:'contain',
+                      filter: !isRevealed ? 'grayscale(1) brightness(0.3)'
+                        : !survived ? 'grayscale(1) brightness(0.4) sepia(1) hue-rotate(280deg)'
+                        : 'none',
+                      transition:'filter 0.4s ease',
+                    }}
+                    onError={e=>{(e.target as HTMLImageElement).style.display='none';}}
+                  />
+                ) : (
+                  <span style={{
+                    filter: !isRevealed ? "grayscale(1)" : !survived ? "grayscale(.9) brightness(.5)" : "none",
+                    fontSize: isActive ? 22 : 18, transition: "font-size .2s ease",
+                  }}>{m.emoji}</span>
+                )}
               {slot.boosted && isRevealed && survived && (
                 <div style={{ position: "absolute", top: -6, right: -4, fontSize: 8, background: "#f472b6", borderRadius: 4, padding: "1px 3px", color: "white", fontWeight: 900 }}>💥</div>
               )}
@@ -752,7 +820,15 @@ export default function Raid() {
   const [playerId]                               = useState(initialId);
   const [effectivePlayerId, setEffectivePlayerId]= useState(initialEffectiveId);
 
-  useEffect(() => { startMarch(); return () => { stopMarch(); }; }, []);
+  useEffect(() => {
+    // Try immediate autoplay (works if user already interacted)
+    void startMarch();
+    // Fallback: start on first click/touch/keydown anywhere
+    const startOnce = () => { void startMarch(); document.removeEventListener('pointerdown', startOnce); document.removeEventListener('keydown', startOnce); };
+    document.addEventListener('pointerdown', startOnce, { once: true });
+    document.addEventListener('keydown', startOnce, { once: true });
+    return () => { stopMarch(); document.removeEventListener('pointerdown', startOnce); document.removeEventListener('keydown', startOnce); };
+  }, []);
   useEffect(() => {
     const u = () => setEffectivePlayerId(getEffectivePlayerId(loadProfile()));
     u(); window.addEventListener("ra:identity-changed", u);
@@ -772,7 +848,7 @@ export default function Raid() {
     return () => { cancelled=true; };
   }, []);
 
-  const { balance, spend, earn, devGrant, refresh } = usePoints(effectivePlayerId);
+  const { balance, spend, earn, devGrant, refresh, remainingDaily, capBank, dailyCap, totalEarnRoom } = usePoints(effectivePlayerId);
 
   const [profile, setProfile] = useState<any>(()=>{ try{return loadProfile();}catch{return {};} });
   useEffect(() => {
@@ -931,7 +1007,7 @@ export default function Raid() {
   }
 
   // Game state
-  const [squad, setSquad]                 = useState<AntRole[]>([...DEFAULT_SQUAD]);
+  const [squad, setSquad]                 = useState<AntRole[]>([]);
   const [lastSquad,setLastSquad]=useState<AntRole[]|null>(()=>{if(typeof window==="undefined")return null;try{const v=localStorage.getItem(LAST_SQUAD_KEY);return v?JSON.parse(v):null;}catch{return null;}});
   const [phase, setPhase]                 = useState<Phase>("idle");
   const { muted: raidMuted, toggleMute: toggleRaidMute, startMarch, stopMarch, sfx: raidSfx } = useRaidAudio();
@@ -1089,138 +1165,306 @@ export default function Raid() {
 
   const isBattling = phase==="launching"||phase==="battling";
 
+
+
+  const [factionId, setFactionId] = React.useState<import('../lib/factionConfig').FactionId>('ashigaru');
+  // Inline faction data — SSR safe, no window access
+  const FACTION_DATA: Record<string, any> = {
+    ashigaru: { id:'ashigaru', name:'Ashigaru', colors:{ primary:'#4ade80', secondary:'#16a34a', bg:'rgba(22,163,74,0.12)', glow:'rgba(74,222,128,0.5)', text:'#4ade80', gradient:'linear-gradient(135deg,#14532d,#166534,#15803d)' }, roles:{ scout:{img:'/factions/ashigaru/ashigaru_scout.PNG?v=2',label:'Scout'}, soldier:{img:'/factions/ashigaru/ashigaru_soldier.PNG?v=2',label:'Soldier'}, carrier:{img:'/factions/ashigaru/ashigaru_carrier.PNG?v=2',label:'Carrier'}, guard:{img:'/factions/ashigaru/ashigaru_guard.PNG?v=2',label:'Guard'}, bomber:{img:'/factions/ashigaru/ashigaru_bomber.PNG?v=2',label:'Bomber'} } },
+    ronin:    { id:'ronin',    name:'Ronin',    colors:{ primary:'#ef4444', secondary:'#1c1917', bg:'rgba(239,68,68,0.1)', glow:'rgba(239,68,68,0.45)', text:'#f87171', gradient:'linear-gradient(135deg,#1c1917,#292524,#ef4444)' }, roles:{ scout:{img:'/factions/ronin/ronin_scout.PNG?v=2',label:'Scout'}, soldier:{img:'/factions/ronin/ronin_soldier.PNG?v=2',label:'Soldier'}, carrier:{img:'/factions/ronin/ronin_carrier.PNG?v=2',label:'Carrier'}, guard:{img:'/factions/ronin/ronin_guard.PNG?v=2',label:'Guard'}, bomber:{img:'/factions/ronin/ronin_bomber.PNG?v=2',label:'Bomber'} } },
+    samurai:  { id:'samurai',  name:'Samurai',  colors:{ primary:'#dc2626', secondary:'#7f1d1d', bg:'rgba(220,38,38,0.1)', glow:'rgba(220,38,38,0.45)', text:'#fca5a5', gradient:'linear-gradient(135deg,#450a0a,#7f1d1d,#dc2626)' }, roles:{ scout:{img:'/factions/samurai/samurai_scout.PNG?v=2',label:'Scout'}, soldier:{img:'/factions/samurai/samurai_soldier.PNG?v=2',label:'Soldier'}, carrier:{img:'/factions/samurai/samurai_carrier.PNG?v=2',label:'Carrier'}, guard:{img:'/factions/samurai/samurai_guard.PNG?v=2',label:'Guard'}, bomber:{img:'/factions/samurai/samurai_bomber.PNG?v=2',label:'Bomber'} } },
+    bushi:    { id:'bushi',    name:'Bushi',    colors:{ primary:'#eab308', secondary:'#1e3a5f', bg:'rgba(30,58,95,0.2)', glow:'rgba(234,179,8,0.45)', text:'#fbbf24', gradient:'linear-gradient(135deg,#0c1a2e,#1e3a5f,#b45309)' }, roles:{ scout:{img:'/factions/bushi/bushi_scout.PNG?v=2',label:'Scout'}, soldier:{img:'/factions/bushi/bushi_soldier.PNG?v=2',label:'Soldier'}, carrier:{img:'/factions/bushi/bushi_carrier.PNG?v=2',label:'Carrier'}, guard:{img:'/factions/bushi/bushi_guard.PNG?v=2',label:'Guard'}, bomber:{img:'/factions/bushi/bushi_bomber.PNG?v=2',label:'Bomber'} } },
+    warrior:  { id:'warrior',  name:'Warriors', colors:{ primary:'#b45309', secondary:'#78350f', bg:'rgba(180,83,9,0.1)', glow:'rgba(180,83,9,0.45)', text:'#fb923c', gradient:'linear-gradient(135deg,#431407,#78350f,#b45309)' }, roles:{ scout:{img:'/factions/warrior/warrior_scout.PNG?v=2',label:'Scout'}, soldier:{img:'/factions/warrior/warrior_soldier.PNG?v=2',label:'Soldier'}, carrier:{img:'/factions/warrior/warrior_carrier.PNG?v=2',label:'Carrier'}, guard:{img:'/factions/warrior/warrior_guard.PNG?v=2',label:'Guard'}, bomber:{img:'/factions/warrior/warrior_bomber.PNG?v=2',label:'Bomber'} } },
+    shogun:   { id:'shogun',   name:'Shogun',   colors:{ primary:'#a855f7', secondary:'#1e1b4b', bg:'rgba(168,85,247,0.1)', glow:'rgba(168,85,247,0.5)', text:'#c084fc', gradient:'linear-gradient(135deg,#0f0720,#1e1b4b,#6b21a8)' }, roles:{ scout:{img:'/factions/shogun/shogun_scout.PNG?v=2',label:'Scout'}, soldier:{img:'/factions/shogun/shogun_soldier.PNG?v=2',label:'Soldier'}, carrier:{img:'/factions/shogun/shogun_carrier.PNG?v=2',label:'Carrier'}, guard:{img:'/factions/shogun/shogun_guard.PNG?v=2',label:'Guard'}, bomber:{img:'/factions/shogun/shogun_bomber.PNG?v=2',label:'Bomber'} } },
+    buke:     { id:'buke',     name:'Buke',     colors:{ primary:'#84cc16', secondary:'#3f6212', bg:'rgba(132,204,22,0.08)', glow:'rgba(132,204,22,0.4)', text:'#a3e635', gradient:'linear-gradient(135deg,#1a2e05,#3f6212,#65a30d)' }, roles:{ scout:{img:'/factions/buke/buke_scout.PNG?v=2',label:'Scout'}, soldier:{img:'/factions/buke/buke_soldier.PNG?v=2',label:'Soldier'}, carrier:{img:'/factions/buke/buke_carrier.PNG?v=2',label:'Carrier'}, guard:{img:'/factions/buke/buke_guard.PNG?v=2',label:'Guard'}, bomber:{img:'/factions/buke/buke_bomber.PNG?v=2',label:'Bomber'} } },
+    kenshi:   { id:'kenshi',   name:'Kenshi',   colors:{ primary:'#06b6d4', secondary:'#164e63', bg:'rgba(6,182,212,0.1)', glow:'rgba(6,182,212,0.45)', text:'#67e8f9', gradient:'linear-gradient(135deg,#083344,#164e63,#0e7490)' }, roles:{ scout:{img:'/factions/kenshi/kenshi_scout.PNG?v=2',label:'Scout'}, soldier:{img:'/factions/kenshi/kenshi_soldier.PNG?v=2',label:'Soldier'}, carrier:{img:'/factions/kenshi/kenshi_carrier.PNG?v=2',label:'Carrier'}, guard:{img:'/factions/kenshi/kenshi_guard.PNG?v=2',label:'Guard'}, bomber:{img:'/factions/kenshi/kenshi_bomber.PNG?v=2',label:'Bomber'} } },
+    wokou:    { id:'wokou',    name:'Wokou',    colors:{ primary:'#a16207', secondary:'#78350f', bg:'rgba(161,98,7,0.1)', glow:'rgba(161,98,7,0.4)', text:'#ca8a04', gradient:'linear-gradient(135deg,#1c0a00,#431407,#92400e)' }, roles:{ scout:{img:'/factions/wokou/wokou_scout.PNG?v=2',label:'Scout'}, soldier:{img:'/factions/wokou/wokou_soldier.PNG?v=2',label:'Soldier'}, carrier:{img:'/factions/wokou/wokou_carrier.PNG?v=2',label:'Carrier'}, guard:{img:'/factions/wokou/wokou_guard.PNG?v=2',label:'Guard'}, bomber:{img:'/factions/wokou/wokou_bomber.PNG?v=2',label:'Bomber'} } },
+    sohei:    { id:'sohei',    name:'Sohei',    colors:{ primary:'#f97316', secondary:'#7c2d12', bg:'rgba(249,115,22,0.1)', glow:'rgba(249,115,22,0.45)', text:'#fdba74', gradient:'linear-gradient(135deg,#2c0a00,#7c2d12,#c2410c)' }, roles:{ scout:{img:'/factions/sohei/sohei_scout.PNG?v=2',label:'Scout'}, soldier:{img:'/factions/sohei/sohei_soldier.PNG?v=2',label:'Soldier'}, carrier:{img:'/factions/sohei/sohei_carrier.PNG?v=2',label:'Carrier'}, guard:{img:'/factions/sohei/sohei_guard.PNG?v=2',label:'Guard'}, bomber:{img:'/factions/sohei/sohei_bomber.PNG?v=2',label:'Bomber'} } },
+    yamabushi:{ id:'yamabushi',name:'Yamabushi',colors:{ primary:'#14b8a6', secondary:'#134e4a', bg:'rgba(20,184,166,0.1)', glow:'rgba(20,184,166,0.45)', text:'#5eead4', gradient:'linear-gradient(135deg,#042f2e,#134e4a,#0f766e)' }, roles:{ scout:{img:'/factions/yamabushi/yamabushi_scout.PNG?v=2',label:'Scout'}, soldier:{img:'/factions/yamabushi/yamabushi_soldier.PNG?v=2',label:'Soldier'}, carrier:{img:'/factions/yamabushi/yamabushi_carrier.PNG?v=2',label:'Carrier'}, guard:{img:'/factions/yamabushi/yamabushi_guard.PNG?v=2',label:'Guard'}, bomber:{img:'/factions/yamabushi/yamabushi_bomber.PNG?v=2',label:'Bomber'} } },
+  };
+  const faction = FACTION_DATA[factionId] ?? FACTION_DATA['ashigaru'];
+
+  // Expose current faction to BattleScene via window (client-only)
+  if (typeof window !== 'undefined') {
+    (window as any).__RAID_FACTION__ = faction;
+  }
+
   return (
     <>
-      {/* Epic background */}
-      <div className="ant-colony-bg" aria-hidden="true" />
+      {/* ── PARTICLES ── */}
+      <div style={{ position:'fixed', inset:0, zIndex:0, pointerEvents:'none', overflow:'hidden' }}>
+        {[...Array(25)].map((_,i) => (
+          <div key={i} style={{
+            position:'absolute', bottom:'-4px',
+            left: `${(i*97+13)%100}%`,
+            width: 1+(i%2), height: 2+(i%4),
+            borderRadius: i%3===0 ? '50%' : '2px',
+            background: i%3===0 ? '#22d3ee' : i%3===1 ? '#0ea5e9' : '#67e8f9',
+            opacity: 0.1+(i%4)*0.05,
+            animation: `raidFloat ${5+(i%5)*1.5}s ${(i*0.6)%7}s infinite linear`,
+          }} />
+        ))}
+      </div>
 
-      <header className="page-head" role="banner">
-        <div className="site-title" style={{ display:"flex", alignItems:"center", gap:10 }}>
-          <Link href="/">Rebel Ants Playground</Link>
-          <button onClick={toggleRaidMute} title={raidMuted ? "Unmute" : "Mute"} style={{ background:"rgba(0,0,0,0.4)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:20, padding:"3px 10px", cursor:"pointer", fontSize:16, color:"rgba(255,255,255,0.8)", lineHeight:1 }}>
-            {raidMuted ? "🔇" : "🔊"}
+      {/* ── BG ── */}
+      <div style={{ position:'fixed', inset:0, zIndex:0, pointerEvents:'none', backgroundImage:"url('/ui/raid-bg.jpg')", backgroundSize:'cover', backgroundPosition:'center', filter:'saturate(0.75) brightness(0.55)' }} />
+      <div style={{ position:'fixed', inset:0, zIndex:1, pointerEvents:'none', background:'linear-gradient(160deg, rgba(2,6,23,0.8) 0%, rgba(3,10,28,0.65) 50%, rgba(2,8,20,0.85) 100%)' }} />
+      <div style={{ position:'fixed', inset:0, zIndex:1, pointerEvents:'none', background:'radial-gradient(ellipse at 50% 20%, rgba(6,182,212,0.08) 0%, transparent 60%)' }} />
+
+      {/* ── HEADER ── */}
+      <header style={{ position:'relative', zIndex:20, maxWidth:980, margin:'0 auto', padding:'16px 20px 0', display:'flex', alignItems:'center', justifyContent:'space-between', fontFamily: "'Noto Serif JP', 'Hiragino Mincho ProN', serif" }}>
+        <Link href="/" style={{ display:'flex', alignItems:'center', gap:10, textDecoration:'none', color:'white' }}>
+          <span style={{ fontSize:20, filter:'drop-shadow(0 0 8px rgba(34,211,238,0.6))' }}>←</span>
+          <span style={{ fontSize:11, fontWeight:900, letterSpacing:'0.2em', textTransform:'uppercase', color:'rgba(255,255,255,0.5)' }}>REBEL ANTS</span>
+        </Link>
+        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+          <div style={{ fontSize:13, fontWeight:900, letterSpacing:'0.1em', color:'#fbbf24', filter:'drop-shadow(0 0 8px rgba(251,191,36,0.5))' }}>
+            ⚡ {balance} <span style={{ fontSize:10, color:'rgba(251,191,36,0.6)' }}>REBEL</span>
+          </div>
+          <button onPointerDown={e=>{e.preventDefault();toggleRaidMute();}}
+            style={{ background:'rgba(0,0,0,0.4)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:20, padding:'6px 12px', cursor:'pointer', fontSize:15, color:'rgba(255,255,255,0.8)', minWidth:40, minHeight:40, touchAction:'manipulation' }}>
+            {raidMuted ? '🔇' : '🔊'}
           </button>
         </div>
-        <nav className="tabs" aria-label="Main">
-          <Link href="/tunnel"     className="tab">🐜 Ant Tunnel</Link>
-          <Link href="/faction-wars"      className="tab">⚔️ Faction Wars</Link>
-          <Link href="/the-raid" className="tab tab-active">⚔️ The Raid</Link>
-          <Link href="/shuffle"    className="tab">🃏 Shuffle</Link>
-        </nav>
       </header>
 
-      <div className="ant-card">
-        {/* Hero */}
-        <div style={{ textAlign:"center", marginBottom:4 }}>
-          <div style={{ fontSize:28, fontWeight:900, letterSpacing:"0.06em", background:"linear-gradient(135deg,#f87171,#fbbf24,#60a5fa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", marginBottom:4 }}>
-            ⚔️ THE RAID
-          </div>
-          <div style={{ fontSize:13, opacity:0.65, letterSpacing:"0.04em" }}>
-            🐜 Assemble {SQUAD_SIZE} ants. March into enemy territory. Win loot or die trying.
+      {/* ── MAIN ── */}
+      <div style={{ position:'relative', zIndex:10, maxWidth:980, margin:'0 auto', padding:'12px 16px 40px', fontFamily: "'Noto Serif JP', 'Hiragino Mincho ProN', serif" }}>
+
+        {/* Title */}
+        <div style={{ textAlign:'center', marginBottom:20 }}>
+          <div style={{ fontSize:'clamp(26px,5vw,52px)', fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase',
+            background:'linear-gradient(135deg,#e0f2fe,#38bdf8,#0ea5e9,#22d3ee,#67e8f9)',
+            WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text',
+            filter:'drop-shadow(0 0 24px rgba(34,211,238,0.5))' }}>⚔️ THE RAID</div>
+          <div style={{ fontSize:12, letterSpacing:'0.25em', color:'rgba(255,255,255,0.35)', textTransform:'uppercase', marginTop:6 }}>
+            🐜 ASSEMBLE YOUR SQUAD · MARCH INTO ENEMY TERRITORY · WIN LOOT OR DIE TRYING
           </div>
         </div>
 
-        {/* Difficulty warning */}
-        <div style={{ marginTop:10, padding:"8px 14px", borderRadius:10, background:"rgba(248,113,113,.07)", border:"1px solid rgba(248,113,113,.2)", fontSize:11, color:"#f87171", fontWeight:700, textAlign:"center", letterSpacing:"0.04em" }}>
-          ⚠️ BRUTAL DIFFICULTY — Carriers only have {Math.round(Number(cfg?.raidCarrierSurvival ?? 20) * (Number(cfg?.raidCarrierSurvival ?? 20) <= 1 ? 100 : 1))}% survival. Place 🛡️ Guards next to them to boost their odds.
+        {/* Mission briefing */}
+        <div style={{ marginBottom:16, padding:'12px 18px', borderRadius:14, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.25)', display:'flex', alignItems:'center', gap:10 }}>
+          <span style={{ fontSize:18 }}>⚠️</span>
+          <div style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:11, letterSpacing:'0.1em', textTransform:'uppercase', color:'rgba(255,180,180,0.85)' }}>
+            BRUTAL DIFFICULTY — Carriers only have {Math.round(Number(cfg?.raidCarrierSurvival ?? 25) * 100)}% survival chance. Send warriors to protect them.
+          </div>
         </div>
 
-        <RolePicker lastSquad={lastSquad} onLastSquad={(s) => setSquad(s)} squad={squad} onChange={setSquad} disabled={isBattling} carrierPct={Math.round(Number(cfg?.raidCarrierSurvival ?? 0.20) * (Number(cfg?.raidCarrierSurvival ?? 0.20) <= 1 ? 100 : 1))} />
+        {/* ── SQUAD BUILDER ── */}
+        <div style={{ marginBottom:16, borderRadius:20, overflow:'hidden',
+          background:'linear-gradient(135deg, rgba(3,10,28,0.9), rgba(5,15,35,0.95))',
+          border:`1px solid ${faction.colors.primary}33`,
+          boxShadow:`0 0 40px ${faction.colors.glow.replace('0.5','0.06')}, inset 0 1px 0 ${faction.colors.primary}22`,
+          transition:'border-color 0.4s, box-shadow 0.4s',
+        }}>
+          {/* Squad builder header + faction dropdown */}
+          <div style={{ padding:'14px 20px 12px', borderBottom:`1px solid ${faction.colors.primary}15`, display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
+            <div style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:12, fontWeight:900, letterSpacing:'0.25em', textTransform:'uppercase', color: faction.colors.text, filter:`drop-shadow(0 0 8px ${faction.colors.glow})` }}>
+              ⚔️ ASSEMBLE YOUR SQUAD
+            </div>
 
-        {phase==="launching" && <LaunchAnimation />}
-        {(phase==="battling"||phase==="revealed") && slots.length>0 && (
-          <BattleScene
-            slots={slots} revealedCount={revealedCount} phase={phase}
-            ultraCarriers={ultraCarriersThreshold} ultraRatio={ultraRatioThreshold}
-          />
-        )}
-        {phase==="battling" && (
-          <div style={{ marginTop:8, fontSize:12, opacity:0.65, textAlign:"center", fontWeight:700, letterSpacing:"0.06em" }}>
-            🐜 Ant {Math.min(revealedCount+1,SQUAD_SIZE)} of {SQUAD_SIZE} reporting in…
+            {/* Faction Dropdown */}
+            <div style={{ position:'relative', display:'flex', alignItems:'center', gap:10 }}>
+              <span style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:9, letterSpacing:'0.2em', textTransform:'uppercase', color:'rgba(255,255,255,0.4)' }}>FACTION</span>
+              <select
+                value={factionId}
+                onChange={e => setFactionId(e.target.value as any)}
+                style={{
+                  fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif",
+                  fontSize:11, fontWeight:900, letterSpacing:'0.12em',
+                  background:'rgba(0,0,0,0.6)',
+                  border:`1px solid ${faction.colors.primary}55`,
+                  borderRadius:10, padding:'7px 32px 7px 12px',
+                  color: faction.colors.text,
+                  cursor:'pointer', outline:'none', appearance:'none',
+                  boxShadow:`0 0 12px ${faction.colors.glow.replace('0.5','0.2')}`,
+                  textTransform:'uppercase',
+                  minWidth:140,
+                }}>
+                {[
+                  {id:'ashigaru',name:'⛩ ASHIGARU',available:true},
+                  {id:'ronin',name:'🗡 RONIN',available:true},
+                  {id:'samurai',name:'⚔️ SAMURAI',available:true},
+                  {id:'bushi',name:'🏯 BUSHI',available:true},
+                  {id:'warrior',name:'🛡 WARRIORS',available:true},
+                  {id:'shogun',name:'👑 SHOGUN',available:true},
+                  {id:'buke',name:'🌿 BUKE',available:true},
+                  {id:'kenshi',name:'💧 KENSHI',available:true},
+                  {id:'wokou',name:'🌊 WOKOU',available:true},
+                  {id:'sohei',name:'🔥 SOHEI',available:true},
+                  {id:'yamabushi',name:'🌌 YAMABUSHI',available:true},
+                ].map(f => (
+                  <option key={f.id} value={f.id} disabled={!f.available}
+                    style={{ background:'#0a0f1e', color: f.available ? '#fff' : 'rgba(255,255,255,0.3)' }}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+              {/* Dropdown arrow */}
+              <div style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', pointerEvents:'none', color: faction.colors.text, fontSize:9 }}>▼</div>
+            </div>
+          </div>
+
+          <div style={{ padding:'16px 20px' }}>
+            <RolePicker
+              lastSquad={lastSquad} onLastSquad={(s) => setSquad(s)}
+              squad={squad} onChange={setSquad}
+              disabled={isBattling}
+              carrierPct={Math.round(Number(cfg?.raidCarrierSurvival ?? 0.20) * (Number(cfg?.raidCarrierSurvival ?? 0.20) <= 1 ? 100 : 1))}
+              faction={faction}
+            />
+          </div>
+        </div>
+
+        {/* ── BATTLE SCENE ── */}
+        {(phase==='battling'||phase==='revealed') && slots.length>0 && (
+          <div style={{ marginBottom:16, borderRadius:20, overflow:'hidden',
+            background:'linear-gradient(135deg, rgba(3,10,28,0.95), rgba(8,20,50,0.98))',
+            border:`1px solid ${faction.colors.primary}33`,
+            boxShadow:`0 0 60px ${faction.colors.glow.replace('0.5','0.1')}, inset 0 1px 0 ${faction.colors.primary}22`,
+            padding:'20px' }}>
+            <div style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:11, fontWeight:900, letterSpacing:'0.25em', textTransform:'uppercase', color: faction.colors.text, marginBottom:14, filter:`drop-shadow(0 0 8px ${faction.colors.glow})` }}>
+              ⚔️ BATTLE REPORT
+            </div>
+            <BattleScene slots={slots} revealedCount={revealedCount} phase={phase}
+              ultraCarriers={ultraCarriersThreshold} ultraRatio={ultraRatioThreshold} faction={faction} />
           </div>
         )}
 
-        {/* CTA */}
-        <div style={{ marginTop:16, display:"flex", gap:10, flexWrap:"wrap", alignItems:"center" }}>
-          <button className="btn" onClick={launchRaid}
+        {phase==='launching' && <LaunchAnimation />}
+
+        {phase==='battling' && (
+          <div style={{ marginTop:8, fontSize:12, textAlign:'center', fontWeight:900, fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", letterSpacing:'0.2em', textTransform:'uppercase', color:'#22d3ee', animation:'raidPulse 1s ease-in-out infinite', filter:'drop-shadow(0 0 8px rgba(34,211,238,0.6))' }}>
+            🐜 ANT {Math.min(revealedCount+1,SQUAD_SIZE)} OF {SQUAD_SIZE} REPORTING IN…
+          </div>
+        )}
+
+        {/* ── ACTION ROW ── */}
+        <div style={{ display:'flex', gap:10, flexWrap:'wrap', alignItems:'center', marginTop:16, marginBottom:12 }}>
+          <button onClick={launchRaid}
             disabled={busy||squad.length<SQUAD_SIZE||needMore>0}
-            title={squad.length<SQUAD_SIZE?`Need ${SQUAD_SIZE} ants`:needMore>0?"Not enough points":""}
-            style={{ minWidth:240, height:48, fontSize:14, fontWeight:900, display:"inline-flex", alignItems:"center", justifyContent:"center", position:"relative", background:busy?"rgba(15,23,42,.7)":"linear-gradient(135deg,rgba(248,113,113,.18),rgba(96,165,250,.18))", border:"1px solid rgba(248,113,113,.35)", color:"#f87171" }}>
-            <span style={{ visibility:"hidden" }}>Launch Raid (-{cost} {cfg?.currency})</span>
-            <span style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center" }}>
-              {phase==="launching"?"🐜 Marching…":phase==="battling"?"⚔️ Battle in progress…":squad.length<SQUAD_SIZE?`🐜 Need ${SQUAD_SIZE-squad.length} more ants`:`⚔️ Launch Raid (-${totalCost} ${cfg?.currency})`}
+            title={squad.length<SQUAD_SIZE ? `Need ${SQUAD_SIZE} ants` : needMore>0 ? 'Not enough points' : ''}
+            style={{
+              fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", position:'relative', minWidth:240, height:52,
+              display:'inline-flex', alignItems:'center', justifyContent:'center',
+              fontSize:13, fontWeight:900, letterSpacing:'0.2em', textTransform:'uppercase',
+              background: (busy||squad.length<SQUAD_SIZE||needMore>0) ? 'rgba(6,182,212,0.08)' : 'linear-gradient(135deg,#0369a1,#0ea5e9,#22d3ee)',
+              border: (busy||squad.length<SQUAD_SIZE||needMore>0) ? '2px solid rgba(6,182,212,0.2)' : '2px solid rgba(34,211,238,0.6)',
+              borderRadius:50, color:'white',
+              cursor: (busy||squad.length<SQUAD_SIZE||needMore>0) ? 'not-allowed' : 'pointer',
+              opacity: (busy||squad.length<SQUAD_SIZE||needMore>0) ? 0.45 : 1,
+              boxShadow: (busy||squad.length<SQUAD_SIZE||needMore>0) ? 'none' : '0 0 20px rgba(6,182,212,0.5), 0 0 40px rgba(6,182,212,0.2)',
+              animation: (!busy&&squad.length>=SQUAD_SIZE&&needMore===0) ? 'btnTealGlow 2.5s ease-in-out infinite' : 'none',
+              transition:'all 0.2s',
+            }}>
+            <span style={{ visibility:'hidden', position:'absolute' }}>LAUNCH RAID (cost: {totalCost} REBEL)</span>
+            <span style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:2 }}>
+              {phase==='launching' ? (
+                <span>🐜 MARCHING…</span>
+              ) : phase==='battling' ? (
+                <span>⚔️ BATTLE IN PROGRESS…</span>
+              ) : squad.length<SQUAD_SIZE ? (
+                <span>{`SQUAD NEEDS ${SQUAD_SIZE-squad.length} MORE`}</span>
+              ) : (
+                <>
+                  <span style={{ fontSize:14, lineHeight:1 }}>⚔️ LAUNCH RAID</span>
+                  <span style={{ fontSize:9, opacity:0.85, fontWeight:700, letterSpacing:'0.15em', lineHeight:1 }}>{`COST: ${totalCost} ${cfg?.currency}`}</span>
+                </>
+              )}
             </span>
           </button>
 
-          <button className="btn" type="button" onClick={()=>setShowBuyPoints(true)} style={{ padding:"10px 14px", fontSize:12 }}>💳 Buy Points</button>
-
-          {isDiscordConnected
-            ? <button className="btn" type="button" onClick={disconnectDiscord} style={{ padding:"10px 14px", fontSize:12 }}>Disconnect Discord</button>
-            : <button className="btn" type="button"
-                onClick={()=>{ try{saveProfile({discordSkipLink:false});window.dispatchEvent(new Event("ra:identity-changed"));}catch{} window.location.href="/api/auth/discord/login"; }}
-                style={{ padding:"10px 14px", fontSize:12 }}>Connect Discord</button>
-          }
-
-          <button
-            className="btn"
-            type="button"
-            onClick={async()=>{ if(!isDiscordConnected)return; await openDripModal(); }}
-            disabled={dripBusy||!isDiscordConnected}
-            style={{ padding:"10px 14px", fontSize:12 }}
-            title={isDiscordConnected?"Move points from Discord (DRIP) into the game.":"Connect Discord to migrate DRIP points."}
-          >
-            {dripBusy?"Loading DRIP…":isDiscordConnected?"Migrate DRIP Points":"Connect Discord for DRIP"}
+          <button type="button" onClick={()=>setShowBuyPoints(true)}
+            style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", padding:'10px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background:'rgba(251,191,36,0.1)', border:'1px solid rgba(251,191,36,0.3)', borderRadius:50, color:'#fbbf24', cursor:'pointer', whiteSpace:'nowrap' }}>
+            💎 BUY POINTS
           </button>
 
-          <div style={{ fontSize:11, opacity:0.65 }}>Discord: <b>{isDiscordConnected?"✅":"❌"}</b></div>
-        </div>
-
-        <div style={{ marginTop:10, fontSize:12, opacity:0.8, display:"flex", gap:14, flexWrap:"wrap" }}>
-          <span>🐜 Balance: <b>{balance}</b> {cfg?.currency}</span>
-          <span>⚔️ Launch: <b>{cost}</b> + Squad: <b>{squadCost}</b> = <b>{totalCost}</b> {cfg?.currency}</span>
-          {needMore>0 && <span style={{ color:"#f87171" }}>Need {needMore} more {cfg?.currency}</span>}
-        </div>
-        <div style={{ marginTop:6, fontSize:11, opacity:0.55, display:"flex", gap:10, flexWrap:"wrap" }}>
-          <span>🏆 Ultra: +{cfg?.rewards?.ultra}</span>
-          <span>⚔️ Rare: +{cfg?.rewards?.rare}</span>
-          <span>✅ Common: +{cfg?.rewards?.common}</span>
-          <span>📅 Daily cap: {cfg?.dailyEarnCap}</span>
-        </div>
-
-        {/* Name + claim */}
-        <div style={{ marginTop:12, display:"flex", gap:10, flexWrap:"wrap", alignItems:"center" }}>
-          <label style={{ fontSize:12, opacity:0.85 }}>
-            🐜 Commander:&nbsp;
-            <input value={playerName}
-              onChange={e=>{ const v=(e.target.value.slice(0,18)||"guest").trim()||"guest"; setPlayerName(v); const p=loadProfile(); saveProfile({name:v,id:(p?.id||playerId||"guest").trim()||"guest"}); }}
-              style={{ padding:"6px 10px", borderRadius:10, border:"1px solid rgba(255,255,255,.18)", background:"rgba(15,23,42,.55)", color:"inherit" }}
-            />
-            <div style={{ fontSize:10, opacity:0.55, marginTop:3 }}>ID: {profile?.discordName || playerName}</div>
-          </label>
-
-          <button className="btn" type="button" onClick={claimDailyNow} disabled={claimBusy||dailyClaimed} style={{ padding:"8px 12px", fontSize:12 }}>
-            {dailyClaimed
-              ? countdownStr
-                ? `⏱ Next claim in ${countdownStr}`
-                : "🐜 Claimed Today ✅"
-              : `🐜 Daily +${cfg?.dailyClaim} ${cfg?.currency}`}
-          </button>
-
-          {process.env.NODE_ENV!=="production" && (
-            <button className="btn" type="button" onClick={async()=>{ await devGrant(5000); await refresh(); alert("Dev grant ✅"); }} style={{ padding:"8px 12px", fontSize:12 }}>Dev +5000</button>
+          {isDiscordConnected ? (
+            <div style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", display:'flex', alignItems:'center', gap:8, padding:'10px 14px', borderRadius:50, border:'1px solid rgba(88,101,242,0.3)', background:'rgba(88,101,242,0.08)', fontSize:11, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase', whiteSpace:'nowrap' }}>
+              <span style={{ color:'#a5b4fc' }}>✓ DISCORD</span>
+              <button type="button" onClick={disconnectDiscord} style={{ background:'none', border:'none', fontSize:10, color:'rgba(255,255,255,0.4)', cursor:'pointer', padding:0, textDecoration:'underline', textTransform:'lowercase', letterSpacing:'0.05em', fontFamily:'inherit' }}>disconnect</button>
+            </div>
+          ) : (
+            <button type="button"
+              onClick={()=>{ try{saveProfile({discordSkipLink:false});window.dispatchEvent(new Event('ra:identity-changed'));}catch{} window.location.href='/api/auth/discord/login'; }}
+              style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", padding:'10px 14px', fontSize:11, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase', background:'#5865F2', border:'none', borderRadius:50, color:'white', cursor:'pointer', whiteSpace:'nowrap' }}>
+              CONNECT DISCORD
+            </button>
           )}
-          {claimStatus && <div style={{ fontSize:11, opacity:0.85 }}>{claimStatus}</div>}
+
+          {needMore>0 && <span style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:11, color:'#f87171', letterSpacing:'0.1em', textTransform:'uppercase' }}>NEED {needMore} MORE</span>}
         </div>
 
-        <div style={{ marginTop:10 }}>
-          <button onClick={()=>setShowRules(true)} style={{ fontSize:12, textDecoration:"underline", opacity:0.65, background:"none", border:"none", color:"inherit", cursor:"pointer", padding:0 }}>Official Rules</button>
+        
+        {/* ── Plays & Daily Cap ── */}
+        {(remainingDaily > 0 || dailyCap > 0 || capBank > 0) && (
+          <div style={{ borderRadius:14, border:'1px solid rgba(34,211,238,0.12)', background:'rgba(3,10,28,0.6)', padding:'12px 16px', marginBottom:12 }}>
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center', marginBottom:8 }}>
+              <div style={{ padding:'5px 14px', borderRadius:20, background:'rgba(34,211,238,0.08)', border:'1px solid rgba(34,211,238,0.2)' }}>
+                <span style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:10, letterSpacing:'0.1em', textTransform:'uppercase', color:'rgba(255,255,255,0.4)', marginRight:6 }}>PLAYS TODAY</span>
+                <span style={{ fontSize:13, fontWeight:900, color:'#22d3ee' }}>{remainingDaily}</span>
+                <span style={{ fontSize:10, color:'rgba(255,255,255,0.25)' }}> / {Number(dailyCap||0)}</span>
+              </div>
+              {capBank > 0 && (
+                <div style={{ padding:'5px 14px', borderRadius:20, background:'rgba(251,191,36,0.08)', border:'1px solid rgba(251,191,36,0.2)' }}>
+                  <span style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:10, letterSpacing:'0.1em', textTransform:'uppercase', color:'rgba(255,255,255,0.4)', marginRight:6 }}>BONUS BANK</span>
+                  <span style={{ fontSize:13, fontWeight:900, color:'#fbbf24' }}>{capBank}</span>
+                  <span style={{ fontSize:9, color:'rgba(255,255,255,0.3)', marginLeft:4 }}>NEVER EXPIRE</span>
+                </div>
+              )}
+            </div>
+            <div style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:10, color:'rgba(255,255,255,0.3)', lineHeight:1.6 }}>
+              🔄 Free plays reset daily · 💎 Buying REBEL raises your daily cap permanently + adds to your bonus bank (never expires)
+            </div>
+          </div>
+        )}
+        {/* ── INFO STRIP ── */}
+        <div style={{ display:'flex', gap:14, flexWrap:'wrap', alignItems:'center', marginBottom:12, padding:'12px 16px', borderRadius:14, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(34,211,238,0.1)' }}>
+          <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+            {[
+              {label:'ULTRA',val:`+${cfg?.rewards?.ultra}`,col:'#fbbf24'},
+              {label:'RARE',val:`+${cfg?.rewards?.rare}`,col:'#22d3ee'},
+              {label:'COMMON',val:`+${cfg?.rewards?.common}`,col:'#34d399'},
+              {label:'LAUNCH',val:String(cost),col:'#f87171'},
+              {label:'SQUAD',val:String(squadCost),col:'#f87171'},
+            ].map(item => (
+              <div key={item.label} style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:10, letterSpacing:'0.12em', textTransform:'uppercase' }}>
+                <span style={{ color:'rgba(255,255,255,0.35)' }}>{item.label} </span>
+                <span style={{ color:item.col, fontWeight:900 }}>{item.val}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ flex:1 }} />
+          <button type="button" onClick={claimDailyNow} disabled={claimBusy||dailyClaimed}
+            style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", padding:'7px 14px', fontSize:10, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background: dailyClaimed ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg,#ef4444,#f97316)', border: dailyClaimed ? '1px solid rgba(255,255,255,0.1)' : 'none', borderRadius:50, color: dailyClaimed ? 'rgba(255,255,255,0.3)' : 'white', cursor: dailyClaimed ? 'not-allowed' : 'pointer', whiteSpace:'nowrap', boxShadow: dailyClaimed ? 'none' : '0 0 12px rgba(239,68,68,0.3)' }}>
+            {dailyClaimed ? (countdownStr ? `⏱ NEXT IN ${countdownStr}` : '✓ CLAIMED TODAY') : `⚡ CLAIM +${cfg?.dailyClaim} REBEL`}
+          </button>
+          {isDiscordConnected && (
+            <button type="button" onClick={async()=>{ if(isDiscordConnected) await openDripModal(); }} disabled={dripBusy}
+              style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", padding:'7px 12px', fontSize:10, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:50, color:'rgba(255,255,255,0.5)', cursor:'pointer', whiteSpace:'nowrap' }}>
+              {dripBusy ? 'LOADING...' : 'MIGRATE DRIP'}
+            </button>
+          )}
         </div>
 
-        <RaidLeaderboardPanel lb={lb} />
+        <div style={{ marginBottom:20 }}>
+          <button onClick={()=>setShowRules(true)} style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:10, letterSpacing:'0.12em', textTransform:'uppercase', background:'transparent', border:'none', color:'rgba(255,255,255,0.3)', cursor:'pointer', textDecoration:'underline' }}>
+            OFFICIAL RULES
+          </button>
+        </div>
 
-        {showResult && slots.length>0 && (
-          <RaidResultModal
-          slots={slots} rarity={rarity} prize={prize} onClose={resetRaid}
+        <div style={{ borderRadius:18, border:'1px solid rgba(34,211,238,0.15)', background:'rgba(3,10,28,0.7)', backdropFilter:'blur(12px)', padding:16, boxShadow:'0 0 30px rgba(6,182,212,0.08)' }}>
+          <RaidLeaderboardPanel lb={lb} />
+        </div>
+
+        <div style={{ textAlign:'center', padding:'16px 0 4px', fontSize:10, opacity:0.25, color:'white', letterSpacing:'0.06em', userSelect:'none', fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", textTransform:'uppercase' }}>
+          © 2026 REBEL ANTS LLC · DEVELOPED BY MIGUEL CONCEPCION
+        </div>
+      </div>
+
+      {/* ── MODALS ── */}
+      {showResult && slots.length>0 && (
+        <RaidResultModal slots={slots} rarity={rarity} prize={prize} onClose={resetRaid}
           ultraCarriers={ultraCarriersThreshold} ultraRatio={ultraRatioThreshold}
           rareCarriers={rareCarriersThreshold} rareRatio={rareRatioThreshold}
           commonSurvivors={commonSurvivorsThreshold}
@@ -1229,104 +1473,69 @@ export default function Raid() {
           prizeClaimId={prizeClaimId} prizeShipForm={prizeShipForm}
           setPrizeShipForm={setPrizeShipForm} setPrizeShipMsg={setPrizeShipMsg}
           setPrizeShipBusy={setPrizeShipBusy} setPrizeClaimId={setPrizeClaimId}
-          setPrizeNeedShipping={setPrizeNeedShipping} effectivePlayerId={effectivePlayerId}
-          />
-        )}
+          setPrizeNeedShipping={setPrizeNeedShipping} effectivePlayerId={effectivePlayerId} />
+      )}
 
-        <BuyPointsModal open={showBuyPoints} onClose={()=>setShowBuyPoints(false)} playerId={effectivePlayerId} onClaimed={async()=>{ await refresh(); }} />
-
-        {/* DRIP Modal */}
-        {showDripMigrate && (
-          <div style={{ position:"fixed", inset:0, zIndex:2500, background:"rgba(0,0,0,.6)", display:"grid", placeItems:"center", padding:16 }} role="dialog" aria-modal="true">
-            <div style={{ width:"min(520px, 95vw)", borderRadius:16, border:"1px solid rgba(255,255,255,.18)", background:"rgba(15,23,42,.96)", boxShadow:"0 28px 60px rgba(0,0,0,.55)", padding:16, color:"white" }}>
-              <div style={{ display:"flex", justifyContent:"space-between", gap:12, alignItems:"center" }}>
-                <div style={{ fontWeight:900, fontSize:16 }}>Migrate DRIP Points → Game</div>
-                <button className="btn" onClick={()=>setShowDripMigrate(false)} style={{ padding:"8px 12px" }}>Close</button>
-              </div>
-              <div style={{ marginTop:10, fontSize:13, opacity:0.9, lineHeight:1.4 }}>
-                This will <b>deduct</b> points from DRIP (Discord) and <b>credit</b> the same amount into the game. No double-dipping.
-              </div>
-              <div style={{ marginTop:12, fontSize:13, opacity:0.95 }}>DRIP Balance: <b>{typeof dripBalance==="number"?dripBalance:"—"}</b></div>
-              <div style={{ marginTop:12, display:"grid", gap:8 }}>
-                <label style={{ fontSize:12, opacity:0.9 }}>Amount to migrate</label>
-                <input value={dripAmount===0?"":String(dripAmount)} onChange={e=>{ const raw=String(e.target.value||"").replace(/^0+/,""); setDripAmount(Number(raw||0)); }} type="number" min={0} step={1}
-                  style={{ padding:"10px 12px", borderRadius:12, border:"1px solid rgba(255,255,255,.18)", background:"rgba(15,23,42,.7)", color:"white", outline:"none", fontWeight:800 }} />
-                <button className="btn" type="button" onClick={migrateDripNow} disabled={dripBusy} style={{ padding:"12px 12px" }}>
-                  <div style={{ fontWeight:900 }}>{dripBusy?"Working…":"Migrate Now"}</div>
-                  <div style={{ fontSize:12, opacity:0.9 }}>Deduct from DRIP → Credit to <b>{effectivePlayerId}</b></div>
-                </button>
-              </div>
-              {dripStatus && <div style={{ marginTop:12, fontSize:12, opacity:0.9, whiteSpace:"pre-wrap" }}>{dripStatus}</div>}
-            </div>
-          </div>
-        )}
-      </div>
+      <BuyPointsModal open={showBuyPoints} onClose={()=>setShowBuyPoints(false)} playerId={effectivePlayerId} onClaimed={async()=>{ await refresh(); }} />
 
       {showRules && (
-        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.8)", zIndex:3000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }} onClick={()=>setShowRules(false)}>
-          <div style={{ background:"#0f172a", border:"1px solid rgba(255,255,255,0.15)", borderRadius:16, padding:28, maxWidth:560, width:"100%", maxHeight:"85vh", overflowY:"auto", position:"relative" }} onClick={e=>e.stopPropagation()}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
-              <div style={{ fontWeight:900, fontSize:18 }}>📋 Official Rules</div>
-              <button onClick={()=>setShowRules(false)} style={{ background:"rgba(255,255,255,0.1)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:8, padding:"6px 14px", color:"white", cursor:"pointer", fontSize:13 }}>✕ Close</button>
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.85)', zIndex:3000, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }} onClick={()=>setShowRules(false)}>
+          <div style={{ background:'#040c1e', border:'1px solid rgba(34,211,238,0.2)', borderRadius:16, padding:28, maxWidth:560, width:'100%', maxHeight:'85vh', overflowY:'auto' }} onClick={e=>e.stopPropagation()}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:18 }}>
+              <div style={{ fontWeight:900, fontSize:18, fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", letterSpacing:'0.1em' }}>📋 OFFICIAL RULES</div>
+              <button onClick={()=>setShowRules(false)} style={{ background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.2)', borderRadius:8, padding:'6px 14px', color:'white', cursor:'pointer', fontSize:13 }}>✕</button>
             </div>
-            <div style={{ fontSize:13, lineHeight:1.7, display:"flex", flexDirection:"column", gap:12, opacity:0.9 }}>
-              <p><b>Free-to-play.</b> No purchase necessary to play. Void where prohibited.</p>
-              <p><b>Game currency:</b> REBEL Points are an in-app, promotional points system. They have no guaranteed cash value and are not redeemable for cash.</p>
-              <p><b>Optional purchase (APE):</b> You may optionally buy REBEL Points using APE to support the project. <b>All purchases are final</b> (no refunds). Network fees (gas) may apply.</p>
-              <p><b>Prizes:</b> Crates may award REBEL Points and/or digital collectibles and/or merch (when available). Prize availability may vary by location.</p>
-              <p><b>Daily limits:</b> Daily claim limits and daily play limits apply to support fair access and prevent abuse. Daily plays reset every 24 hours. Purchased bonus plays do not expire.</p>
-              <p><b>Fair play:</b> Multi-accounting, automation/bots, exploits, or abuse may result in disqualification, prize forfeiture, or account blocking.</p>
-              <p><b>Odds:</b> Prize odds and point values may change over time based on live configuration and promotions.</p>
-              <p><b>Taxes:</b> You are responsible for any taxes associated with prizes, if applicable.</p>
-              <p style={{ opacity:0.7 }}>By playing, you agree to these rules and acknowledge this is an entertainment experience with promotional rewards.</p>
+            <div style={{ fontSize:13, lineHeight:1.7, display:'flex', flexDirection:'column', gap:12, opacity:0.9 }}>
+              <p><b>Free-to-play.</b> No purchase necessary. Void where prohibited.</p>
+              <p><b>Game currency:</b> REBEL Points are promotional only. No guaranteed cash value.</p>
+              <p><b>Prizes:</b> May award REBEL Points and/or collectibles/merch when available.</p>
+              <p><b>Fair play:</b> Bots or exploits may result in disqualification.</p>
+              <p style={{ opacity:0.7 }}>By playing, you agree to these rules.</p>
             </div>
           </div>
         </div>
       )}
 
+      {showDripMigrate && (
+        <div style={{ position:'fixed', inset:0, zIndex:2500, background:'rgba(0,0,0,.6)', display:'grid', placeItems:'center', padding:16 }} role="dialog" aria-modal="true">
+          <div style={{ width:'min(520px, 95vw)', borderRadius:16, border:'1px solid rgba(255,255,255,.18)', background:'rgba(4,9,22,.97)', boxShadow:'0 28px 60px rgba(0,0,0,.55)', padding:20, color:'white' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', gap:12, alignItems:'center', marginBottom:12 }}>
+              <div style={{ fontWeight:900, fontSize:16 }}>Migrate DRIP Points → Game</div>
+              <button className="btn" onClick={()=>setShowDripMigrate(false)} style={{ padding:'8px 12px' }}>Close</button>
+            </div>
+            <div style={{ fontSize:13, opacity:0.9, lineHeight:1.4, marginBottom:12 }}>
+              This will <b>deduct</b> points from DRIP (Discord) and <b>credit</b> the same amount into the game.
+            </div>
+            <div style={{ fontSize:13, opacity:0.95, marginBottom:12 }}>DRIP Balance: <b>{typeof dripBalance==='number'?dripBalance:'—'}</b></div>
+            <div style={{ display:'grid', gap:8, marginBottom:14 }}>
+              <label style={{ fontSize:12, opacity:0.9 }}>Amount to migrate</label>
+              <input value={dripAmount===0?'':String(dripAmount)}
+                onChange={(e)=>{ const raw=String(e.target.value||'').replace(/^0+/,''); const n=parseInt(raw,10); setDripAmount(isNaN(n)?0:Math.max(0,Math.min(n,typeof dripBalance==='number'?dripBalance:0))); }}
+                type="number" min={0} max={typeof dripBalance==='number'?dripBalance:0} placeholder="0"
+                style={{ padding:10, borderRadius:10, border:'1px solid rgba(255,255,255,.18)', background:'rgba(15,23,42,.55)', color:'inherit', fontSize:15, width:160 }} />
+            </div>
+            <div style={{ display:'flex', gap:8 }}>
+              <button className="btn" onClick={migrateDripNow} disabled={dripBusy||dripAmount<=0} style={{ padding:'10px 18px', fontSize:13 }}>
+                {dripBusy?'Migrating…':`Migrate ${dripAmount} ${cfg?.currency}`}
+              </button>
+            </div>
+            {dripStatus && <div style={{ marginTop:10, fontSize:13 }}>{dripStatus}</div>}
+          </div>
+        </div>
+      )}
+
       <style>{`
-        .ant-colony-bg {
-          position: fixed; inset: 0; pointer-events: none; z-index: 0;
-          background-image: url('/ui/raid-bg.jpg');
-          background-size: cover; background-position: center;
-        }
-        .ant-colony-bg::after {
-          content: ''; position: absolute; inset: 0;
-          background: linear-gradient(140deg, rgba(4,9,22,0.78), rgba(7,13,30,0.85));
-        }
-        .page-head {
-          position: relative; z-index: 10;
-          max-width: 980px; margin: 24px auto 14px; padding: 4px 2px;
-        }
-        .site-title { font-size: 22px; font-weight: 800; margin-bottom: 8px; }
-        .site-title a { color: inherit; text-decoration: none; }
-        .tabs { display: flex; gap: 8px; flex-wrap: wrap; }
-        .tab {
-          display: inline-flex; align-items: center; gap: 6px;
-          padding: 6px 10px; border-radius: 999px; font-size: 13px;
-          background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.15);
-          backdrop-filter: blur(4px); transition: transform .06s ease, background .2s ease;
-          color: inherit; text-decoration: none;
-        }
-        .tab:hover { transform: translateY(-1px); background: rgba(255,255,255,.11); }
-        .tab-active { background: rgba(248,113,113,.14); border-color: rgba(248,113,113,.32); color: #f87171; }
-        .ant-card {
-          position: relative; z-index: 5;
-          max-width: 980px; margin: 0 auto 40px;
-          padding: 20px; border-radius: 20px;
-          background: rgba(8,14,32,.88);
-          border: 1px solid rgba(255,255,255,.1);
-          backdrop-filter: blur(14px);
-          box-shadow: 0 24px 60px rgba(0,0,0,.5);
-        }
-        .btn {
-          border-radius: 12px; border: 1px solid rgba(255,255,255,.18);
-          background: rgba(15,23,42,.7); color: white;
-          font-weight: 800; cursor: pointer; padding: 10px 16px;
-          transition: background .15s, transform .08s;
-        }
-        .btn:hover:not(:disabled) { background: rgba(15,23,42,.95); transform: translateY(-1px); }
-        .btn:disabled { opacity: .42; cursor: not-allowed; transform: none; }
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;700;900&display=swap');
+        * { box-sizing: border-box; }
+        body { background: #020617; }
+        .ant-colony-bg, .page-head, .site-title, .tabs { display: none; }
+        .btn { border-radius:12px; border:1px solid rgba(34,211,238,0.2); background:rgba(6,182,212,0.1); color:white; font-weight:800; cursor:pointer; transition:all 0.2s; }
+        .btn:hover:not(:disabled) { background:rgba(6,182,212,0.2); }
+        .btn:disabled { opacity:0.4; cursor:not-allowed; }
+        .ant-card { background:transparent!important; border:none!important; box-shadow:none!important; padding:0!important; }
+        @keyframes raidFloat { 0%{transform:translateY(0) scale(1);opacity:inherit} 80%{opacity:inherit} 100%{transform:translateY(-100vh) scale(0.1);opacity:0} }
+        @keyframes btnTealGlow { 0%,100%{box-shadow:0 0 20px rgba(6,182,212,0.5),0 0 40px rgba(6,182,212,0.2)} 50%{box-shadow:0 0 30px rgba(6,182,212,0.8),0 0 60px rgba(6,182,212,0.3)} }
+        @keyframes raidPulse { 0%,100%{opacity:0.7;transform:scale(1)} 50%{opacity:1;transform:scale(1.02)} }
       `}</style>
     </>
   );

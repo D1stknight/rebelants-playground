@@ -47,34 +47,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const key = claimKey(playerId);
 
-   // ✅ GET = status only (claimed today?) + next claim timer
-if (req.method === "GET") {
-  const exists = await redis.get<number>(key);
+    // ✅ GET = status only (claimed today?) + next claim timer
+    if (req.method === "GET") {
+      const exists = await redis.get<number>(key);
 
-  const now = new Date();
-  const nextUtcMidnight = new Date(
-    Date.UTC(
-      now.getUTCFullYear(),
-      now.getUTCMonth(),
-      now.getUTCDate() + 1,
-      0,
-      0,
-      0,
-      0
-    )
-  );
+      const now = new Date();
+      const nextUtcMidnight = new Date(
+        Date.UTC(
+          now.getUTCFullYear(),
+          now.getUTCMonth(),
+          now.getUTCDate() + 1,
+          0,
+          0,
+          0,
+          0
+        )
+      );
 
-  const nextClaimAt = nextUtcMidnight.toISOString();
-  const msUntilNextClaim = Math.max(0, nextUtcMidnight.getTime() - now.getTime());
+      const nextClaimAt = nextUtcMidnight.toISOString();
+      const msUntilNextClaim = Math.max(0, nextUtcMidnight.getTime() - now.getTime());
 
-  return res.status(200).json({
-    ok: true,
-    playerId,
-    claimed: !!exists,
-    nextClaimAt,
-    msUntilNextClaim,
-  });
-}
+      return res.status(200).json({
+        ok: true,
+        playerId,
+        claimed: !!exists,
+        nextClaimAt,
+        msUntilNextClaim,
+      });
+    }
 
     // ✅ POST = attempt claim (server enforces once/day)
     if (req.method !== "POST") {
@@ -103,8 +103,9 @@ if (req.method === "GET") {
       // already claimed today
       const balNowRaw = await redis.get<number>(balKey(playerId));
       const balNow = Number(balNowRaw || 0);
-      return res.status(200).json({
-        ok: true,
+      return res.status(409).json({
+        ok: false,
+        error: "already_claimed",
         playerId,
         claimed: true,
         alreadyClaimed: true,
