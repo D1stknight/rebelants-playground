@@ -138,6 +138,13 @@ export interface PvpMatch {
   createdAt: number;
   updatedAt: number;
   lastActionAt: number;
+
+  // ── Spectator visibility (Layer 2C) ─────────────────────────────────────
+  // When true, match is hidden from /api/faction-wars/pvp/list-active and
+  // therefore from the public "Live Matches" list. The direct spectate URL
+  // (/faction-wars/spectate/{challengeId}) still works — sharing is opt-in
+  // via link, not via a hard gate. Defaults to false (public).
+  isPrivate?: boolean;
 }
 
 // Body for POST /api/faction-wars/pvp/create
@@ -146,6 +153,7 @@ export interface CreateChallengeRequest {
   challengerDisplayName: string;
   challengerTeam?: FactionId[];   // optional — challenger may pick at create time or after accept
   wagerAmount?: number;           // optional — must be one of factionWarsPvpWagerTiers; defaults to factionWarsPvpCost
+  isPrivate?: boolean;            // optional — when true, match is hidden from public Live Matches list (default false)
 }
 
 // Body for POST /api/faction-wars/pvp/accept

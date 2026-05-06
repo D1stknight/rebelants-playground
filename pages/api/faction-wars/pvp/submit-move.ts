@@ -20,7 +20,7 @@
 // currently-active faction. This prevents move spoofing.
 
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getMatch, saveMatch, creditREBEL, getCrateRewards, recordPvpResult } from "../../../../lib/server/fwpvp";
+import { getMatch, saveMatch, creditREBEL, getCrateRewards, recordPvpResult, unmarkActive } from "../../../../lib/server/fwpvp";
 import {
   FACTIONS,
   MAX_HP,
@@ -274,6 +274,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           rebelEarned,
         );
       } catch {}
+      // Match concluded — drop from public Live Matches list. Best-effort.
+      try { await unmarkActive(match.challengeId); } catch {}
     } else {
       // Match continues — flip turn
       match.currentTurnSide = defenderSide;

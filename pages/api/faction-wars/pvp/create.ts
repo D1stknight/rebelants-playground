@@ -10,7 +10,7 @@
 // frontend will hit this.
 
 import type { NextApiRequest, NextApiResponse } from "next";
-import { generateChallengeId, saveMatch, addPlayerMatch, getPvpEconomyConfig, spendREBEL, getREBELBalance } from "../../../../lib/server/fwpvp";
+import { generateChallengeId, saveMatch, addPlayerMatch, markActive, getPvpEconomyConfig, spendREBEL, getREBELBalance } from "../../../../lib/server/fwpvp";
 import { TEAM_SIZE, MAX_HP, FACTIONS, FACTION_IDS } from "../../../../lib/factionWarsCore";
 import type { PvpMatch, CreateChallengeRequest } from "../../../../lib/types/fwpvp";
 import type { FactionId } from "../../../../lib/factionWarsCore";
@@ -136,10 +136,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       createdAt: now,
       updatedAt: now,
       lastActionAt: now,
+      // Spectator visibility (Layer 2C). Default false (public — visible in
+      // the Live Matches lobby). Challenger may opt in to a private match
+      // by sending isPrivate: true; only viewers with the direct link will
+      // see it.
+      isPrivate: body.isPrivate === true,
     };
 
     await saveMatch(match);
     await addPlayerMatch(challengerPlayerId, challengeId);
+    // Add to active index so the public Live Matches list can find it.
+    // (listActiveMatches filters out isPrivate=true at read time.)
+    await markActive(challengeId);
 
     return res.status(200).json({
       ok: true,

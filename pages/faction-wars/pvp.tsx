@@ -140,6 +140,11 @@ export default function PvpLobbyPage() {
   // selectedTier defaults to factionWarsPvpCost (typically 300).
   const [pvpTiers, setPvpTiers] = useState<number[]>([100, 300, 500, 1000, 3000, 5000, 10000]);
   const [selectedTier, setSelectedTier] = useState<number | null>(null);
+  // Spectator visibility (Layer 2C). When true, the match is omitted from the
+  // public Live Matches list — only the direct spectate link works.
+  const [isPrivate, setIsPrivate] = useState<boolean>(false);
+  // Public Live Matches the user can spectate. Polled every 8s while on lobby.
+  const [liveMatches, setLiveMatches] = useState<any[]>([]);
 
   // Initial profile + identity load
   useEffect(() => {
@@ -198,6 +203,27 @@ export default function PvpLobbyPage() {
     return () => clearInterval(t);
   }, [identity, refreshMatches]);
 
+  // ── Fetch live (spectatable) matches every 8s ───────────────────────────
+  // Public Live Matches list. Polls so newly-created matches appear without
+  // a page reload. Stops when no identity (still SSR-safe).
+  useEffect(() => {
+    let cancelled = false;
+    let timer: any = null;
+    const tick = async () => {
+      if (cancelled) return;
+      try {
+        const r = await fetch("/api/faction-wars/pvp/list-active");
+        const j = await r.json();
+        if (!cancelled && j.ok && Array.isArray(j.matches)) {
+          setLiveMatches(j.matches);
+        }
+      } catch {}
+      finally { if (!cancelled) timer = setTimeout(tick, 8000); }
+    };
+    tick();
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+  }, []);
+
   // ── Fetch PvP cost / enabled flag + player balance ──────────────────────
   // Called once when identity is known. We don't bother polling — admin tweaks
   // are infrequent and stale cost just means the create call may reject; UX
@@ -251,6 +277,7 @@ export default function PvpLobbyPage() {
           challengerPlayerId: identity.playerId,
           challengerDisplayName: identity.displayName,
           wagerAmount: selectedTier ?? undefined,
+          isPrivate,
         }),
       });
       const j = await r.json();
@@ -370,6 +397,22 @@ export default function PvpLobbyPage() {
                     </div>
                   </div>
                 )}
+                {/* Private match toggle (Layer 2C) */}
+                {pvpEnabled && (
+                  <label style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, cursor: creating ? "wait" : "pointer", userSelect: "none" }}>
+                    <input
+                      type="checkbox"
+                      checked={isPrivate}
+                      onChange={(e) => setIsPrivate(e.target.checked)}
+                      disabled={creating}
+                      style={{ width: 16, height: 16, accentColor: "#fbbf24", cursor: creating ? "wait" : "pointer" }}
+                    />
+                    <span style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", letterSpacing: "0.05em" }}>
+                      Private match
+                      <span style={{ color: "rgba(255,255,255,0.4)", marginLeft: 6 }}>· hide from Live Matches list (link still works)</span>
+                    </span>
+                  </label>
+                )}
                 {(() => {
                   // Compute affordability + state of the Create button
                   // Variable wager (Layer 2A): cost is the chosen tier (or 0 if free).
@@ -415,6 +458,41 @@ export default function PvpLobbyPage() {
                   Playing as <b style={{ color: "rgba(255,255,255,0.7)" }}>{identity.displayName}</b>
                 </div>
               </div>
+
+              {/* Live Matches — anyone can spectate */}
+              {liveMatches.length > 0 && (
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ fontSize: 11, letterSpacing: "0.25em", textTransform: "uppercase", color: "rgba(248,113,113,0.7)", marginBottom: 12, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: 3, background: "#f87171", boxShadow: "0 0 8px #f87171" }} />
+                    Live Matches ({liveMatches.length})
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {liveMatches.map((m: any) => (
+                      <a key={m.challengeId} href={`/faction-wars/spectate/${m.challengeId}`} style={{ display: "block", textDecoration: "none", color: "white" }}>
+                        <div style={{ padding: "12px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", display: "flex", alignItems: "center", gap: 12, transition: "all 0.15s ease" }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: "white", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              <span style={{ color: "#fbbf24" }}>{m.challengerDisplayName}</span>
+                              <span style={{ color: "rgba(255,255,255,0.4)", margin: "0 8px" }}>vs</span>
+                              <span style={{ color: "#a5b4fc" }}>{m.opponentDisplayName ?? "—"}</span>
+                            </div>
+                            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 4 }}>
+                              {m.status === "team_selection" ? "Picking factions" : `Territory ${Math.min(5, (m.currentTerritory ?? 0) + 1)}/5`}
+                              {Number(m.pvpCost ?? 0) > 0 && ` · ${Number(m.pvpCost).toLocaleString()} REBEL wager`}
+                              <span style={{ color: "#fbbf24", marginLeft: 8 }}>{m.challengerTerritoriesWon ?? 0}</span>
+                              <span style={{ color: "rgba(255,255,255,0.4)" }}> – </span>
+                              <span style={{ color: "#a5b4fc" }}>{m.opponentTerritoriesWon ?? 0}</span>
+                            </div>
+                          </div>
+                          <div style={{ fontSize: 10, fontWeight: 900, letterSpacing: "0.15em", color: "#f87171", padding: "4px 10px", borderRadius: 12, background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.3)" }}>
+                            👁 Watch
+                          </div>
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Active matches */}
               <div style={{ marginBottom: 24 }}>

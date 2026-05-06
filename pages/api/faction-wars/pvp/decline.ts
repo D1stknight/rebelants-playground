@@ -7,7 +7,7 @@
 // link rendering stays uniform.
 
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getMatch, saveMatch, creditREBEL } from "../../../../lib/server/fwpvp";
+import { getMatch, saveMatch, creditREBEL, unmarkActive } from "../../../../lib/server/fwpvp";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Cache-Control", "no-store");
@@ -58,6 +58,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     match.updatedAt = now;
     match.lastActionAt = now;
     await saveMatch(match);
+    // Remove from public Live Matches list.
+    await unmarkActive(challengeId);
 
     return res.status(200).json({ ok: true, match, refunded, refundedTo, refundedBalance });
   } catch (e: any) {

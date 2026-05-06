@@ -102,6 +102,74 @@ export async function unmarkActive(challengeId: string): Promise<void> {
   await redis.srem(ACTIVE_INDEX_KEY, challengeId);
 }
 
+// ── Live Matches list (Layer 2C) ──────────────────────────────────────────────
+// Returns up to `limit` active matches that are NOT private and NOT in a
+// terminal state. Used by the public "⚔️ Live Matches" lobby section.
+// Sorted by lastActionAt DESC (most recently active first) so freshly-played
+// matches surface to the top.
+export async function listActiveMatches(limit: number = 20): Promise<PvpMatch[]> {
+  const ids = await redis.smembers(ACTIVE_INDEX_KEY);
+  if (!ids || ids.length === 0) return [];
+  // Cap fanout — even a busy lobby shouldn't fetch >100 matches.
+  const slice = ids.slice(0, 100);
+  const matches = await Promise.all(slice.map((id) => getMatch(String(id)).catch(() => null)));
+  const live: PvpMatch[] = [];
+  const stale: string[] = [];
+  for (let i = 0; i < matches.length; i++) {
+    const m = matches[i];
+    const id = String(slice[i]);
+    if (!m) {
+      // Match was deleted/expired — clean up the index entry.
+      stale.push(id);
+      continue;
+    }
+    if (m.status === "completed" || m.status === "cancelled") {
+      stale.push(id);
+      continue;
+    }
+    if (m.isPrivate) continue;
+    live.push(m);
+  }
+  // Best-effort cleanup of stale index entries.
+  for (const id of stale) {
+    redis.srem(ACTIVE_INDEX_KEY, id).catch(() => {});
+  }
+  live.sort((a, b) => (Number(b.lastActionAt ?? 0) - Number(a.lastActionAt ?? 0)));
+  return live.slice(0, Math.max(1, Math.min(50, limit)));
+}
+
+// ── Spectator presence counter (Layer 2C) ─────────────────────────────────────
+// Tracks unique spectators in the last ~30s using one short-lived Redis key
+// per (challengeId, viewerKey). Counter = number of distinct keys still alive.
+// Cheap, eventually consistent, no per-viewer bookkeeping needed.
+const SPECTATOR_KEY = (cid: string, vid: string) => `ra:fwpvp:spec:${cid}:${vid}`;
+const SPECTATOR_TTL_SECONDS = 30;
+
+export async function pingSpectator(challengeId: string, viewerKey: string): Promise<void> {
+  await redis.set(SPECTATOR_KEY(challengeId, viewerKey), 1, { ex: SPECTATOR_TTL_SECONDS });
+}
+
+export async function countSpectators(challengeId: string): Promise<number> {
+  // Scan-based count of keys matching the prefix. Upstash supports SCAN; we
+  // use a simple SCAN-MATCH loop with a small cursor budget so we don't burn
+  // a ton of read ops on a hot match.
+  let cursor: string | number = 0;
+  let count = 0;
+  let iters = 0;
+  const pattern = `ra:fwpvp:spec:${challengeId}:*`;
+  while (iters < 5) {
+    iters++;
+    const result: any = await redis.scan(cursor, { match: pattern, count: 100 });
+    // Upstash returns [nextCursor, keys[]]
+    const next = Array.isArray(result) ? result[0] : result?.cursor;
+    const keys = Array.isArray(result) ? result[1] : result?.keys;
+    if (Array.isArray(keys)) count += keys.length;
+    cursor = next;
+    if (cursor === 0 || cursor === "0") break;
+  }
+  return count;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // PvP Economy helpers (Commit C)
 // ─────────────────────────────────────────────────────────────────────────────

@@ -943,6 +943,9 @@ export default function ChallengePage() {
   const [busy, setBusy] = useState(false);
   const [team, setTeam] = useState<FactionId[]>([]);
   const [copied, setCopied] = useState(false);
+  // Spectator link copy button (Layer 2C) — separate flag from `copied` so
+  // both buttons can show their own ✓ feedback independently.
+  const [copiedSpectate, setCopiedSpectate] = useState(false);
 
   // ── Heal config + balance (Commit E) ───────────────────────────────────
   // Pulled from /api/config + /api/points/balance on identity load. Used to:
@@ -1402,6 +1405,17 @@ export default function ChallengePage() {
     });
   };
 
+  // Spectator-only link — non-participants land on the read-only spectate page.
+  // Useful for tournament shows or sharing in Discord while a match is live.
+  const copySpectateLink = () => {
+    if (typeof window === "undefined") return;
+    const url = `${window.location.origin}/faction-wars/spectate/${challengeId}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedSpectate(true);
+      setTimeout(() => setCopiedSpectate(false), 2000);
+    });
+  };
+
   // ── Render ─────────────────────────────────────────────────────────────────
   const isChallenger = match && identity && match.challengerPlayerId === identity.playerId;
   const isOpponent = match && identity && match.opponentPlayerId === identity.playerId;
@@ -1674,6 +1688,9 @@ export default function ChallengePage() {
                       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                         <button onClick={copyShareLink} style={{ padding: "8px 16px", borderRadius: 18, border: "1px solid rgba(255,255,255,0.2)", background: "rgba(255,255,255,0.05)", color: "white", fontSize: 11, fontWeight: 900, letterSpacing: "0.1em", textTransform: "uppercase", cursor: "pointer" }}>
                           {copied ? "✓ Copied" : "Copy link"}
+                        </button>
+                        <button onClick={copySpectateLink} style={{ padding: "8px 16px", borderRadius: 18, border: "1px solid rgba(248,113,113,0.3)", background: "rgba(248,113,113,0.04)", color: "#f87171", fontSize: 11, fontWeight: 900, letterSpacing: "0.1em", textTransform: "uppercase", cursor: "pointer" }} title="Read-only link for spectators">
+                          {copiedSpectate ? "✓ Copied" : "👁 Spectate link"}
                         </button>
                         <button onClick={handleCancel} disabled={busy} style={{ padding: "8px 16px", borderRadius: 18, border: "1px solid rgba(248,113,113,0.4)", background: "rgba(248,113,113,0.05)", color: "#f87171", fontSize: 11, fontWeight: 900, letterSpacing: "0.1em", textTransform: "uppercase", cursor: busy ? "wait" : "pointer" }}>
                           Cancel challenge
