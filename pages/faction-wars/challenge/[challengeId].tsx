@@ -943,6 +943,9 @@ export default function ChallengePage() {
   const [busy, setBusy] = useState(false);
   const [team, setTeam] = useState<FactionId[]>([]);
   const [copied, setCopied] = useState(false);
+  // Spectator link copy button (Layer 2C) — separate flag from `copied` so
+  // both buttons can show their own ✓ feedback independently.
+  const [copiedSpectate, setCopiedSpectate] = useState(false);
 
   // ── Heal config + balance (Commit E) ───────────────────────────────────
   // Pulled from /api/config + /api/points/balance on identity load. Used to:
@@ -1245,6 +1248,21 @@ export default function ChallengePage() {
     } catch (e: any) { setError(e?.message || "Network error"); } finally { setBusy(false); }
   };
 
+  const handleDecline = async () => {
+    if (!identity || !match) return;
+    if (!confirm("Decline this challenge? The challenger will be refunded.")) return;
+    setBusy(true); setError(null);
+    try {
+      const r = await fetch("/api/faction-wars/pvp/decline", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ challengeId, playerId: identity.playerId }),
+      });
+      const j = await r.json();
+      if (!j.ok) setError(j.error || "Decline failed");
+      else setMatch(j.match);
+    } catch (e: any) { setError(e?.message || "Network error"); } finally { setBusy(false); }
+  };
+
   // ── Fetch heal config + balance ──────────────────────────────────────
   // Refetch balance after every action that spends/credits REBEL (heal,
   // submit-move, ante deduction at create/accept) so the heal button reflects
@@ -1387,6 +1405,17 @@ export default function ChallengePage() {
     });
   };
 
+  // Spectator-only link — non-participants land on the read-only spectate page.
+  // Useful for tournament shows or sharing in Discord while a match is live.
+  const copySpectateLink = () => {
+    if (typeof window === "undefined") return;
+    const url = `${window.location.origin}/faction-wars/spectate/${challengeId}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedSpectate(true);
+      setTimeout(() => setCopiedSpectate(false), 2000);
+    });
+  };
+
   // ── Render ─────────────────────────────────────────────────────────────────
   const isChallenger = match && identity && match.challengerPlayerId === identity.playerId;
   const isOpponent = match && identity && match.opponentPlayerId === identity.playerId;
@@ -1408,6 +1437,12 @@ export default function ChallengePage() {
             <span style={{ fontSize: 20, filter: "drop-shadow(0 0 8px rgba(251,191,36,0.6))" }}>←</span>
             <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.5)" }}>PvP Lobby</span>
           </Link>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {balance !== null && (
+              <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: "0.1em", color: "#fbbf24", filter: "drop-shadow(0 0 8px rgba(251,191,36,0.5))" }}>
+                ⚡ {balance.toLocaleString()} <span style={{ fontSize: 10, color: "rgba(251,191,36,0.6)" }}>REBEL</span>
+              </div>
+            )}
           {/* Mute toggle — lives in header so it never overlaps title text */}
           <button
             onClick={audio.toggleMute}
@@ -1422,6 +1457,7 @@ export default function ChallengePage() {
           >
             {audio.muted ? "🔇" : "🔊"}
           </button>
+          </div>
         </header>
 
         <div style={{ maxWidth: 720, margin: "0 auto", padding: "12px 16px 40px", fontFamily: JP }}>
@@ -1653,6 +1689,9 @@ export default function ChallengePage() {
                         <button onClick={copyShareLink} style={{ padding: "8px 16px", borderRadius: 18, border: "1px solid rgba(255,255,255,0.2)", background: "rgba(255,255,255,0.05)", color: "white", fontSize: 11, fontWeight: 900, letterSpacing: "0.1em", textTransform: "uppercase", cursor: "pointer" }}>
                           {copied ? "✓ Copied" : "Copy link"}
                         </button>
+                        <button onClick={copySpectateLink} style={{ padding: "8px 16px", borderRadius: 18, border: "1px solid rgba(248,113,113,0.3)", background: "rgba(248,113,113,0.04)", color: "#f87171", fontSize: 11, fontWeight: 900, letterSpacing: "0.1em", textTransform: "uppercase", cursor: "pointer" }} title="Read-only link for spectators">
+                          {copiedSpectate ? "✓ Copied" : "👁 Spectate link"}
+                        </button>
                         <button onClick={handleCancel} disabled={busy} style={{ padding: "8px 16px", borderRadius: 18, border: "1px solid rgba(248,113,113,0.4)", background: "rgba(248,113,113,0.05)", color: "#f87171", fontSize: 11, fontWeight: 900, letterSpacing: "0.1em", textTransform: "uppercase", cursor: busy ? "wait" : "pointer" }}>
                           Cancel challenge
                         </button>
@@ -1667,9 +1706,28 @@ export default function ChallengePage() {
                       <div style={{ fontSize: 22, fontWeight: 900, color: "#fbbf24", marginBottom: 18, letterSpacing: "0.05em" }}>
                         {match.challengerDisplayName}
                       </div>
-                      <button onClick={handleAccept} disabled={busy} style={{ minWidth: 200, height: 46, fontSize: 13, fontWeight: 900, letterSpacing: "0.1em", textTransform: "uppercase", borderRadius: 24, border: "1px solid rgba(251,191,36,0.5)", background: busy ? "rgba(255,255,255,0.05)" : "linear-gradient(135deg,rgba(251,191,36,0.3),rgba(248,113,113,0.3))", color: busy ? "rgba(255,255,255,0.4)" : "#fbbf24", cursor: busy ? "wait" : "pointer" }}>
-                        {busy ? "Accepting…" : "⚔️ Accept Challenge"}
-                      </button>
+                      {/* Wager display (Layer 2A) */}
+                      {Number(match.pvpCost ?? 0) > 0 && (
+                        <div style={{ marginBottom: 18, padding: "14px 16px", borderRadius: 12, border: "1px solid rgba(251,191,36,0.3)", background: "rgba(0,0,0,0.3)" }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(255,255,255,0.5)", marginBottom: 6 }}>
+                            Wager
+                          </div>
+                          <div style={{ fontSize: 28, fontWeight: 900, color: "#fbbf24", letterSpacing: "0.02em", lineHeight: 1 }}>
+                            {Number(match.pvpCost).toLocaleString()} <span style={{ fontSize: 14, color: "rgba(251,191,36,0.7)", fontWeight: 700 }}>REBEL</span>
+                          </div>
+                          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.55)", marginTop: 8, lineHeight: 1.5 }}>
+                            Match {Number(match.pvpCost).toLocaleString()} REBEL to play. Winner takes the {(Number(match.pvpCost) * 2).toLocaleString()} REBEL pot.
+                          </div>
+                        </div>
+                      )}
+                      <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 10 }}>
+                        <button onClick={handleAccept} disabled={busy} style={{ minWidth: 240, height: 50, padding: "0 28px", fontSize: 13, fontWeight: 900, letterSpacing: "0.08em", textTransform: "uppercase", borderRadius: 25, border: "1px solid rgba(251,191,36,0.5)", background: busy ? "rgba(255,255,255,0.05)" : "linear-gradient(135deg,rgba(251,191,36,0.3),rgba(248,113,113,0.3))", color: busy ? "rgba(255,255,255,0.4)" : "#fbbf24", cursor: busy ? "wait" : "pointer", filter: busy ? "none" : "drop-shadow(0 0 12px rgba(251,191,36,0.3))" }}>
+                          {busy ? "Accepting…" : Number(match.pvpCost ?? 0) > 0 ? `⚔️ Accept — Match ${Number(match.pvpCost).toLocaleString()} REBEL` : "⚔️ Accept Challenge"}
+                        </button>
+                        <button onClick={handleDecline} disabled={busy} style={{ minWidth: 120, height: 50, padding: "0 22px", fontSize: 12, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", borderRadius: 25, border: "1px solid rgba(248,113,113,0.4)", background: "rgba(248,113,113,0.05)", color: "#f87171", cursor: busy ? "wait" : "pointer" }}>
+                          Decline
+                        </button>
+                      </div>
                     </div>
                   )}
                 </>

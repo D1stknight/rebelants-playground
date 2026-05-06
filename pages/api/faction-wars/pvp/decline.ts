@@ -1,12 +1,13 @@
-// POST /api/faction-wars/pvp/cancel
+// POST /api/faction-wars/pvp/decline
 //
-// Challenger cancels a pending challenge (only valid if status === "pending",
-// i.e. opponent has not accepted yet). Sets status to "cancelled". Match is
-// preserved in storage with TTL so the link returns "cancelled" if visited.
+// Opponent declines a pending challenge (only valid if status === "pending"
+// and the caller is NOT the challenger). Sets status to "cancelled" and
+// refunds the challenger's ante. Symmetric to cancel.ts (which is the
+// challenger-side path) — both end with status="cancelled" so the share
+// link rendering stays uniform.
 
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getMatch, saveMatch, creditREBEL, unmarkActive } from "../../../../lib/server/fwpvp";
-import type { CancelChallengeRequest } from "../../../../lib/types/fwpvp";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Cache-Control", "no-store");
@@ -14,7 +15,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ ok: false, error: "Method not allowed" });
   }
   try {
-    const body = (typeof req.body === "string" ? JSON.parse(req.body) : req.body || {}) as Partial<CancelChallengeRequest>;
+    const body = (typeof req.body === "string" ? JSON.parse(req.body) : req.body || {}) as Partial<{
+      challengeId: string;
+      playerId: string;
+    }>;
     const challengeId = String(body.challengeId || "").trim().slice(0, 64);
     const playerId = String(body.playerId || "").trim().slice(0, 64);
 
@@ -23,26 +27,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const match = await getMatch(challengeId);
     if (!match) return res.status(404).json({ ok: false, error: "Match not found" });
-    if (match.challengerPlayerId !== playerId) {
-      return res.status(403).json({ ok: false, error: "Only the challenger can cancel" });
+
+    if (match.challengerPlayerId === playerId) {
+      return res.status(403).json({ ok: false, error: "Challenger should use cancel, not decline" });
     }
     if (match.status !== "pending") {
-      return res.status(409).json({ ok: false, error: `Cannot cancel; match is ${match.status}` });
+      return res.status(409).json({ ok: false, error: `Cannot decline; match is ${match.status}` });
     }
 
     // ── Refund ─────────────────────────────────────────────────────────────
-    // If the challenger paid their ante on create, refund it now since the
-    // opponent never accepted. Only refund if challengerPaid is true and
-    // pvpCost > 0 (defensive against legacy/old matches without these fields).
+    // Decliner is the opponent — they never paid an ante (accept is what
+    // takes the ante). We refund the CHALLENGER's ante, matching cancel.ts.
     let refunded = 0;
+    let refundedTo: string | null = null;
     let refundedBalance: number | null = null;
     if (match.challengerPaid && Number(match.pvpCost ?? 0) > 0) {
       const amt = Number(match.pvpCost);
       const newBal = await creditREBEL(match.challengerPlayerId, amt);
       if (newBal !== null) {
         refunded = amt;
+        refundedTo = match.challengerPlayerId;
         refundedBalance = newBal;
-        // Mark the match so we never double-refund if cancel is somehow called twice.
         match.challengerPaid = false;
         match.pvpPotPaid = Math.max(0, Number(match.pvpPotPaid ?? 0) - amt);
       }
@@ -56,8 +61,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Remove from public Live Matches list.
     await unmarkActive(challengeId);
 
-    return res.status(200).json({ ok: true, match, refunded, refundedBalance });
+    return res.status(200).json({ ok: true, match, refunded, refundedTo, refundedBalance });
   } catch (e: any) {
-    return res.status(500).json({ ok: false, error: e?.message || "Internal error" });
+    return res.status(500).json({ ok: false, error: e?.message || "decline failed" });
   }
 }

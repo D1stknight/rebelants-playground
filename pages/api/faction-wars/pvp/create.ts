@@ -10,7 +10,7 @@
 // frontend will hit this.
 
 import type { NextApiRequest, NextApiResponse } from "next";
-import { generateChallengeId, saveMatch, addPlayerMatch, getPvpEconomyConfig, spendREBEL, getREBELBalance } from "../../../../lib/server/fwpvp";
+import { generateChallengeId, saveMatch, addPlayerMatch, markActive, getPvpEconomyConfig, spendREBEL, getREBELBalance } from "../../../../lib/server/fwpvp";
 import { TEAM_SIZE, MAX_HP, FACTIONS, FACTION_IDS } from "../../../../lib/factionWarsCore";
 import type { PvpMatch, CreateChallengeRequest } from "../../../../lib/types/fwpvp";
 import type { FactionId } from "../../../../lib/factionWarsCore";
@@ -55,11 +55,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Check live admin config. Reject if PvP is disabled, OR if challenger
     // can't afford the ante. Snapshot the cost on the match so admin tweaks
     // mid-game don't break refund / payout math later.
+    //
+    // Variable wager (Layer 2A): challenger may pick a tier from
+    // factionWarsPvpWagerTiers. If body.wagerAmount is omitted or invalid,
+    // we fall back to factionWarsPvpCost (the default highlighted tier).
     const econCfg = await getPvpEconomyConfig();
     if (!econCfg.factionWarsPvpEnabled) {
       return res.status(403).json({ ok: false, error: "PvP is currently disabled" });
     }
-    const ante = econCfg.factionWarsPvpCost;
+    const tiers = econCfg.factionWarsPvpWagerTiers;
+    const requestedWager = Number(body.wagerAmount);
+    let ante: number;
+    if (Number.isFinite(requestedWager) && requestedWager >= 0) {
+      if (!tiers.includes(requestedWager)) {
+        return res.status(400).json({
+          ok: false,
+          error: `Invalid wager. Allowed tiers: ${tiers.join(", ")}.`,
+          allowedTiers: tiers,
+        });
+      }
+      ante = requestedWager;
+    } else {
+      ante = econCfg.factionWarsPvpCost;
+    }
     if (ante > 0) {
       const bal = await getREBELBalance(challengerPlayerId);
       if (bal < ante) {
@@ -118,10 +136,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       createdAt: now,
       updatedAt: now,
       lastActionAt: now,
+      // Spectator visibility (Layer 2C). Default false (public — visible in
+      // the Live Matches lobby). Challenger may opt in to a private match
+      // by sending isPrivate: true; only viewers with the direct link will
+      // see it.
+      isPrivate: body.isPrivate === true,
     };
 
     await saveMatch(match);
     await addPlayerMatch(challengerPlayerId, challengeId);
+    // Add to active index so the public Live Matches list can find it.
+    // (listActiveMatches filters out isPrivate=true at read time.)
+    await markActive(challengeId);
 
     return res.status(200).json({
       ok: true,
