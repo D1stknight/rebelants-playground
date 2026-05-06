@@ -603,6 +603,20 @@ export default function FactionWars() {
     u(); window.addEventListener("ra:identity-changed", u); return () => window.removeEventListener("ra:identity-changed", u);
   }, []);
 
+  // Inject a CSS @media rule so the AI move-grid reliably collapses to a single
+  // column on mobile (≤600px). Inline minmax(300px,1fr) auto-fit should already
+  // do this, but this is belt-and-suspenders for any browser/cache that ignores
+  // the inline style. !important wins specificity. Idempotent (id check).
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const id = "fw-move-grid-mobile-css";
+    if (document.getElementById(id)) return;
+    const styleEl = document.createElement("style");
+    styleEl.id = id;
+    styleEl.textContent = "@media (max-width: 600px) { .fw-move-grid { grid-template-columns: 1fr !important; } }";
+    document.head.appendChild(styleEl);
+  }, []);
+
   const { balance, spend, earn, refresh, totalEarnRoom, devGrant } = usePoints(effectivePlayerId);
   const lastPidRef = useRef<string>("");
   useEffect(() => { if (!effectivePlayerId||lastPidRef.current===effectivePlayerId) return; lastPidRef.current=effectivePlayerId; refresh().catch(()=>{}); }, [effectivePlayerId, refresh]);
@@ -1732,7 +1746,7 @@ if (over) {
                   <div style={{ fontSize:12, fontWeight:800, marginBottom:10, opacity:0.7, letterSpacing:"0.04em" }}>
                     ⚔️ CHOOSE {currentPlayerFD.name.toUpperCase()}'S MOVE
                   </div>
-                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+                  <div className="fw-move-grid" style={{ display:"grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap:8 }}>
                   {currentPlayerFD.moves.map(m=>{
                     const tc: Record<string,string> = { attack:"#f87171", defend:"#34d399", magic:"#c084fc", trick:"#fbbf24" };
                     const isSel = selectedMove?.id===m.id;
