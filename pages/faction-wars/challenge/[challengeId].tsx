@@ -1245,6 +1245,21 @@ export default function ChallengePage() {
     } catch (e: any) { setError(e?.message || "Network error"); } finally { setBusy(false); }
   };
 
+  const handleDecline = async () => {
+    if (!identity || !match) return;
+    if (!confirm("Decline this challenge? The challenger will be refunded.")) return;
+    setBusy(true); setError(null);
+    try {
+      const r = await fetch("/api/faction-wars/pvp/decline", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ challengeId, playerId: identity.playerId }),
+      });
+      const j = await r.json();
+      if (!j.ok) setError(j.error || "Decline failed");
+      else setMatch(j.match);
+    } catch (e: any) { setError(e?.message || "Network error"); } finally { setBusy(false); }
+  };
+
   // ── Fetch heal config + balance ──────────────────────────────────────
   // Refetch balance after every action that spends/credits REBEL (heal,
   // submit-move, ante deduction at create/accept) so the heal button reflects
@@ -1681,9 +1696,14 @@ export default function ChallengePage() {
                           </div>
                         </div>
                       )}
-                      <button onClick={handleAccept} disabled={busy} style={{ minWidth: 200, height: 46, fontSize: 13, fontWeight: 900, letterSpacing: "0.1em", textTransform: "uppercase", borderRadius: 24, border: "1px solid rgba(251,191,36,0.5)", background: busy ? "rgba(255,255,255,0.05)" : "linear-gradient(135deg,rgba(251,191,36,0.3),rgba(248,113,113,0.3))", color: busy ? "rgba(255,255,255,0.4)" : "#fbbf24", cursor: busy ? "wait" : "pointer" }}>
-                        {busy ? "Accepting…" : Number(match.pvpCost ?? 0) > 0 ? `⚔️ Accept — Match ${Number(match.pvpCost).toLocaleString()} REBEL` : "⚔️ Accept Challenge"}
-                      </button>
+                      <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 10 }}>
+                        <button onClick={handleAccept} disabled={busy} style={{ minWidth: 240, height: 50, padding: "0 28px", fontSize: 13, fontWeight: 900, letterSpacing: "0.08em", textTransform: "uppercase", borderRadius: 25, border: "1px solid rgba(251,191,36,0.5)", background: busy ? "rgba(255,255,255,0.05)" : "linear-gradient(135deg,rgba(251,191,36,0.3),rgba(248,113,113,0.3))", color: busy ? "rgba(255,255,255,0.4)" : "#fbbf24", cursor: busy ? "wait" : "pointer", filter: busy ? "none" : "drop-shadow(0 0 12px rgba(251,191,36,0.3))" }}>
+                          {busy ? "Accepting…" : Number(match.pvpCost ?? 0) > 0 ? `⚔️ Accept — Match ${Number(match.pvpCost).toLocaleString()} REBEL` : "⚔️ Accept Challenge"}
+                        </button>
+                        <button onClick={handleDecline} disabled={busy} style={{ minWidth: 120, height: 50, padding: "0 22px", fontSize: 12, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", borderRadius: 25, border: "1px solid rgba(248,113,113,0.4)", background: "rgba(248,113,113,0.05)", color: "#f87171", cursor: busy ? "wait" : "pointer" }}>
+                          Decline
+                        </button>
+                      </div>
                     </div>
                   )}
                 </>
