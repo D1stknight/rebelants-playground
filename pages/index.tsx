@@ -49,6 +49,32 @@ export default function LandingPage() {
   const audioRef = React.useRef<HTMLAudioElement|null>(null);
   const audioUnlocked = React.useRef(false);
 
+  // Mobile alignment for the COMMANDER STRIP — on phones the 3-column flex
+  // layout wraps but each column keeps its auto-width buttons, so "Claim
+  // Your Name" / "Sign In" / "Claim Daily" / "Buy Points" / "Connect Discord"
+  // come out at different widths. Inject a global @media rule so on ≤600px
+  // every column AND every button inside the strip stretches to full width
+  // with consistent padding. !important wins specificity over the inline
+  // styles on each button.
+  React.useEffect(() => {
+    if (typeof document === "undefined") return;
+    const id = "commander-strip-mobile-css";
+    if (document.getElementById(id)) return;
+    const styleEl = document.createElement("style");
+    styleEl.id = id;
+    styleEl.textContent = `
+@media (max-width: 600px) {
+  .commander-strip-card { flex-direction: column !important; align-items: stretch !important; gap: 14px !important; padding: 20px !important; }
+  .commander-strip-card > div { width: 100% !important; min-width: 0 !important; align-items: stretch !important; }
+  .commander-strip-card > div > div { width: 100% !important; min-width: 0 !important; }
+  .commander-strip-card button { width: 100% !important; min-width: 0 !important; padding: 12px 16px !important; font-size: 12px !important; box-sizing: border-box !important; }
+  /* Inline links (the small "disconnect" underline) keep their auto width */
+  .commander-strip-card a, .commander-strip-card button[style*="text-decoration"] { width: auto !important; padding: 0 !important; }
+}
+`;
+    document.head.appendChild(styleEl);
+  }, []);
+
   // ── Commander Strip ──
   const [profile, setProfile] = useState<any>(null);
   const [discordLinked, setDiscordLinked] = useState(false);
@@ -572,7 +598,7 @@ export default function LandingPage() {
           {/* ══ COMMANDER STRIP ══════════════════════════════════════════════════ */}
           <div id="commander-strip" />
           <div style={{ padding:'0 24px 60px', maxWidth:1100, margin:'0 auto' }}>
-            <div style={{
+            <div className="commander-strip-card" style={{
               display:'flex', flexWrap:'wrap', alignItems:'center', justifyContent:'space-between',
               gap:16, padding:'24px 32px',
               background:'rgba(255,255,255,0.04)',
