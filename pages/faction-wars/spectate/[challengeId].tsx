@@ -800,7 +800,6 @@ function PoolCard({ side, name, accent, pool, mult, bettors }: { side: "challeng
           <> · <span style={{ color: accent, fontWeight: 700 }}>{mult.toFixed(2)}x</span> if win</>
         )}
       </div>
-      </div>
     </div>
   );
 }
