@@ -135,6 +135,33 @@ const rareMerchDecimal = Number.isFinite(rawRareMerch)
   raidUltraCarriers:   Number(src?.raidUltraCarriers   ?? DEFAULTS.raidUltraCarriers),
   raidUltraRatio:      Number(src?.raidUltraRatio      ?? DEFAULTS.raidUltraRatio),
 
+  // ── Faction Wars (AI mode) ──────────────────────────────────────────────
+  factionWarsCost:          Number(src?.factionWarsCost          ?? 150),
+  factionWarsAIDifficulty:  Number(src?.factionWarsAIDifficulty  ?? 0.65),
+
+  // ── Faction Wars PvP (Commit C + Layer 2A/2B/2C) ────────────────────────
+  factionWarsPvpEnabled: src?.factionWarsPvpEnabled !== false,
+  factionWarsPvpCost:    Number(src?.factionWarsPvpCost ?? 300),
+  factionWarsPvpPayoutMode: "pot",
+  // Variable wager tiers (Layer 2A) — accept array; sanitize to non-negative finite ints.
+  factionWarsPvpWagerTiers: Array.isArray(src?.factionWarsPvpWagerTiers)
+    ? src.factionWarsPvpWagerTiers
+        .map((n: any) => Number(n))
+        .filter((n: number) => Number.isFinite(n) && n >= 0)
+        .map((n: number) => Math.floor(n))
+    : [100, 300, 500, 1000, 3000, 5000, 10000],
+  // Spectator side bets (Layer 2B)
+  factionWarsBetEnabled: src?.factionWarsBetEnabled !== false,
+  factionWarsBetMin:     Math.max(0, Number(src?.factionWarsBetMin ?? 50)),
+  factionWarsBetMax:     Math.max(0, Number(src?.factionWarsBetMax ?? 25000)),
+  factionWarsBetPoolCap: Math.max(0, Number(src?.factionWarsBetPoolCap ?? 100000)),
+  factionWarsBetLockTerritory: Math.min(5, Math.max(1, Math.floor(Number(src?.factionWarsBetLockTerritory ?? 3)))),
+  // Per-match chat (Layer 2D)
+  factionWarsChatEnabled: src?.factionWarsChatEnabled !== false,
+  factionWarsChatPostCleanupMins: Math.max(0, Number(src?.factionWarsChatPostCleanupMins ?? 30)),
+  // Featured match (Layer 2C cont.) — empty string = unset
+  featuredMatchId: typeof src?.featuredMatchId === "string" ? src.featuredMatchId.trim().slice(0, 64) : "",
+
   rewards: {
     none: Number(src?.rewards?.none ?? DEFAULTS.rewards.none),
     common: Number(src?.rewards?.common ?? DEFAULTS.rewards.common),

@@ -25,6 +25,19 @@ type PointsConfigShape = {
   factionWarsPvpEnabled: boolean;
   factionWarsPvpCost: number;
   factionWarsPvpPayoutMode: "pot";
+  // Variable wager tiers (Layer 2A) — comma-separated list of allowed wager amounts
+  factionWarsPvpWagerTiers: number[];
+  // Spectator side bets (Layer 2B)
+  factionWarsBetEnabled: boolean;
+  factionWarsBetMin: number;
+  factionWarsBetMax: number;
+  factionWarsBetPoolCap: number;
+  factionWarsBetLockTerritory: number; // 1..5, bets close at start of this territory
+  // Per-match chat (Layer 2D)
+  factionWarsChatEnabled: boolean;
+  factionWarsChatPostCleanupMins: number;
+  // Featured match (admin podcast tool, Layer 2C cont.) — empty = no featured match
+  featuredMatchId: string;
 
   // ✅ Raid settings
   raidCost: number;
@@ -160,6 +173,21 @@ const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
     factionWarsPvpEnabled: (defaultConfig as any).factionWarsPvpEnabled !== false,
     factionWarsPvpCost: (defaultConfig as any).factionWarsPvpCost ?? 300,
     factionWarsPvpPayoutMode: ((defaultConfig as any).factionWarsPvpPayoutMode === "pot" ? "pot" : "pot") as "pot",
+    // Variable wager tiers (Layer 2A)
+    factionWarsPvpWagerTiers: Array.isArray((defaultConfig as any).factionWarsPvpWagerTiers)
+      ? (defaultConfig as any).factionWarsPvpWagerTiers
+      : [100, 300, 500, 1000, 3000, 5000, 10000],
+    // Spectator side bets (Layer 2B) defaults
+    factionWarsBetEnabled: (defaultConfig as any).factionWarsBetEnabled !== false,
+    factionWarsBetMin: (defaultConfig as any).factionWarsBetMin ?? 50,
+    factionWarsBetMax: (defaultConfig as any).factionWarsBetMax ?? 25000,
+    factionWarsBetPoolCap: (defaultConfig as any).factionWarsBetPoolCap ?? 100000,
+    factionWarsBetLockTerritory: (defaultConfig as any).factionWarsBetLockTerritory ?? 3,
+    // Per-match chat (Layer 2D)
+    factionWarsChatEnabled: (defaultConfig as any).factionWarsChatEnabled !== false,
+    factionWarsChatPostCleanupMins: (defaultConfig as any).factionWarsChatPostCleanupMins ?? 30,
+    // Featured match (Layer 2C cont.)
+    featuredMatchId: typeof (defaultConfig as any).featuredMatchId === "string" ? (defaultConfig as any).featuredMatchId : "",
   raidCarrierSurvival: (defaultConfig as any).raidCarrierSurvival ?? 0.20,
   raidUltraCarriers: (defaultConfig as any).raidUltraCarriers ?? 4,
   raidUltraRatio: (defaultConfig as any).raidUltraRatio ?? 0.65,
@@ -1131,6 +1159,94 @@ String(c.status).toUpperCase()==="PENDING"
           </label>
           <label style={{ fontSize: 12, opacity: 0.9 }}>PvP Cost / Side (REBEL)<input value={cfg.factionWarsPvpCost} onChange={e => setCfg(c => ({ ...c, factionWarsPvpCost: safeNum(e.target.value, c.factionWarsPvpCost) }))} type="number" min="0" style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
           <label style={{ fontSize: 12, opacity: 0.9 }}>PvP Payout Mode<input value={cfg.factionWarsPvpPayoutMode} disabled type="text" style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.12)", background: "rgba(0,0,0,.15)", color: "rgba(255,255,255,.5)", cursor: "not-allowed" }} /><span style={{ fontSize: 10, opacity: 0.4 }}>Winner takes pot. (Future: split / fee modes.)</span></label>
+
+          {/* Variable wager tiers (Layer 2A) — full-width row */}
+          <label style={{ fontSize: 12, opacity: 0.9, gridColumn: "1 / -1", marginTop: 6 }}>
+            Wager Tiers <span style={{ opacity: 0.6 }}>(comma-separated REBEL amounts the challenger can pick)</span>
+            <input
+              type="text"
+              value={(cfg.factionWarsPvpWagerTiers || []).join(", ")}
+              onChange={(e) => {
+                const parsed = e.target.value
+                  .split(",")
+                  .map((v) => Number(v.trim()))
+                  .filter((n) => Number.isFinite(n) && n >= 0);
+                setCfg((c) => ({ ...c, factionWarsPvpWagerTiers: parsed }));
+              }}
+              placeholder="100, 300, 500, 1000, 3000, 5000, 10000"
+              style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}
+            />
+            <span style={{ fontSize: 10, opacity: 0.4 }}>Default if blank: 100, 300, 500, 1000, 3000, 5000, 10000.</span>
+          </label>
+
+          {/* Featured match — full-width row, podcast tool */}
+          <label style={{ fontSize: 12, opacity: 0.9, gridColumn: "1 / -1", marginTop: 6, paddingTop: 10, borderTop: "1px dashed rgba(255,255,255,.12)" }}>
+            ⭐ Featured Match ID <span style={{ opacity: 0.6 }}>(paste a live challengeId to highlight on lobby; clear to remove)</span>
+            <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+              <input
+                type="text"
+                value={cfg.featuredMatchId || ""}
+                onChange={(e) => setCfg((c) => ({ ...c, featuredMatchId: e.target.value.trim().slice(0, 64) }))}
+                placeholder="e.g. fwc_a1b2c3d4"
+                style={{ flex: 1, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white", fontFamily: "ui-monospace, monospace", fontSize: 12 }}
+              />
+              {cfg.featuredMatchId && (
+                <button
+                  type="button"
+                  onClick={() => setCfg((c) => ({ ...c, featuredMatchId: "" }))}
+                  style={{ padding: "10px 14px", borderRadius: 12, border: "1px solid rgba(248,113,113,.4)", background: "rgba(248,113,113,.08)", color: "#f87171", fontSize: 11, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", cursor: "pointer" }}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            <span style={{ fontSize: 10, opacity: 0.4 }}>When set, lobby shows a 🔴 FEATURED hero card linking to this match.</span>
+          </label>
+
+          {/* Spectator side bets (Layer 2B) — full-width row */}
+          <label style={{ fontSize: 12, opacity: 0.9, gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 10, marginTop: 6, paddingTop: 10, borderTop: "1px dashed rgba(255,255,255,.12)" }}>
+            <input
+              type="checkbox"
+              checked={!!cfg.factionWarsBetEnabled}
+              onChange={(e) => setCfg((c) => ({ ...c, factionWarsBetEnabled: e.target.checked }))}
+              style={{ width: 16, height: 16, cursor: "pointer" }}
+            />
+            <span>Spectator Side Bets Enabled <span style={{ opacity: 0.6 }}>— uncheck to hide the betting panel on spectate pages</span></span>
+          </label>
+
+          <label style={{ fontSize: 12, opacity: 0.9 }}>
+            Bet Min (REBEL)
+            <input type="number" min="0" value={cfg.factionWarsBetMin} onChange={(e) => setCfg((c) => ({ ...c, factionWarsBetMin: safeNum(e.target.value, c.factionWarsBetMin) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} />
+          </label>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>
+            Bet Max (single bet)
+            <input type="number" min="0" value={cfg.factionWarsBetMax} onChange={(e) => setCfg((c) => ({ ...c, factionWarsBetMax: safeNum(e.target.value, c.factionWarsBetMax) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} />
+          </label>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>
+            Pool Cap per Side
+            <input type="number" min="0" value={cfg.factionWarsBetPoolCap} onChange={(e) => setCfg((c) => ({ ...c, factionWarsBetPoolCap: safeNum(e.target.value, c.factionWarsBetPoolCap) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} />
+          </label>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>
+            Lock Territory <span style={{ opacity: 0.5 }}>(1–5)</span>
+            <input type="number" min="1" max="5" value={cfg.factionWarsBetLockTerritory} onChange={(e) => setCfg((c) => ({ ...c, factionWarsBetLockTerritory: Math.min(5, Math.max(1, safeNum(e.target.value, c.factionWarsBetLockTerritory))) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} />
+            <span style={{ fontSize: 10, opacity: 0.4 }}>Bets close when match enters this territory. Default: 3.</span>
+          </label>
+
+          {/* Per-match chat (Layer 2D) — full-width row */}
+          <label style={{ fontSize: 12, opacity: 0.9, gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 10, marginTop: 6, paddingTop: 10, borderTop: "1px dashed rgba(255,255,255,.12)" }}>
+            <input
+              type="checkbox"
+              checked={!!cfg.factionWarsChatEnabled}
+              onChange={(e) => setCfg((c) => ({ ...c, factionWarsChatEnabled: e.target.checked }))}
+              style={{ width: 16, height: 16, cursor: "pointer" }}
+            />
+            <span>💬 Per-match Chat Enabled <span style={{ opacity: 0.6 }}>— uncheck to disable chat panel on all spectate pages</span></span>
+          </label>
+          <label style={{ fontSize: 12, opacity: 0.9, gridColumn: "1 / -1" }}>
+            Chat TTL after match completion <span style={{ opacity: 0.5 }}>(minutes)</span>
+            <input type="number" min="0" value={cfg.factionWarsChatPostCleanupMins} onChange={(e) => setCfg((c) => ({ ...c, factionWarsChatPostCleanupMins: safeNum(e.target.value, c.factionWarsChatPostCleanupMins) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} />
+            <span style={{ fontSize: 10, opacity: 0.4 }}>How long chat history sticks around after the match ends. Default: 30 minutes.</span>
+          </label>
         </div>
       </div>
     </div>

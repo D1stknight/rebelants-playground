@@ -13,7 +13,7 @@
 // challengeId format: 12 chars [a-z0-9], URL-safe.
 
 import { redis } from "./redis";
-import type { PvpMatch } from "../types/fwpvp";
+import type { PvpMatch, PvpBet, PvpBetsState, PvpSide, ChatMessage, ChatMute, ChatRole } from "../types/fwpvp";
 
 const MATCH_KEY = (id: string) => `ra:fwpvp:match:${id}`;
 const PLAYER_MATCHES_KEY = (pid: string) => `ra:fwpvp:player:${pid}`;
@@ -192,12 +192,32 @@ const PVP_COST_DEFAULT = 300;
 const PVP_PAYOUT_MODE_DEFAULT: "pot" = "pot";
 const PVP_ENABLED_DEFAULT = true;
 const PVP_TIERS_DEFAULT: number[] = [100, 300, 500, 1000, 3000, 5000, 10000];
+// Spectator side bets (Layer 2B). All admin-overridable from ra:config:economy.
+const BET_MIN_DEFAULT = 50;
+const BET_MAX_DEFAULT = 25000;
+const BET_POOL_CAP_DEFAULT = 100000;
+const BET_LOCK_TERRITORY_DEFAULT = 3;  // bets close when match enters T3 (0-indexed: territory >= 2)
+const BET_ENABLED_DEFAULT = true;
+// Per-match chat (Layer 2D)
+const CHAT_ENABLED_DEFAULT = true;
+const CHAT_POST_CLEANUP_MINS_DEFAULT = 30;  // chat TTL after match completion
 
 export interface PvpEconomyConfig {
   factionWarsPvpCost: number;
   factionWarsPvpPayoutMode: "pot";
   factionWarsPvpEnabled: boolean;
   factionWarsPvpWagerTiers: number[];
+  // Spectator side bets (Layer 2B)
+  factionWarsBetEnabled: boolean;
+  factionWarsBetMin: number;
+  factionWarsBetMax: number;
+  factionWarsBetPoolCap: number;
+  factionWarsBetLockTerritory: number;  // 1-indexed for admin clarity (1..5). Stored as 0-indexed comparison.
+  // Per-match chat (Layer 2D)
+  factionWarsChatEnabled: boolean;
+  factionWarsChatPostCleanupMins: number;  // minutes after match completion before chat TTLs out
+  // Featured match (admin podcast tool) — empty/undefined = no featured match
+  featuredMatchId?: string;
 }
 
 // Reads the live admin config from Redis and returns the PvP economy slice.
@@ -242,11 +262,30 @@ export async function getPvpEconomyConfig(): Promise<PvpEconomyConfig> {
       // We accept the row even if cost is unset (use default). The presence of
       // ANY key in the cfg means it's valid live config — we just fill blanks.
       if (cfg && typeof cfg === "object") {
+        const betEnabled = (cfg as any).factionWarsBetEnabled;
+        const betMin = Number((cfg as any).factionWarsBetMin);
+        const betMax = Number((cfg as any).factionWarsBetMax);
+        const betCap = Number((cfg as any).factionWarsBetPoolCap);
+        const betLock = Number((cfg as any).factionWarsBetLockTerritory);
+        const featuredMatchIdRaw = (cfg as any).featuredMatchId;
+        const featuredMatchId = typeof featuredMatchIdRaw === "string" && featuredMatchIdRaw.trim().length > 0
+          ? featuredMatchIdRaw.trim().slice(0, 64)
+          : undefined;
+        const chatEnabled = (cfg as any).factionWarsChatEnabled;
+        const chatCleanup = Number((cfg as any).factionWarsChatPostCleanupMins);
         return {
           factionWarsPvpCost: Number.isFinite(cost) && cost >= 0 ? cost : PVP_COST_DEFAULT,
           factionWarsPvpPayoutMode: PVP_PAYOUT_MODE_DEFAULT,
           factionWarsPvpEnabled: enabled === false ? false : PVP_ENABLED_DEFAULT,
           factionWarsPvpWagerTiers: tiers.length > 0 ? tiers : PVP_TIERS_DEFAULT,
+          factionWarsBetEnabled: betEnabled === false ? false : BET_ENABLED_DEFAULT,
+          factionWarsBetMin: Number.isFinite(betMin) && betMin >= 0 ? betMin : BET_MIN_DEFAULT,
+          factionWarsBetMax: Number.isFinite(betMax) && betMax >= 0 ? betMax : BET_MAX_DEFAULT,
+          factionWarsBetPoolCap: Number.isFinite(betCap) && betCap >= 0 ? betCap : BET_POOL_CAP_DEFAULT,
+          factionWarsBetLockTerritory: Number.isFinite(betLock) && betLock >= 1 && betLock <= 5 ? Math.floor(betLock) : BET_LOCK_TERRITORY_DEFAULT,
+          factionWarsChatEnabled: chatEnabled === false ? false : CHAT_ENABLED_DEFAULT,
+          factionWarsChatPostCleanupMins: Number.isFinite(chatCleanup) && chatCleanup >= 0 ? Math.floor(chatCleanup) : CHAT_POST_CLEANUP_MINS_DEFAULT,
+          featuredMatchId,
         };
       }
     } catch {
@@ -259,6 +298,14 @@ export async function getPvpEconomyConfig(): Promise<PvpEconomyConfig> {
     factionWarsPvpPayoutMode: PVP_PAYOUT_MODE_DEFAULT,
     factionWarsPvpEnabled: PVP_ENABLED_DEFAULT,
     factionWarsPvpWagerTiers: PVP_TIERS_DEFAULT,
+    factionWarsBetEnabled: BET_ENABLED_DEFAULT,
+    factionWarsBetMin: BET_MIN_DEFAULT,
+    factionWarsBetMax: BET_MAX_DEFAULT,
+    factionWarsBetPoolCap: BET_POOL_CAP_DEFAULT,
+    factionWarsBetLockTerritory: BET_LOCK_TERRITORY_DEFAULT,
+    factionWarsChatEnabled: CHAT_ENABLED_DEFAULT,
+    factionWarsChatPostCleanupMins: CHAT_POST_CLEANUP_MINS_DEFAULT,
+    featuredMatchId: undefined,
   };
 }
 
@@ -491,4 +538,490 @@ export async function recordPvpResult(
   } catch {
     // Leaderboard writes are best-effort; do not crash match completion.
   }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Spectator side bets (Layer 2B)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Pari-mutuel: bettors deposit REBEL into a side pool. On match resolve,
+// loser-side total splits proportionally among winner-side bettors.
+// House takes 0%. Loser bettors get nothing back; if no winner-side bettors
+// exist, loser pool is refunded to the losers (no house grab).
+//
+// Storage:
+//   ra:fwpvp:bets:{challengeId}            -> Redis HASH, field={playerId}, value=JSON(PvpBet)
+//   ra:fwpvp:bets:locked:{challengeId}     -> string "1" with TTL > match
+//   ra:fwpvp:bets:settled:{challengeId}    -> string "1" idempotency guard for payout/refund
+//
+// Bet amounts are debited from balance immediately at place-time. We store
+// bet records (not balance lock) so refunds/payouts are cheap to compute.
+
+
+const BETS_KEY = (cid: string) => `ra:fwpvp:bets:${cid}`;
+const BETS_LOCKED_KEY = (cid: string) => `ra:fwpvp:bets:locked:${cid}`;
+const BETS_SETTLED_KEY = (cid: string) => `ra:fwpvp:bets:settled:${cid}`;
+
+function parseBet(raw: any): PvpBet | null {
+  try {
+    const b = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (!b || typeof b !== "object") return null;
+    if (typeof b.playerId !== "string") return null;
+    if (b.side !== "challenger" && b.side !== "opponent") return null;
+    if (typeof b.amount !== "number" || !Number.isFinite(b.amount) || b.amount < 0) return null;
+    return {
+      playerId: String(b.playerId),
+      displayName: String(b.displayName || ""),
+      side: b.side as PvpSide,
+      amount: Math.floor(b.amount),
+      firstAt: Number(b.firstAt) || 0,
+      lastAt: Number(b.lastAt) || 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function isBetsLocked(challengeId: string): Promise<boolean> {
+  try {
+    const v = await redis.get(BETS_LOCKED_KEY(challengeId));
+    return v === "1" || v === 1 || v === true;
+  } catch {
+    return false;
+  }
+}
+
+export async function lockBets(challengeId: string): Promise<void> {
+  // 24h TTL — long enough to outlive any active match.
+  await redis.set(BETS_LOCKED_KEY(challengeId), "1", { ex: 60 * 60 * 24 });
+}
+
+export async function getBets(challengeId: string): Promise<PvpBetsState> {
+  const [raw, locked] = await Promise.all([
+    redis.hgetall<Record<string, any>>(BETS_KEY(challengeId)).catch(() => null),
+    isBetsLocked(challengeId),
+  ]);
+  const bets: PvpBet[] = [];
+  if (raw && typeof raw === "object") {
+    for (const k of Object.keys(raw)) {
+      const b = parseBet((raw as any)[k]);
+      if (b) bets.push(b);
+    }
+  }
+  bets.sort((a, b) => Number(b.lastAt ?? 0) - Number(a.lastAt ?? 0));
+  let challengerPool = 0, opponentPool = 0;
+  let challengerBettorCount = 0, opponentBettorCount = 0;
+  for (const b of bets) {
+    if (b.side === "challenger") {
+      challengerPool += b.amount;
+      challengerBettorCount += 1;
+    } else {
+      opponentPool += b.amount;
+      opponentBettorCount += 1;
+    }
+  }
+  return {
+    challengerPool,
+    opponentPool,
+    bets,
+    locked,
+    challengerBettorCount,
+    opponentBettorCount,
+  };
+}
+
+export async function getMyBet(challengeId: string, playerId: string): Promise<PvpBet | null> {
+  try {
+    const raw = await redis.hget<any>(BETS_KEY(challengeId), playerId);
+    return parseBet(raw);
+  } catch {
+    return null;
+  }
+}
+
+// Place or top-up a bet. Caller is responsible for:
+//   - validating the match exists, is in a bettable status, and player isn't a participant
+//   - validating amount against admin min/max/cap and player balance
+//   - debiting REBEL from balance (we do that here so the write is atomic-ish)
+//
+// Returns the updated bet record on success, or { error: string } on failure.
+export async function placeBet(params: {
+  challengeId: string;
+  playerId: string;
+  displayName: string;
+  side: PvpSide;
+  amount: number;
+}): Promise<{ ok: true; bet: PvpBet; newBalance: number } | { ok: false; error: string }> {
+  const { challengeId, playerId, displayName, side, amount } = params;
+  const now = Date.now();
+
+  // Read existing bet (if any) to check side consistency
+  const existing = await getMyBet(challengeId, playerId);
+  if (existing && existing.side !== side) {
+    return { ok: false, error: `You already bet on ${existing.side}. Top-ups must stay on the same side.` };
+  }
+
+  // Debit REBEL FIRST. If this fails (insufficient balance), bail.
+  const newBalance = await spendREBEL(playerId, amount);
+  if (newBalance === null) {
+    return { ok: false, error: "Insufficient REBEL balance" };
+  }
+
+  const merged: PvpBet = {
+    playerId,
+    displayName: displayName.slice(0, 32),
+    side,
+    amount: (existing?.amount ?? 0) + amount,
+    firstAt: existing?.firstAt ?? now,
+    lastAt: now,
+  };
+
+  try {
+    await redis.hset(BETS_KEY(challengeId), { [playerId]: JSON.stringify(merged) });
+  } catch (e: any) {
+    // Storage failed — best-effort refund the debit.
+    await creditREBEL(playerId, amount).catch(() => {});
+    return { ok: false, error: "Failed to store bet — refunded" };
+  }
+
+  return { ok: true, bet: merged, newBalance };
+}
+
+// Refund every bet at full face value. Used on cancel/decline/no-winner.
+// Idempotent: sets a "settled" flag so we don't double-refund if called twice.
+export async function refundBets(challengeId: string): Promise<{ refunded: number; bettorCount: number }> {
+  const settled = await redis.get(BETS_SETTLED_KEY(challengeId)).catch(() => null);
+  if (settled === "1" || settled === 1 || settled === true) {
+    return { refunded: 0, bettorCount: 0 };
+  }
+
+  const state = await getBets(challengeId);
+  let total = 0;
+  let count = 0;
+  for (const b of state.bets) {
+    if (b.amount <= 0) continue;
+    const r = await creditREBEL(b.playerId, b.amount).catch(() => null);
+    if (r !== null) {
+      total += b.amount;
+      count += 1;
+    }
+  }
+  await redis.set(BETS_SETTLED_KEY(challengeId), "1", { ex: 60 * 60 * 24 * 7 }).catch(() => {});
+  return { refunded: total, bettorCount: count };
+}
+
+// Pari-mutuel payout. Winning side gets their stake back PLUS their pro-rata
+// share of the loser pool. Loser side gets nothing.
+// Edge case: if no bettors on the winning side, refund loser pool fully
+// (no house grab — matches the no-fee design).
+// Idempotent via the "settled" flag.
+export async function payoutBets(challengeId: string, winnerSide: PvpSide): Promise<{
+  winnerPaid: number;
+  loserForfeited: number;
+  refundedNoWinner: boolean;
+}> {
+  const settled = await redis.get(BETS_SETTLED_KEY(challengeId)).catch(() => null);
+  if (settled === "1" || settled === 1 || settled === true) {
+    return { winnerPaid: 0, loserForfeited: 0, refundedNoWinner: false };
+  }
+
+  const state = await getBets(challengeId);
+  const winners = state.bets.filter((b) => b.side === winnerSide && b.amount > 0);
+  const losers = state.bets.filter((b) => b.side !== winnerSide && b.amount > 0);
+  const loserPool = losers.reduce((acc, b) => acc + b.amount, 0);
+  const winnerPool = winners.reduce((acc, b) => acc + b.amount, 0);
+
+  // No winners — refund losers (refund-on-no-winner per design Q3).
+  if (winners.length === 0) {
+    let refunded = 0;
+    for (const b of losers) {
+      const r = await creditREBEL(b.playerId, b.amount).catch(() => null);
+      if (r !== null) refunded += b.amount;
+    }
+    await redis.set(BETS_SETTLED_KEY(challengeId), "1", { ex: 60 * 60 * 24 * 7 }).catch(() => {});
+    return { winnerPaid: 0, loserForfeited: 0, refundedNoWinner: true };
+  }
+
+  // Pari-mutuel split. Use floor for each share so we never overpay; small
+  // fractional remainder (< winners.length REBEL) is left in the system —
+  // negligible at REBEL granularity.
+  let winnerPaid = 0;
+  for (const w of winners) {
+    if (winnerPool <= 0) break;
+    const shareOfLoserPool = Math.floor((w.amount / winnerPool) * loserPool);
+    const total = w.amount + shareOfLoserPool;
+    const r = await creditREBEL(w.playerId, total).catch(() => null);
+    if (r !== null) winnerPaid += total;
+  }
+  await redis.set(BETS_SETTLED_KEY(challengeId), "1", { ex: 60 * 60 * 24 * 7 }).catch(() => {});
+  return { winnerPaid, loserForfeited: loserPool, refundedNoWinner: false };
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Per-match chat (Layer 2D)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// All chat operations key off challengeId. Posts append to a Redis LIST that's
+// trimmed to the latest 200 messages. Mutes are a separate hash with expireAt
+// timestamps. Rate limit is a 2-second TTL string per (challenge, player).
+//
+// Admin endpoints (delete, mute, clear) authenticate via the SAME ADMIN_KEY
+// env var that pages/api/admin/config.ts uses, accepting either the
+// "x-admin-key" or "x-admin-token" header.
+
+const CHAT_KEY = (cid: string) => `ra:fwpvp:chat:${cid}`;
+const CHAT_MUTES_KEY = (cid: string) => `ra:fwpvp:chat:mutes:${cid}`;
+const CHAT_RL_KEY = (cid: string, pid: string) => `ra:fwpvp:chat:rl:${cid}:${pid}`;
+
+const CHAT_MAX_LEN = 280;
+const CHAT_LIST_CAP = 200;
+const CHAT_RL_SECONDS = 2;
+const CHAT_TTL_LIVE_SECONDS = 60 * 60 * 24;  // 24h baseline; tightened on completion
+
+function generateMessageId(): string {
+  // 12 hex chars; ample to avoid collisions within a 200-message window.
+  let out = "";
+  for (let i = 0; i < 12; i++) out += Math.floor(Math.random() * 16).toString(16);
+  return out;
+}
+
+function parseChatMessage(raw: any): ChatMessage | null {
+  try {
+    const m = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (!m || typeof m !== "object") return null;
+    if (typeof m.id !== "string") return null;
+    if (typeof m.playerId !== "string") return null;
+    if (typeof m.text !== "string") return null;
+    if (m.role !== "challenger" && m.role !== "opponent" && m.role !== "spectator") return null;
+    return {
+      id: String(m.id),
+      playerId: String(m.playerId),
+      displayName: String(m.displayName || ""),
+      role: m.role as ChatRole,
+      text: String(m.text),
+      at: Number(m.at) || 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// Determine whether the given playerId should render as the challenger,
+// opponent, or a generic spectator in chat.
+export function chatRoleForPlayer(match: PvpMatch | null, playerId: string): ChatRole {
+  if (!match) return "spectator";
+  if (match.challengerPlayerId === playerId) return "challenger";
+  if (match.opponentPlayerId === playerId) return "opponent";
+  return "spectator";
+}
+
+// ── Mutes ────────────────────────────────────────────────────────────────────
+// Mute records auto-expire client-side via expireAt; we lazily clean on read.
+
+export async function getMute(challengeId: string, playerId: string): Promise<ChatMute | null> {
+  try {
+    const raw: any = await redis.hget(CHAT_MUTES_KEY(challengeId), playerId);
+    if (!raw) return null;
+    const m = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (!m || typeof m !== "object") return null;
+    const expireAt = Number(m.expireAt) || 0;
+    if (expireAt && expireAt < Date.now()) {
+      // Expired — clean up best-effort.
+      redis.hdel(CHAT_MUTES_KEY(challengeId), playerId).catch(() => {});
+      return null;
+    }
+    return {
+      playerId: String(m.playerId || playerId),
+      expireAt,
+      displayName: m.displayName ? String(m.displayName) : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function setMute(challengeId: string, playerId: string, durationMs: number, displayName?: string): Promise<ChatMute> {
+  const expireAt = Date.now() + Math.max(0, durationMs);
+  const record: ChatMute = { playerId, expireAt, displayName };
+  await redis.hset(CHAT_MUTES_KEY(challengeId), { [playerId]: JSON.stringify(record) });
+  // Mute hash inherits a generous TTL so it doesn't outlive the match by much.
+  await redis.expire(CHAT_MUTES_KEY(challengeId), CHAT_TTL_LIVE_SECONDS).catch(() => {});
+  return record;
+}
+
+export async function clearMute(challengeId: string, playerId: string): Promise<void> {
+  await redis.hdel(CHAT_MUTES_KEY(challengeId), playerId).catch(() => {});
+}
+
+export async function listMutes(challengeId: string): Promise<ChatMute[]> {
+  try {
+    const raw: any = await redis.hgetall(CHAT_MUTES_KEY(challengeId));
+    if (!raw || typeof raw !== "object") return [];
+    const now = Date.now();
+    const live: ChatMute[] = [];
+    const stale: string[] = [];
+    for (const k of Object.keys(raw)) {
+      try {
+        const v = (raw as any)[k];
+        const m = typeof v === "string" ? JSON.parse(v) : v;
+        const expireAt = Number(m?.expireAt) || 0;
+        if (!expireAt || expireAt < now) {
+          stale.push(k);
+          continue;
+        }
+        live.push({
+          playerId: String(m?.playerId || k),
+          expireAt,
+          displayName: m?.displayName ? String(m.displayName) : undefined,
+        });
+      } catch {
+        stale.push(k);
+      }
+    }
+    // Best-effort cleanup of expired entries.
+    for (const id of stale) {
+      redis.hdel(CHAT_MUTES_KEY(challengeId), id).catch(() => {});
+    }
+    return live;
+  } catch {
+    return [];
+  }
+}
+
+// ── Posting ──────────────────────────────────────────────────────────────────
+// Returns the created ChatMessage on success, or { error: string } on failure.
+// Caller must have already validated identity. We DO check rate-limit + mute
+// here so the API handler stays thin.
+
+export async function postChatMessage(params: {
+  challengeId: string;
+  playerId: string;
+  displayName: string;
+  text: string;
+  role: ChatRole;
+}): Promise<{ ok: true; message: ChatMessage } | { ok: false; error: string; mute?: ChatMute }> {
+  const { challengeId, playerId, displayName, role } = params;
+  const trimmed = (params.text || "").trim().slice(0, CHAT_MAX_LEN);
+  if (!trimmed) return { ok: false, error: "Message cannot be empty" };
+
+  // Mute check (auto-expires via getMute).
+  const mute = await getMute(challengeId, playerId);
+  if (mute) {
+    return { ok: false, error: "You are muted in this match", mute };
+  }
+
+  // Rate limit — atomic SET NX EX so concurrent requests can't race.
+  // Returns "OK" on success (key didn't exist) or null if the key was already
+  // present (player posted within CHAT_RL_SECONDS). Cast to any because the
+  // Upstash types vary by version; the runtime semantics are stable.
+  try {
+    const setRes: any = await redis.set(CHAT_RL_KEY(challengeId, playerId), "1", { nx: true, ex: CHAT_RL_SECONDS });
+    if (setRes === null) {
+      return { ok: false, error: "Slow down — wait a couple seconds between messages" };
+    }
+  } catch {
+    // If rate-limit infra fails, allow the message rather than block all posting.
+  }
+
+  const message: ChatMessage = {
+    id: generateMessageId(),
+    playerId,
+    displayName: (displayName || "").slice(0, 32),
+    role,
+    text: trimmed,
+    at: Date.now(),
+  };
+
+  try {
+    await redis.rpush(CHAT_KEY(challengeId), JSON.stringify(message));
+    // Trim to the most recent CHAT_LIST_CAP messages (keeps memory bounded
+    // even if a chat goes wild).
+    await redis.ltrim(CHAT_KEY(challengeId), -CHAT_LIST_CAP, -1).catch(() => {});
+    // Refresh TTL so active chats don't expire mid-match.
+    await redis.expire(CHAT_KEY(challengeId), CHAT_TTL_LIVE_SECONDS).catch(() => {});
+  } catch (e: any) {
+    return { ok: false, error: "Failed to post message" };
+  }
+
+  return { ok: true, message };
+}
+
+// ── Reading ──────────────────────────────────────────────────────────────────
+
+export async function getChatMessages(challengeId: string, limit: number = CHAT_LIST_CAP): Promise<ChatMessage[]> {
+  try {
+    const cap = Math.max(1, Math.min(CHAT_LIST_CAP, limit));
+    const raw: any = await redis.lrange(CHAT_KEY(challengeId), -cap, -1);
+    if (!raw || !Array.isArray(raw)) return [];
+    const out: ChatMessage[] = [];
+    for (const item of raw) {
+      const m = parseChatMessage(item);
+      if (m) out.push(m);
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+// ── Admin ops ────────────────────────────────────────────────────────────────
+// Delete a single message by id. Because messages are stored in a list, we
+// LREM by re-fetching, finding the JSON containing the id, and removing that
+// exact value. Cheap because list is capped at 200.
+
+export async function adminDeleteChatMessage(challengeId: string, messageId: string): Promise<boolean> {
+  try {
+    const all: any = await redis.lrange(CHAT_KEY(challengeId), 0, -1);
+    if (!all || !Array.isArray(all)) return false;
+    let target: string | null = null;
+    for (const item of all) {
+      try {
+        const obj = typeof item === "string" ? JSON.parse(item) : item;
+        if (obj?.id === messageId) {
+          target = typeof item === "string" ? item : JSON.stringify(item);
+          break;
+        }
+      } catch {}
+    }
+    if (!target) return false;
+    const removed: any = await redis.lrem(CHAT_KEY(challengeId), 1, target);
+    return Number(removed) > 0;
+  } catch {
+    return false;
+  }
+}
+
+export async function adminClearAllChat(challengeId: string): Promise<number> {
+  let len = 0;
+  try {
+    const result: any = await redis.llen(CHAT_KEY(challengeId));
+    len = Number(result) || 0;
+  } catch {
+    // ignore — proceed to del anyway
+  }
+  try {
+    await redis.del(CHAT_KEY(challengeId));
+  } catch {}
+  return len;
+}
+
+// Tighten chat TTL to N minutes after match completion.
+// Called from submit-move when match transitions to "completed", and from
+// cancel/decline. Best-effort — if the key is gone, no-op.
+export async function tightenChatTTL(challengeId: string, minutes: number): Promise<void> {
+  const seconds = Math.max(60, Math.floor(minutes * 60));
+  await redis.expire(CHAT_KEY(challengeId), seconds).catch(() => {});
+  await redis.expire(CHAT_MUTES_KEY(challengeId), seconds).catch(() => {});
+}
+
+// Server-side admin auth check. Same env var used by /api/admin/config.ts.
+// Accepts both header names that admin.tsx sends.
+export function checkAdminAuth(req: { headers: Record<string, any> }): boolean {
+  const headerVal = (v: any): string => Array.isArray(v) ? String(v[0] || "") : String(v || "");
+  const provided = headerVal(req.headers["x-admin-key"]) || headerVal(req.headers["x-admin-token"]) || "";
+  const expected = process.env.ADMIN_KEY || process.env.ADMIN_TOKEN || "";
+  if (!expected) return false;
+  return !!provided && provided === expected;
 }
