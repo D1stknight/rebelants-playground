@@ -206,7 +206,68 @@ export interface PlaceBetRequest {
   amount: number;
 }
 
-// Body for POST /api/faction-wars/pvp/create
+// ── Per-match chat (Layer 2D) ───────────────────────────────────────────────
+//
+// Per-spectate-page chat. Anyone signed in can post; participants and
+// spectators in the same room. Read-only for unsigned viewers.
+//
+// Storage:
+//   ra:fwpvp:chat:{cid}              -> Redis LIST of JSON-stringified ChatMessage,
+//                                       capped at 200 via LTRIM (most recent kept).
+//                                       TTL 24h baseline; TTL drops to 30min on match completion.
+//   ra:fwpvp:chat:mutes:{cid}        -> Redis HASH, field={playerId}, value=expireAt(ms)
+//   ra:fwpvp:chat:rl:{cid}:{pid}     -> string with 2s TTL for rate limit
+//
+// Admin actions (delete/mute/clear/unmute) require x-admin-key header
+// matching ADMIN_KEY env var — same auth pattern as /api/admin/config.
+
+export type ChatRole = "challenger" | "opponent" | "spectator";
+
+export interface ChatMessage {
+  // Stable random id (hex) so admin delete can target by id without index shifting.
+  id: string;
+  // Author. playerId follows the standard rebel-ants identity format
+  // (e.g. "discord:123" or "commander:Name"). displayName is denormalized for
+  // render perf (no second lookup per message).
+  playerId: string;
+  displayName: string;
+  // Role determines name color in the UI. Computed at post time from match
+  // participant ids — saves recomputation on every poll.
+  role: ChatRole;
+  // Message body. <= 280 chars. Server trims + caps.
+  text: string;
+  // Posted-at ms.
+  at: number;
+}
+
+export interface ChatMute {
+  playerId: string;
+  // ms timestamp when the mute expires. 0 = unmuted.
+  expireAt: number;
+  // Optional display name snapshot for the admin "Muted: N" panel — saves a
+  // round-trip on the client.
+  displayName?: string;
+}
+
+// Body for POST /api/faction-wars/pvp/chat/post
+export interface PostChatRequest {
+  challengeId: string;
+  playerId: string;
+  displayName: string;
+  text: string;
+}
+
+// Response from GET /api/faction-wars/pvp/chat/messages
+export interface ChatMessagesResponse {
+  ok: boolean;
+  enabled: boolean;
+  messages: ChatMessage[];
+  // myMute is populated only if the requesting playerId param is provided.
+  myMute?: ChatMute | null;
+  error?: string;
+}
+
+// Body for POST /api/faction-wars/pvp/chat/post
 export interface CreateChallengeRequest {
   challengerPlayerId: string;
   challengerDisplayName: string;

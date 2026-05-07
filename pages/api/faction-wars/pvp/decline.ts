@@ -7,7 +7,7 @@
 // link rendering stays uniform.
 
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getMatch, saveMatch, creditREBEL, unmarkActive, refundBets } from "../../../../lib/server/fwpvp";
+import { getMatch, saveMatch, creditREBEL, unmarkActive, refundBets, tightenChatTTL, getPvpEconomyConfig } from "../../../../lib/server/fwpvp";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Cache-Control", "no-store");
@@ -62,6 +62,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await unmarkActive(challengeId);
     // Refund any spectator side bets (Layer 2B). Best-effort.
     try { await refundBets(challengeId); } catch {}
+    // Tighten chat TTL (Layer 2D). Best-effort.
+    try {
+      const cfg = await getPvpEconomyConfig();
+      await tightenChatTTL(challengeId, cfg.factionWarsChatPostCleanupMins);
+    } catch {}
 
     return res.status(200).json({ ok: true, match, refunded, refundedTo, refundedBalance });
   } catch (e: any) {

@@ -13,7 +13,7 @@
 // challengeId format: 12 chars [a-z0-9], URL-safe.
 
 import { redis } from "./redis";
-import type { PvpMatch, PvpBet, PvpBetsState, PvpSide } from "../types/fwpvp";
+import type { PvpMatch, PvpBet, PvpBetsState, PvpSide, ChatMessage, ChatMute, ChatRole } from "../types/fwpvp";
 
 const MATCH_KEY = (id: string) => `ra:fwpvp:match:${id}`;
 const PLAYER_MATCHES_KEY = (pid: string) => `ra:fwpvp:player:${pid}`;
@@ -198,6 +198,9 @@ const BET_MAX_DEFAULT = 25000;
 const BET_POOL_CAP_DEFAULT = 100000;
 const BET_LOCK_TERRITORY_DEFAULT = 3;  // bets close when match enters T3 (0-indexed: territory >= 2)
 const BET_ENABLED_DEFAULT = true;
+// Per-match chat (Layer 2D)
+const CHAT_ENABLED_DEFAULT = true;
+const CHAT_POST_CLEANUP_MINS_DEFAULT = 30;  // chat TTL after match completion
 
 export interface PvpEconomyConfig {
   factionWarsPvpCost: number;
@@ -210,6 +213,9 @@ export interface PvpEconomyConfig {
   factionWarsBetMax: number;
   factionWarsBetPoolCap: number;
   factionWarsBetLockTerritory: number;  // 1-indexed for admin clarity (1..5). Stored as 0-indexed comparison.
+  // Per-match chat (Layer 2D)
+  factionWarsChatEnabled: boolean;
+  factionWarsChatPostCleanupMins: number;  // minutes after match completion before chat TTLs out
   // Featured match (admin podcast tool) — empty/undefined = no featured match
   featuredMatchId?: string;
 }
@@ -265,6 +271,8 @@ export async function getPvpEconomyConfig(): Promise<PvpEconomyConfig> {
         const featuredMatchId = typeof featuredMatchIdRaw === "string" && featuredMatchIdRaw.trim().length > 0
           ? featuredMatchIdRaw.trim().slice(0, 64)
           : undefined;
+        const chatEnabled = (cfg as any).factionWarsChatEnabled;
+        const chatCleanup = Number((cfg as any).factionWarsChatPostCleanupMins);
         return {
           factionWarsPvpCost: Number.isFinite(cost) && cost >= 0 ? cost : PVP_COST_DEFAULT,
           factionWarsPvpPayoutMode: PVP_PAYOUT_MODE_DEFAULT,
@@ -275,6 +283,8 @@ export async function getPvpEconomyConfig(): Promise<PvpEconomyConfig> {
           factionWarsBetMax: Number.isFinite(betMax) && betMax >= 0 ? betMax : BET_MAX_DEFAULT,
           factionWarsBetPoolCap: Number.isFinite(betCap) && betCap >= 0 ? betCap : BET_POOL_CAP_DEFAULT,
           factionWarsBetLockTerritory: Number.isFinite(betLock) && betLock >= 1 && betLock <= 5 ? Math.floor(betLock) : BET_LOCK_TERRITORY_DEFAULT,
+          factionWarsChatEnabled: chatEnabled === false ? false : CHAT_ENABLED_DEFAULT,
+          factionWarsChatPostCleanupMins: Number.isFinite(chatCleanup) && chatCleanup >= 0 ? Math.floor(chatCleanup) : CHAT_POST_CLEANUP_MINS_DEFAULT,
           featuredMatchId,
         };
       }
@@ -293,6 +303,8 @@ export async function getPvpEconomyConfig(): Promise<PvpEconomyConfig> {
     factionWarsBetMax: BET_MAX_DEFAULT,
     factionWarsBetPoolCap: BET_POOL_CAP_DEFAULT,
     factionWarsBetLockTerritory: BET_LOCK_TERRITORY_DEFAULT,
+    factionWarsChatEnabled: CHAT_ENABLED_DEFAULT,
+    factionWarsChatPostCleanupMins: CHAT_POST_CLEANUP_MINS_DEFAULT,
     featuredMatchId: undefined,
   };
 }
@@ -744,4 +756,266 @@ export async function payoutBets(challengeId: string, winnerSide: PvpSide): Prom
   }
   await redis.set(BETS_SETTLED_KEY(challengeId), "1", { ex: 60 * 60 * 24 * 7 }).catch(() => {});
   return { winnerPaid, loserForfeited: loserPool, refundedNoWinner: false };
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Per-match chat (Layer 2D)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// All chat operations key off challengeId. Posts append to a Redis LIST that's
+// trimmed to the latest 200 messages. Mutes are a separate hash with expireAt
+// timestamps. Rate limit is a 2-second TTL string per (challenge, player).
+//
+// Admin endpoints (delete, mute, clear) authenticate via the SAME ADMIN_KEY
+// env var that pages/api/admin/config.ts uses, accepting either the
+// "x-admin-key" or "x-admin-token" header.
+
+const CHAT_KEY = (cid: string) => `ra:fwpvp:chat:${cid}`;
+const CHAT_MUTES_KEY = (cid: string) => `ra:fwpvp:chat:mutes:${cid}`;
+const CHAT_RL_KEY = (cid: string, pid: string) => `ra:fwpvp:chat:rl:${cid}:${pid}`;
+
+const CHAT_MAX_LEN = 280;
+const CHAT_LIST_CAP = 200;
+const CHAT_RL_SECONDS = 2;
+const CHAT_TTL_LIVE_SECONDS = 60 * 60 * 24;  // 24h baseline; tightened on completion
+
+function generateMessageId(): string {
+  // 12 hex chars; ample to avoid collisions within a 200-message window.
+  let out = "";
+  for (let i = 0; i < 12; i++) out += Math.floor(Math.random() * 16).toString(16);
+  return out;
+}
+
+function parseChatMessage(raw: any): ChatMessage | null {
+  try {
+    const m = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (!m || typeof m !== "object") return null;
+    if (typeof m.id !== "string") return null;
+    if (typeof m.playerId !== "string") return null;
+    if (typeof m.text !== "string") return null;
+    if (m.role !== "challenger" && m.role !== "opponent" && m.role !== "spectator") return null;
+    return {
+      id: m.id,
+      playerId: m.playerId,
+      displayName: String(m.displayName || ""),
+      role: m.role,
+      text: m.text,
+      at: Number(m.at) || 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// Determine whether the given playerId should render as the challenger,
+// opponent, or a generic spectator in chat.
+export function chatRoleForPlayer(match: PvpMatch | null, playerId: string): ChatRole {
+  if (!match) return "spectator";
+  if (match.challengerPlayerId === playerId) return "challenger";
+  if (match.opponentPlayerId === playerId) return "opponent";
+  return "spectator";
+}
+
+// ── Mutes ────────────────────────────────────────────────────────────────────
+// Mute records auto-expire client-side via expireAt; we lazily clean on read.
+
+export async function getMute(challengeId: string, playerId: string): Promise<ChatMute | null> {
+  try {
+    const raw = await redis.hget<any>(CHAT_MUTES_KEY(challengeId), playerId);
+    if (!raw) return null;
+    const m = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (!m || typeof m !== "object") return null;
+    const expireAt = Number(m.expireAt) || 0;
+    if (expireAt && expireAt < Date.now()) {
+      // Expired — clean up best-effort.
+      redis.hdel(CHAT_MUTES_KEY(challengeId), playerId).catch(() => {});
+      return null;
+    }
+    return {
+      playerId: String(m.playerId || playerId),
+      expireAt,
+      displayName: m.displayName ? String(m.displayName) : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function setMute(challengeId: string, playerId: string, durationMs: number, displayName?: string): Promise<ChatMute> {
+  const expireAt = Date.now() + Math.max(0, durationMs);
+  const record: ChatMute = { playerId, expireAt, displayName };
+  await redis.hset(CHAT_MUTES_KEY(challengeId), { [playerId]: JSON.stringify(record) });
+  // Mute hash inherits a generous TTL so it doesn't outlive the match by much.
+  await redis.expire(CHAT_MUTES_KEY(challengeId), CHAT_TTL_LIVE_SECONDS).catch(() => {});
+  return record;
+}
+
+export async function clearMute(challengeId: string, playerId: string): Promise<void> {
+  await redis.hdel(CHAT_MUTES_KEY(challengeId), playerId).catch(() => {});
+}
+
+export async function listMutes(challengeId: string): Promise<ChatMute[]> {
+  try {
+    const raw = await redis.hgetall<Record<string, any>>(CHAT_MUTES_KEY(challengeId));
+    if (!raw || typeof raw !== "object") return [];
+    const now = Date.now();
+    const live: ChatMute[] = [];
+    const stale: string[] = [];
+    for (const k of Object.keys(raw)) {
+      try {
+        const v = (raw as any)[k];
+        const m = typeof v === "string" ? JSON.parse(v) : v;
+        const expireAt = Number(m?.expireAt) || 0;
+        if (!expireAt || expireAt < now) {
+          stale.push(k);
+          continue;
+        }
+        live.push({
+          playerId: String(m?.playerId || k),
+          expireAt,
+          displayName: m?.displayName ? String(m.displayName) : undefined,
+        });
+      } catch {
+        stale.push(k);
+      }
+    }
+    // Best-effort cleanup of expired entries.
+    for (const id of stale) {
+      redis.hdel(CHAT_MUTES_KEY(challengeId), id).catch(() => {});
+    }
+    return live;
+  } catch {
+    return [];
+  }
+}
+
+// ── Posting ──────────────────────────────────────────────────────────────────
+// Returns the created ChatMessage on success, or { error: string } on failure.
+// Caller must have already validated identity. We DO check rate-limit + mute
+// here so the API handler stays thin.
+
+export async function postChatMessage(params: {
+  challengeId: string;
+  playerId: string;
+  displayName: string;
+  text: string;
+  role: ChatRole;
+}): Promise<{ ok: true; message: ChatMessage } | { ok: false; error: string; mute?: ChatMute }> {
+  const { challengeId, playerId, displayName, role } = params;
+  const trimmed = (params.text || "").trim().slice(0, CHAT_MAX_LEN);
+  if (!trimmed) return { ok: false, error: "Message cannot be empty" };
+
+  // Mute check (auto-expires via getMute).
+  const mute = await getMute(challengeId, playerId);
+  if (mute) {
+    return { ok: false, error: "You are muted in this match", mute };
+  }
+
+  // Rate limit — atomic SET with NX+EX so concurrent requests can't race.
+  // If the key already exists, the player posted within CHAT_RL_SECONDS.
+  try {
+    const set = await redis.set(CHAT_RL_KEY(challengeId, playerId), "1", { nx: true, ex: CHAT_RL_SECONDS });
+    if (set === null || set === false) {
+      return { ok: false, error: `Slow down — wait a couple seconds between messages` };
+    }
+  } catch {
+    // If rate-limit infra fails, allow the message rather than block all posting.
+  }
+
+  const message: ChatMessage = {
+    id: generateMessageId(),
+    playerId,
+    displayName: (displayName || "").slice(0, 32),
+    role,
+    text: trimmed,
+    at: Date.now(),
+  };
+
+  try {
+    await redis.rpush(CHAT_KEY(challengeId), JSON.stringify(message));
+    // Trim to the most recent CHAT_LIST_CAP messages (keeps memory bounded
+    // even if a chat goes wild).
+    await redis.ltrim(CHAT_KEY(challengeId), -CHAT_LIST_CAP, -1).catch(() => {});
+    // Refresh TTL so active chats don't expire mid-match.
+    await redis.expire(CHAT_KEY(challengeId), CHAT_TTL_LIVE_SECONDS).catch(() => {});
+  } catch (e: any) {
+    return { ok: false, error: "Failed to post message" };
+  }
+
+  return { ok: true, message };
+}
+
+// ── Reading ──────────────────────────────────────────────────────────────────
+
+export async function getChatMessages(challengeId: string, limit: number = CHAT_LIST_CAP): Promise<ChatMessage[]> {
+  try {
+    const cap = Math.max(1, Math.min(CHAT_LIST_CAP, limit));
+    const raw = await redis.lrange<string>(CHAT_KEY(challengeId), -cap, -1);
+    if (!raw || !Array.isArray(raw)) return [];
+    const out: ChatMessage[] = [];
+    for (const item of raw) {
+      const m = parseChatMessage(item);
+      if (m) out.push(m);
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+// ── Admin ops ────────────────────────────────────────────────────────────────
+// Delete a single message by id. Because messages are stored in a list, we
+// LREM by re-fetching, finding the JSON containing the id, and removing that
+// exact value. Cheap because list is capped at 200.
+
+export async function adminDeleteChatMessage(challengeId: string, messageId: string): Promise<boolean> {
+  try {
+    const all = await redis.lrange<string>(CHAT_KEY(challengeId), 0, -1);
+    if (!all || !Array.isArray(all)) return false;
+    let target: string | null = null;
+    for (const item of all) {
+      try {
+        const obj = typeof item === "string" ? JSON.parse(item) : item;
+        if (obj?.id === messageId) {
+          target = typeof item === "string" ? item : JSON.stringify(item);
+          break;
+        }
+      } catch {}
+    }
+    if (!target) return false;
+    const removed = await redis.lrem(CHAT_KEY(challengeId), 1, target);
+    return Number(removed) > 0;
+  } catch {
+    return false;
+  }
+}
+
+export async function adminClearAllChat(challengeId: string): Promise<number> {
+  try {
+    const len = await redis.llen(CHAT_KEY(challengeId)).catch(() => 0);
+    await redis.del(CHAT_KEY(challengeId));
+    return Number(len) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+// Tighten chat TTL to N minutes after match completion.
+// Called from submit-move when match transitions to "completed", and from
+// cancel/decline. Best-effort — if the key is gone, no-op.
+export async function tightenChatTTL(challengeId: string, minutes: number): Promise<void> {
+  const seconds = Math.max(60, Math.floor(minutes * 60));
+  await redis.expire(CHAT_KEY(challengeId), seconds).catch(() => {});
+  await redis.expire(CHAT_MUTES_KEY(challengeId), seconds).catch(() => {});
+}
+
+// Server-side admin auth check. Same env var used by /api/admin/config.ts.
+// Accepts both header names that admin.tsx sends.
+export function checkAdminAuth(req: { headers: Record<string, any> }): boolean {
+  const headerVal = (v: any): string => Array.isArray(v) ? String(v[0] || "") : String(v || "");
+  const provided = headerVal(req.headers["x-admin-key"]) || headerVal(req.headers["x-admin-token"]) || "";
+  const expected = process.env.ADMIN_KEY || process.env.ADMIN_TOKEN || "";
+  if (!expected) return false;
+  return !!provided && provided === expected;
 }

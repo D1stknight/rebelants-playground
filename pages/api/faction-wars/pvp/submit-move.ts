@@ -20,7 +20,7 @@
 // currently-active faction. This prevents move spoofing.
 
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getMatch, saveMatch, creditREBEL, getCrateRewards, recordPvpResult, unmarkActive, lockBets, payoutBets, refundBets, getPvpEconomyConfig } from "../../../../lib/server/fwpvp";
+import { getMatch, saveMatch, creditREBEL, getCrateRewards, recordPvpResult, unmarkActive, lockBets, payoutBets, refundBets, getPvpEconomyConfig, tightenChatTTL } from "../../../../lib/server/fwpvp";
 import {
   FACTIONS,
   MAX_HP,
@@ -296,6 +296,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         } else {
           await refundBets(match.challengeId);
         }
+      } catch {}
+      // Tighten chat TTL (Layer 2D). Re-fetch config in case admin changed
+      // the cleanup window mid-match. Best-effort.
+      try {
+        const cfg2 = await getPvpEconomyConfig();
+        await tightenChatTTL(match.challengeId, cfg2.factionWarsChatPostCleanupMins);
       } catch {}
     } else {
       // Match continues — flip turn
