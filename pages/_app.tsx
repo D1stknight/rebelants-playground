@@ -36,7 +36,10 @@ export default function App({ Component, pageProps }: AppProps) {
           <meta name="apple-mobile-web-app-title" content="Rebel Ants" />
           <meta name="theme-color" content="#09090b" />
           <link rel="manifest" href="/manifest.json" />
-          <link rel="apple-touch-icon" href="/icon-192.png" />
+          <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+          <link rel="icon" type="image/png" sizes="32x32" href="/icon-192.png" />
+          <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+          <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
 
         <meta
           name="description"
@@ -52,6 +55,15 @@ export default function App({ Component, pageProps }: AppProps) {
           property="og:image"
           content="https://play.rebelants.io/social_preview_final.PNG?v=3"
         />
+        {/* Explicit og:image dimensions — REQUIRED by WhatsApp link previews
+            (they silently drop images without explicit width/height). The image
+            is 1200×630 (standard OpenGraph aspect ratio). If you swap the
+            image for one of different dimensions, update these numbers. */}
+        <meta property="og:image:secure_url" content="https://play.rebelants.io/social_preview_final.PNG?v=3" />
+        <meta property="og:image:type" content="image/png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:alt" content="Rebel Ants Playground — play, earn REBEL, win NFTs" />
         <meta property="og:url" content="https://play.rebelants.io" />
         <meta property="og:type" content="website" />
 

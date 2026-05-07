@@ -260,6 +260,15 @@ export function ChatPanel({
   compact?: boolean;
 }) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  // Ref to the compose input so we can refocus it after each send. Without
+  // this, the player has to click the input again every message — awful for
+  // rapid trash talk during a match.
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  // Quick-reaction emojis — one tap inserts at the cursor end. Native OS
+  // emoji keyboards still work (Cmd+Ctrl+Space on Mac, Win+. on Windows,
+  // emoji button on iOS/Android), this just speeds up the most-used ones
+  // so trash talk doesn't require leaving the chat box.
+  const QUICK_EMOJIS = ["🔥","💀","😂","👀","⚡","🐜","🤡","💩"];
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -483,16 +492,58 @@ export function ChatPanel({
             <a href="/" style={{ color: "#fbbf24", textDecoration: "underline" }}>Sign in</a> to chat
           </div>
         ) : (
+          (() => {
+            // Wrap chat.post so we can re-focus the input after a successful send.
+            // The setTimeout(0) lets React flush the disabled→enabled transition first
+            // (input is disabled while chatPosting === true).
+            const doPost = async () => {
+              await chat.post();
+              setTimeout(() => { inputRef.current?.focus(); }, 0);
+            };
+            const insertEmoji = (emoji: string) => {
+              const next = (chat.chatInput + emoji).slice(0, 280);
+              chat.setChatInput(next);
+              // Refocus after insert so the user can keep typing.
+              setTimeout(() => { inputRef.current?.focus(); }, 0);
+            };
+            return (
           <div>
+            {/* Quick-reaction emoji row */}
+            <div style={{ display: "flex", gap: 4, marginBottom: 8, flexWrap: "wrap" }}>
+              {QUICK_EMOJIS.map((e) => (
+                <button
+                  key={e}
+                  onClick={() => insertEmoji(e)}
+                  type="button"
+                  style={{
+                    width: 32, height: 32,
+                    padding: 0,
+                    borderRadius: 8,
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    background: "rgba(255,255,255,0.04)",
+                    fontSize: 16,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    lineHeight: 1,
+                  }}
+                  title={`Insert ${e}`}
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
             <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
               <input
+                ref={inputRef}
                 type="text"
                 value={chat.chatInput}
                 onChange={(e) => chat.setChatInput(e.target.value.slice(0, 280))}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
-                    chat.post();
+                    void doPost();
                   }
                 }}
                 placeholder="Talk trash, support your fave, hype the play..."
@@ -511,7 +562,7 @@ export function ChatPanel({
                 }}
               />
               <button
-                onClick={chat.post}
+                onClick={() => void doPost()}
                 disabled={chat.chatPosting || !chat.chatInput.trim()}
                 style={{
                   minWidth: 80, height: 38, padding: "0 14px", borderRadius: 10,
@@ -534,6 +585,8 @@ export function ChatPanel({
               </span>
             </div>
           </div>
+            );
+          })()
         )}
       </div>
     </div>

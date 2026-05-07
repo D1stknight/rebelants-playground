@@ -294,7 +294,9 @@ export default function SpectatePage() {
       <Head>
         <title>Spectate · Faction Wars PvP</title>
       </Head>
-      <div style={{ minHeight: "100vh", background: "linear-gradient(180deg,#0a0a14 0%,#1a0f1f 100%)", color: "white", paddingBottom: 60, fontFamily: JP }}>
+      <div style={{ minHeight: "100vh", color: "white", paddingBottom: 60, fontFamily: JP, backgroundImage: "url('/bg/faction-wars-bg.png')", backgroundSize: "cover", backgroundPosition: "center top", backgroundAttachment: "fixed", backgroundRepeat: "no-repeat", position: "relative" }}>
+      <div style={{ position: "fixed", inset: 0, background: "rgba(8,11,20,0.82)", zIndex: 0, pointerEvents: "none" }} />
+      <div style={{ position: "relative", zIndex: 1 }}>
         {/* Header */}
         <header style={{ position: "relative", zIndex: 20, maxWidth: 980, margin: "0 auto", padding: "16px 20px 0", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
           <Link href="/faction-wars/pvp" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none", color: "white" }}>
@@ -796,6 +798,7 @@ function PoolCard({ side, name, accent, pool, mult, bettors }: { side: "challeng
         {mult !== null && pool > 0 && (
           <> · <span style={{ color: accent, fontWeight: 700 }}>{mult.toFixed(2)}x</span> if win</>
         )}
+      </div>
       </div>
     </div>
   );
