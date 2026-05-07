@@ -796,11 +796,11 @@ function parseChatMessage(raw: any): ChatMessage | null {
     if (typeof m.text !== "string") return null;
     if (m.role !== "challenger" && m.role !== "opponent" && m.role !== "spectator") return null;
     return {
-      id: m.id,
-      playerId: m.playerId,
+      id: String(m.id),
+      playerId: String(m.playerId),
       displayName: String(m.displayName || ""),
-      role: m.role,
-      text: m.text,
+      role: m.role as ChatRole,
+      text: String(m.text),
       at: Number(m.at) || 0,
     };
   } catch {
@@ -822,7 +822,7 @@ export function chatRoleForPlayer(match: PvpMatch | null, playerId: string): Cha
 
 export async function getMute(challengeId: string, playerId: string): Promise<ChatMute | null> {
   try {
-    const raw = await redis.hget<any>(CHAT_MUTES_KEY(challengeId), playerId);
+    const raw: any = await redis.hget(CHAT_MUTES_KEY(challengeId), playerId);
     if (!raw) return null;
     const m = typeof raw === "string" ? JSON.parse(raw) : raw;
     if (!m || typeof m !== "object") return null;
@@ -857,7 +857,7 @@ export async function clearMute(challengeId: string, playerId: string): Promise<
 
 export async function listMutes(challengeId: string): Promise<ChatMute[]> {
   try {
-    const raw = await redis.hgetall<Record<string, any>>(CHAT_MUTES_KEY(challengeId));
+    const raw: any = await redis.hgetall(CHAT_MUTES_KEY(challengeId));
     if (!raw || typeof raw !== "object") return [];
     const now = Date.now();
     const live: ChatMute[] = [];
@@ -912,12 +912,14 @@ export async function postChatMessage(params: {
     return { ok: false, error: "You are muted in this match", mute };
   }
 
-  // Rate limit — atomic SET with NX+EX so concurrent requests can't race.
-  // If the key already exists, the player posted within CHAT_RL_SECONDS.
+  // Rate limit — atomic SET NX EX so concurrent requests can't race.
+  // Returns "OK" on success (key didn't exist) or null if the key was already
+  // present (player posted within CHAT_RL_SECONDS). Cast to any because the
+  // Upstash types vary by version; the runtime semantics are stable.
   try {
-    const set = await redis.set(CHAT_RL_KEY(challengeId, playerId), "1", { nx: true, ex: CHAT_RL_SECONDS });
-    if (set === null || set === false) {
-      return { ok: false, error: `Slow down — wait a couple seconds between messages` };
+    const setRes: any = await redis.set(CHAT_RL_KEY(challengeId, playerId), "1", { nx: true, ex: CHAT_RL_SECONDS });
+    if (setRes === null) {
+      return { ok: false, error: "Slow down — wait a couple seconds between messages" };
     }
   } catch {
     // If rate-limit infra fails, allow the message rather than block all posting.
@@ -951,7 +953,7 @@ export async function postChatMessage(params: {
 export async function getChatMessages(challengeId: string, limit: number = CHAT_LIST_CAP): Promise<ChatMessage[]> {
   try {
     const cap = Math.max(1, Math.min(CHAT_LIST_CAP, limit));
-    const raw = await redis.lrange<string>(CHAT_KEY(challengeId), -cap, -1);
+    const raw: any = await redis.lrange(CHAT_KEY(challengeId), -cap, -1);
     if (!raw || !Array.isArray(raw)) return [];
     const out: ChatMessage[] = [];
     for (const item of raw) {
@@ -971,7 +973,7 @@ export async function getChatMessages(challengeId: string, limit: number = CHAT_
 
 export async function adminDeleteChatMessage(challengeId: string, messageId: string): Promise<boolean> {
   try {
-    const all = await redis.lrange<string>(CHAT_KEY(challengeId), 0, -1);
+    const all: any = await redis.lrange(CHAT_KEY(challengeId), 0, -1);
     if (!all || !Array.isArray(all)) return false;
     let target: string | null = null;
     for (const item of all) {
@@ -984,7 +986,7 @@ export async function adminDeleteChatMessage(challengeId: string, messageId: str
       } catch {}
     }
     if (!target) return false;
-    const removed = await redis.lrem(CHAT_KEY(challengeId), 1, target);
+    const removed: any = await redis.lrem(CHAT_KEY(challengeId), 1, target);
     return Number(removed) > 0;
   } catch {
     return false;
@@ -992,13 +994,17 @@ export async function adminDeleteChatMessage(challengeId: string, messageId: str
 }
 
 export async function adminClearAllChat(challengeId: string): Promise<number> {
+  let len = 0;
   try {
-    const len = await redis.llen(CHAT_KEY(challengeId)).catch(() => 0);
-    await redis.del(CHAT_KEY(challengeId));
-    return Number(len) || 0;
+    const result: any = await redis.llen(CHAT_KEY(challengeId));
+    len = Number(result) || 0;
   } catch {
-    return 0;
+    // ignore — proceed to del anyway
   }
+  try {
+    await redis.del(CHAT_KEY(challengeId));
+  } catch {}
+  return len;
 }
 
 // Tighten chat TTL to N minutes after match completion.
