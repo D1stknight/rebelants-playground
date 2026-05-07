@@ -20,7 +20,7 @@
 // currently-active faction. This prevents move spoofing.
 
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getMatch, saveMatch, creditREBEL, getCrateRewards, recordPvpResult, unmarkActive } from "../../../../lib/server/fwpvp";
+import { getMatch, saveMatch, creditREBEL, getCrateRewards, recordPvpResult, unmarkActive, lockBets, payoutBets, refundBets, getPvpEconomyConfig } from "../../../../lib/server/fwpvp";
 import {
   FACTIONS,
   MAX_HP,
@@ -173,6 +173,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       match.challengerHp = MAX_HP;
       match.opponentHp = MAX_HP;
       match.currentTerritory += 1;
+      // Lock spectator side bets if we've entered or passed the lock territory
+      // (Layer 2B). 1-indexed admin config; currentTerritory is 0-indexed.
+      // Best-effort — failure here doesn't block the match from progressing.
+      try {
+        const cfg = await getPvpEconomyConfig();
+        const lockIdx = Math.max(1, Math.min(TERRITORY_COUNT, cfg.factionWarsBetLockTerritory)) - 1;
+        if (match.currentTerritory >= lockIdx) {
+          await lockBets(match.challengeId);
+        }
+      } catch {}
     }
 
     // ── Match completion check ────────────────────────────────────────────
@@ -276,6 +286,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } catch {}
       // Match concluded — drop from public Live Matches list. Best-effort.
       try { await unmarkActive(match.challengeId); } catch {}
+      // Settle spectator side bets (Layer 2B). If there's a winner, payout;
+      // if a tie (no winnerPlayerId), refund all bets in full. Idempotent
+      // via the BETS_SETTLED flag.
+      try {
+        if (match.winnerPlayerId && match.loserPlayerId) {
+          const winnerSide = match.winnerPlayerId === match.challengerPlayerId ? "challenger" : "opponent";
+          await payoutBets(match.challengeId, winnerSide);
+        } else {
+          await refundBets(match.challengeId);
+        }
+      } catch {}
     } else {
       // Match continues — flip turn
       match.currentTurnSide = defenderSide;

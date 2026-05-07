@@ -145,6 +145,9 @@ export default function PvpLobbyPage() {
   const [isPrivate, setIsPrivate] = useState<boolean>(false);
   // Public Live Matches the user can spectate. Polled every 8s while on lobby.
   const [liveMatches, setLiveMatches] = useState<any[]>([]);
+  // Featured match (admin podcast tool, Layer 2C). When set, renders a hero
+  // card above Live Matches with bigger styling.
+  const [featuredMatchId, setFeaturedMatchId] = useState<string | null>(null);
 
   // Initial profile + identity load
   useEffect(() => {
@@ -239,6 +242,8 @@ export default function PvpLobbyPage() {
         ]);
         if (cancelled) return;
         if (cfgRes?.ok && cfgRes.pointsConfig) {
+          const fmid = cfgRes.pointsConfig.featuredMatchId;
+          setFeaturedMatchId(typeof fmid === "string" && fmid.trim().length > 0 ? fmid.trim() : null);
           const cost = Number(cfgRes.pointsConfig.factionWarsPvpCost);
           const enabled = cfgRes.pointsConfig.factionWarsPvpEnabled;
           const resolvedCost = Number.isFinite(cost) && cost >= 0 ? cost : 300;
@@ -458,6 +463,47 @@ export default function PvpLobbyPage() {
                   Playing as <b style={{ color: "rgba(255,255,255,0.7)" }}>{identity.displayName}</b>
                 </div>
               </div>
+
+              {/* Featured match hero (admin podcast tool, Layer 2C) */}
+              {featuredMatchId && (() => {
+                const fm = liveMatches.find((m: any) => m.challengeId === featuredMatchId);
+                if (!fm) return null;
+                return (
+                  <a href={`/faction-wars/spectate/${fm.challengeId}`} style={{ display: "block", textDecoration: "none", color: "white", marginBottom: 24 }}>
+                    <div style={{
+                      padding: "20px 22px",
+                      borderRadius: 14,
+                      border: "2px solid rgba(248,113,113,0.5)",
+                      background: "linear-gradient(135deg,rgba(248,113,113,0.15),rgba(251,191,36,0.08))",
+                      filter: "drop-shadow(0 0 16px rgba(248,113,113,0.25))",
+                      position: "relative",
+                      overflow: "hidden",
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                        <span style={{ width: 8, height: 8, borderRadius: 4, background: "#f87171", boxShadow: "0 0 12px #f87171" }} />
+                        <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: "0.25em", textTransform: "uppercase", color: "#f87171" }}>
+                          🔴 FEATURED MATCH · LIVE NOW
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 6 }}>
+                        <span style={{ color: "#fbbf24" }}>{fm.challengerDisplayName}</span>
+                        <span style={{ color: "rgba(255,255,255,0.4)", margin: "0 12px", fontSize: 16 }}>vs</span>
+                        <span style={{ color: "#a5b4fc" }}>{fm.opponentDisplayName ?? "—"}</span>
+                      </div>
+                      <div style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }}>
+                        {fm.status === "team_selection" ? "Picking factions" : `Territory ${Math.min(5, (fm.currentTerritory ?? 0) + 1)}/5`}
+                        {Number(fm.pvpCost ?? 0) > 0 && ` · ${Number(fm.pvpCost).toLocaleString()} REBEL wager`}
+                        <span style={{ color: "#fbbf24", marginLeft: 8 }}>{fm.challengerTerritoriesWon ?? 0}</span>
+                        <span style={{ color: "rgba(255,255,255,0.4)" }}> – </span>
+                        <span style={{ color: "#a5b4fc" }}>{fm.opponentTerritoriesWon ?? 0}</span>
+                      </div>
+                      <div style={{ position: "absolute", right: 22, top: "50%", transform: "translateY(-50%)", fontSize: 11, fontWeight: 900, letterSpacing: "0.15em", color: "#f87171", padding: "8px 14px", borderRadius: 14, background: "rgba(0,0,0,0.3)", border: "1px solid rgba(248,113,113,0.4)" }}>
+                        👁 WATCH NOW
+                      </div>
+                    </div>
+                  </a>
+                );
+              })()}
 
               {/* Live Matches — anyone can spectate */}
               {liveMatches.length > 0 && (

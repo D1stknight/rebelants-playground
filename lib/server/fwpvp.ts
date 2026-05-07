@@ -13,7 +13,7 @@
 // challengeId format: 12 chars [a-z0-9], URL-safe.
 
 import { redis } from "./redis";
-import type { PvpMatch } from "../types/fwpvp";
+import type { PvpMatch, PvpBet, PvpBetsState, PvpSide } from "../types/fwpvp";
 
 const MATCH_KEY = (id: string) => `ra:fwpvp:match:${id}`;
 const PLAYER_MATCHES_KEY = (pid: string) => `ra:fwpvp:player:${pid}`;
@@ -192,12 +192,26 @@ const PVP_COST_DEFAULT = 300;
 const PVP_PAYOUT_MODE_DEFAULT: "pot" = "pot";
 const PVP_ENABLED_DEFAULT = true;
 const PVP_TIERS_DEFAULT: number[] = [100, 300, 500, 1000, 3000, 5000, 10000];
+// Spectator side bets (Layer 2B). All admin-overridable from ra:config:economy.
+const BET_MIN_DEFAULT = 50;
+const BET_MAX_DEFAULT = 25000;
+const BET_POOL_CAP_DEFAULT = 100000;
+const BET_LOCK_TERRITORY_DEFAULT = 3;  // bets close when match enters T3 (0-indexed: territory >= 2)
+const BET_ENABLED_DEFAULT = true;
 
 export interface PvpEconomyConfig {
   factionWarsPvpCost: number;
   factionWarsPvpPayoutMode: "pot";
   factionWarsPvpEnabled: boolean;
   factionWarsPvpWagerTiers: number[];
+  // Spectator side bets (Layer 2B)
+  factionWarsBetEnabled: boolean;
+  factionWarsBetMin: number;
+  factionWarsBetMax: number;
+  factionWarsBetPoolCap: number;
+  factionWarsBetLockTerritory: number;  // 1-indexed for admin clarity (1..5). Stored as 0-indexed comparison.
+  // Featured match (admin podcast tool) — empty/undefined = no featured match
+  featuredMatchId?: string;
 }
 
 // Reads the live admin config from Redis and returns the PvP economy slice.
@@ -242,11 +256,26 @@ export async function getPvpEconomyConfig(): Promise<PvpEconomyConfig> {
       // We accept the row even if cost is unset (use default). The presence of
       // ANY key in the cfg means it's valid live config — we just fill blanks.
       if (cfg && typeof cfg === "object") {
+        const betEnabled = (cfg as any).factionWarsBetEnabled;
+        const betMin = Number((cfg as any).factionWarsBetMin);
+        const betMax = Number((cfg as any).factionWarsBetMax);
+        const betCap = Number((cfg as any).factionWarsBetPoolCap);
+        const betLock = Number((cfg as any).factionWarsBetLockTerritory);
+        const featuredMatchIdRaw = (cfg as any).featuredMatchId;
+        const featuredMatchId = typeof featuredMatchIdRaw === "string" && featuredMatchIdRaw.trim().length > 0
+          ? featuredMatchIdRaw.trim().slice(0, 64)
+          : undefined;
         return {
           factionWarsPvpCost: Number.isFinite(cost) && cost >= 0 ? cost : PVP_COST_DEFAULT,
           factionWarsPvpPayoutMode: PVP_PAYOUT_MODE_DEFAULT,
           factionWarsPvpEnabled: enabled === false ? false : PVP_ENABLED_DEFAULT,
           factionWarsPvpWagerTiers: tiers.length > 0 ? tiers : PVP_TIERS_DEFAULT,
+          factionWarsBetEnabled: betEnabled === false ? false : BET_ENABLED_DEFAULT,
+          factionWarsBetMin: Number.isFinite(betMin) && betMin >= 0 ? betMin : BET_MIN_DEFAULT,
+          factionWarsBetMax: Number.isFinite(betMax) && betMax >= 0 ? betMax : BET_MAX_DEFAULT,
+          factionWarsBetPoolCap: Number.isFinite(betCap) && betCap >= 0 ? betCap : BET_POOL_CAP_DEFAULT,
+          factionWarsBetLockTerritory: Number.isFinite(betLock) && betLock >= 1 && betLock <= 5 ? Math.floor(betLock) : BET_LOCK_TERRITORY_DEFAULT,
+          featuredMatchId,
         };
       }
     } catch {
@@ -259,6 +288,12 @@ export async function getPvpEconomyConfig(): Promise<PvpEconomyConfig> {
     factionWarsPvpPayoutMode: PVP_PAYOUT_MODE_DEFAULT,
     factionWarsPvpEnabled: PVP_ENABLED_DEFAULT,
     factionWarsPvpWagerTiers: PVP_TIERS_DEFAULT,
+    factionWarsBetEnabled: BET_ENABLED_DEFAULT,
+    factionWarsBetMin: BET_MIN_DEFAULT,
+    factionWarsBetMax: BET_MAX_DEFAULT,
+    factionWarsBetPoolCap: BET_POOL_CAP_DEFAULT,
+    factionWarsBetLockTerritory: BET_LOCK_TERRITORY_DEFAULT,
+    featuredMatchId: undefined,
   };
 }
 
@@ -491,4 +526,222 @@ export async function recordPvpResult(
   } catch {
     // Leaderboard writes are best-effort; do not crash match completion.
   }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Spectator side bets (Layer 2B)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Pari-mutuel: bettors deposit REBEL into a side pool. On match resolve,
+// loser-side total splits proportionally among winner-side bettors.
+// House takes 0%. Loser bettors get nothing back; if no winner-side bettors
+// exist, loser pool is refunded to the losers (no house grab).
+//
+// Storage:
+//   ra:fwpvp:bets:{challengeId}            -> Redis HASH, field={playerId}, value=JSON(PvpBet)
+//   ra:fwpvp:bets:locked:{challengeId}     -> string "1" with TTL > match
+//   ra:fwpvp:bets:settled:{challengeId}    -> string "1" idempotency guard for payout/refund
+//
+// Bet amounts are debited from balance immediately at place-time. We store
+// bet records (not balance lock) so refunds/payouts are cheap to compute.
+
+
+const BETS_KEY = (cid: string) => `ra:fwpvp:bets:${cid}`;
+const BETS_LOCKED_KEY = (cid: string) => `ra:fwpvp:bets:locked:${cid}`;
+const BETS_SETTLED_KEY = (cid: string) => `ra:fwpvp:bets:settled:${cid}`;
+
+function parseBet(raw: any): PvpBet | null {
+  try {
+    const b = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (!b || typeof b !== "object") return null;
+    if (typeof b.playerId !== "string") return null;
+    if (b.side !== "challenger" && b.side !== "opponent") return null;
+    if (typeof b.amount !== "number" || !Number.isFinite(b.amount) || b.amount < 0) return null;
+    return {
+      playerId: String(b.playerId),
+      displayName: String(b.displayName || ""),
+      side: b.side as PvpSide,
+      amount: Math.floor(b.amount),
+      firstAt: Number(b.firstAt) || 0,
+      lastAt: Number(b.lastAt) || 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function isBetsLocked(challengeId: string): Promise<boolean> {
+  try {
+    const v = await redis.get(BETS_LOCKED_KEY(challengeId));
+    return v === "1" || v === 1 || v === true;
+  } catch {
+    return false;
+  }
+}
+
+export async function lockBets(challengeId: string): Promise<void> {
+  // 24h TTL — long enough to outlive any active match.
+  await redis.set(BETS_LOCKED_KEY(challengeId), "1", { ex: 60 * 60 * 24 });
+}
+
+export async function getBets(challengeId: string): Promise<PvpBetsState> {
+  const [raw, locked] = await Promise.all([
+    redis.hgetall<Record<string, any>>(BETS_KEY(challengeId)).catch(() => null),
+    isBetsLocked(challengeId),
+  ]);
+  const bets: PvpBet[] = [];
+  if (raw && typeof raw === "object") {
+    for (const k of Object.keys(raw)) {
+      const b = parseBet((raw as any)[k]);
+      if (b) bets.push(b);
+    }
+  }
+  bets.sort((a, b) => Number(b.lastAt ?? 0) - Number(a.lastAt ?? 0));
+  let challengerPool = 0, opponentPool = 0;
+  let challengerBettorCount = 0, opponentBettorCount = 0;
+  for (const b of bets) {
+    if (b.side === "challenger") {
+      challengerPool += b.amount;
+      challengerBettorCount += 1;
+    } else {
+      opponentPool += b.amount;
+      opponentBettorCount += 1;
+    }
+  }
+  return {
+    challengerPool,
+    opponentPool,
+    bets,
+    locked,
+    challengerBettorCount,
+    opponentBettorCount,
+  };
+}
+
+export async function getMyBet(challengeId: string, playerId: string): Promise<PvpBet | null> {
+  try {
+    const raw = await redis.hget<any>(BETS_KEY(challengeId), playerId);
+    return parseBet(raw);
+  } catch {
+    return null;
+  }
+}
+
+// Place or top-up a bet. Caller is responsible for:
+//   - validating the match exists, is in a bettable status, and player isn't a participant
+//   - validating amount against admin min/max/cap and player balance
+//   - debiting REBEL from balance (we do that here so the write is atomic-ish)
+//
+// Returns the updated bet record on success, or { error: string } on failure.
+export async function placeBet(params: {
+  challengeId: string;
+  playerId: string;
+  displayName: string;
+  side: PvpSide;
+  amount: number;
+}): Promise<{ ok: true; bet: PvpBet; newBalance: number } | { ok: false; error: string }> {
+  const { challengeId, playerId, displayName, side, amount } = params;
+  const now = Date.now();
+
+  // Read existing bet (if any) to check side consistency
+  const existing = await getMyBet(challengeId, playerId);
+  if (existing && existing.side !== side) {
+    return { ok: false, error: `You already bet on ${existing.side}. Top-ups must stay on the same side.` };
+  }
+
+  // Debit REBEL FIRST. If this fails (insufficient balance), bail.
+  const newBalance = await spendREBEL(playerId, amount);
+  if (newBalance === null) {
+    return { ok: false, error: "Insufficient REBEL balance" };
+  }
+
+  const merged: PvpBet = {
+    playerId,
+    displayName: displayName.slice(0, 32),
+    side,
+    amount: (existing?.amount ?? 0) + amount,
+    firstAt: existing?.firstAt ?? now,
+    lastAt: now,
+  };
+
+  try {
+    await redis.hset(BETS_KEY(challengeId), { [playerId]: JSON.stringify(merged) });
+  } catch (e: any) {
+    // Storage failed — best-effort refund the debit.
+    await creditREBEL(playerId, amount).catch(() => {});
+    return { ok: false, error: "Failed to store bet — refunded" };
+  }
+
+  return { ok: true, bet: merged, newBalance };
+}
+
+// Refund every bet at full face value. Used on cancel/decline/no-winner.
+// Idempotent: sets a "settled" flag so we don't double-refund if called twice.
+export async function refundBets(challengeId: string): Promise<{ refunded: number; bettorCount: number }> {
+  const settled = await redis.get(BETS_SETTLED_KEY(challengeId)).catch(() => null);
+  if (settled === "1" || settled === 1 || settled === true) {
+    return { refunded: 0, bettorCount: 0 };
+  }
+
+  const state = await getBets(challengeId);
+  let total = 0;
+  let count = 0;
+  for (const b of state.bets) {
+    if (b.amount <= 0) continue;
+    const r = await creditREBEL(b.playerId, b.amount).catch(() => null);
+    if (r !== null) {
+      total += b.amount;
+      count += 1;
+    }
+  }
+  await redis.set(BETS_SETTLED_KEY(challengeId), "1", { ex: 60 * 60 * 24 * 7 }).catch(() => {});
+  return { refunded: total, bettorCount: count };
+}
+
+// Pari-mutuel payout. Winning side gets their stake back PLUS their pro-rata
+// share of the loser pool. Loser side gets nothing.
+// Edge case: if no bettors on the winning side, refund loser pool fully
+// (no house grab — matches the no-fee design).
+// Idempotent via the "settled" flag.
+export async function payoutBets(challengeId: string, winnerSide: PvpSide): Promise<{
+  winnerPaid: number;
+  loserForfeited: number;
+  refundedNoWinner: boolean;
+}> {
+  const settled = await redis.get(BETS_SETTLED_KEY(challengeId)).catch(() => null);
+  if (settled === "1" || settled === 1 || settled === true) {
+    return { winnerPaid: 0, loserForfeited: 0, refundedNoWinner: false };
+  }
+
+  const state = await getBets(challengeId);
+  const winners = state.bets.filter((b) => b.side === winnerSide && b.amount > 0);
+  const losers = state.bets.filter((b) => b.side !== winnerSide && b.amount > 0);
+  const loserPool = losers.reduce((acc, b) => acc + b.amount, 0);
+  const winnerPool = winners.reduce((acc, b) => acc + b.amount, 0);
+
+  // No winners — refund losers (refund-on-no-winner per design Q3).
+  if (winners.length === 0) {
+    let refunded = 0;
+    for (const b of losers) {
+      const r = await creditREBEL(b.playerId, b.amount).catch(() => null);
+      if (r !== null) refunded += b.amount;
+    }
+    await redis.set(BETS_SETTLED_KEY(challengeId), "1", { ex: 60 * 60 * 24 * 7 }).catch(() => {});
+    return { winnerPaid: 0, loserForfeited: 0, refundedNoWinner: true };
+  }
+
+  // Pari-mutuel split. Use floor for each share so we never overpay; small
+  // fractional remainder (< winners.length REBEL) is left in the system —
+  // negligible at REBEL granularity.
+  let winnerPaid = 0;
+  for (const w of winners) {
+    if (winnerPool <= 0) break;
+    const shareOfLoserPool = Math.floor((w.amount / winnerPool) * loserPool);
+    const total = w.amount + shareOfLoserPool;
+    const r = await creditREBEL(w.playerId, total).catch(() => null);
+    if (r !== null) winnerPaid += total;
+  }
+  await redis.set(BETS_SETTLED_KEY(challengeId), "1", { ex: 60 * 60 * 24 * 7 }).catch(() => {});
+  return { winnerPaid, loserForfeited: loserPool, refundedNoWinner: false };
 }

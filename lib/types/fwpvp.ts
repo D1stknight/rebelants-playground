@@ -147,6 +147,65 @@ export interface PvpMatch {
   isPrivate?: boolean;
 }
 
+// ── Spectator side bets (Layer 2B) ─────────────────────────────────────────
+//
+// Pari-mutuel betting: spectators pick a side, deposit REBEL into a pool.
+// On match resolve, loser-side deposits split pro-rata to winner-side
+// bettors. Loser bettors get nothing. House takes 0%.
+//
+// Storage: Redis hash `ra:fwpvp:bets:{challengeId}` with field={playerId}
+// value=JSON-stringified PvpBet. Lock flag at `ra:fwpvp:bets:locked:{challengeId}`.
+// Bet amounts are debited from the player's REBEL balance immediately at
+// place-time and re-credited (with payout share) on resolve.
+
+export interface PvpBet {
+  // Player who placed the bet.
+  playerId: string;
+  displayName: string;
+  // Which side they're backing — must match a PvpSide.
+  side: PvpSide;
+  // Total REBEL committed (sum of all top-ups by this player on this side).
+  amount: number;
+  // Timestamp of the FIRST bet from this player on this match.
+  firstAt: number;
+  // Last update timestamp (for "Bob just dropped 1k" feed sorting).
+  lastAt: number;
+}
+
+// Settlement record stored on the match object so post-resolve clients can
+// render the result without hitting a separate endpoint.
+export interface PvpBetPayout {
+  playerId: string;
+  displayName: string;
+  side: PvpSide;
+  betAmount: number;       // What they put in
+  payoutAmount: number;    // What they got back (0 if loser, betAmount + share if winner)
+  netDelta: number;        // payoutAmount - betAmount (signed)
+}
+
+export interface PvpBetsState {
+  // Per-side totals across all bettors. Used for live odds display.
+  challengerPool: number;
+  opponentPool: number;
+  // Per-bettor records. Sorted by lastAt DESC client-side.
+  bets: PvpBet[];
+  // Bets are locked once the match enters the lock-territory (admin-configurable,
+  // default 3 of 5). After lock, no new bets / top-ups accepted.
+  locked: boolean;
+  // Total bettors per side (length of filtered bets array).
+  challengerBettorCount: number;
+  opponentBettorCount: number;
+}
+
+// Body for POST /api/faction-wars/pvp/bet
+export interface PlaceBetRequest {
+  challengeId: string;
+  playerId: string;
+  displayName: string;
+  side: PvpSide;
+  amount: number;
+}
+
 // Body for POST /api/faction-wars/pvp/create
 export interface CreateChallengeRequest {
   challengerPlayerId: string;
