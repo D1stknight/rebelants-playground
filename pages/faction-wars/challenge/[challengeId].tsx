@@ -4,6 +4,7 @@ import Link from "next/link";
 import Head from "next/head";
 import { loadProfile, saveProfile, getEffectivePlayerId, type Profile } from "../../../lib/profile";
 import type { PvpMatch, PvpRound } from "../../../lib/types/fwpvp";
+import { ChatDrawer, useChatState } from "../../../components/PvpChatPanel";
 import { FACTIONS, FACTION_IDS, TEAM_SIZE, TERRITORY_COUNT, MAX_HP, type FactionId, type Move, type RoundResult, type TerritoryResult, type Rarity } from "../../../lib/factionWarsCore";
 import FactionWarsBattleScene, { type BattleSceneState, type BattleSceneActions } from "../../../components/FactionWarsBattleScene";
 import { useFWAudio } from "../../../lib/useFWAudio";
@@ -938,6 +939,13 @@ export default function ChallengePage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [identity, setIdentity] = useState<{ playerId: string; displayName: string } | null>(null);
   const [match, setMatch] = useState<PvpMatch | null>(null);
+
+  // ── Chat (Layer 2D) ──────────────────────────────────────────────────────
+  // Same per-match chat as the spectate page. Players type → spectators see it.
+  // Spectators talk back → players see it. Single Redis key per challengeId.
+  // The drawer collapses by default to keep battle UI clean; unread badge
+  // pings when new messages arrive while collapsed.
+  const chat = useChatState({ challengeId, identity });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -1802,6 +1810,10 @@ export default function ChallengePage() {
           )}
         </div>
       </div>
+      {/* Floating chat drawer (Layer 2D) — bottom-right, collapsed by default,
+          unread badge pings while collapsed. Hidden when chat is disabled
+          server-side via factionWarsChatEnabled. */}
+      <ChatDrawer match={match} identity={identity} chat={chat} />
     </>
   );
 }
