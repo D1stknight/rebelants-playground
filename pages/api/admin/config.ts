@@ -156,6 +156,9 @@ const rareMerchDecimal = Number.isFinite(rawRareMerch)
   factionWarsBetMax:     Math.max(0, Number(src?.factionWarsBetMax ?? 25000)),
   factionWarsBetPoolCap: Math.max(0, Number(src?.factionWarsBetPoolCap ?? 100000)),
   factionWarsBetLockTerritory: Math.min(5, Math.max(1, Math.floor(Number(src?.factionWarsBetLockTerritory ?? 3)))),
+  // Per-match chat (Layer 2D)
+  factionWarsChatEnabled: src?.factionWarsChatEnabled !== false,
+  factionWarsChatPostCleanupMins: Math.max(0, Number(src?.factionWarsChatPostCleanupMins ?? 30)),
   // Featured match (Layer 2C cont.) — empty string = unset
   featuredMatchId: typeof src?.featuredMatchId === "string" ? src.featuredMatchId.trim().slice(0, 64) : "",
 

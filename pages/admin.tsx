@@ -33,6 +33,9 @@ type PointsConfigShape = {
   factionWarsBetMax: number;
   factionWarsBetPoolCap: number;
   factionWarsBetLockTerritory: number; // 1..5, bets close at start of this territory
+  // Per-match chat (Layer 2D)
+  factionWarsChatEnabled: boolean;
+  factionWarsChatPostCleanupMins: number;
   // Featured match (admin podcast tool, Layer 2C cont.) — empty = no featured match
   featuredMatchId: string;
 
@@ -180,6 +183,9 @@ const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
     factionWarsBetMax: (defaultConfig as any).factionWarsBetMax ?? 25000,
     factionWarsBetPoolCap: (defaultConfig as any).factionWarsBetPoolCap ?? 100000,
     factionWarsBetLockTerritory: (defaultConfig as any).factionWarsBetLockTerritory ?? 3,
+    // Per-match chat (Layer 2D)
+    factionWarsChatEnabled: (defaultConfig as any).factionWarsChatEnabled !== false,
+    factionWarsChatPostCleanupMins: (defaultConfig as any).factionWarsChatPostCleanupMins ?? 30,
     // Featured match (Layer 2C cont.)
     featuredMatchId: typeof (defaultConfig as any).featuredMatchId === "string" ? (defaultConfig as any).featuredMatchId : "",
   raidCarrierSurvival: (defaultConfig as any).raidCarrierSurvival ?? 0.20,
@@ -1224,6 +1230,22 @@ String(c.status).toUpperCase()==="PENDING"
             Lock Territory <span style={{ opacity: 0.5 }}>(1–5)</span>
             <input type="number" min="1" max="5" value={cfg.factionWarsBetLockTerritory} onChange={(e) => setCfg((c) => ({ ...c, factionWarsBetLockTerritory: Math.min(5, Math.max(1, safeNum(e.target.value, c.factionWarsBetLockTerritory))) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} />
             <span style={{ fontSize: 10, opacity: 0.4 }}>Bets close when match enters this territory. Default: 3.</span>
+          </label>
+
+          {/* Per-match chat (Layer 2D) — full-width row */}
+          <label style={{ fontSize: 12, opacity: 0.9, gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 10, marginTop: 6, paddingTop: 10, borderTop: "1px dashed rgba(255,255,255,.12)" }}>
+            <input
+              type="checkbox"
+              checked={!!cfg.factionWarsChatEnabled}
+              onChange={(e) => setCfg((c) => ({ ...c, factionWarsChatEnabled: e.target.checked }))}
+              style={{ width: 16, height: 16, cursor: "pointer" }}
+            />
+            <span>💬 Per-match Chat Enabled <span style={{ opacity: 0.6 }}>— uncheck to disable chat panel on all spectate pages</span></span>
+          </label>
+          <label style={{ fontSize: 12, opacity: 0.9, gridColumn: "1 / -1" }}>
+            Chat TTL after match completion <span style={{ opacity: 0.5 }}>(minutes)</span>
+            <input type="number" min="0" value={cfg.factionWarsChatPostCleanupMins} onChange={(e) => setCfg((c) => ({ ...c, factionWarsChatPostCleanupMins: safeNum(e.target.value, c.factionWarsChatPostCleanupMins) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} />
+            <span style={{ fontSize: 10, opacity: 0.4 }}>How long chat history sticks around after the match ends. Default: 30 minutes.</span>
           </label>
         </div>
       </div>
