@@ -269,6 +269,20 @@ export function ChatPanel({
   // emoji button on iOS/Android), this just speeds up the most-used ones
   // so trash talk doesn't require leaving the chat box.
   const QUICK_EMOJIS = ["🔥","💀","😂","👀","⚡","🐜","🤡","💩"];
+
+  // Wrap chat.post so we can re-focus the input after a successful send.
+  // The setTimeout(0) lets React flush the disabled→enabled transition first
+  // (the input is disabled while chatPosting === true).
+  const doPost = async () => {
+    await chat.post();
+    setTimeout(() => { inputRef.current?.focus(); }, 0);
+  };
+  const insertEmoji = (emoji: string) => {
+    const next = (chat.chatInput + emoji).slice(0, 280);
+    chat.setChatInput(next);
+    // Refocus after insert so the user can keep typing.
+    setTimeout(() => { inputRef.current?.focus(); }, 0);
+  };
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -492,21 +506,6 @@ export function ChatPanel({
             <a href="/" style={{ color: "#fbbf24", textDecoration: "underline" }}>Sign in</a> to chat
           </div>
         ) : (
-          (() => {
-            // Wrap chat.post so we can re-focus the input after a successful send.
-            // The setTimeout(0) lets React flush the disabled→enabled transition first
-            // (input is disabled while chatPosting === true).
-            const doPost = async () => {
-              await chat.post();
-              setTimeout(() => { inputRef.current?.focus(); }, 0);
-            };
-            const insertEmoji = (emoji: string) => {
-              const next = (chat.chatInput + emoji).slice(0, 280);
-              chat.setChatInput(next);
-              // Refocus after insert so the user can keep typing.
-              setTimeout(() => { inputRef.current?.focus(); }, 0);
-            };
-            return (
           <div>
             {/* Quick-reaction emoji row */}
             <div style={{ display: "flex", gap: 4, marginBottom: 8, flexWrap: "wrap" }}>
@@ -585,8 +584,6 @@ export function ChatPanel({
               </span>
             </div>
           </div>
-            );
-          })()
         )}
       </div>
     </div>
