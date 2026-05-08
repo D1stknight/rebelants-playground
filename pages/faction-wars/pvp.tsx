@@ -316,6 +316,22 @@ export default function PvpLobbyPage() {
             <span style={{ fontSize: 20, filter: "drop-shadow(0 0 8px rgba(251,191,36,0.6))" }}>←</span>
             <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.5)" }}>Faction Wars</span>
           </Link>
+          <Link href="/tournament" style={{
+            display: "flex", alignItems: "center", gap: 6,
+            padding: "6px 14px",
+            background: "linear-gradient(135deg, rgba(250,204,21,0.18) 0%, rgba(248,113,113,0.18) 100%)",
+            border: "1px solid rgba(250,204,21,0.5)",
+            borderRadius: 18,
+            textDecoration: "none",
+            fontSize: 11,
+            fontWeight: 900,
+            letterSpacing: "0.15em",
+            color: "#facc15",
+            textTransform: "uppercase",
+            boxShadow: "0 0 12px rgba(250,204,21,0.25)",
+          }}>
+            🏆 <span>Tournament</span>
+          </Link>
           {balance !== null && (
             <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: "0.1em", color: "#fbbf24", filter: "drop-shadow(0 0 8px rgba(251,191,36,0.5))" }}>
               ⚡ {balance.toLocaleString()} <span style={{ fontSize: 10, color: "rgba(251,191,36,0.6)" }}>REBEL</span>
@@ -337,6 +353,37 @@ export default function PvpLobbyPage() {
               CHALLENGE A FRIEND · ASYNC TURN-BASED
             </div>
           </div>
+
+          {/* Tournament CTA */}
+          <Link href="/tournament" style={{ display: "block", textDecoration: "none", marginBottom: 24 }}>
+            <div style={{
+              padding: "16px 20px",
+              borderRadius: 14,
+              background: "linear-gradient(135deg, rgba(180,83,9,0.4) 0%, rgba(127,29,29,0.4) 100%)",
+              border: "2px solid rgba(250,204,21,0.55)",
+              boxShadow: "0 0 24px rgba(250,204,21,0.25), inset 0 0 12px rgba(250,204,21,0.08)",
+              display: "flex", alignItems: "center", gap: 14,
+              cursor: "pointer",
+              transition: "transform 0.2s ease",
+            }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.transform = "translateY(-2px)"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)"; }}
+            >
+              <div style={{ fontSize: 36, filter: "drop-shadow(0 0 12px rgba(250,204,21,0.6))" }}>🏆</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 15, fontWeight: 900, letterSpacing: "0.1em", color: "white", textTransform: "uppercase" }}>
+                  Tournaments
+                </div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", marginTop: 2, letterSpacing: "0.05em" }}>
+                  Single-elimination brackets · Winner takes all · Big REBEL pots
+                </div>
+              </div>
+              <div style={{
+                fontSize: 11, fontWeight: 900, color: "#facc15", letterSpacing: "0.15em",
+                padding: "6px 12px", border: "1px solid rgba(250,204,21,0.6)", borderRadius: 6,
+              }}>VIEW →</div>
+            </div>
+          </Link>
 
           {/* Identity gate */}
           {!identity ? (
