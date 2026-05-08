@@ -1,8 +1,19 @@
 // pages/api/admin/players/search.ts
+//
+// Search the admin player directory by name fragment. Reads from MULTIPLE
+// name registries so commanders who haven't won anything yet still appear:
+//   - ra:player_names_v1     (set by /api/wins/add — wins-game players)
+//   - ra:fw:pvp_player_names (set by FW PvP — match participants)
+// Results are merged + deduplicated by playerId. starts-with matches sort
+// before substring matches.
+
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../../lib/server/redis";
 
-const PLAYER_NAMES = "ra:player_names_v1"; // playerId -> last known display name
+const NAME_HASHES = [
+  "ra:player_names_v1",
+  "ra:fw:pvp_player_names",
+];
 
 function headerValue(v: string | string[] | undefined) {
   return Array.isArray(v) ? v[0] : v;
@@ -13,10 +24,8 @@ function isAuthed(req: NextApiRequest) {
     headerValue(req.headers["x-admin-key"]) ||
     headerValue(req.headers["x-admin-token"]) ||
     "";
-
   const expected = process.env.ADMIN_KEY || process.env.ADMIN_TOKEN || "";
   if (!expected) return false;
-
   return !!provided && provided === expected;
 }
 
@@ -33,35 +42,46 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(405).json({ ok: false, error: "Method not allowed" });
     }
 
-    const qRaw = String(req.query.q ?? "").trim();
+    const qRaw = String(req.query.q || "").trim();
     const q = qRaw.toLowerCase();
 
     if (!q || q.length < 2) {
       return res.status(200).json({ ok: true, results: [] });
     }
 
-    // Pull all (playerId -> name) and filter server-side (fine for now)
-    const map = (await redis.hgetall(PLAYER_NAMES)) as Record<string, string> | null;
-    const entries = Object.entries(map || {});
+    // Read all name hashes in parallel
+    const maps = await Promise.all(
+      NAME_HASHES.map(async (key) => {
+        try {
+          const m = (await redis.hgetall(key)) as Record<string, string> | null;
+          return m || {};
+        } catch {
+          return {};
+        }
+      })
+    );
 
-    // rank: startsWith first, then includes
+    // Merge — last hash wins on duplicates (FW pvp likely has more recent names)
+    const merged: Record<string, string> = {};
+    for (const m of maps) {
+      for (const [pid, name] of Object.entries(m)) {
+        const trimmed = String(name || "").trim();
+        if (trimmed) merged[pid] = trimmed;
+      }
+    }
+
     const starts: Array<{ playerId: string; name: string }> = [];
     const includes: Array<{ playerId: string; name: string }> = [];
 
-    for (const [playerId, nameRaw] of entries) {
-      const name = String(nameRaw || "").trim();
-      if (!name) continue;
-
+    for (const [playerId, name] of Object.entries(merged)) {
       const hay = name.toLowerCase();
       if (hay.startsWith(q)) starts.push({ playerId, name });
       else if (hay.includes(q)) includes.push({ playerId, name });
     }
 
-    const results = [...starts, ...includes].slice(0, 10);
-
+    const results = [...starts, ...includes].slice(0, 25);
     return res.status(200).json({ ok: true, results });
   } catch (e: any) {
-    console.error("admin players search error:", e);
-    return res.status(500).json({ ok: false, error: "Server error" });
+    return res.status(500).json({ ok: false, error: e?.message || "Internal error" });
   }
 }
