@@ -25,6 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const trimmed = matches.map((m) => ({
       challengeId: m.challengeId,
       status: m.status,
+      challengerPlayerId: m.challengerPlayerId,
       challengerDisplayName: m.challengerDisplayName,
       opponentDisplayName: m.opponentDisplayName,
       currentTerritory: m.currentTerritory,

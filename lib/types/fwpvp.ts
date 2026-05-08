@@ -184,6 +184,11 @@ export interface PvpMatch {
   // (/faction-wars/spectate/{challengeId}) still works — sharing is opt-in
   // via link, not via a hard gate. Defaults to false (public).
   isPrivate?: boolean;
+
+  // ── Forfeit / cancellation tracking (set when match ends abnormally) ──
+  forfeitedBy?: string;     // playerId of forfeiting player
+  payoutPlayerId?: string;  // playerId who received the pot on completion
+  cancelledAt?: number;     // ms timestamp when match was cancelled
 }
 
 // ── Spectator side bets (Layer 2B) ─────────────────────────────────────────
