@@ -114,7 +114,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (pot > 0) {
       const newBal = await creditREBEL(match.opponentPlayerId, pot);
       payoutBalance = newBal;
-      match.payoutAmount = pot;
       match.payoutPlayerId = match.opponentPlayerId;
     }
 
