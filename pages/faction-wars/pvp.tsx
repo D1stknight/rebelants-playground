@@ -39,7 +39,7 @@ function statusPill(status: PvpStatus, isMyTurn: boolean): { label: string; colo
 }
 
 // ── Match card ───────────────────────────────────────────────────────────────
-function MatchCard({ match, mePlayerId }: { match: PvpMatch; mePlayerId: string }) {
+function MatchCard({ match, mePlayerId, onForfeit }: { match: PvpMatch; mePlayerId: string; onForfeit?: (match: PvpMatch) => void }) {
   const isChallenger = match.challengerPlayerId === mePlayerId;
   const opponentName = isChallenger ? match.opponentDisplayName : match.challengerDisplayName;
   const isMyTurn = match.currentTurnPlayerId === mePlayerId;
@@ -106,6 +106,24 @@ function MatchCard({ match, mePlayerId }: { match: PvpMatch; mePlayerId: string 
             {pill.label}
           </div>
         </div>
+        {/* Forfeit button — only challenger, only while in-progress */}
+        {isChallenger && (match.status === "pending" || match.status === "team_selection" || match.status === "active") && onForfeit && (
+          <div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end" }}>
+            <button
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onForfeit(match); }}
+              style={{
+                fontSize: 10, fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase",
+                padding: "5px 12px", borderRadius: 8,
+                border: "1px solid rgba(248,113,113,0.45)",
+                background: "rgba(248,113,113,0.12)",
+                color: "#fca5a5",
+                cursor: "pointer",
+              }}
+            >
+              🏳️ Forfeit
+            </button>
+          </div>
+        )}
         {showShareLink && (
           <div style={{ marginTop: 10, fontSize: 10, color: "rgba(255,255,255,0.5)", fontFamily: "ui-monospace, monospace", wordBreak: "break-all" }}>
             🔗 {typeof window !== "undefined" ? window.location.origin : ""}/faction-wars/challenge/{match.challengeId}
@@ -169,6 +187,55 @@ export default function PvpLobbyPage() {
   }, [identity]);
 
   // Clear all completed/cancelled matches from MY view (other player still sees them).
+  // Forfeit a match the user created. Confirms before sending.
+  const onForfeit = useCallback(async (m: PvpMatch) => {
+    if (!identity) return;
+    const opponent = m.opponentDisplayName || "your opponent";
+    const cost = Number(m.pvpCost || 0);
+    let warn = "";
+    if (m.status === "pending") {
+      warn = `Cancel this challenge? Your ${cost} REBEL ante will be refunded.`;
+    } else {
+      warn = `Forfeit to ${opponent}? They win the ${cost * 2} REBEL pot and you take the loss.`;
+    }
+    if (!window.confirm(warn)) return;
+    try {
+      const r = await fetch("/api/faction-wars/pvp/forfeit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ challengeId: m.challengeId, playerId: identity.playerId }),
+      });
+      const j = await r.json();
+      if (!j.ok) { alert("Forfeit failed: " + (j.error || "?")); return; }
+      await refreshMatches();
+    } catch (e: any) {
+      alert("Forfeit error: " + (e?.message || "?"));
+    }
+  }, [identity, refreshMatches]);
+
+  // Accept an open challenge that someone else created
+  const onAcceptOpen = useCallback(async (m: any) => {
+    if (!identity) { alert("Sign in first to accept challenges"); return; }
+    if (!window.confirm(`Accept this challenge from ${m.challengerDisplayName}? You'll pay ${m.pvpCost} REBEL ante.`)) return;
+    try {
+      const r = await fetch("/api/faction-wars/pvp/accept", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          challengeId: m.challengeId,
+          opponentPlayerId: identity.playerId,
+          opponentDisplayName: identity.displayName,
+        }),
+      });
+      const j = await r.json();
+      if (!j.ok) { alert("Accept failed: " + (j.error || "?")); return; }
+      // Navigate to the match page
+      window.location.href = "/faction-wars/challenge/" + m.challengeId;
+    } catch (e: any) {
+      alert("Accept error: " + (e?.message || "?"));
+    }
+  }, [identity]);
+
   const clearCompleted = useCallback(async () => {
     if (!identity) return;
     if (clearBusy) return;
@@ -316,6 +383,22 @@ export default function PvpLobbyPage() {
             <span style={{ fontSize: 20, filter: "drop-shadow(0 0 8px rgba(251,191,36,0.6))" }}>←</span>
             <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.5)" }}>Faction Wars</span>
           </Link>
+          <Link href="/tournament" style={{
+            display: "flex", alignItems: "center", gap: 6,
+            padding: "6px 14px",
+            background: "linear-gradient(135deg, rgba(250,204,21,0.18) 0%, rgba(248,113,113,0.18) 100%)",
+            border: "1px solid rgba(250,204,21,0.5)",
+            borderRadius: 18,
+            textDecoration: "none",
+            fontSize: 11,
+            fontWeight: 900,
+            letterSpacing: "0.15em",
+            color: "#facc15",
+            textTransform: "uppercase",
+            boxShadow: "0 0 12px rgba(250,204,21,0.25)",
+          }}>
+            🏆 <span>Tournament</span>
+          </Link>
           {balance !== null && (
             <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: "0.1em", color: "#fbbf24", filter: "drop-shadow(0 0 8px rgba(251,191,36,0.5))" }}>
               ⚡ {balance.toLocaleString()} <span style={{ fontSize: 10, color: "rgba(251,191,36,0.6)" }}>REBEL</span>
@@ -337,6 +420,37 @@ export default function PvpLobbyPage() {
               CHALLENGE A FRIEND · ASYNC TURN-BASED
             </div>
           </div>
+
+          {/* Tournament CTA */}
+          <Link href="/tournament" style={{ display: "block", textDecoration: "none", marginBottom: 24 }}>
+            <div style={{
+              padding: "16px 20px",
+              borderRadius: 14,
+              background: "linear-gradient(135deg, rgba(180,83,9,0.4) 0%, rgba(127,29,29,0.4) 100%)",
+              border: "2px solid rgba(250,204,21,0.55)",
+              boxShadow: "0 0 24px rgba(250,204,21,0.25), inset 0 0 12px rgba(250,204,21,0.08)",
+              display: "flex", alignItems: "center", gap: 14,
+              cursor: "pointer",
+              transition: "transform 0.2s ease",
+            }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.transform = "translateY(-2px)"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)"; }}
+            >
+              <div style={{ fontSize: 36, filter: "drop-shadow(0 0 12px rgba(250,204,21,0.6))" }}>🏆</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 15, fontWeight: 900, letterSpacing: "0.1em", color: "white", textTransform: "uppercase" }}>
+                  Tournaments
+                </div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", marginTop: 2, letterSpacing: "0.05em" }}>
+                  Single-elimination brackets · Winner takes all · Big REBEL pots
+                </div>
+              </div>
+              <div style={{
+                fontSize: 11, fontWeight: 900, color: "#facc15", letterSpacing: "0.15em",
+                padding: "6px 12px", border: "1px solid rgba(250,204,21,0.6)", borderRadius: 6,
+              }}>VIEW →</div>
+            </div>
+          </Link>
 
           {/* Identity gate */}
           {!identity ? (
@@ -507,15 +621,61 @@ export default function PvpLobbyPage() {
                 );
               })()}
 
+              {/* Open Challenges — pending matches not created by me, anyone can accept */}
+              {(() => {
+                const myId = identity?.playerId;
+                const open = liveMatches.filter((m: any) => m.status === "pending" && m.challengerPlayerId !== myId);
+                if (open.length === 0) return null;
+                return (
+                  <div style={{ marginBottom: 24 }}>
+                    <div style={{ fontSize: 11, letterSpacing: "0.25em", textTransform: "uppercase", color: "#fbbf24", marginBottom: 12, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
+                      <span>⚔️</span>
+                      <span>Open Challenges ({open.length})</span>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {open.map((m: any) => (
+                        <div key={m.challengeId} style={{ padding: "12px 14px", borderRadius: 10, border: "1px solid rgba(250,204,21,0.25)", background: "rgba(250,204,21,0.05)", display: "flex", alignItems: "center", gap: 12 }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: "white", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              <span style={{ color: "#fbbf24" }}>{m.challengerDisplayName}</span>
+                              <span style={{ color: "rgba(255,255,255,0.4)", margin: "0 6px" }}>·</span>
+                              <span style={{ color: "rgba(255,255,255,0.7)", fontSize: 11 }}>{Number(m.pvpCost || 0).toLocaleString()} REBEL ante</span>
+                            </div>
+                            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginTop: 2, letterSpacing: "0.05em" }}>
+                              Winner takes both antes ({Number(m.pvpCost || 0) * 2} REBEL pot)
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => onAcceptOpen(m)}
+                            disabled={!identity}
+                            style={{
+                              fontSize: 11, fontWeight: 900, letterSpacing: "0.1em", textTransform: "uppercase",
+                              padding: "8px 14px", borderRadius: 8,
+                              border: "1px solid rgba(250,204,21,0.6)",
+                              background: identity ? "linear-gradient(135deg, rgba(250,204,21,0.25), rgba(248,113,113,0.25))" : "rgba(255,255,255,0.05)",
+                              color: identity ? "#facc15" : "rgba(255,255,255,0.4)",
+                              cursor: identity ? "pointer" : "not-allowed",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            ⚔️ Accept
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Live Matches — anyone can spectate */}
-              {liveMatches.length > 0 && (
+              {liveMatches.filter((m: any) => m.status !== "pending").length > 0 && (
                 <div style={{ marginBottom: 24 }}>
                   <div style={{ fontSize: 11, letterSpacing: "0.25em", textTransform: "uppercase", color: "rgba(248,113,113,0.7)", marginBottom: 12, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
                     <span style={{ width: 6, height: 6, borderRadius: 3, background: "#f87171", boxShadow: "0 0 8px #f87171" }} />
-                    Live Matches ({liveMatches.length})
+                    Live Matches ({liveMatches.filter((m: any) => m.status !== "pending").length})
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {liveMatches.map((m: any) => (
+                    {liveMatches.filter((m: any) => m.status !== "pending").map((m: any) => (
                       <a key={m.challengeId} href={`/faction-wars/spectate/${m.challengeId}`} style={{ display: "block", textDecoration: "none", color: "white" }}>
                         <div style={{ padding: "12px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", display: "flex", alignItems: "center", gap: 12, transition: "all 0.15s ease" }}>
                           <div style={{ flex: 1, minWidth: 0 }}>
@@ -554,7 +714,7 @@ export default function PvpLobbyPage() {
                     No active matches. Create a challenge above to start one.
                   </div>
                 ) : (
-                  activeMatches.map((m) => <MatchCard key={m.challengeId} match={m} mePlayerId={identity.playerId} />)
+                  activeMatches.map((m) => <MatchCard key={m.challengeId} match={m} mePlayerId={identity.playerId} onForfeit={onForfeit} />)
                 )}
               </div>
 

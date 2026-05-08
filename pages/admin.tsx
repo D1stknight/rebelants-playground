@@ -355,6 +355,85 @@ async function loadDashboard() {
 
 const [log, setLog] = useState<string>("");
 
+  // ── Tournaments (admin management) ────────────────────────────────────
+  const [tournaments, setTournaments] = useState<any[]>([]);
+  const [tournLoading, setTournLoading] = useState(false);
+  const [newTournName, setNewTournName] = useState("Faction Wars Cup");
+  const [newTournSize, setNewTournSize] = useState(8);
+  const [newTournFee, setNewTournFee] = useState(300);
+  const [newTournPots, setNewTournPots] = useState("300,500,1000");
+  const [tournBusy, setTournBusy] = useState(false);
+
+  async function refreshTournaments() {
+    setTournLoading(true);
+    try {
+      const r = await fetch("/api/faction-wars/tournament/list");
+      const j = await r.json();
+      if (j.ok) setTournaments(j.tournaments || []);
+    } catch {}
+    setTournLoading(false);
+  }
+
+  async function createTournament() {
+    if (!authed) { alert("Enter admin token first"); return; }
+    setTournBusy(true);
+    try {
+      const pots = newTournPots.split(",").map(p => Number(p.trim())).filter(n => Number.isFinite(n) && n >= 0);
+      const expectedRounds = Math.log2(newTournSize);
+      if (pots.length !== expectedRounds) {
+        alert("Need exactly " + expectedRounds + " pot values for size " + newTournSize + " (one per round)");
+        setTournBusy(false);
+        return;
+      }
+      const r = await fetch("/api/faction-wars/tournament/create", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ name: newTournName, size: newTournSize, entryFee: newTournFee, potPerRound: pots }),
+      });
+      const j = await r.json();
+      append(j.ok ? "Tournament created: " + j.tournament.id : "Create failed: " + (j.error || "?"));
+      await refreshTournaments();
+    } catch (e: any) { append("Error: " + (e?.message || "?")); }
+    setTournBusy(false);
+  }
+
+  async function seedTournament(id: string) {
+    if (!authed) { alert("Enter admin token first"); return; }
+    if (!confirm("Seed this tournament? Bracket will be locked and round 1 matches will be created.")) return;
+    setTournBusy(true);
+    try {
+      const r = await fetch("/api/faction-wars/tournament/seed", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ tournamentId: id }),
+      });
+      const j = await r.json();
+      append(j.ok ? "Seeded tournament " + id : "Seed failed: " + (j.error || "?"));
+      await refreshTournaments();
+    } catch (e: any) { append("Error: " + (e?.message || "?")); }
+    setTournBusy(false);
+  }
+
+  async function cancelTournament(id: string) {
+    if (!authed) { alert("Enter admin token first"); return; }
+    if (!confirm("Cancel this tournament? Eligible participants will be refunded.")) return;
+    setTournBusy(true);
+    try {
+      const r = await fetch("/api/faction-wars/tournament/cancel", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ tournamentId: id }),
+      });
+      const j = await r.json();
+      append(j.ok ? "Cancelled " + id + " — refunded " + (j.refundedCount || 0) + " players" : "Cancel failed: " + (j.error || "?"));
+      await refreshTournaments();
+    } catch (e: any) { append("Error: " + (e?.message || "?")); }
+    setTournBusy(false);
+  }
+
+  useEffect(() => { refreshTournaments(); }, []);
+
+
   function append(msg: string) {
     setLog((s) => `${msg}\n\n${s}`.trim());
   }
@@ -1690,6 +1769,106 @@ String(c.status).toUpperCase()==="PENDING"
         </div>
       </div> 
          
+      {/* Tournaments */}
+      <div style={{ marginTop: 14, padding: 14, border: "1px solid rgba(250,204,21,.3)", borderRadius: 14, background: "rgba(127,29,29,.18)" }}>
+        <div style={{ fontWeight: 900, marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 18 }}>🏆</span>
+          <span>Faction Wars Tournaments</span>
+        </div>
+
+        {/* Create form */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 100px 100px 1fr auto", gap: 8, alignItems: "end", marginBottom: 12 }}>
+          <div>
+            <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 4 }}>NAME</div>
+            <input className="admin-input" value={newTournName} onChange={(e) => setNewTournName(e.target.value)} placeholder="Faction Wars Cup" />
+          </div>
+          <div>
+            <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 4 }}>SIZE</div>
+            <select className="admin-input" value={newTournSize} onChange={(e) => {
+              const sz = Number(e.target.value);
+              setNewTournSize(sz);
+              const rounds = Math.log2(sz);
+              const defaults = [300, 500, 1000, 2000, 4000].slice(0, rounds);
+              setNewTournPots(defaults.join(","));
+            }}>
+              <option value={4}>4</option>
+              <option value={8}>8</option>
+              <option value={16}>16</option>
+              <option value={32}>32</option>
+            </select>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 4 }}>ENTRY FEE</div>
+            <input className="admin-input" type="number" min={0} value={newTournFee} onChange={(e) => setNewTournFee(Number(e.target.value) || 0)} />
+          </div>
+          <div>
+            <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 4 }}>POT PER ROUND (comma)</div>
+            <input className="admin-input" value={newTournPots} onChange={(e) => setNewTournPots(e.target.value)} placeholder="300,500,1000" />
+          </div>
+          <div>
+            <button className="btn" onClick={createTournament} disabled={tournBusy} style={{ padding: "10px 14px", whiteSpace: "nowrap" }}>
+              {tournBusy ? "…" : "+ Create"}
+            </button>
+          </div>
+        </div>
+        <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 10 }}>
+          Pot count must equal log2(size): 4→2 pots, 8→3 pots, 16→4 pots, 32→5 pots. Last value is the final-round pot.
+        </div>
+
+        {/* Active tournaments */}
+        <div style={{ borderTop: "1px solid rgba(255,255,255,.1)", paddingTop: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+            <div style={{ fontSize: 12, opacity: 0.85, fontWeight: 700, letterSpacing: 1 }}>ACTIVE</div>
+            <button className="btn" onClick={refreshTournaments} disabled={tournLoading} style={{ padding: "4px 10px", fontSize: 11 }}>
+              {tournLoading ? "…" : "↻ Refresh"}
+            </button>
+          </div>
+          {tournaments.length === 0 ? (
+            <div style={{ fontSize: 12, opacity: 0.6, padding: 12, textAlign: "center" }}>No active tournaments.</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {tournaments.map((t: any) => (
+                <div key={t.id} style={{ padding: 10, background: "rgba(0,0,0,.25)", borderRadius: 8, border: "1px solid rgba(255,255,255,.08)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 14 }}>{t.name}</div>
+                      <div style={{ fontSize: 11, opacity: 0.65, marginTop: 2 }}>
+                        ID: <code>{t.id}</code> · {t.status.toUpperCase()} · {t.participants.length}/{t.size} players · entry {t.entryFee} REBEL
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      {t.status === "draft" && (
+                        <button className="btn" onClick={() => seedTournament(t.id)} disabled={tournBusy || t.participants.length < 2} style={{ padding: "6px 12px", fontSize: 12, background: "rgba(34,197,94,.3)" }}>
+                          ▶ Seed & Start
+                        </button>
+                      )}
+                      {(t.status === "draft" || t.status === "seeded" || t.status === "active") && (
+                        <button className="btn" onClick={() => cancelTournament(t.id)} disabled={tournBusy} style={{ padding: "6px 12px", fontSize: 12, background: "rgba(248,113,113,.25)" }}>
+                          ✕ Cancel
+                        </button>
+                      )}
+                      <a href={"/tournament"} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
+                        <button className="btn" style={{ padding: "6px 12px", fontSize: 12 }}>👁 View</button>
+                      </a>
+                    </div>
+                  </div>
+                  {t.participants.length > 0 && (
+                    <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 4, fontSize: 11 }}>
+                      {t.participants.slice(0, 16).map((p: any) => (
+                        <span key={p.playerId} style={{ padding: "2px 8px", background: "rgba(255,255,255,.06)", borderRadius: 10, opacity: p.eliminatedRound !== null ? 0.5 : 1, textDecoration: p.eliminatedRound !== null ? "line-through" : "none" }}>
+                          {p.displayName}
+                        </span>
+                      ))}
+                      {t.participants.length > 16 && <span style={{ padding: "2px 8px", opacity: 0.5 }}>+{t.participants.length - 16} more</span>}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Maintenance */}
       <div style={{ marginTop: 14, padding: 14, border: "1px solid rgba(255,255,255,.14)", borderRadius: 14, background: "rgba(15,23,42,.55)" }}>
         <div style={{ fontWeight: 900, marginBottom: 10 }}>Maintenance</div>

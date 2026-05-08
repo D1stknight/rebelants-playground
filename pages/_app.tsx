@@ -46,37 +46,25 @@ export default function App({ Component, pageProps }: AppProps) {
           content="Play Rebel Ants mini-games, earn REBEL points, and win NFTs or merch."
         />
 
-        <meta property="og:title" content="Rebel Ants Playground 🐜" />
-        <meta
-          property="og:description"
-          content="Play mini-games. Earn REBEL. Win NFTs and merch."
-        />
-        <meta
-          property="og:image"
-          content="https://play.rebelants.io/social_preview_final.PNG?v=3"
-        />
+        <meta property="og:title" content="Rebel Ants Playground 🐜" key="og:title" />
+        <meta property="og:description" content="Play mini-games. Earn REBEL. Win NFTs and merch." key="og:description" />
+        <meta property="og:image" content="https://play.rebelants.io/social_preview_final.PNG?v=3" key="og:image" />
         {/* Explicit og:image dimensions — REQUIRED by WhatsApp link previews
             (they silently drop images without explicit width/height). The image
             is 1200×630 (standard OpenGraph aspect ratio). If you swap the
             image for one of different dimensions, update these numbers. */}
-        <meta property="og:image:secure_url" content="https://play.rebelants.io/social_preview_final.PNG?v=3" />
-        <meta property="og:image:type" content="image/png" />
-        <meta property="og:image:width" content="1200" />
-        <meta property="og:image:height" content="630" />
-        <meta property="og:image:alt" content="Rebel Ants Playground — play, earn REBEL, win NFTs" />
-        <meta property="og:url" content="https://play.rebelants.io" />
-        <meta property="og:type" content="website" />
+        <meta property="og:image:secure_url" content="https://play.rebelants.io/social_preview_final.PNG?v=3" key="og:image:secure_url" />
+        <meta property="og:image:type" content="image/png" key="og:image:type" />
+        <meta property="og:image:width" content="1200" key="og:image:width" />
+        <meta property="og:image:height" content="630" key="og:image:height" />
+        <meta property="og:image:alt" content="Rebel Ants Playground — play, earn REBEL, win NFTs" key="og:image:alt" />
+        <meta property="og:url" content="https://play.rebelants.io" key="og:url" />
+        <meta property="og:type" content="website" key="og:type" />
 
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Rebel Ants Playground 🐜" />
-        <meta
-          name="twitter:description"
-          content="Play mini-games. Earn REBEL. Win NFTs and merch."
-        />
-        <meta
-          name="twitter:image"
-          content="https://play.rebelants.io/social_preview_final.PNG?v=3"
-        />
+        <meta name="twitter:card" content="summary_large_image" key="twitter:card" />
+        <meta name="twitter:title" content="Rebel Ants Playground 🐜" key="twitter:title" />
+        <meta name="twitter:description" content="Play mini-games. Earn REBEL. Win NFTs and merch." key="twitter:description" />
+        <meta name="twitter:image" content="https://play.rebelants.io/social_preview_final.PNG?v=3" key="twitter:image" />
       </Head>
 
       <WagmiProvider config={wagmiConfig}>

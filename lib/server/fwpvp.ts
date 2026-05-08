@@ -13,7 +13,7 @@
 // challengeId format: 12 chars [a-z0-9], URL-safe.
 
 import { redis } from "./redis";
-import type { PvpMatch, PvpBet, PvpBetsState, PvpSide, ChatMessage, ChatMute, ChatRole } from "../types/fwpvp";
+import type { PvpMatch, PvpBet, PvpBetsState, PvpSide, ChatMessage, ChatMute, ChatRole, Tournament, TournamentParticipant, TournamentRound, TournamentBracketSlot, TournamentStatus } from "../types/fwpvp";
 
 const MATCH_KEY = (id: string) => `ra:fwpvp:match:${id}`;
 const PLAYER_MATCHES_KEY = (pid: string) => `ra:fwpvp:player:${pid}`;
@@ -276,6 +276,13 @@ export interface PvpEconomyConfig {
   // Per-match chat (Layer 2D)
   factionWarsChatEnabled: boolean;
   factionWarsChatPostCleanupMins: number;  // minutes after match completion before chat TTLs out
+
+  // Tournaments
+  factionWarsTournamentEnabled: boolean;
+  factionWarsTournamentMaxSize: number;
+  factionWarsTournamentDefaultFee: number;
+  factionWarsTournamentDefaultPots: number[];
+
   // Featured match (admin podcast tool) — empty/undefined = no featured match
   featuredMatchId?: string;
 }
@@ -345,6 +352,12 @@ export async function getPvpEconomyConfig(): Promise<PvpEconomyConfig> {
           factionWarsBetLockTerritory: Number.isFinite(betLock) && betLock >= 1 && betLock <= 5 ? Math.floor(betLock) : BET_LOCK_TERRITORY_DEFAULT,
           factionWarsChatEnabled: chatEnabled === false ? false : CHAT_ENABLED_DEFAULT,
           factionWarsChatPostCleanupMins: Number.isFinite(chatCleanup) && chatCleanup >= 0 ? Math.floor(chatCleanup) : CHAT_POST_CLEANUP_MINS_DEFAULT,
+          factionWarsTournamentEnabled: (cfg as any).factionWarsTournamentEnabled !== false,
+          factionWarsTournamentMaxSize: Math.min(32, Math.max(4, Number((cfg as any).factionWarsTournamentMaxSize) || 32)),
+          factionWarsTournamentDefaultFee: Math.max(0, Number((cfg as any).factionWarsTournamentDefaultFee) || 300),
+          factionWarsTournamentDefaultPots: Array.isArray((cfg as any).factionWarsTournamentDefaultPots)
+            ? ((cfg as any).factionWarsTournamentDefaultPots as any[]).map((n: any) => Math.max(0, Number(n) || 0))
+            : [300, 500, 1000, 2000],
           featuredMatchId,
         };
       }
@@ -365,6 +378,10 @@ export async function getPvpEconomyConfig(): Promise<PvpEconomyConfig> {
     factionWarsBetLockTerritory: BET_LOCK_TERRITORY_DEFAULT,
     factionWarsChatEnabled: CHAT_ENABLED_DEFAULT,
     factionWarsChatPostCleanupMins: CHAT_POST_CLEANUP_MINS_DEFAULT,
+    factionWarsTournamentEnabled: true,
+    factionWarsTournamentMaxSize: 32,
+    factionWarsTournamentDefaultFee: 300,
+    factionWarsTournamentDefaultPots: [300, 500, 1000, 2000],
     featuredMatchId: undefined,
   };
 }
@@ -1148,4 +1165,380 @@ export function checkAdminAuth(req: { headers: Record<string, any> }): boolean {
   const expected = process.env.ADMIN_KEY || process.env.ADMIN_TOKEN || "";
   if (!expected) return false;
   return !!provided && provided === expected;
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────
+// Tournaments (single-elimination brackets)
+// ─────────────────────────────────────────────────────────────────────────
+
+const TOURNEY_KEY = (id: string) => `ra:fwpvp:tournament:${id}`;
+const TOURNEY_ACTIVE_INDEX = "ra:fwpvp:tournaments:active";
+const TOURNEY_MATCHES_KEY = (id: string) => `ra:fwpvp:tournament:${id}:matches`;
+const TOURNEY_TTL_DAYS = 30;
+
+// 12-char [a-z0-9] id, same alphabet as challengeId.
+export function generateTournamentId(): string {
+  const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
+  let id = "";
+  for (let i = 0; i < 12; i++) {
+    id += alphabet.charAt(Math.floor(Math.random() * alphabet.length));
+  }
+  return id;
+}
+
+export async function getTournament(id: string): Promise<Tournament | null> {
+  if (!id) return null;
+  try {
+    const raw: any = await redis.get(TOURNEY_KEY(id));
+    if (!raw) return null;
+    if (typeof raw === "string") return JSON.parse(raw) as Tournament;
+    return raw as Tournament;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveTournament(t: Tournament): Promise<void> {
+  await redis.set(TOURNEY_KEY(t.id), JSON.stringify(t));
+  if (t.status === "completed" || t.status === "cancelled") {
+    await redis.expire(TOURNEY_KEY(t.id), TOURNEY_TTL_DAYS * 24 * 60 * 60).catch(() => {});
+    await (redis as any).srem(TOURNEY_ACTIVE_INDEX, t.id).catch(() => {});
+  } else {
+    await (redis as any).sadd(TOURNEY_ACTIVE_INDEX, t.id).catch(() => {});
+  }
+}
+
+export async function listActiveTournaments(): Promise<Tournament[]> {
+  try {
+    const ids: any = await (redis as any).smembers(TOURNEY_ACTIVE_INDEX);
+    const out: Tournament[] = [];
+    if (Array.isArray(ids)) {
+      for (const id of ids) {
+        const t = await getTournament(String(id));
+        if (t) out.push(t);
+      }
+    }
+    out.sort((a, b) => b.createdAt - a.createdAt);
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+export async function listAllTournaments(limit: number = 50): Promise<Tournament[]> {
+  // For history we'd ideally have an "all" index. For V1 we just return active.
+  // Completed tournaments live for TOURNEY_TTL_DAYS days at their key but are
+  // no longer in the active set; admin can fetch them directly by id.
+  return listActiveTournaments();
+}
+
+export async function tournamentAddMatch(tournamentId: string, challengeId: string): Promise<void> {
+  await (redis as any).sadd(TOURNEY_MATCHES_KEY(tournamentId), challengeId).catch(() => {});
+}
+
+// Validate + sanitize tournament configuration. Returns null + error string if invalid.
+export function validateTournamentConfig(opts: {
+  size: number;
+  entryFee: number;
+  potPerRound: number[];
+  maxSize: number;
+}): { ok: true } | { ok: false; error: string } {
+  const allowedSizes = [4, 8, 16, 32];
+  if (!allowedSizes.includes(opts.size)) {
+    return { ok: false, error: "size must be 4, 8, 16, or 32" };
+  }
+  if (opts.size > opts.maxSize) {
+    return { ok: false, error: `size exceeds admin max (${opts.maxSize})` };
+  }
+  if (!Number.isFinite(opts.entryFee) || opts.entryFee < 0) {
+    return { ok: false, error: "entryFee must be >= 0" };
+  }
+  const expectedRounds = Math.log2(opts.size);
+  if (!Array.isArray(opts.potPerRound) || opts.potPerRound.length !== expectedRounds) {
+    return { ok: false, error: `potPerRound must have ${expectedRounds} entries for size ${opts.size}` };
+  }
+  for (const p of opts.potPerRound) {
+    if (!Number.isFinite(p) || p < 0) {
+      return { ok: false, error: "all potPerRound entries must be >= 0" };
+    }
+  }
+  return { ok: true };
+}
+
+// Fisher-Yates shuffle, returns a new array.
+function shuffle<T>(arr: T[]): T[] {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// Build the empty bracket tree for a given size, then fill round 0 from
+// shuffled participant ids. Subsequent rounds start with all-null slots and
+// get populated as matches complete.
+export function buildBracket(size: number, participantIds: string[], potPerRound: number[]): TournamentRound[] {
+  const numRounds = Math.log2(size);
+  const rounds: TournamentRound[] = [];
+  for (let r = 0; r < numRounds; r++) {
+    const matches: TournamentBracketSlot[] = [];
+    const numMatches = size / Math.pow(2, r + 1);
+    for (let m = 0; m < numMatches; m++) {
+      matches.push({
+        slotIndex: m,
+        p1: null,
+        p2: null,
+        challengeId: null,
+        winner: null,
+      });
+    }
+    rounds.push({
+      roundIndex: r,
+      matches,
+      potThisRound: potPerRound[r] || 0,
+    });
+  }
+
+  // Fill round 0 with shuffled participants. If fewer than `size` joined, the
+  // remaining slots stay null and those matches resolve as auto-advance byes.
+  const seeded = shuffle(participantIds);
+  for (let i = 0; i < seeded.length; i++) {
+    const matchIdx = Math.floor(i / 2);
+    const slot = rounds[0].matches[matchIdx];
+    if (i % 2 === 0) slot.p1 = seeded[i];
+    else slot.p2 = seeded[i];
+  }
+
+  return rounds;
+}
+
+// Find the bracket slot that produced this challengeId.
+// Returns { roundIndex, slotIndex } or null if not found.
+export function findBracketSlot(t: Tournament, challengeId: string): { roundIndex: number; slotIndex: number } | null {
+  for (let r = 0; r < t.rounds.length; r++) {
+    const round = t.rounds[r];
+    for (let s = 0; s < round.matches.length; s++) {
+      if (round.matches[s].challengeId === challengeId) {
+        return { roundIndex: r, slotIndex: s };
+      }
+    }
+  }
+  return null;
+}
+
+
+// Build a fully-initialized PvpMatch for a tournament round. Both players are
+// already known (advanced from prior round), neither has paid an ante (matches
+// in tournament mode are free at the per-match level — entry fee was charged
+// at join time). Status starts in "team_selection" so both players pick teams,
+// like a regular match would after accept().
+export function buildTournamentMatch(opts: {
+  challengeId: string;
+  tournamentId: string;
+  tournamentRound: number;
+  tournamentSlotIndex: number;
+  challengerPlayerId: string;
+  challengerDisplayName: string;
+  opponentPlayerId: string;
+  opponentDisplayName: string;
+  payoutPot: number;
+  isPrivate: boolean;
+}): PvpMatch {
+  const now = Date.now();
+  return {
+    challengeId: opts.challengeId,
+    status: "team_selection",
+    challengerPlayerId: opts.challengerPlayerId,
+    challengerDisplayName: opts.challengerDisplayName,
+    opponentPlayerId: opts.opponentPlayerId,
+    opponentDisplayName: opts.opponentDisplayName,
+    challengerTeam: [],
+    opponentTeam: [],
+    currentTurnPlayerId: null,
+    currentTurnSide: null,
+    challengerCurrentFactionIndex: 0,
+    opponentCurrentFactionIndex: 0,
+    challengerHp: 100,
+    opponentHp: 100,
+    currentTerritory: 0,
+    roundHistory: [],
+    territoryResults: [],
+    challengerTerritoriesWon: 0,
+    opponentTerritoriesWon: 0,
+    winnerPlayerId: null,
+    loserPlayerId: null,
+    winnerCrateRarity: null,
+    pvpCost: 0,
+    pvpPayoutMode: "pot",
+    pvpPotPaid: opts.payoutPot,
+    challengerPaid: true,
+    opponentPaid: true,
+    challengerHealsUsed: 0,
+    opponentHealsUsed: 0,
+    challengerSpellUsed: false,
+    opponentSpellUsed: false,
+    spellChallengerActive: null,
+    spellOpponentActive: null,
+    pvpCrateRewardPaid: 0,
+    tournamentId: opts.tournamentId,
+    tournamentRound: opts.tournamentRound,
+    tournamentSlotIndex: opts.tournamentSlotIndex,
+    createdAt: now,
+    updatedAt: now,
+    lastActionAt: now,
+    isPrivate: opts.isPrivate,
+  } as PvpMatch;
+}
+
+
+// Propagate completed winners forward through the bracket. Idempotent — safe
+// to call repeatedly. For round R slot N, if slot.winner is set, fills the
+// corresponding slot in round R+1 (slotIndex floor(N/2), p1 if N even else p2).
+export function propagateWinners(t: Tournament): void {
+  for (let r = 0; r < t.rounds.length - 1; r++) {
+    const round = t.rounds[r];
+    const next = t.rounds[r + 1];
+    for (const slot of round.matches) {
+      if (slot.winner) {
+        const nextIdx = Math.floor(slot.slotIndex / 2);
+        const nextSlot = next.matches[nextIdx];
+        if (slot.slotIndex % 2 === 0) nextSlot.p1 = slot.winner;
+        else nextSlot.p2 = slot.winner;
+      }
+    }
+  }
+}
+
+// Mark a participant eliminated in the given round. Best-effort.
+export function markEliminated(t: Tournament, playerId: string, round: number): void {
+  const p = t.participants.find(x => x.playerId === playerId);
+  if (p && p.eliminatedRound === null) {
+    p.eliminatedRound = round;
+  }
+}
+
+// Create the PvP match for a single bracket slot (used by submit-move when a
+// match completes and the next round's slot now has both players).
+// Returns the new challengeId if a match was created, null if not ready or
+// already exists.
+export async function spawnTournamentRoundMatch(
+  t: Tournament,
+  roundIndex: number,
+  slotIndex: number,
+): Promise<string | null> {
+  const round = t.rounds[roundIndex];
+  if (!round) return null;
+  const slot = round.matches[slotIndex];
+  if (!slot) return null;
+  if (slot.challengeId) return null; // already created
+  if (!slot.p1 || !slot.p2) return null; // both sides required
+
+  const nameOf = (pid: string): string => {
+    const p = t.participants.find(x => x.playerId === pid);
+    return p ? p.displayName : "";
+  };
+
+  const challengeId = generateChallengeId();
+  const match = buildTournamentMatch({
+    challengeId,
+    tournamentId: t.id,
+    tournamentRound: roundIndex,
+    tournamentSlotIndex: slotIndex,
+    challengerPlayerId: slot.p1,
+    challengerDisplayName: nameOf(slot.p1),
+    opponentPlayerId: slot.p2,
+    opponentDisplayName: nameOf(slot.p2),
+    payoutPot: round.potThisRound,
+    isPrivate: false,
+  });
+  await saveMatch(match);
+  await addPlayerMatch(slot.p1, challengeId);
+  await addPlayerMatch(slot.p2, challengeId);
+  await markActive(challengeId);
+  await tournamentAddMatch(t.id, challengeId);
+  slot.challengeId = challengeId;
+  return challengeId;
+}
+
+// Called from submit-move when a tournament match completes. Updates the
+// bracket slot's winner, marks loser eliminated, propagates forward, spawns
+// next-round matches if both players are now seated, and crowns champion if
+// final round resolved.
+export async function onTournamentMatchComplete(
+  tournamentId: string,
+  challengeId: string,
+  winnerPlayerId: string,
+  loserPlayerId: string,
+): Promise<void> {
+  const t = await getTournament(tournamentId);
+  if (!t) return;
+  if (t.status === "completed" || t.status === "cancelled") return;
+
+  // Locate the slot for this match
+  const loc = findBracketSlot(t, challengeId);
+  if (!loc) return;
+  const slot = t.rounds[loc.roundIndex].matches[loc.slotIndex];
+  if (slot.winner) return; // already processed
+
+  slot.winner = winnerPlayerId;
+  markEliminated(t, loserPlayerId, loc.roundIndex);
+  if (t.status === "seeded") t.status = "active";
+
+  // Propagate this winner one round forward
+  propagateWinners(t);
+
+  // Spawn next-round match if its other slot is now also resolved
+  const isFinalRound = loc.roundIndex === t.rounds.length - 1;
+  if (isFinalRound) {
+    // Champion!
+    t.championPlayerId = winnerPlayerId;
+    t.status = "completed";
+    t.completedAt = Date.now();
+  } else {
+    const nextSlotIdx = Math.floor(loc.slotIndex / 2);
+    const nextSlot = t.rounds[loc.roundIndex + 1].matches[nextSlotIdx];
+    if (nextSlot.p1 && nextSlot.p2 && !nextSlot.challengeId) {
+      await spawnTournamentRoundMatch(t, loc.roundIndex + 1, nextSlotIdx);
+    }
+  }
+
+  await saveTournament(t);
+}
+
+
+// Seed a draft tournament: shuffle participants, build bracket, spawn round-1
+// matches. Used by both POST /seed (admin) and the auto-seed in join.ts when
+// the tournament hits its full size. Returns true if seeded, false if not in
+// draft state or fewer than 2 participants.
+export async function seedDraftTournament(t: Tournament): Promise<boolean> {
+  if (t.status !== "draft") return false;
+  if (t.participants.length < 2) return false;
+
+  const ids = t.participants.map(p => p.playerId);
+  t.rounds = buildBracket(t.size, ids, t.potPerRound);
+  t.status = "seeded";
+  t.startedAt = Date.now();
+
+  const round0 = t.rounds[0];
+  for (const slot of round0.matches) {
+    if (slot.p1 && slot.p2) {
+      await spawnTournamentRoundMatch(t, 0, slot.slotIndex);
+    } else if (slot.p1 && !slot.p2) {
+      slot.winner = slot.p1;
+    } else if (!slot.p1 && slot.p2) {
+      slot.winner = slot.p2;
+    }
+  }
+  propagateWinners(t);
+  if (t.rounds.length > 1) {
+    const round1 = t.rounds[1];
+    for (const slot of round1.matches) {
+      if (slot.p1 && slot.p2 && !slot.challengeId) {
+        await spawnTournamentRoundMatch(t, 1, slot.slotIndex);
+      }
+    }
+  }
+  return true;
 }

@@ -166,6 +166,13 @@ export interface PvpMatch {
   // admin tweaks. Not zeroed after payout (pot does that) — kept for display.
   pvpCrateRewardPaid: number;
 
+  // ── Tournament linkage (optional) ──────────────────────────────────────
+  // If this match is part of a tournament, these are populated. Submit-move
+  // calls into the tournament module on completion to advance the bracket.
+  tournamentId?: string | null;
+  tournamentRound?: number | null;
+  tournamentSlotIndex?: number | null;
+
   // ── Timestamps ─────────────────────────────────────────────────────────
   createdAt: number;
   updatedAt: number;
@@ -177,6 +184,11 @@ export interface PvpMatch {
   // (/faction-wars/spectate/{challengeId}) still works — sharing is opt-in
   // via link, not via a hard gate. Defaults to false (public).
   isPrivate?: boolean;
+
+  // ── Forfeit / cancellation tracking (set when match ends abnormally) ──
+  forfeitedBy?: string;     // playerId of forfeiting player
+  payoutPlayerId?: string;  // playerId who received the pot on completion
+  cancelledAt?: number;     // ms timestamp when match was cancelled
 }
 
 // ── Spectator side bets (Layer 2B) ─────────────────────────────────────────
@@ -333,4 +345,88 @@ export interface SubmitMoveRequest {
 export interface CancelChallengeRequest {
   challengeId: string;
   playerId: string;   // must equal challengerPlayerId, and status must be "pending"
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────
+// Tournaments (single-elimination brackets)
+// ─────────────────────────────────────────────────────────────────────────
+//
+// Storage:
+//   ra:fwpvp:tournament:{id}              -> JSON blob of Tournament
+//   ra:fwpvp:tournaments:active           -> SET of active tournament ids
+//   ra:fwpvp:tournament:{id}:matches      -> SET of challengeIds spawned by this tournament
+//
+// Lifecycle:
+//   draft      -> admin created, players can join
+//   seeded     -> admin clicked Seed & Start, bracket fixed, round 1 matches created
+//   active     -> at least one round completed; further rounds in progress
+//   completed  -> champion crowned
+//   cancelled  -> admin killed it; refund any antes that were locked
+//
+// All matches in the tournament use the existing PvpMatch flow. The match
+// links back to the tournament via PvpMatch.tournamentId / tournamentRound.
+
+export type TournamentStatus =
+  | "draft"
+  | "seeded"
+  | "active"
+  | "completed"
+  | "cancelled";
+
+export interface TournamentParticipant {
+  playerId: string;
+  displayName: string;
+  joinedAt: number;
+  // Set once the player loses or wins the final
+  eliminatedRound: number | null;
+}
+
+export interface TournamentBracketSlot {
+  // index in this round (0-based)
+  slotIndex: number;
+  // playerIds that fill this slot. p2 may be null if odd or pending advancement.
+  p1: string | null;
+  p2: string | null;
+  // challengeId of the PvpMatch created for this pairing (null until created)
+  challengeId: string | null;
+  // playerId of winner, null until match completes
+  winner: string | null;
+}
+
+export interface TournamentRound {
+  roundIndex: number;        // 0 = round of N, 1 = next, etc.
+  matches: TournamentBracketSlot[];
+  // pot awarded to the winner of each match in this round
+  potThisRound: number;
+}
+
+export interface Tournament {
+  id: string;                       // 12-char id, same alphabet as challengeId
+  status: TournamentStatus;
+  name: string;                     // human-friendly display title
+  size: number;                     // 4, 8, 16, 32 — slots in round 1
+  entryFee: number;                 // REBEL deducted on join
+  // Pot per round. Length === ceil(log2(size)). potPerRound[r] = REBEL the
+  // winner of a match in round r receives. Independent of entry fee.
+  potPerRound: number[];
+  participants: TournamentParticipant[];
+  rounds: TournamentRound[];        // populated on seed; updated as matches finish
+  championPlayerId: string | null;
+  createdAt: number;
+  startedAt: number | null;
+  completedAt: number | null;
+}
+
+export interface CreateTournamentRequest {
+  name: string;
+  size: number;
+  entryFee: number;
+  potPerRound: number[];
+}
+
+export interface JoinTournamentRequest {
+  tournamentId: string;
+  playerId: string;
+  displayName: string;
 }
