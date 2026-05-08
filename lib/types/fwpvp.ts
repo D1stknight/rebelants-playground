@@ -123,6 +123,38 @@ export interface PvpMatch {
   challengerHealsUsed: number;
   opponentHealsUsed: number;
 
+  // ── Death Spell (Commit Spell) ──────────────────────────────────────────
+  // Wall-clock DoT cast by one side onto the other. Each side can cast at
+  // most once per match (5 territories). The DoT ticks server-side via
+  // lazy evaluation in getMatch — every time match state is read, we look
+  // at how many seconds have elapsed since the last tick and apply
+  // factionWarsSpellDot HP damage per second, capping at the spell's total
+  // duration (factionWarsSpellDuration). Persists across territory
+  // transitions: if the DoT is still active when HP resets to MAX_HP at
+  // territory rollover, it keeps ticking against the fresh 100 HP. Heals
+  // do NOT suspend or interfere — victim can heal normally to outpace it.
+  challengerSpellUsed: boolean;             // true after challenger casts
+  opponentSpellUsed: boolean;               // true after opponent casts
+  // Active spell state (one at a time per side; null when no DoT running).
+  // `targetSide` says who's bleeding. `startedAt` and `expiresAt` are
+  // wall-clock timestamps. `damageApplied` accumulates so we never exceed
+  // factionWarsSpellDuration * factionWarsSpellDot total. `lastTickAt`
+  // marks the last server-side evaluation.
+  spellChallengerActive: {
+    targetSide: PvpSide;
+    startedAt: number;
+    expiresAt: number;
+    lastTickAt: number;
+    damageApplied: number;
+  } | null;
+  spellOpponentActive: {
+    targetSide: PvpSide;
+    startedAt: number;
+    expiresAt: number;
+    lastTickAt: number;
+    damageApplied: number;
+  } | null;
+
   // ── Crate reward (Commit F) ─────────────────────────────────────────────
   // REBEL bonus credited to the winner on completion, on TOP of the pot.
   // Comes from cfg.rewards[rarity] (same admin config AI mode uses):
