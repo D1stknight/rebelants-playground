@@ -13,7 +13,7 @@
 // challengeId format: 12 chars [a-z0-9], URL-safe.
 
 import { redis } from "./redis";
-import type { PvpMatch, PvpBet, PvpBetsState, PvpSide, ChatMessage, ChatMute, ChatRole } from "../types/fwpvp";
+import type { PvpMatch, PvpBet, PvpBetsState, PvpSide, ChatMessage, ChatMute, ChatRole, Tournament, TournamentParticipant, TournamentRound, TournamentBracketSlot, TournamentStatus } from "../types/fwpvp";
 
 const MATCH_KEY = (id: string) => `ra:fwpvp:match:${id}`;
 const PLAYER_MATCHES_KEY = (pid: string) => `ra:fwpvp:player:${pid}`;
@@ -1148,4 +1148,165 @@ export function checkAdminAuth(req: { headers: Record<string, any> }): boolean {
   const expected = process.env.ADMIN_KEY || process.env.ADMIN_TOKEN || "";
   if (!expected) return false;
   return !!provided && provided === expected;
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────
+// Tournaments (single-elimination brackets)
+// ─────────────────────────────────────────────────────────────────────────
+
+const TOURNEY_KEY = (id: string) => `ra:fwpvp:tournament:${id}`;
+const TOURNEY_ACTIVE_INDEX = "ra:fwpvp:tournaments:active";
+const TOURNEY_MATCHES_KEY = (id: string) => `ra:fwpvp:tournament:${id}:matches`;
+const TOURNEY_TTL_DAYS = 30;
+
+// 12-char [a-z0-9] id, same alphabet as challengeId.
+export function generateTournamentId(): string {
+  const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
+  let id = "";
+  for (let i = 0; i < 12; i++) {
+    id += alphabet.charAt(Math.floor(Math.random() * alphabet.length));
+  }
+  return id;
+}
+
+export async function getTournament(id: string): Promise<Tournament | null> {
+  if (!id) return null;
+  try {
+    const raw: any = await redis.get(TOURNEY_KEY(id));
+    if (!raw) return null;
+    if (typeof raw === "string") return JSON.parse(raw) as Tournament;
+    return raw as Tournament;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveTournament(t: Tournament): Promise<void> {
+  await redis.set(TOURNEY_KEY(t.id), JSON.stringify(t));
+  if (t.status === "completed" || t.status === "cancelled") {
+    await redis.expire(TOURNEY_KEY(t.id), TOURNEY_TTL_DAYS * 24 * 60 * 60).catch(() => {});
+    await (redis as any).srem(TOURNEY_ACTIVE_INDEX, t.id).catch(() => {});
+  } else {
+    await (redis as any).sadd(TOURNEY_ACTIVE_INDEX, t.id).catch(() => {});
+  }
+}
+
+export async function listActiveTournaments(): Promise<Tournament[]> {
+  try {
+    const ids: any = await (redis as any).smembers(TOURNEY_ACTIVE_INDEX);
+    const out: Tournament[] = [];
+    if (Array.isArray(ids)) {
+      for (const id of ids) {
+        const t = await getTournament(String(id));
+        if (t) out.push(t);
+      }
+    }
+    out.sort((a, b) => b.createdAt - a.createdAt);
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+export async function listAllTournaments(limit: number = 50): Promise<Tournament[]> {
+  // For history we'd ideally have an "all" index. For V1 we just return active.
+  // Completed tournaments live for TOURNEY_TTL_DAYS days at their key but are
+  // no longer in the active set; admin can fetch them directly by id.
+  return listActiveTournaments();
+}
+
+export async function tournamentAddMatch(tournamentId: string, challengeId: string): Promise<void> {
+  await (redis as any).sadd(TOURNEY_MATCHES_KEY(tournamentId), challengeId).catch(() => {});
+}
+
+// Validate + sanitize tournament configuration. Returns null + error string if invalid.
+export function validateTournamentConfig(opts: {
+  size: number;
+  entryFee: number;
+  potPerRound: number[];
+  maxSize: number;
+}): { ok: true } | { ok: false; error: string } {
+  const allowedSizes = [4, 8, 16, 32];
+  if (!allowedSizes.includes(opts.size)) {
+    return { ok: false, error: "size must be 4, 8, 16, or 32" };
+  }
+  if (opts.size > opts.maxSize) {
+    return { ok: false, error: `size exceeds admin max (${opts.maxSize})` };
+  }
+  if (!Number.isFinite(opts.entryFee) || opts.entryFee < 0) {
+    return { ok: false, error: "entryFee must be >= 0" };
+  }
+  const expectedRounds = Math.log2(opts.size);
+  if (!Array.isArray(opts.potPerRound) || opts.potPerRound.length !== expectedRounds) {
+    return { ok: false, error: `potPerRound must have ${expectedRounds} entries for size ${opts.size}` };
+  }
+  for (const p of opts.potPerRound) {
+    if (!Number.isFinite(p) || p < 0) {
+      return { ok: false, error: "all potPerRound entries must be >= 0" };
+    }
+  }
+  return { ok: true };
+}
+
+// Fisher-Yates shuffle, returns a new array.
+function shuffle<T>(arr: T[]): T[] {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// Build the empty bracket tree for a given size, then fill round 0 from
+// shuffled participant ids. Subsequent rounds start with all-null slots and
+// get populated as matches complete.
+export function buildBracket(size: number, participantIds: string[], potPerRound: number[]): TournamentRound[] {
+  const numRounds = Math.log2(size);
+  const rounds: TournamentRound[] = [];
+  for (let r = 0; r < numRounds; r++) {
+    const matches: TournamentBracketSlot[] = [];
+    const numMatches = size / Math.pow(2, r + 1);
+    for (let m = 0; m < numMatches; m++) {
+      matches.push({
+        slotIndex: m,
+        p1: null,
+        p2: null,
+        challengeId: null,
+        winner: null,
+      });
+    }
+    rounds.push({
+      roundIndex: r,
+      matches,
+      potThisRound: potPerRound[r] || 0,
+    });
+  }
+
+  // Fill round 0 with shuffled participants. If fewer than `size` joined, the
+  // remaining slots stay null and those matches resolve as auto-advance byes.
+  const seeded = shuffle(participantIds);
+  for (let i = 0; i < seeded.length; i++) {
+    const matchIdx = Math.floor(i / 2);
+    const slot = rounds[0].matches[matchIdx];
+    if (i % 2 === 0) slot.p1 = seeded[i];
+    else slot.p2 = seeded[i];
+  }
+
+  return rounds;
+}
+
+// Find the bracket slot that produced this challengeId.
+// Returns { roundIndex, slotIndex } or null if not found.
+export function findBracketSlot(t: Tournament, challengeId: string): { roundIndex: number; slotIndex: number } | null {
+  for (let r = 0; r < t.rounds.length; r++) {
+    const round = t.rounds[r];
+    for (let s = 0; s < round.matches.length; s++) {
+      if (round.matches[s].challengeId === challengeId) {
+        return { roundIndex: r, slotIndex: s };
+      }
+    }
+  }
+  return null;
 }

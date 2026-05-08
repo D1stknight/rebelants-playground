@@ -40,6 +40,12 @@ const DEFAULTS = {
   raidUltraCarriers: 4,
   raidUltraRatio: 0.65,
 
+  // Tournaments
+  factionWarsTournamentEnabled: true,
+  factionWarsTournamentMaxSize: 32,
+  factionWarsTournamentDefaultFee: 300,
+  factionWarsTournamentDefaultPots: [300, 500, 1000, 2000],
+
   rewards: { none: 0, common: 50, rare: 100, ultra: 200 },
 
   // ✅ Pro Odds (weights) — Admin editable
@@ -164,6 +170,13 @@ const rareMerchDecimal = Number.isFinite(rawRareMerch)
   factionWarsSpellCost: Math.max(0, Number(src?.factionWarsSpellCost ?? 1000)),
   factionWarsSpellDot: Math.max(1, Number(src?.factionWarsSpellDot ?? 2)),
   factionWarsSpellDuration: Math.max(1, Number(src?.factionWarsSpellDuration ?? 15)),
+  // Tournaments
+  factionWarsTournamentEnabled: src?.factionWarsTournamentEnabled !== false,
+  factionWarsTournamentMaxSize: Math.min(32, Math.max(4, Number(src?.factionWarsTournamentMaxSize ?? 32))),
+  factionWarsTournamentDefaultFee: Math.max(0, Number(src?.factionWarsTournamentDefaultFee ?? 300)),
+  factionWarsTournamentDefaultPots: Array.isArray(src?.factionWarsTournamentDefaultPots)
+    ? (src.factionWarsTournamentDefaultPots as any[]).map((n: any) => Math.max(0, Number(n) || 0))
+    : DEFAULTS.factionWarsTournamentDefaultPots,
   // Featured match (Layer 2C cont.) — empty string = unset
   featuredMatchId: typeof src?.featuredMatchId === "string" ? src.featuredMatchId.trim().slice(0, 64) : "",
 
