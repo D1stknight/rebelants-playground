@@ -407,14 +407,21 @@ function ActiveMatchView({
   const theySpelledMe = oppSpellOnMe != null && oppSpellOnMe.targetSide === mySide && Date.now() < oppSpellOnMe.expiresAt;
   const spellRemainingMs = theySpelledMe && oppSpellOnMe ? Math.max(0, oppSpellOnMe.expiresAt - Date.now()) : 0;
   const spellRemainingSec = Math.ceil(spellRemainingMs / 1000);
+  // ── Caster's view: am I currently bleeding the opponent? ──────────────
+  // `mySpellOnThem` is the ACTIVE record installed by ME — i.e. the
+  // record on MY side slot whose targetSide is the opposing side. Used
+  // for the "you cursed them — Xs left" feedback pill.
+  const mySpellOnThem = isChallenger ? match.spellChallengerActive : match.spellOpponentActive;
+  const iCursedThem = mySpellOnThem != null && mySpellOnThem.targetSide !== mySide && Date.now() < mySpellOnThem.expiresAt;
+  const myCurseRemainingSec = iCursedThem && mySpellOnThem ? Math.max(0, Math.ceil((mySpellOnThem.expiresAt - Date.now()) / 1000)) : 0;
   // Tick a re-render every 500ms while the DoT is active so the timer
   // pill counts down smoothly. Stops once expired.
   const [, _setNow] = useState(0);
   useEffect(() => {
-    if (!theySpelledMe) return;
+    if (!theySpelledMe && !iCursedThem) return;
     const id = setInterval(() => _setNow((n) => n + 1), 500);
     return () => clearInterval(id);
-  }, [theySpelledMe]);
+  }, [theySpelledMe, iCursedThem]);
   // Inject keyframes for the spell hit visual once per page load.
   useEffect(() => {
     const id = "fw-spell-keyframes";
@@ -472,6 +479,21 @@ function ActiveMatchView({
         <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
           <span className="fw-spelled-pill" title={`${spellDot} HP/sec — ${spellRemainingSec}s remaining`}>
             💀 CURSED · {spellRemainingSec}s
+          </span>
+        </div>
+      )}
+      {/* Caster pill — shows when I am the one cursing the opponent. */}
+      {iCursedThem && (
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
+          <span style={{
+            display: "inline-flex", alignItems: "center", gap: 6,
+            padding: "4px 10px", borderRadius: 14,
+            background: "rgba(192,132,252,0.18)",
+            border: "1px solid rgba(192,132,252,0.6)",
+            color: "#d8b4fe",
+            fontSize: 11, fontWeight: 900, letterSpacing: "0.1em", textTransform: "uppercase",
+          }}>
+            💀 YOU CURSED THEM · {myCurseRemainingSec}s
           </span>
         </div>
       )}
@@ -1324,12 +1346,19 @@ export default function ChallengePage() {
     refreshMatch();
   }, [challengeId, refreshMatch]);
 
+  // Active-match poll. Reduced from 5000ms to 1500ms in the spell update
+  // so DoT ticks visibly without waiting for the next move. The callback
+  // ref pattern keeps the deps minimal so we don't tear down/recreate
+  // the interval on every match refresh (which would cause polls to
+  // sometimes fire later than intended).
+  const refreshMatchRef = useRef(refreshMatch);
+  useEffect(() => { refreshMatchRef.current = refreshMatch; }, [refreshMatch]);
   useEffect(() => {
     if (!match) return;
     if (match.status === "completed" || match.status === "cancelled") return;
-    const t = setInterval(refreshMatch, 5000);
+    const t = setInterval(() => { refreshMatchRef.current?.(); }, 1500);
     return () => clearInterval(t);
-  }, [match, refreshMatch]);
+  }, [match?.status]);
 
   // ── Actions ────────────────────────────────────────────────────────────────
   const handleAccept = async () => {
@@ -1479,7 +1508,12 @@ export default function ChallengePage() {
       });
       const j = await r.json();
       if (!j.ok) {
-        setError(j.error || "Cast failed");
+        // Surface the server's reject reason directly so failures aren't
+        // silent. Common causes: insufficient balance, already cast,
+        // mechanic disabled, not a participant (identity mismatch).
+        const msg = j.error || "Cast failed";
+        setError(msg);
+        if (typeof window !== "undefined") alert("Spell cast failed: " + msg);
       } else {
         setMatch(j.match);
         await refreshBalance();
