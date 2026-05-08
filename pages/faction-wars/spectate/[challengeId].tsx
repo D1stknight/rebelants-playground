@@ -83,7 +83,12 @@ export default function SpectatePage() {
     let cancelled = false;
     let timer: any = null;
     const tick = async () => {
-      if (cancelled || stoppedRef.current) return;
+      if (cancelled) return;
+      // If tab is hidden, skip the fetch but keep the polling chain alive.
+      if (stoppedRef.current) {
+        timer = setTimeout(tick, 3000);
+        return;
+      }
       try {
         const r = await fetch(`/api/faction-wars/pvp/get?id=${encodeURIComponent(challengeId)}`);
         const j = await r.json();
