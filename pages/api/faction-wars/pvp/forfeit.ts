@@ -101,7 +101,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     match.status = "completed";
     match.winnerPlayerId = match.opponentPlayerId;
     match.loserPlayerId = match.challengerPlayerId;
-    match.completedAt = now;
     match.updatedAt = now;
     match.forfeitedBy = match.challengerPlayerId;
 
