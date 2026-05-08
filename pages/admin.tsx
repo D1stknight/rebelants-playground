@@ -36,6 +36,11 @@ type PointsConfigShape = {
   // Per-match chat (Layer 2D)
   factionWarsChatEnabled: boolean;
   factionWarsChatPostCleanupMins: number;
+  // Death Spell (Spell A-D)
+  factionWarsSpellEnabled: boolean;
+  factionWarsSpellCost: number;
+  factionWarsSpellDot: number;
+  factionWarsSpellDuration: number;
   // Featured match (admin podcast tool, Layer 2C cont.) — empty = no featured match
   featuredMatchId: string;
 
@@ -186,6 +191,11 @@ const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
     // Per-match chat (Layer 2D)
     factionWarsChatEnabled: (defaultConfig as any).factionWarsChatEnabled !== false,
     factionWarsChatPostCleanupMins: (defaultConfig as any).factionWarsChatPostCleanupMins ?? 30,
+    // Death Spell defaults — match getSpellConfig() server-side fallbacks.
+    factionWarsSpellEnabled: (defaultConfig as any).factionWarsSpellEnabled !== false,
+    factionWarsSpellCost: (defaultConfig as any).factionWarsSpellCost ?? 1000,
+    factionWarsSpellDot: (defaultConfig as any).factionWarsSpellDot ?? 2,
+    factionWarsSpellDuration: (defaultConfig as any).factionWarsSpellDuration ?? 15,
     // Featured match (Layer 2C cont.)
     featuredMatchId: typeof (defaultConfig as any).featuredMatchId === "string" ? (defaultConfig as any).featuredMatchId : "",
   raidCarrierSurvival: (defaultConfig as any).raidCarrierSurvival ?? 0.20,
@@ -1246,6 +1256,32 @@ String(c.status).toUpperCase()==="PENDING"
             Chat TTL after match completion <span style={{ opacity: 0.5 }}>(minutes)</span>
             <input type="number" min="0" value={cfg.factionWarsChatPostCleanupMins} onChange={(e) => setCfg((c) => ({ ...c, factionWarsChatPostCleanupMins: safeNum(e.target.value, c.factionWarsChatPostCleanupMins) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} />
             <span style={{ fontSize: 10, opacity: 0.4 }}>How long chat history sticks around after the match ends. Default: 30 minutes.</span>
+          </label>
+
+          {/* Death Spell (Spell A-D) — divided section */}
+          <label style={{ fontSize: 12, opacity: 0.9, gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 10, marginTop: 6, paddingTop: 10, borderTop: "1px dashed rgba(255,255,255,.12)" }}>
+            <input
+              type="checkbox"
+              checked={!!cfg.factionWarsSpellEnabled}
+              onChange={(e) => setCfg((c) => ({ ...c, factionWarsSpellEnabled: e.target.checked }))}
+              style={{ width: 16, height: 16, cursor: "pointer" }}
+            />
+            <span>💀 Death Spell Enabled <span style={{ opacity: 0.6 }}>— uncheck to hide the cast button on all PvP matches</span></span>
+          </label>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>
+            Spell cost <span style={{ opacity: 0.5 }}>(REBEL)</span>
+            <input type="number" min="0" value={cfg.factionWarsSpellCost} onChange={(e) => setCfg((c) => ({ ...c, factionWarsSpellCost: safeNum(e.target.value, c.factionWarsSpellCost) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} />
+            <span style={{ fontSize: 10, opacity: 0.4 }}>REBEL spent per cast. Once-per-side per match. Default: 1000.</span>
+          </label>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>
+            Spell DoT <span style={{ opacity: 0.5 }}>(HP/sec)</span>
+            <input type="number" min="1" value={cfg.factionWarsSpellDot} onChange={(e) => setCfg((c) => ({ ...c, factionWarsSpellDot: Math.max(1, safeNum(e.target.value, c.factionWarsSpellDot)) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} />
+            <span style={{ fontSize: 10, opacity: 0.4 }}>HP drained per second from the target. Default: 2.</span>
+          </label>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>
+            Spell duration <span style={{ opacity: 0.5 }}>(seconds)</span>
+            <input type="number" min="1" value={cfg.factionWarsSpellDuration} onChange={(e) => setCfg((c) => ({ ...c, factionWarsSpellDuration: Math.max(1, safeNum(e.target.value, c.factionWarsSpellDuration)) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} />
+            <span style={{ fontSize: 10, opacity: 0.4 }}>Wall-clock seconds the DoT runs. Total damage = DoT × duration. Default: 15s (= 30 HP total).</span>
           </label>
         </div>
       </div>

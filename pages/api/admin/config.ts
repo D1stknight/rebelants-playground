@@ -159,6 +159,11 @@ const rareMerchDecimal = Number.isFinite(rawRareMerch)
   // Per-match chat (Layer 2D)
   factionWarsChatEnabled: src?.factionWarsChatEnabled !== false,
   factionWarsChatPostCleanupMins: Math.max(0, Number(src?.factionWarsChatPostCleanupMins ?? 30)),
+  // Death Spell (Spell A-D)
+  factionWarsSpellEnabled: src?.factionWarsSpellEnabled !== false,
+  factionWarsSpellCost: Math.max(0, Number(src?.factionWarsSpellCost ?? 1000)),
+  factionWarsSpellDot: Math.max(1, Number(src?.factionWarsSpellDot ?? 2)),
+  factionWarsSpellDuration: Math.max(1, Number(src?.factionWarsSpellDuration ?? 15)),
   // Featured match (Layer 2C cont.) — empty string = unset
   featuredMatchId: typeof src?.featuredMatchId === "string" ? src.featuredMatchId.trim().slice(0, 64) : "",
 
