@@ -54,6 +54,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(409).json({ ok: false, error: `Cannot forfeit; match is ${match.status}` });
     }
 
+    const cfg = await getPvpEconomyConfig();
+    const chatTtlMins = cfg.factionWarsChatPostCleanupMins ?? 60;
     const now = Date.now();
     const cost = Number(match.pvpCost || 0);
 
@@ -75,7 +77,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       await saveMatch(match);
       await refundBets(challengeId).catch(() => {});
       await unmarkActive(challengeId).catch(() => {});
-      await tightenChatTTL(challengeId).catch(() => {});
+      await tightenChatTTL(challengeId, chatTtlMins).catch(() => {});
       return res.status(200).json({
         ok: true,
         match,
@@ -133,7 +135,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     ).catch(() => {});
 
     await unmarkActive(challengeId).catch(() => {});
-    await tightenChatTTL(challengeId).catch(() => {});
+    await tightenChatTTL(challengeId, chatTtlMins).catch(() => {});
 
     return res.status(200).json({
       ok: true,
