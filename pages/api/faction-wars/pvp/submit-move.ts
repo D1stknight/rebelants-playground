@@ -20,7 +20,7 @@
 // currently-active faction. This prevents move spoofing.
 
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getMatch, saveMatch, creditREBEL, getCrateRewards, recordPvpResult, unmarkActive, lockBets, payoutBets, refundBets, getPvpEconomyConfig, tightenChatTTL } from "../../../../lib/server/fwpvp";
+import { getMatch, saveMatch, creditREBEL, getCrateRewards, recordPvpResult, unmarkActive, lockBets, payoutBets, refundBets, getPvpEconomyConfig, tightenChatTTL, onTournamentMatchComplete } from "../../../../lib/server/fwpvp";
 import {
   FACTIONS,
   MAX_HP,
@@ -312,6 +312,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     match.updatedAt = now;
     match.lastActionAt = now;
     await saveMatch(match);
+
+    // Tournament auto-advance: if this match is part of a tournament and it
+    // just completed, propagate the winner forward and (if not final) spawn
+    // the next-round match. Best-effort — failures don't break the response.
+    if (match.status === "completed" && match.tournamentId && match.winnerPlayerId && match.loserPlayerId) {
+      try {
+        await onTournamentMatchComplete(
+          match.tournamentId,
+          match.challengeId,
+          match.winnerPlayerId,
+          match.loserPlayerId,
+        );
+      } catch (e) {
+        // swallow — match is already saved, tournament can be repaired manually
+      }
+    }
 
     return res.status(200).json({ ok: true, match, round, territoryEnded });
   } catch (e: any) {
