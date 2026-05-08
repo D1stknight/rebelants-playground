@@ -130,6 +130,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Heal counters (Commit E). Capped at factionWarsHealMax per side.
       challengerHealsUsed: 0,
       opponentHealsUsed: 0,
+      // Spell mechanic — neither side has cast yet, no active DoT.
+      challengerSpellUsed: false,
+      opponentSpellUsed: false,
+      spellChallengerActive: null,
+      spellOpponentActive: null,
       // Crate REBEL bonus paid to winner on completion (Commit F).
       // Set by submit-move.ts on the active→completed transition.
       pvpCrateRewardPaid: 0,

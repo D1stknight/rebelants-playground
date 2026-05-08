@@ -39,9 +39,69 @@ export async function getMatch(challengeId: string): Promise<PvpMatch | null> {
     // Upstash auto-parses JSON when the stored value is JSON-stringifiable.
     // Defensive: handle both string and already-parsed object.
     const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-    return parsed as PvpMatch;
+    const match = parsed as PvpMatch;
+    // Defensive: backfill spell fields on matches created before the spell
+    // mechanic shipped. Without this, older active matches throw on the
+    // tick logic below.
+    if ((match as any).challengerSpellUsed === undefined) (match as any).challengerSpellUsed = false;
+    if ((match as any).opponentSpellUsed === undefined) (match as any).opponentSpellUsed = false;
+    if ((match as any).spellChallengerActive === undefined) (match as any).spellChallengerActive = null;
+    if ((match as any).spellOpponentActive === undefined) (match as any).spellOpponentActive = null;
+    // Project spell DoT into HP for read-time display. Read-only — does NOT
+    // persist back to Redis here. Mutations (submit-move, heal, cast) call
+    // `applySpellTick` themselves before saving so the persisted state stays
+    // consistent. This keeps idle reads cheap.
+    try {
+      const cfg = await getSpellConfig();
+      applySpellTick(match, Date.now(), cfg);
+    } catch {
+      // Spell tick is best-effort projection; never block reads.
+    }
+    return match;
   } catch {
     return null;
+  }
+}
+
+// ── Death Spell tick (Commit Spell) ──────────────────────────────────────────
+// Mutates `match` in-place: applies wall-clock DoT damage from any active
+// spell, capping per-spell total damage at cfg.factionWarsSpellDuration *
+// cfg.factionWarsSpellDot, and clears expired spells. Persists across
+// territory transitions: HP resets to MAX_HP at rollover but the spell
+// timer keeps ticking against the fresh HP. Caller is responsible for
+// saveMatch() if they want the change persisted (read paths skip the write).
+export function applySpellTick(match: PvpMatch, now: number, cfg: SpellConfig): void {
+  if (match.status !== "active") return;
+  const dotPerSec = Math.max(0, Number(cfg.factionWarsSpellDot) || 0);
+  if (dotPerSec <= 0) return;
+  const maxTotal = dotPerSec * Math.max(1, Number(cfg.factionWarsSpellDuration) || 0);
+
+  for (const slot of ["spellChallengerActive", "spellOpponentActive"] as const) {
+    const sp = match[slot];
+    if (!sp) continue;
+    // Compute elapsed full seconds since last tick (integer floor).
+    const elapsedSec = Math.max(0, Math.floor((now - sp.lastTickAt) / 1000));
+    if (elapsedSec <= 0 && now < sp.expiresAt) continue; // not yet a full sec
+    // Don't tick past expiresAt.
+    const effectiveNow = Math.min(now, sp.expiresAt);
+    const effSec = Math.max(0, Math.floor((effectiveNow - sp.lastTickAt) / 1000));
+    let toApply = effSec * dotPerSec;
+    // Cap total damage per spell instance.
+    const remainingBudget = Math.max(0, maxTotal - sp.damageApplied);
+    if (toApply > remainingBudget) toApply = remainingBudget;
+    if (toApply > 0) {
+      if (sp.targetSide === "challenger") {
+        match.challengerHp = Math.max(0, match.challengerHp - toApply);
+      } else {
+        match.opponentHp = Math.max(0, match.opponentHp - toApply);
+      }
+      sp.damageApplied += toApply;
+      sp.lastTickAt = sp.lastTickAt + effSec * 1000;
+    }
+    // Clear if fully expired and budget exhausted (or time is up).
+    if (now >= sp.expiresAt || sp.damageApplied >= maxTotal) {
+      match[slot] = null;
+    }
   }
 }
 
@@ -367,6 +427,70 @@ export async function getHealConfig(): Promise<HealConfig> {
     factionWarsHealCost: HEAL_COST_DEFAULT,
     factionWarsHealAmt: HEAL_AMT_DEFAULT,
     factionWarsHealMax: HEAL_MAX_DEFAULT,
+  };
+}
+
+// ── Death Spell config (Commit Spell) ────────────────────────────────────────
+// Centralized spell tunables. Same admin config blob as heal/economy. Reads
+// the same Redis keys ra:config:economy etc. so admin save flow stays the
+// same. Defaults keep the spec values: 1000 REBEL cost, 2 HP/sec for 15s.
+export interface SpellConfig {
+  factionWarsSpellEnabled: boolean;     // master kill switch
+  factionWarsSpellCost: number;         // REBEL spent per cast
+  factionWarsSpellDot: number;          // HP per second
+  factionWarsSpellDuration: number;     // seconds the DoT runs
+}
+
+const SPELL_ENABLED_DEFAULT = true;
+const SPELL_COST_DEFAULT = 1000;
+const SPELL_DOT_DEFAULT = 2;
+const SPELL_DURATION_DEFAULT = 15;
+
+export async function getSpellConfig(): Promise<SpellConfig> {
+  const keysToTry = [
+    "ra:config:economy",
+    "ra:points:config",
+    "ra:config:points",
+    "ra:pointsConfig",
+    "ra:config",
+  ];
+  const normalize = (raw: any) => {
+    if (typeof raw === "string") {
+      try { return JSON.parse(raw); } catch { return null; }
+    }
+    if (raw && typeof raw === "object") return raw;
+    return null;
+  };
+  for (const k of keysToTry) {
+    try {
+      const raw = await redis.get<any>(k);
+      const v = normalize(raw);
+      if (!v) continue;
+      const cfg = (v as any).pointsConfig && typeof (v as any).pointsConfig === "object"
+        ? (v as any).pointsConfig
+        : v;
+      if (cfg && typeof cfg === "object") {
+        const cost = Number((cfg as any).factionWarsSpellCost);
+        const dot = Number((cfg as any).factionWarsSpellDot);
+        const dur = Number((cfg as any).factionWarsSpellDuration);
+        const enabledRaw = (cfg as any).factionWarsSpellEnabled;
+        const enabled = enabledRaw === undefined ? SPELL_ENABLED_DEFAULT : Boolean(enabledRaw);
+        return {
+          factionWarsSpellEnabled: enabled,
+          factionWarsSpellCost: Number.isFinite(cost) && cost >= 0 ? cost : SPELL_COST_DEFAULT,
+          factionWarsSpellDot: Number.isFinite(dot) && dot > 0 ? dot : SPELL_DOT_DEFAULT,
+          factionWarsSpellDuration: Number.isFinite(dur) && dur > 0 ? dur : SPELL_DURATION_DEFAULT,
+        };
+      }
+    } catch {
+      // try next key
+    }
+  }
+  return {
+    factionWarsSpellEnabled: SPELL_ENABLED_DEFAULT,
+    factionWarsSpellCost: SPELL_COST_DEFAULT,
+    factionWarsSpellDot: SPELL_DOT_DEFAULT,
+    factionWarsSpellDuration: SPELL_DURATION_DEFAULT,
   };
 }
 

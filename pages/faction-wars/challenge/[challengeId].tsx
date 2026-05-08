@@ -135,13 +135,15 @@ function findMove(factionId: FactionId | null | undefined, moveId: string): Move
 }
 
 function ActiveMatchView({
-  match, mePlayerId, challengeId, onSubmitMove, onHeal, busy, healBusy, healCost, healAmt, healMax, balance, sfx,
+  match, mePlayerId, challengeId, onSubmitMove, onHeal, onCastSpell, busy, healBusy, healCost, healAmt, healMax, balance, sfx,
+  spellEnabled, spellBusy, spellCost, spellDot, spellDuration,
 }: {
   match: PvpMatch;
   mePlayerId: string;
   challengeId: string;
   onSubmitMove: (moveId: string) => Promise<void>;
   onHeal: () => Promise<void>;
+  onCastSpell: () => Promise<void>;
   busy: boolean;
   healBusy: boolean;
   healCost: number;
@@ -149,6 +151,11 @@ function ActiveMatchView({
   healMax: number;
   balance: number | null;
   sfx: ReturnType<typeof useFWAudio>["sfx"];
+  spellEnabled: boolean;
+  spellBusy: boolean;
+  spellCost: number;
+  spellDot: number;
+  spellDuration: number;
 }) {
   // ── Perspective math ───────────────────────────────────────────────────────
   const isChallenger = match.challengerPlayerId === mePlayerId;
@@ -384,6 +391,73 @@ function ActiveMatchView({
     refresh: async () => undefined,
   };
 
+  // ── Spell button state + active DoT detection ─────────────────────────
+  // Cast eligibility: spell enabled, not yet cast, balance >= cost.
+  // Critically NOT gated by isMyTurn — spec says free action / can be
+  // cast anytime. Server enforces all of these too.
+  const mySpellUsed = isChallenger
+    ? Boolean(match.challengerSpellUsed)
+    : Boolean(match.opponentSpellUsed);
+  const cantAffordSpell = balance !== null && balance < spellCost;
+  const spellDisabled = !spellEnabled || busy || spellBusy || mySpellUsed || cantAffordSpell;
+  // Detect if MY side is being bled by the opponent's active spell — for
+  // the shake/red-pulse wrapper visual. The active spell record from the
+  // OTHER side targets US. `mySide` is computed at the top of ActiveMatchView.
+  const oppSpellOnMe = isChallenger ? match.spellOpponentActive : match.spellChallengerActive;
+  const theySpelledMe = oppSpellOnMe != null && oppSpellOnMe.targetSide === mySide && Date.now() < oppSpellOnMe.expiresAt;
+  const spellRemainingMs = theySpelledMe && oppSpellOnMe ? Math.max(0, oppSpellOnMe.expiresAt - Date.now()) : 0;
+  const spellRemainingSec = Math.ceil(spellRemainingMs / 1000);
+  // ── Caster's view: am I currently bleeding the opponent? ──────────────
+  // `mySpellOnThem` is the ACTIVE record installed by ME — i.e. the
+  // record on MY side slot whose targetSide is the opposing side. Used
+  // for the "you cursed them — Xs left" feedback pill.
+  const mySpellOnThem = isChallenger ? match.spellChallengerActive : match.spellOpponentActive;
+  const iCursedThem = mySpellOnThem != null && mySpellOnThem.targetSide !== mySide && Date.now() < mySpellOnThem.expiresAt;
+  const myCurseRemainingSec = iCursedThem && mySpellOnThem ? Math.max(0, Math.ceil((mySpellOnThem.expiresAt - Date.now()) / 1000)) : 0;
+  // Tick a re-render every 500ms while the DoT is active so the timer
+  // pill counts down smoothly. Stops once expired.
+  const [, _setNow] = useState(0);
+  useEffect(() => {
+    if (!theySpelledMe && !iCursedThem) return;
+    const id = setInterval(() => _setNow((n) => n + 1), 500);
+    return () => clearInterval(id);
+  }, [theySpelledMe, iCursedThem]);
+  // Inject keyframes for the spell hit visual once per page load.
+  useEffect(() => {
+    const id = "fw-spell-keyframes";
+    if (typeof document === "undefined") return;
+    if (document.getElementById(id)) return;
+    const style = document.createElement("style");
+    style.id = id;
+    style.textContent = `
+      @keyframes fw-spell-shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-3px); }
+        75% { transform: translateX(3px); }
+      }
+      @keyframes fw-spell-pulse {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(248,113,113,0.0), inset 0 0 24px rgba(248,113,113,0.0); }
+        50% { box-shadow: 0 0 22px 2px rgba(248,113,113,0.45), inset 0 0 32px rgba(248,113,113,0.18); }
+      }
+      .fw-spelled-me {
+        animation: fw-spell-shake 0.45s ease-in-out infinite, fw-spell-pulse 1.2s ease-in-out infinite;
+        border-radius: 12px;
+        outline: 2px solid rgba(248,113,113,0.35);
+        outline-offset: -2px;
+      }
+      .fw-spelled-pill {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 4px 10px; border-radius: 14px;
+        background: rgba(248,113,113,0.18);
+        border: 1px solid rgba(248,113,113,0.6);
+        color: #fca5a5;
+        font-size: 11px; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase;
+        animation: fw-spell-pulse 1.2s ease-in-out infinite;
+      }
+    `;
+    document.head.appendChild(style);
+  }, []);
+
   return (
     <div>
       {/* Turn indicator */}
@@ -400,14 +474,42 @@ function ActiveMatchView({
         </div>
       </div>
 
-      <FactionWarsBattleScene
-        state={battleSceneState}
-        actions={inertActions}
-        enableHealing={false}
-        showMovePicker={false}
-        enableHowToPlay={false}
-        leaderboardSlot={null}
-      />
+      {/* Cursed pill — shows when this player is bled by opponent spell */}
+      {theySpelledMe && (
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
+          <span className="fw-spelled-pill" title={`${spellDot} HP/sec — ${spellRemainingSec}s remaining`}>
+            💀 CURSED · {spellRemainingSec}s
+          </span>
+        </div>
+      )}
+      {/* Caster pill — shows when I am the one cursing the opponent. */}
+      {iCursedThem && (
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
+          <span style={{
+            display: "inline-flex", alignItems: "center", gap: 6,
+            padding: "4px 10px", borderRadius: 14,
+            background: "rgba(192,132,252,0.18)",
+            border: "1px solid rgba(192,132,252,0.6)",
+            color: "#d8b4fe",
+            fontSize: 11, fontWeight: 900, letterSpacing: "0.1em", textTransform: "uppercase",
+          }}>
+            💀 YOU CURSED THEM · {myCurseRemainingSec}s
+          </span>
+        </div>
+      )}
+      {/* Wrap BattleScene so we can shake + red-pulse the entire fight area
+          when the local player is bled. The .fw-spelled-me class is injected
+          via the keyframe useEffect above. */}
+      <div className={theySpelledMe ? "fw-spelled-me" : undefined}>
+        <FactionWarsBattleScene
+          state={battleSceneState}
+          actions={inertActions}
+          enableHealing={false}
+          showMovePicker={false}
+          enableHowToPlay={false}
+          leaderboardSlot={null}
+        />
+      </div>
 
       {/* PvP move picker */}
       {(() => {
@@ -460,6 +562,38 @@ function ActiveMatchView({
               >
                 {healBusy ? "Healing…" : `💚 Heal · ${healCost} REBEL · ${myHealsUsed}/${healMax}`}
               </button>
+              {/* ── Cast Death Spell button (Spell B) ──────────────────────
+                  Free action, once per match per side, costs spellCost REBEL.
+                  Renders only when admin has spell mechanic enabled. */}
+              {spellEnabled && (
+                <button
+                  onClick={() => {
+                    if (spellDisabled) return;
+                    if (!confirm(`Cast Death Spell on opponent for ${spellCost} REBEL? Bleeds 2 HP/sec for ${spellDuration}s. One-time per match.`)) return;
+                    try { sfx.cardSelect(); } catch {}
+                    onCastSpell();
+                  }}
+                  disabled={spellDisabled}
+                  title={
+                    !spellEnabled ? "Spell disabled" :
+                    mySpellUsed ? "You've already cast your spell" :
+                    cantAffordSpell ? `Need ${spellCost} REBEL (you have ${balance ?? "?"})` :
+                    `Spend ${spellCost} REBEL — bleed opponent for ${spellDot} HP/sec × ${spellDuration}s`
+                  }
+                  style={{
+                    display: "flex", alignItems: "center", gap: 6,
+                    padding: "6px 14px", borderRadius: 20,
+                    border: `1px solid ${spellDisabled ? "rgba(255,255,255,0.12)" : "rgba(192,132,252,0.5)"}`,
+                    background: spellDisabled ? "rgba(255,255,255,0.04)" : "rgba(192,132,252,0.14)",
+                    color: spellDisabled ? "rgba(255,255,255,0.4)" : "#c084fc",
+                    fontSize: 11, fontWeight: 800,
+                    cursor: spellDisabled ? "not-allowed" : "pointer",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {spellBusy ? "Casting…" : mySpellUsed ? "💀 Spell Used" : `💀 Death Spell · ${spellCost}`}
+                </button>
+              )}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))", gap: 8, marginBottom: 12 }}>
               {myMoves.map((mv) => {
@@ -965,6 +1099,16 @@ export default function ChallengePage() {
   const [healMax, setHealMax] = useState<number>(2);
   const [balance, setBalance] = useState<number | null>(null);
   const [healBusy, setHealBusy] = useState(false);
+  // ── Spell config + busy state ─────────────────────────────────────────
+  // Mirrors heal: pulled from /api/config and refreshed alongside heal cfg.
+  // `enabled` is the kill switch so admin can disable the mechanic without
+  // a deploy. `spellBusy` is the local "request-in-flight" flag for the
+  // cast button.
+  const [spellEnabled, setSpellEnabled] = useState<boolean>(true);
+  const [spellCost, setSpellCost] = useState<number>(1000);
+  const [spellDot, setSpellDot] = useState<number>(2);
+  const [spellDuration, setSpellDuration] = useState<number>(15);
+  const [spellBusy, setSpellBusy] = useState(false);
 
   // Audio hook (provides muted/toggleMute/SFX/music control). Lives on the
   // page (not ActiveMatchView) so music persists across status transitions.
@@ -1202,12 +1346,19 @@ export default function ChallengePage() {
     refreshMatch();
   }, [challengeId, refreshMatch]);
 
+  // Active-match poll. Reduced from 5000ms to 1500ms in the spell update
+  // so DoT ticks visibly without waiting for the next move. The callback
+  // ref pattern keeps the deps minimal so we don't tear down/recreate
+  // the interval on every match refresh (which would cause polls to
+  // sometimes fire later than intended).
+  const refreshMatchRef = useRef(refreshMatch);
+  useEffect(() => { refreshMatchRef.current = refreshMatch; }, [refreshMatch]);
   useEffect(() => {
     if (!match) return;
     if (match.status === "completed" || match.status === "cancelled") return;
-    const t = setInterval(refreshMatch, 5000);
+    const t = setInterval(() => { refreshMatchRef.current?.(); }, 1500);
     return () => clearInterval(t);
-  }, [match, refreshMatch]);
+  }, [match?.status]);
 
   // ── Actions ────────────────────────────────────────────────────────────────
   const handleAccept = async () => {
@@ -1300,6 +1451,16 @@ export default function ChallengePage() {
           if (Number.isFinite(cost) && cost >= 0) setHealCost(cost);
           if (Number.isFinite(amt) && amt > 0) setHealAmt(amt);
           if (Number.isFinite(max) && max >= 0) setHealMax(max);
+          // Spell config: only override defaults when the key is present.
+          // `factionWarsSpellEnabled` is allowed to be explicitly false to
+          // disable the mechanic, so we don't gate that on truthiness.
+          const sCost = Number(c.factionWarsSpellCost);
+          const sDot = Number(c.factionWarsSpellDot);
+          const sDur = Number(c.factionWarsSpellDuration);
+          if (typeof c.factionWarsSpellEnabled === "boolean") setSpellEnabled(c.factionWarsSpellEnabled);
+          if (Number.isFinite(sCost) && sCost >= 0) setSpellCost(sCost);
+          if (Number.isFinite(sDot) && sDot > 0) setSpellDot(sDot);
+          if (Number.isFinite(sDur) && sDur > 0) setSpellDuration(sDur);
         }
       } catch {}
       await refreshBalance();
@@ -1327,6 +1488,40 @@ export default function ChallengePage() {
       setError(e?.message || "Network error");
     } finally {
       setHealBusy(false);
+    }
+  };
+
+  // ── Cast Death Spell ──────────────────────────────────────────────────
+  // Free action (doesn't replace the move) — sends to /api/cast-spell which
+  // validates server-side and returns the updated match. Once-per-side per
+  // match. Heals do NOT suspend the DoT — caster bleeds the victim for
+  // factionWarsSpellDuration wall-clock seconds regardless of heals or
+  // territory transitions.
+  const handleCastSpell = async () => {
+    if (!identity || !match) return;
+    setSpellBusy(true);
+    setError(null);
+    try {
+      const r = await fetch("/api/faction-wars/pvp/cast-spell", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ challengeId, playerId: identity.playerId }),
+      });
+      const j = await r.json();
+      if (!j.ok) {
+        // Surface the server's reject reason directly so failures aren't
+        // silent. Common causes: insufficient balance, already cast,
+        // mechanic disabled, not a participant (identity mismatch).
+        const msg = j.error || "Cast failed";
+        setError(msg);
+        if (typeof window !== "undefined") alert("Spell cast failed: " + msg);
+      } else {
+        setMatch(j.match);
+        await refreshBalance();
+      }
+    } catch (e: any) {
+      setError(e?.message || "Network error");
+    } finally {
+      setSpellBusy(false);
     }
   };
 
@@ -1437,6 +1632,21 @@ export default function ChallengePage() {
     <>
       <Head>
         <title>{match ? `vs ${isChallenger ? match.opponentDisplayName || "?" : match.challengerDisplayName} · Faction Wars PvP` : "Faction Wars PvP"}</title>
+        {/* OG tags for invite-link share previews. Image lives at /pvp-invite-share.png.
+            Note: file is ~1.5MB so X/Discord/Telegram render fine, WhatsApp may
+            silently drop the image (it caps OG images near ~300KB). Re-export
+            as a JPG under that limit if WhatsApp previews matter. */}
+        <meta property="og:title" content={match ? `Faction Wars PvP — ${match.challengerDisplayName} vs ${match.opponentDisplayName || "open challenge"}` : "Faction Wars PvP — Battle Invite"} />
+        <meta property="og:description" content={match ? `${Number(match.pvpCost ?? 0).toLocaleString()} REBEL on the line. 5 territories. Tap to accept.` : "Tap to accept this Faction Wars PvP challenge."} />
+        <meta property="og:image" content="https://play.rebelants.io/pvp-invite-share.png" />
+        <meta property="og:image:secure_url" content="https://play.rebelants.io/pvp-invite-share.png" />
+        <meta property="og:image:type" content="image/png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:alt" content="Rebel Ants Faction Wars PvP — battle invite" />
+        <meta property="og:type" content="website" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:image" content="https://play.rebelants.io/pvp-invite-share.png" />
       </Head>
       <div style={{ minHeight: "100vh", color: "white", paddingBottom: 60, fontFamily: '"Segoe UI",sans-serif', backgroundImage: "url('/bg/faction-wars-bg.png')", backgroundSize: "cover", backgroundPosition: "center top", backgroundAttachment: "fixed", backgroundRepeat: "no-repeat", position: "relative" }}>
       <div style={{ position: "fixed", inset: 0, background: "rgba(8,11,20,0.82)", zIndex: 0, pointerEvents: "none" }} />
@@ -1769,6 +1979,7 @@ export default function ChallengePage() {
                   challengeId={challengeId}
                   onSubmitMove={handleSubmitMove}
                   onHeal={handleHeal}
+                  onCastSpell={handleCastSpell}
                   busy={busy}
                   healBusy={healBusy}
                   healCost={healCost}
@@ -1776,6 +1987,11 @@ export default function ChallengePage() {
                   healMax={healMax}
                   balance={balance}
                   sfx={audio.sfx}
+                  spellEnabled={spellEnabled}
+                  spellBusy={spellBusy}
+                  spellCost={spellCost}
+                  spellDot={spellDot}
+                  spellDuration={spellDuration}
                 />
               )}
 
