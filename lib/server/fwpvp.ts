@@ -1506,3 +1506,39 @@ export async function onTournamentMatchComplete(
 
   await saveTournament(t);
 }
+
+
+// Seed a draft tournament: shuffle participants, build bracket, spawn round-1
+// matches. Used by both POST /seed (admin) and the auto-seed in join.ts when
+// the tournament hits its full size. Returns true if seeded, false if not in
+// draft state or fewer than 2 participants.
+export async function seedDraftTournament(t: Tournament): Promise<boolean> {
+  if (t.status !== "draft") return false;
+  if (t.participants.length < 2) return false;
+
+  const ids = t.participants.map(p => p.playerId);
+  t.rounds = buildBracket(t.size, ids, t.potPerRound);
+  t.status = "seeded";
+  t.startedAt = Date.now();
+
+  const round0 = t.rounds[0];
+  for (const slot of round0.matches) {
+    if (slot.p1 && slot.p2) {
+      await spawnTournamentRoundMatch(t, 0, slot.slotIndex);
+    } else if (slot.p1 && !slot.p2) {
+      slot.winner = slot.p1;
+    } else if (!slot.p1 && slot.p2) {
+      slot.winner = slot.p2;
+    }
+  }
+  propagateWinners(t);
+  if (t.rounds.length > 1) {
+    const round1 = t.rounds[1];
+    for (const slot of round1.matches) {
+      if (slot.p1 && slot.p2 && !slot.challengeId) {
+        await spawnTournamentRoundMatch(t, 1, slot.slotIndex);
+      }
+    }
+  }
+  return true;
+}

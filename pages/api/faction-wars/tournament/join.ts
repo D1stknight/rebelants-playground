@@ -2,9 +2,10 @@
 //
 // Player pays entryFee REBEL and joins a draft tournament. Idempotent — if
 // the player is already in the tournament, returns ok without double-charging.
+// Auto-seeds the bracket when participant count hits tournament size.
 
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getTournament, saveTournament, getREBELBalance, spendREBEL } from "../../../../lib/server/fwpvp";
+import { getTournament, saveTournament, getREBELBalance, spendREBEL, seedDraftTournament } from "../../../../lib/server/fwpvp";
 import type { JoinTournamentRequest } from "../../../../lib/types/fwpvp";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -51,7 +52,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     joinedAt: Date.now(),
     eliminatedRound: null,
   });
+
+  // Auto-seed when we hit the size cap
+  let autoSeeded = false;
+  if (t.participants.length >= t.size) {
+    autoSeeded = await seedDraftTournament(t);
+  }
+
   await saveTournament(t);
 
-  return res.status(200).json({ ok: true, tournament: t });
+  return res.status(200).json({ ok: true, tournament: t, autoSeeded });
 }
