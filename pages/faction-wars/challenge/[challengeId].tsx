@@ -1632,6 +1632,21 @@ export default function ChallengePage() {
     <>
       <Head>
         <title>{match ? `vs ${isChallenger ? match.opponentDisplayName || "?" : match.challengerDisplayName} · Faction Wars PvP` : "Faction Wars PvP"}</title>
+        {/* OG tags for invite-link share previews. Image lives at /pvp-invite-share.png.
+            Note: file is ~1.5MB so X/Discord/Telegram render fine, WhatsApp may
+            silently drop the image (it caps OG images near ~300KB). Re-export
+            as a JPG under that limit if WhatsApp previews matter. */}
+        <meta property="og:title" content={match ? `Faction Wars PvP — ${match.challengerDisplayName} vs ${match.opponentDisplayName || "open challenge"}` : "Faction Wars PvP — Battle Invite"} />
+        <meta property="og:description" content={match ? `${Number(match.pvpCost ?? 0).toLocaleString()} REBEL on the line. 5 territories. Tap to accept.` : "Tap to accept this Faction Wars PvP challenge."} />
+        <meta property="og:image" content="https://play.rebelants.io/pvp-invite-share.png" />
+        <meta property="og:image:secure_url" content="https://play.rebelants.io/pvp-invite-share.png" />
+        <meta property="og:image:type" content="image/png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:alt" content="Rebel Ants Faction Wars PvP — battle invite" />
+        <meta property="og:type" content="website" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:image" content="https://play.rebelants.io/pvp-invite-share.png" />
       </Head>
       <div style={{ minHeight: "100vh", color: "white", paddingBottom: 60, fontFamily: '"Segoe UI",sans-serif', backgroundImage: "url('/bg/faction-wars-bg.png')", backgroundSize: "cover", backgroundPosition: "center top", backgroundAttachment: "fixed", backgroundRepeat: "no-repeat", position: "relative" }}>
       <div style={{ position: "fixed", inset: 0, background: "rgba(8,11,20,0.82)", zIndex: 0, pointerEvents: "none" }} />
