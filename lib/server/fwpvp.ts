@@ -276,6 +276,13 @@ export interface PvpEconomyConfig {
   // Per-match chat (Layer 2D)
   factionWarsChatEnabled: boolean;
   factionWarsChatPostCleanupMins: number;  // minutes after match completion before chat TTLs out
+
+  // Tournaments
+  factionWarsTournamentEnabled: boolean;
+  factionWarsTournamentMaxSize: number;
+  factionWarsTournamentDefaultFee: number;
+  factionWarsTournamentDefaultPots: number[];
+
   // Featured match (admin podcast tool) — empty/undefined = no featured match
   featuredMatchId?: string;
 }
@@ -345,6 +352,12 @@ export async function getPvpEconomyConfig(): Promise<PvpEconomyConfig> {
           factionWarsBetLockTerritory: Number.isFinite(betLock) && betLock >= 1 && betLock <= 5 ? Math.floor(betLock) : BET_LOCK_TERRITORY_DEFAULT,
           factionWarsChatEnabled: chatEnabled === false ? false : CHAT_ENABLED_DEFAULT,
           factionWarsChatPostCleanupMins: Number.isFinite(chatCleanup) && chatCleanup >= 0 ? Math.floor(chatCleanup) : CHAT_POST_CLEANUP_MINS_DEFAULT,
+          factionWarsTournamentEnabled: (cfg as any).factionWarsTournamentEnabled !== false,
+          factionWarsTournamentMaxSize: Math.min(32, Math.max(4, Number((cfg as any).factionWarsTournamentMaxSize) || 32)),
+          factionWarsTournamentDefaultFee: Math.max(0, Number((cfg as any).factionWarsTournamentDefaultFee) || 300),
+          factionWarsTournamentDefaultPots: Array.isArray((cfg as any).factionWarsTournamentDefaultPots)
+            ? ((cfg as any).factionWarsTournamentDefaultPots as any[]).map((n: any) => Math.max(0, Number(n) || 0))
+            : [300, 500, 1000, 2000],
           featuredMatchId,
         };
       }
@@ -365,6 +378,10 @@ export async function getPvpEconomyConfig(): Promise<PvpEconomyConfig> {
     factionWarsBetLockTerritory: BET_LOCK_TERRITORY_DEFAULT,
     factionWarsChatEnabled: CHAT_ENABLED_DEFAULT,
     factionWarsChatPostCleanupMins: CHAT_POST_CLEANUP_MINS_DEFAULT,
+    factionWarsTournamentEnabled: true,
+    factionWarsTournamentMaxSize: 32,
+    factionWarsTournamentDefaultFee: 300,
+    factionWarsTournamentDefaultPots: [300, 500, 1000, 2000],
     featuredMatchId: undefined,
   };
 }
