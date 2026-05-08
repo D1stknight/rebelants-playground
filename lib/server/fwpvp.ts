@@ -1310,3 +1310,182 @@ export function findBracketSlot(t: Tournament, challengeId: string): { roundInde
   }
   return null;
 }
+
+
+// Build a fully-initialized PvpMatch for a tournament round. Both players are
+// already known (advanced from prior round), neither has paid an ante (matches
+// in tournament mode are free at the per-match level — entry fee was charged
+// at join time). Status starts in "team_selection" so both players pick teams,
+// like a regular match would after accept().
+export function buildTournamentMatch(opts: {
+  challengeId: string;
+  tournamentId: string;
+  tournamentRound: number;
+  tournamentSlotIndex: number;
+  challengerPlayerId: string;
+  challengerDisplayName: string;
+  opponentPlayerId: string;
+  opponentDisplayName: string;
+  payoutPot: number;
+  isPrivate: boolean;
+}): PvpMatch {
+  const now = Date.now();
+  return {
+    challengeId: opts.challengeId,
+    status: "team_selection",
+    challengerPlayerId: opts.challengerPlayerId,
+    challengerDisplayName: opts.challengerDisplayName,
+    opponentPlayerId: opts.opponentPlayerId,
+    opponentDisplayName: opts.opponentDisplayName,
+    challengerTeam: [],
+    opponentTeam: [],
+    currentTurnPlayerId: null,
+    currentTurnSide: null,
+    challengerCurrentFactionIndex: 0,
+    opponentCurrentFactionIndex: 0,
+    challengerHp: 100,
+    opponentHp: 100,
+    currentTerritory: 0,
+    roundHistory: [],
+    territoryResults: [],
+    challengerTerritoriesWon: 0,
+    opponentTerritoriesWon: 0,
+    winnerPlayerId: null,
+    loserPlayerId: null,
+    winnerCrateRarity: null,
+    pvpCost: 0,
+    pvpPayoutMode: "pot",
+    pvpPotPaid: opts.payoutPot,
+    challengerPaid: true,
+    opponentPaid: true,
+    challengerHealsUsed: 0,
+    opponentHealsUsed: 0,
+    challengerSpellUsed: false,
+    opponentSpellUsed: false,
+    spellChallengerActive: null,
+    spellOpponentActive: null,
+    pvpCrateRewardPaid: 0,
+    tournamentId: opts.tournamentId,
+    tournamentRound: opts.tournamentRound,
+    tournamentSlotIndex: opts.tournamentSlotIndex,
+    createdAt: now,
+    updatedAt: now,
+    lastActionAt: now,
+    isPrivate: opts.isPrivate,
+  } as PvpMatch;
+}
+
+
+// Propagate completed winners forward through the bracket. Idempotent — safe
+// to call repeatedly. For round R slot N, if slot.winner is set, fills the
+// corresponding slot in round R+1 (slotIndex floor(N/2), p1 if N even else p2).
+export function propagateWinners(t: Tournament): void {
+  for (let r = 0; r < t.rounds.length - 1; r++) {
+    const round = t.rounds[r];
+    const next = t.rounds[r + 1];
+    for (const slot of round.matches) {
+      if (slot.winner) {
+        const nextIdx = Math.floor(slot.slotIndex / 2);
+        const nextSlot = next.matches[nextIdx];
+        if (slot.slotIndex % 2 === 0) nextSlot.p1 = slot.winner;
+        else nextSlot.p2 = slot.winner;
+      }
+    }
+  }
+}
+
+// Mark a participant eliminated in the given round. Best-effort.
+export function markEliminated(t: Tournament, playerId: string, round: number): void {
+  const p = t.participants.find(x => x.playerId === playerId);
+  if (p && p.eliminatedRound === null) {
+    p.eliminatedRound = round;
+  }
+}
+
+// Create the PvP match for a single bracket slot (used by submit-move when a
+// match completes and the next round's slot now has both players).
+// Returns the new challengeId if a match was created, null if not ready or
+// already exists.
+export async function spawnTournamentRoundMatch(
+  t: Tournament,
+  roundIndex: number,
+  slotIndex: number,
+): Promise<string | null> {
+  const round = t.rounds[roundIndex];
+  if (!round) return null;
+  const slot = round.matches[slotIndex];
+  if (!slot) return null;
+  if (slot.challengeId) return null; // already created
+  if (!slot.p1 || !slot.p2) return null; // both sides required
+
+  const nameOf = (pid: string): string => {
+    const p = t.participants.find(x => x.playerId === pid);
+    return p ? p.displayName : "";
+  };
+
+  const challengeId = generateChallengeId();
+  const match = buildTournamentMatch({
+    challengeId,
+    tournamentId: t.id,
+    tournamentRound: roundIndex,
+    tournamentSlotIndex: slotIndex,
+    challengerPlayerId: slot.p1,
+    challengerDisplayName: nameOf(slot.p1),
+    opponentPlayerId: slot.p2,
+    opponentDisplayName: nameOf(slot.p2),
+    payoutPot: round.potThisRound,
+    isPrivate: false,
+  });
+  await saveMatch(match);
+  await addPlayerMatch(slot.p1, challengeId);
+  await addPlayerMatch(slot.p2, challengeId);
+  await markActive(challengeId);
+  await tournamentAddMatch(t.id, challengeId);
+  slot.challengeId = challengeId;
+  return challengeId;
+}
+
+// Called from submit-move when a tournament match completes. Updates the
+// bracket slot's winner, marks loser eliminated, propagates forward, spawns
+// next-round matches if both players are now seated, and crowns champion if
+// final round resolved.
+export async function onTournamentMatchComplete(
+  tournamentId: string,
+  challengeId: string,
+  winnerPlayerId: string,
+  loserPlayerId: string,
+): Promise<void> {
+  const t = await getTournament(tournamentId);
+  if (!t) return;
+  if (t.status === "completed" || t.status === "cancelled") return;
+
+  // Locate the slot for this match
+  const loc = findBracketSlot(t, challengeId);
+  if (!loc) return;
+  const slot = t.rounds[loc.roundIndex].matches[loc.slotIndex];
+  if (slot.winner) return; // already processed
+
+  slot.winner = winnerPlayerId;
+  markEliminated(t, loserPlayerId, loc.roundIndex);
+  if (t.status === "seeded") t.status = "active";
+
+  // Propagate this winner one round forward
+  propagateWinners(t);
+
+  // Spawn next-round match if its other slot is now also resolved
+  const isFinalRound = loc.roundIndex === t.rounds.length - 1;
+  if (isFinalRound) {
+    // Champion!
+    t.championPlayerId = winnerPlayerId;
+    t.status = "completed";
+    t.completedAt = Date.now();
+  } else {
+    const nextSlotIdx = Math.floor(loc.slotIndex / 2);
+    const nextSlot = t.rounds[loc.roundIndex + 1].matches[nextSlotIdx];
+    if (nextSlot.p1 && nextSlot.p2 && !nextSlot.challengeId) {
+      await spawnTournamentRoundMatch(t, loc.roundIndex + 1, nextSlotIdx);
+    }
+  }
+
+  await saveTournament(t);
+}
