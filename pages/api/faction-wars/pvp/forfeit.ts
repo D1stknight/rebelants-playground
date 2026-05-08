@@ -120,7 +120,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await saveMatch(match);
 
     // Settle bets toward opponent victory, then leaderboards
-    await payoutBets(challengeId, match.opponentPlayerId).catch(() => {});
+    await payoutBets(challengeId, "opponent").catch(() => {});
 
     const winnerName = match.opponentDisplayName || "Opponent";
     const loserName = match.challengerDisplayName || "Challenger";
