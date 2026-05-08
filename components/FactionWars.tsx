@@ -851,16 +851,27 @@ const [player3DAnim, setPlayer3DAnim] = useState<SamuraiAnimState>("idle");
       defs.push(available[idx]); available.splice(idx, 1);
       if (available.length === 0) available.push(...FACTION_IDS.filter(f => !defs.slice(-3).includes(f)));
     }
-    setDefenders(defs); setResults([]); setCurrentT(0); setCurrentFI(0); setSelectedMove(null); setFinalRarity("none"); setRunMessage("");
-    setPlayerHp(MAX_HP); setEnemyHp(MAX_HP); setCurrentRound(0); setRoundLog([]); setDmgFloats([]); setCurrentTerritoryRounds([]);
-    setPhase("battle"); startMusic(); setBusy(false);
+setDefenders(defs); setResults([]); setCurrentT(0); setCurrentFI(0); setSelectedMove(null); setFinalRarity("none"); setRunMessage("");
+setPlayer3DAnim("idle"); setEnemy3DAnim("idle");
+if (typeof window !== "undefined") {
+  (window as any).__fw3dPlayPlayer?.("idle");
+  (window as any).__fw3dPlayEnemy?.("idle");
+}
+setPlayerHp(MAX_HP); setEnemyHp(MAX_HP); setCurrentRound(0); setRoundLog([]); setDmgFloats([]); setCurrentTerritoryRounds([]);
+setPhase("battle"); startMusic(); setBusy(false);
   };
 
-  const startTerritory = () => {
-    sfx.roundStart();
-    setPlayerHp(MAX_HP); setEnemyHp(MAX_HP);
-    setCurrentRound(0); setRoundLog([]); setDmgFloats([]); setCurrentTerritoryRounds([]);
-    setUsedMoves({}); setBerserkerActive(false);
+ const startTerritory = () => {
+  sfx.roundStart();
+  setPlayer3DAnim("idle");
+  setEnemy3DAnim("idle");
+  if (typeof window !== "undefined") {
+    (window as any).__fw3dPlayPlayer?.("idle");
+    (window as any).__fw3dPlayEnemy?.("idle");
+  }
+  setPlayerHp(MAX_HP); setEnemyHp(MAX_HP);
+  setCurrentRound(0); setRoundLog([]); setDmgFloats([]); setCurrentTerritoryRounds([]);
+  setUsedMoves({}); setBerserkerActive(false);
     // Apply meditation stacks to starting power buff
     if (meditationStacks > 0) { setPowerBuffAmt(meditationStacks * 2); setPowerBuffRounds(99); }
   };
@@ -1162,8 +1173,12 @@ if (over) {
   };
 
   const resetGame = () => {
-    stopMusic(); sfx.startTheme(); setPhase("idle"); setTeam([]); setDefenders([]); setResults([]); setCurrentT(0); setCurrentFI(0); setSelectedMove(null); setFinalRarity("none"); setRunMessage(""); setBusy(false); setBattleAnim("idle");
-    setPlayerHp(MAX_HP); setEnemyHp(MAX_HP); setCurrentRound(0); setRoundLog([]); setDmgFloats([]); setCurrentTerritoryRounds([]);
+   stopMusic(); sfx.startTheme(); setPhase("idle"); setTeam([]); setDefenders([]); setResults([]); setCurrentT(0); setCurrentFI(0); setSelectedMove(null); setFinalRarity("none"); setRunMessage(""); setBusy(false); setBattleAnim("idle"); setPlayer3DAnim("idle"); setEnemy3DAnim("idle");
+if (typeof window !== "undefined") {
+  (window as any).__fw3dPlayPlayer?.("idle");
+  (window as any).__fw3dPlayEnemy?.("idle");
+}
+setPlayerHp(MAX_HP); setEnemyHp(MAX_HP); setCurrentRound(0); setRoundLog([]); setDmgFloats([]); setCurrentTerritoryRounds([]);
   };
 
   const currentPlayerFaction = phase==="battle" ? (team[currentFactionIdx]||team[0]) : null;
