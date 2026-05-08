@@ -13,6 +13,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Head from "next/head";
 import Link from "next/link";
 import type { Tournament, TournamentBracketSlot, TournamentRound, TournamentParticipant } from "../lib/types/fwpvp";
+import { loadProfile, type Profile } from "../lib/profile";
 
 const JP = '"Segoe UI",sans-serif';
 
@@ -24,16 +25,20 @@ const ROW_GAP = 36;
 
 type IdentityShape = { playerId: string; displayName: string } | null;
 
-function getIdentity(): IdentityShape {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem("ra_identity");
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed.playerId === "string" && typeof parsed.displayName === "string") {
-      return { playerId: parsed.playerId, displayName: parsed.displayName };
-    }
-  } catch {}
+function deriveIdentity(p: Profile | null): IdentityShape {
+  if (!p) return null;
+  if (p.primaryId) {
+    return {
+      playerId: p.primaryId,
+      displayName: p.discordName || p.name || "Anonymous",
+    };
+  }
+  if (p.name && p.name !== "guest" && p.name.trim().length > 0) {
+    return {
+      playerId: `commander:${p.name}`,
+      displayName: p.name,
+    };
+  }
   return null;
 }
 
@@ -439,7 +444,10 @@ export default function TournamentPage() {
 
   const selected = tournaments.find(t => t.id === selectedId) || null;
 
-  useEffect(() => { setIdentity(getIdentity()); }, []);
+  useEffect(() => {
+    const p = loadProfile();
+    setIdentity(deriveIdentity(p));
+  }, []);
 
   const fetchAll = async () => {
     try {
@@ -610,7 +618,24 @@ export default function TournamentPage() {
                   <div><span style={{ color: "rgba(203,213,225,0.55)" }}>Entry:</span> <strong>{selected.entryFee} REBEL</strong></div>
                   <div><span style={{ color: "rgba(203,213,225,0.55)" }}>Final pot:</span> <strong style={{ color: "#facc15" }}>{selected.potPerRound[selected.potPerRound.length - 1]} REBEL</strong></div>
                 </div>
-                <div style={{ display: "flex", gap: 8 }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  {!identity && selected.status === "draft" && (
+                    <Link href="/faction-wars/pvp" style={{ textDecoration: "none" }}>
+                      <div style={{
+                        padding: "10px 18px",
+                        background: "rgba(96, 165, 250, 0.18)",
+                        border: "1px solid rgba(96, 165, 250, 0.5)",
+                        borderRadius: 8,
+                        color: "#93c5fd",
+                        fontSize: 12,
+                        fontWeight: 700,
+                        letterSpacing: 1,
+                        cursor: "pointer",
+                      }}>
+                        SIGN IN AT PVP LOBBY TO JOIN →
+                      </div>
+                    </Link>
+                  )}
                   {canJoin && identity && (
                     <button onClick={onJoin} disabled={busy} style={{
                       background: "linear-gradient(135deg, #facc15 0%, #fb923c 100%)",
