@@ -768,8 +768,10 @@ const [player3DAnim, setPlayer3DAnim] = useState<SamuraiAnimState>("idle");
   const [roundLog, setRoundLog]         = useState<{playerMove:string;enemyMove:string;playerDmg:number;enemyDmg:number;effect?:string}[]>([]);
   const [dmgFloats, setDmgFloats]       = useState<{id:number;side:"player"|"enemy"|"plunder";dmg:number}[]>([]);
   const [currentTerritoryRounds, setCurrentTerritoryRounds] = useState<RoundResult[]>([]);
-  const dmgFloatId = useRef(0);
-  const plunderPendingRef = useRef(false);
+ const dmgFloatId = useRef(0);
+const plunderPendingRef = useRef(false);
+const fightSeqRef = useRef(0);
+const fightInFlightRef = useRef(false);
   const [usedMoves, setUsedMoves] = useState<Record<string,number>>({});
   const [sacrificeBonus, setSacrificeBonus] = useState(0);
   const [berserkerActive, setBerserkerActive] = useState(false);
@@ -851,6 +853,8 @@ const [player3DAnim, setPlayer3DAnim] = useState<SamuraiAnimState>("idle");
       defs.push(available[idx]); available.splice(idx, 1);
       if (available.length === 0) available.push(...FACTION_IDS.filter(f => !defs.slice(-3).includes(f)));
     }
+fightSeqRef.current += 1;
+fightInFlightRef.current = false;
 setDefenders(defs); setResults([]); setCurrentT(0); setCurrentFI(0); setSelectedMove(null); setFinalRarity("none"); setRunMessage("");
 setPlayer3DAnim("idle"); setEnemy3DAnim("idle");
 if (typeof window !== "undefined") {
@@ -862,7 +866,11 @@ setPhase("battle"); startMusic(); setBusy(false);
   };
 
  const startTerritory = () => {
+  fightSeqRef.current += 1;
+  fightInFlightRef.current = false;
   sfx.roundStart();
+  setSelectedMove(null);
+  setBattleAnim("idle");
   setPlayer3DAnim("idle");
   setEnemy3DAnim("idle");
   if (typeof window !== "undefined") {
@@ -877,7 +885,10 @@ setPhase("battle"); startMusic(); setBusy(false);
   };
 
  const fightTerritory = async () => {
-  if (!selectedMove || busy) return;
+  if (!selectedMove || busy || fightInFlightRef.current) return;
+
+  fightInFlightRef.current = true;
+  const fightSeq = fightSeqRef.current;
 
   const nextPlayerAnim = getSamuraiAnimForMove(selectedMove);
 
@@ -903,7 +914,8 @@ if (typeof window !== "undefined") {
     else if (selectedMove.type === "defend") sfx.defendBlock();
     else if (selectedMove.type === "magic") sfx.magicCast();
     else if (selectedMove.type === "trick") sfx.trickDodge();
-    await new Promise(r=>setTimeout(r,450));
+   await new Promise(r=>setTimeout(r,450));
+if (fightSeq !== fightSeqRef.current) return;
 
     const imperialDecreeFlag = selectedMove.id === "imperial_decree" || selectedMove.id === "final_command";
    const enemyMove = imperialDecreeFlag
@@ -954,7 +966,7 @@ if (typeof window !== "undefined") {
       const sacRnd: RoundResult = {round:currentRound+1,playerMove:selectedMove,enemyMove:selectedMove,playerDmg:0,enemyDmg:100,playerHpAfter:0,enemyHpAfter:enemyHp};
       const sacRes: TerritoryResult = {territory:currentTerritory,defender,playerFaction,rounds:[...currentTerritoryRounds,sacRnd],playerHpFinal:0,enemyHpFinal:enemyHp,won:false};
       setBattleAnim("lose"); await new Promise(r=>setTimeout(r,700)); setBattleAnim("idle");
-      setResults(prev=>[...prev,sacRes]); setSelectedMove(null); setBusy(false); setPhase("territory_result");
+      setResults(prev=>[...prev,sacRes]); setSelectedMove(null); setBusy(false); fightInFlightRef.current = false; setPhase("territory_result");
       return;
     }
     // ── Conditional round effects ────────────────────────────────
@@ -1072,14 +1084,17 @@ if (typeof window !== "undefined") {
 }
 
 setBattleAnim(newEnemyHp <= 0 ? "win" : newPlayerHp <= 0 ? "lose" : "idle");
-    await new Promise(r=>setTimeout(r, over ? 700 : 250));
+   await new Promise(r=>setTimeout(r, over ? 700 : 250));
+    if (fightSeq !== fightSeqRef.current) return;
     if (!over) { setBattleAnim("idle"); }
 
     setSelectedMove(null);
     setBusy(false);
+    if (fightSeq === fightSeqRef.current) fightInFlightRef.current = false;
 
 if (over) {
   await new Promise(r=>setTimeout(r,3500));
+  if (fightSeq !== fightSeqRef.current) return;
   setBattleAnim("idle");
   const playerWon = newEnemyHp <= 0;
       // Plunder bonus on win
@@ -1172,7 +1187,9 @@ if (over) {
     setPhase("final_result"); setBusy(false);
   };
 
-  const resetGame = () => {
+ const resetGame = () => {
+   fightSeqRef.current += 1;
+   fightInFlightRef.current = false;
    stopMusic(); sfx.startTheme(); setPhase("idle"); setTeam([]); setDefenders([]); setResults([]); setCurrentT(0); setCurrentFI(0); setSelectedMove(null); setFinalRarity("none"); setRunMessage(""); setBusy(false); setBattleAnim("idle"); setPlayer3DAnim("idle"); setEnemy3DAnim("idle");
 if (typeof window !== "undefined") {
   (window as any).__fw3dPlayPlayer?.("idle");
