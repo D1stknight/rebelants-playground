@@ -237,6 +237,14 @@ function FactionModel({
 
     if (!action || !(window as any)[triggerName]) return;
 
+    // Don't replay an animation that's already the current action. This
+    // prevents stale animState (e.g. "win" left over from a previous round)
+    // from being re-triggered when the model swaps to a new faction. The
+    // loader effect above always plays "idle" on mount, so on a fresh mount
+    // currentActionRef will be the idle action — we only want to override
+    // that when the parent has actually advanced animState past idle.
+    if (currentActionRef.current === action) return;
+
     (window as any)[triggerName](animState);
   }, [animState, side]);
 
