@@ -317,8 +317,10 @@ export function ChatPanel({
     <div style={{
       padding: compact ? "12px 14px" : "20px 22px",
       borderRadius: 14,
-      border: "1px solid rgba(255,255,255,0.08)",
-      background: "rgba(255,255,255,0.02)",
+      border: "1px solid rgba(255,255,255,0.12)",
+      background: "rgba(10,10,18,0.96)",
+      backdropFilter: "blur(12px)",
+      WebkitBackdropFilter: "blur(12px)",
     }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
@@ -619,24 +621,38 @@ function ChatRow({
       style={{
         position: "relative",
         display: "flex",
-        alignItems: "flex-start",
-        gap: 8,
+        flexDirection: "column",
+        alignItems: "stretch",
+        gap: 2,
         padding: "5px 8px",
         borderRadius: 6,
         background: hovered && showAdminTools ? "rgba(255,255,255,0.03)" : "transparent",
         fontSize: 13,
         lineHeight: 1.4,
         wordBreak: "break-word",
+        overflowWrap: "anywhere",
       }}
     >
-      <span style={{ color: colorForRole(message.role), fontWeight: 700, flexShrink: 0 }}>
-        {message.displayName || "Anonymous"}
-      </span>
-      <span style={{ color: "rgba(255,255,255,0.85)", flex: 1 }}>
+      {/* Header row: username + timestamp + admin actions */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+        <span style={{
+          color: colorForRole(message.role),
+          fontWeight: 700,
+          flex: "1 1 auto",
+          minWidth: 0,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}>
+          {message.displayName || "Anonymous"}
+        </span>
+        <span style={{ color: "rgba(255,255,255,0.3)", fontSize: 10, flexShrink: 0 }}>
+          {formatChatTime(message.at)}
+        </span>
+      </div>
+      {/* Message body — full width below the header */}
+      <span style={{ color: "rgba(255,255,255,0.92)", display: "block" }}>
         {message.text}
-      </span>
-      <span style={{ color: "rgba(255,255,255,0.3)", fontSize: 10, flexShrink: 0, marginTop: 2 }}>
-        {formatChatTime(message.at)}
       </span>
       {showAdminIcons && (
         <div style={{ display: "flex", gap: 4, alignItems: "center", flexShrink: 0, marginLeft: 4 }}>
