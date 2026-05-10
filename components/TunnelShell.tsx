@@ -2060,14 +2060,18 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
             </div>
           </div>
           </div>
-        {/* landscape prompt removed — D-pad supports portrait */}
-        {/* Polished landscape-only overlay */}
-        {isMobileView && !isLandscape && isPlaying && (
-          <div style={{ position:"fixed", inset:0, zIndex:9000, background:"rgba(9,12,22,0.96)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:20, padding:32 }}>
-            <div style={{ fontSize:64, animation:"spin90 1.2s ease-in-out infinite alternate" }}>📱</div>
-            <div style={{ fontSize:22, fontWeight:900, color:"white", textAlign:"center", letterSpacing:"0.02em" }}>Rotate to play</div>
-            <div style={{ fontSize:14, color:"rgba(255,255,255,0.5)", textAlign:"center", maxWidth:260 }}>Ant Tunnel is best in landscape mode</div>
-            <div style={{ fontSize:36, opacity:0.3 }}>🐜</div>
+        {/* Mobile users are blocked — Ant Tunnel needs a keyboard. */}
+        {isMobileView && (
+          <div style={{ position:"fixed", inset:0, zIndex:9000, background:"rgba(9,12,22,0.97)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:18, padding:32 }}>
+            <div style={{ fontSize:64 }}>💻</div>
+            <div style={{ fontSize:22, fontWeight:900, color:"white", textAlign:"center", letterSpacing:"0.02em" }}>Desktop only</div>
+            <div style={{ fontSize:14, color:"rgba(255,255,255,0.65)", textAlign:"center", maxWidth:280, lineHeight:1.5 }}>
+              Ant Tunnel is built for keyboard controls and only plays on a computer. Open this page on your laptop or desktop to dig in.
+            </div>
+            <Link href="/" style={{ marginTop:8, padding:"10px 20px", borderRadius:999, background:"linear-gradient(135deg, rgba(251,191,36,0.25), rgba(248,113,113,0.2))", border:"1px solid rgba(251,191,36,0.4)", color:"white", fontSize:13, fontWeight:800, letterSpacing:"0.05em", textDecoration:"none" }}>
+              ← Back to playground
+            </Link>
+            <div style={{ fontSize:32, opacity:0.3, marginTop:4 }}>🐜</div>
           </div>
         )}
       </main>
