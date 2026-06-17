@@ -2,6 +2,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
 import { pointsConfig as defaultPointsConfig } from "../../../lib/pointsConfig";
+import { resolveFromRequest, economyCredit, idemKey } from "../../../lib/economy";
 
 function balKey(playerId: string) {
   return `ra:points:bal:${playerId}`;
@@ -95,14 +96,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ ok: false, error: "Invalid dailyClaim config" });
     }
 
+    // Daily claim now credits the central economy ledger.
+    // Requires a signed-in identity (no guest claims).
+    const economyUser = await resolveFromRequest(req);
+    if (!economyUser) {
+      return res
+        .status(401)
+        .json({ ok: false, error: "Sign in with Discord to claim daily $REBEL." });
+    }
+
     // ✅ once-per-day guard (atomic)
     // SETNX-like: only set if not exists
     const set = await redis.set(key, 1, { nx: true, ex: 60 * 60 * 48 }); // keep 48h
 
     if (!set) {
       // already claimed today
-      const balNowRaw = await redis.get<number>(balKey(playerId));
-      const balNow = Number(balNowRaw || 0);
+      const balNow = economyUser.balance;
       return res.status(409).json({
         ok: false,
         error: "already_claimed",
@@ -114,8 +123,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // ✅ credit balance
-    const newBal = await redis.incrby(balKey(playerId), amount);
+    // Credit the central economy ledger (shared balance).
+    const credit = await economyCredit({
+      userId: economyUser.userId,
+      amount,
+      reason: "Playground daily claim",
+      type: "claim_code",
+      idempotencyKey: idemKey(["dailyclaim", economyUser.userId, key]),
+      metadata: { playerId },
+    });
+    if (!credit.ok) {
+      // Roll back the once-per-day lock so the user can retry.
+      try { await redis.del(key); } catch {}
+      return res.status(502).json({ ok: false, error: "Economy credit failed" });
+    }
+    const newBal = credit.balance;
 
     return res.status(200).json({
       ok: true,
