@@ -120,7 +120,7 @@ export async function economyCredit(args: {
   amount: number;
   reason: string;
   idempotencyKey: string;
-  type?: "game_reward" | "refund" | "earn";
+  type?: "game_reward" | "refund" | "earn" | "claim_code";
   metadata?: Record<string, unknown>;
 }): Promise<EconomyMoveResult> {
   try {
