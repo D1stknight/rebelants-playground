@@ -99,13 +99,54 @@ export async function resolveEconomyUser(
   }
 }
 
-// Convenience: resolve directly from the request (cookie -> economy user).
+// Resolve the shared sign-on session token from the request.
+// Both Discord login and Commander Name + PIN set this same cookie (issued
+// by the economy's poker-auth). The economy verifies it server-side.
+export function getSessionToken(req: NextApiRequest): string | null {
+  const tok = readCookie(req, "poker_session");
+  return tok || null;
+}
+
+// Resolve directly from the request -> economy user.
+// Prefers the shared session token (Discord OR Commander Name/PIN); falls
+// back to the legacy ra_discord_user cookie for older sessions.
 export async function resolveFromRequest(
   req: NextApiRequest,
 ): Promise<ResolvedUser | null> {
+  const sessionToken = getSessionToken(req);
+  if (sessionToken) {
+    const viaSession = await resolveBySessionToken(sessionToken);
+    if (viaSession) return viaSession;
+  }
   const identity = getDiscordIdentity(req);
   if (!identity) return null;
   return resolveEconomyUser(identity);
+}
+
+// Resolve via a verified session token (economy verifies it).
+export async function resolveBySessionToken(
+  sessionToken: string,
+): Promise<ResolvedUser | null> {
+  try {
+    const r = await fetch(ECONOMY_BASE_URL + "/api/internal/resolve", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ sessionToken }),
+      cache: "no-store",
+    });
+    const j: any = await r.json().catch(() => null);
+    if (!r.ok || !j || !j.ok) return null;
+    return {
+      userId: String(j.userId),
+      displayName: j.displayName ?? null,
+      discordId: j.discordId ?? null,
+      balance: Number(j.balance || 0),
+      justLinked: Boolean(j.justLinked),
+      claimedImport: Boolean(j.claimedImport),
+    };
+  } catch {
+    return null;
+  }
 }
 
 export type EconomyMoveResult = {
