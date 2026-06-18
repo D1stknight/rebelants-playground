@@ -102,6 +102,36 @@ export async function resolveEconomyUser(
 // Resolve the shared sign-on session token from the request.
 // Both Discord login and Commander Name + PIN set this same cookie (issued
 // by the economy's poker-auth). The economy verifies it server-side.
+// Resolve an economy user from a Playground playerId string.
+//
+// Playground playerId formats:
+//   discord:<id>   -> economy keys by the raw Discord id (strip the prefix)
+//   name:<slug>    -> economy stores name-auth identities with the prefix intact
+//   wallet:0x...   -> economy resolves/creates by this namespaced key
+//   guest-xxxxx    -> no persistent economy identity (returns null)
+//
+// Used by server-side flows (e.g. PvP payouts) that only have a stored
+// playerId and no request/cookie to read.
+export async function resolveByPlayerId(
+  playerId: string,
+): Promise<ResolvedUser | null> {
+  if (!playerId) return null;
+  if (playerId.startsWith("guest-") || playerId.startsWith("guest:")) return null;
+
+  let discordId: string;
+  let username: string;
+  if (playerId.startsWith("discord:")) {
+    discordId = playerId.slice("discord:".length);
+    username = discordId;
+  } else {
+    // name:<slug>, wallet:0x..., or any already-namespaced id -> pass through
+    discordId = playerId;
+    username = playerId;
+  }
+  if (!discordId) return null;
+  return resolveEconomyUser({ discordId, username, displayName: null });
+}
+
 export function getSessionToken(req: NextApiRequest): string | null {
   const tok = readCookie(req, "poker_session");
   return tok || null;
