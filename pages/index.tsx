@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { loadProfile, saveProfile } from '../lib/profile';
+import { loadProfile, saveProfile, signOutProfile } from '../lib/profile';
 import { getEffectivePlayerId } from '../lib/profile';
 import dynamic from 'next/dynamic';
 const BuyPointsModal = dynamic(() => import('../components/BuyPointsModal'), { ssr: false });
@@ -287,6 +287,13 @@ export default function LandingPage() {
     saveProfile({ discordSkipLink: false });
     window.dispatchEvent(new Event('ra:identity-changed'));
     window.location.href = '/api/auth/discord/login';
+  }, []);
+
+  // Full sign-out: clear ALL identity (name + discord) back to a guest.
+  // Distinct from "disconnect discord", which keeps a Commander name.
+  const handleSignOut = useCallback(() => {
+    signOutProfile();
+    window.dispatchEvent(new Event('ra:identity-changed'));
   }, []);
 
   // Unlock & start music on first user interaction (iOS requirement)
@@ -692,6 +699,16 @@ export default function LandingPage() {
                     style={{ fontFamily:'inherit', padding:'9px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background:'#5865F2', border:'none', borderRadius:50, color:'white', cursor:'pointer', whiteSpace:'nowrap', boxShadow:'0 0 20px rgba(88,101,242,0.4)' }}
                   >
                     CONNECT DISCORD
+                  </button>
+                )}
+
+                {/* Full sign-out (clears name + discord) */}
+                {effectiveId && effectiveId !== 'guest' && (
+                  <button
+                    onPointerDown={e=>{e.preventDefault();handleSignOut();}}
+                    style={{ background:'none', border:'none', fontSize:10, color:'rgba(255,255,255,0.4)', cursor:'pointer', padding:'9px 4px', textDecoration:'underline', textTransform:'uppercase', letterSpacing:'0.1em', fontFamily:'inherit', whiteSpace:'nowrap' }}
+                  >
+                    SIGN OUT
                   </button>
                 )}
               </div>
