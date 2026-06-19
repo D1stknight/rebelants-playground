@@ -765,6 +765,47 @@ async function saveConfig() {
     }
   }
 
+  // ── Access gate ──────────────────────────────────────────────
+  // Until the admin token is verified (authed via /api/admin/ping),
+  // show ONLY the token prompt — never the dashboard chrome. This
+  // keeps randoms who hit /admin from seeing any admin UI. All admin
+  // actions are additionally guarded server-side by the token.
+  if (!authed) {
+    return (
+      <>
+        <Head>
+          <meta name="robots" content="noindex,nofollow" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>Rebel Ants Admin</title>
+        </Head>
+        <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, background: "#0a0e1a" }}>
+          <div style={{ width: 420, maxWidth: "92vw", padding: 24, border: "1px solid rgba(255,255,255,.14)", borderRadius: 16, background: "rgba(15,23,42,.6)", color: "white" }}>
+            <div style={{ fontSize: 18, fontWeight: 900, marginBottom: 6 }}>Rebel Ants Admin</div>
+            <div style={{ fontSize: 13, opacity: 0.6, marginBottom: 16 }}>Enter the admin token to continue.</div>
+            <input
+              type="password"
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") ping(); }}
+              placeholder="ADMIN_TOKEN"
+              autoFocus
+              style={{ width: "100%", padding: "11px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.3)", color: "white", boxSizing: "border-box" }}
+            />
+            <button
+              onClick={ping}
+              style={{ marginTop: 12, width: "100%", padding: "11px 12px", borderRadius: 12, border: "none", background: "#ef4444", color: "white", fontWeight: 800, cursor: "pointer" }}
+            >
+              Verify
+            </button>
+            <div style={{ marginTop: 14, textAlign: "center" }}>
+              <Link href="/" style={{ color: "white", textDecoration: "underline", opacity: 0.6, fontSize: 12 }}>Back to home</Link>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
      <>
     <Head>
