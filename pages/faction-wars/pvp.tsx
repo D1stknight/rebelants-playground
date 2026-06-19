@@ -13,18 +13,9 @@ const JP = `'Noto Serif JP', 'Hiragino Mincho ProN', serif`;
 // Otherwise: blocked, show sign-in prompt.
 function deriveIdentity(p: Profile | null): { playerId: string; displayName: string } | null {
   if (!p) return null;
-  if (p.primaryId) {
-    return {
-      playerId: p.primaryId,
-      displayName: p.discordName || p.name || "Anonymous",
-    };
-  }
-  if (p.name && p.name !== "guest" && p.name.trim().length > 0) {
-    return {
-      playerId: `commander:${p.name}`,
-      displayName: p.name,
-    };
-  }
+  // Only a real signed-in identity counts (primaryId: discord:/wallet:/name:).
+  // A bare leftover name with no primaryId is NOT signed in -> null (gate shows).
+  if (p.primaryId) return { playerId: p.primaryId, displayName: p.discordName || p.name || "Anonymous" };
   return null;
 }
 
