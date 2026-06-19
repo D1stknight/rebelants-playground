@@ -694,38 +694,7 @@ export default function FactionWars() {
     return ()=>clearInterval(id);
   }, [nextClaimTs]);
 
-  // DRIP migrate
-  const [showDripMigrate, setShowDripMigrate] = useState(false);
   const [showRules, setShowRules] = useState(false);
-  const [dripBalance, setDripBalance]         = useState<number|null>(null);
-  const [dripAmount, setDripAmount]           = useState<string>("");
-  const [dripBusy, setDripBusy]               = useState(false);
-  const [dripStatus, setDripStatus]           = useState("");
-
-  async function openDripModal() {
-    setDripStatus(""); setDripBusy(true); setDripBalance(null);
-    try {
-      const r=await fetch("/api/drip/balance",{cache:"no-store"}); const j=await r.json().catch(()=>null);
-      if (!r.ok||!j?.ok){setDripStatus(j?.error||"Could not load DRIP balance.");setShowDripMigrate(true);return;}
-      setDripBalance(Number(j.balance||0)); setDripAmount(""); setShowDripMigrate(true);
-    } catch(e:any){setDripStatus(e?.message||"DRIP error");setShowDripMigrate(true);}
-    finally{setDripBusy(false);}
-  }
-
-  async function migrateDripNow() {
-    const amt=Math.floor(Number(dripAmount||0)); if(!amt||amt<=0){setDripStatus("Enter an amount > 0.");return;}
-    setDripBusy(true); setDripStatus("Migrating…");
-    try {
-      const idem=`${Date.now()}-${Math.random().toString(36).slice(2,10)}`;
-      const r=await fetch("/api/drip/migrate",{method:"POST",headers:{"Content-Type":"application/json","x-idempotency-key":idem},body:JSON.stringify({amount:amt,playerId:effectivePlayerId,idempotencyKey:idem})});
-      const j=await r.json().catch(()=>null);
-      if (!r.ok||!j?.ok){setDripStatus(j?.error||"Migrate failed.");if(typeof j?.dripBalance==="number")setDripBalance(j.dripBalance);return;}
-      setDripStatus(`✅ Migrated ${amt} points into the game.`); await refresh();
-      const br=await fetch("/api/drip/balance",{cache:"no-store"}); const bj=await br.json().catch(()=>null);
-      if(br.ok&&bj?.ok)setDripBalance(Number(bj.balance||0));
-    } catch(e:any){setDripStatus(e?.message||"Migrate error");}
-    finally{setDripBusy(false);}
-  }
 
   // ── Config ──────────────────────────────────────────────────────────
   const [cfgState, setCfgState] = useState<any>(defaultPointsConfig);
@@ -1339,22 +1308,6 @@ setPlayerHp(MAX_HP); setEnemyHp(MAX_HP); setCurrentRound(0); setRoundLog([]); se
         </div>
       )}
 
-      {/* DRIP Modal */}
-      {showDripMigrate && (
-        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.7)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center" }} onClick={()=>setShowDripMigrate(false)}>
-          <div style={{ background:"#0f172a", border:"1px solid rgba(255,255,255,0.15)", borderRadius:16, padding:24, maxWidth:380, width:"90%", position:"relative" }} onClick={e=>e.stopPropagation()}>
-            <div style={{ fontWeight:900, fontSize:16, marginBottom:12 }}>⚔️ Migrate DRIP Points</div>
-            {dripBalance !== null && <div style={{ fontSize:13, opacity:0.8, marginBottom:10 }}>DRIP Balance: <b>{dripBalance}</b></div>}
-            <input type="number" value={dripAmount} onChange={e=>setDripAmount(e.target.value)} min={0} max={dripBalance||0} placeholder="Amount to migrate" style={{ width:"100%", padding:"10px 12px", borderRadius:10, border:"1px solid rgba(255,255,255,0.2)", background:"rgba(0,0,0,0.3)", color:"white", marginBottom:10, fontSize:14 }} />
-            {dripStatus && <div style={{ fontSize:12, color:dripStatus.startsWith("✅")?"#34d399":"#f87171", marginBottom:10 }}>{dripStatus}</div>}
-            <div style={{ display:"flex", gap:10 }}>
-              <button onClick={migrateDripNow} disabled={dripBusy} style={{ flex:1, padding:"10px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#fbbf24,#f59e0b)", color:"#000", fontWeight:900, cursor:"pointer" }}>Migrate</button>
-              <button onClick={()=>setShowDripMigrate(false)} style={{ flex:1, padding:"10px", borderRadius:10, border:"1px solid rgba(255,255,255,0.2)", background:"transparent", color:"white", cursor:"pointer" }}>Close</button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ── HEADER (cleaned up Shuffle-style) ── */}
       <header style={{ position:'relative', zIndex:20, maxWidth:980, margin:'0 auto', padding:'16px 20px 0', display:'flex', alignItems:'center', justifyContent:'space-between', fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif" }}>
         <Link href="/" style={{ display:'flex', alignItems:'center', gap:10, textDecoration:'none', color:'white' }}>
@@ -1413,11 +1366,6 @@ setPlayerHp(MAX_HP); setEnemyHp(MAX_HP); setCurrentRound(0); setRoundLog([]); se
                     Connect Discord
                   </button>
                 )}
-                <button onClick={async()=>{ if(!isDiscordConnected)return; await openDripModal(); }} disabled={dripBusy||!isDiscordConnected}
-                  style={{ padding:'10px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.1em', textTransform:'uppercase', borderRadius:20, border:'1px solid rgba(255,255,255,0.15)', background:'rgba(0,0,0,0.4)', color:'rgba(255,255,255,0.6)', cursor:isDiscordConnected?'pointer':'not-allowed', opacity:isDiscordConnected?1:0.5 }}
-                  title={isDiscordConnected?"Move points from Discord (DRIP) into the game":"Connect Discord to migrate DRIP points"}>
-                  {dripBusy?"Loading…":"Migrate DRIP"}
-                </button>
                 <Link href="/faction-wars/pvp" style={{ padding: '10px 16px', fontSize: 11, fontWeight: 900, letterSpacing: '0.1em', textTransform: 'uppercase', borderRadius: 20, border: '1px solid rgba(192,132,252,0.4)', background: 'rgba(192,132,252,0.08)', color: '#c084fc', cursor: 'pointer', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                   ⚔️ Challenge a Friend
                 </Link>
