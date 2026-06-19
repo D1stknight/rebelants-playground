@@ -3,6 +3,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
 import { pointsConfig as defaultPointsConfig } from "../../../lib/pointsConfig";
 import { addToEarnedTotal, updateBalanceLeaderboard } from "../../../lib/server/leaderboards";
+import { resolveFromRequest, economyCredit, idemKey } from "../../../lib/economy";
 
 function balKey(playerId: string) {
   return `ra:points:bal:${playerId}`;
@@ -62,8 +63,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: "Invalid amount" });
     }
 
-    // ✅ Rewards only increase BALANCE now
-    const newBalance = await redis.incrby(balKey(pid), amt);
+    // Rewards now credit the central economy ledger (shared balance).
+    // Earning requires a signed-in identity; guests cannot mint points.
+    const economyUser = await resolveFromRequest(req);
+    if (!economyUser) {
+      return res
+        .status(401)
+        .json({ error: "Sign in with Discord to earn $REBEL." });
+    }
+    const credit = await economyCredit({
+      userId: economyUser.userId,
+      amount: amt,
+      reason: "Playground reward",
+      idempotencyKey: idemKey(["earn", economyUser.userId, Date.now(), amt]),
+      metadata: { playerId: pid },
+    });
+    if (!credit.ok) {
+      return res.status(502).json({ error: "Economy credit failed" });
+    }
+    const newBalance = credit.balance;
 
     // ✅ Keep lifetime earned leaderboard accurate
     await addToEarnedTotal(pid, amt);

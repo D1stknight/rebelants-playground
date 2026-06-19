@@ -112,3 +112,23 @@ export function getEffectivePlayerId(p?: Profile) {
 
   return prof.id || "guest";
 }
+
+
+// Sign the current identity out, returning to a fresh guest profile.
+// Keeps the stable guest `id` (so the same browser stays a consistent guest),
+// but clears the linked identity (name, discord, primaryId) and sets
+// discordSkipLink so we don't silently auto-relink an existing Discord session.
+export function signOutProfile() {
+  if (typeof window === "undefined") return;
+  const cur = loadProfile();
+  saveProfile({
+    name: "guest",
+    discordUserId: undefined,
+    discordName: undefined,
+    primaryId: undefined,
+    walletAddress: undefined,
+    discordSkipLink: true,
+  });
+  // keep cur.id (guest id) intact via the merge in saveProfile
+  void cur;
+}

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { loadProfile, saveProfile } from '../lib/profile';
+import { loadProfile, saveProfile, signOutProfile } from '../lib/profile';
 import { getEffectivePlayerId } from '../lib/profile';
 import dynamic from 'next/dynamic';
 const BuyPointsModal = dynamic(() => import('../components/BuyPointsModal'), { ssr: false });
@@ -44,7 +44,6 @@ export default function LandingPage() {
   const [cardsIn,  setCardsIn]  = useState(false);
   const [hovered,  setHovered]  = useState('');
   const [legends,  setLegends]  = useState<Legend[]>([]);
-  const [ctaHover, setCtaHover] = useState(false);
   const [musicMuted, setMusicMuted] = useState(false);
   const audioRef = React.useRef<HTMLAudioElement|null>(null);
   const audioUnlocked = React.useRef(false);
@@ -289,6 +288,13 @@ export default function LandingPage() {
     window.location.href = '/api/auth/discord/login';
   }, []);
 
+  // Full sign-out: clear ALL identity (name + discord) back to a guest.
+  // Distinct from "disconnect discord", which keeps a Commander name.
+  const handleSignOut = useCallback(() => {
+    signOutProfile();
+    window.dispatchEvent(new Event('ra:identity-changed'));
+  }, []);
+
   // Unlock & start music on first user interaction (iOS requirement)
   const unlockAudio = React.useCallback(() => {
     if (audioUnlocked.current) return;
@@ -456,7 +462,6 @@ export default function LandingPage() {
                   GUARD BOTH WELL, COMMANDER.
                 </div>
               </>)}
-              <button onPointerDown={()=>setNameClaimed('')} style={{ fontFamily:'inherit', padding:'12px 32px', fontSize:12, fontWeight:900, letterSpacing:'0.2em', textTransform:'uppercase', background:'linear-gradient(135deg,#ef4444,#f97316)', border:'none', borderRadius:50, color:'white', cursor:'pointer' }}>ENTER THE PLAYGROUND →</button>
             </div>
           </div>
         )}
@@ -574,23 +579,6 @@ export default function LandingPage() {
               </span>
             </p>
 
-            <button
-              onClick={() => { if ((discordLinked || (profile?.primaryId?.startsWith('name:')))) router.push('/faction-wars'); else { const el = document.getElementById('commander-strip'); el?.scrollIntoView({ behavior:'smooth' }); } }}
-              onMouseEnter={() => setCtaHover(true)}
-              onMouseLeave={() => setCtaHover(false)}
-              style={{
-                fontFamily: JP,
-                padding:'18px 60px', fontSize:15, fontWeight:900, letterSpacing:'0.2em',
-                textTransform:'uppercase', background:'linear-gradient(135deg,#ef4444,#f97316)',
-                border:'none', borderRadius:50, color:'white', cursor:'pointer',
-                opacity: ctaIn ? ((discordLinked || (profile?.primaryId?.startsWith('name:'))) ? 1 : 0.55) : 0,
-                transform: ctaIn ? (ctaHover ? 'translateY(-3px) scale(1.04)' : 'translateY(0) scale(1)') : 'translateY(24px) scale(0.92)',
-                transition:'all 0.5s cubic-bezier(0.34,1.56,0.64,1)',
-                boxShadow: ctaHover
-                  ? '0 0 60px rgba(239,68,68,0.7), 0 0 120px rgba(239,68,68,0.3), 0 8px 32px rgba(0,0,0,0.5)'
-                  : '0 0 40px rgba(239,68,68,0.4), 0 0 80px rgba(239,68,68,0.15), 0 4px 16px rgba(0,0,0,0.4)',
-              }}
-            >{(discordLinked || (profile?.primaryId?.startsWith('name:'))) ? '⚔️  ENTER THE PLAYGROUND' : '⚔️  SET YOUR NAME TO ENTER'}</button>
 
             <div style={{ position:'absolute', bottom:28, left:'50%', transform:'translateX(-50%)', opacity:0.35, animation:'bounce 2s ease-in-out infinite', fontSize:22 }}>↓</div>
           </div>
@@ -692,6 +680,16 @@ export default function LandingPage() {
                     style={{ fontFamily:'inherit', padding:'9px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background:'#5865F2', border:'none', borderRadius:50, color:'white', cursor:'pointer', whiteSpace:'nowrap', boxShadow:'0 0 20px rgba(88,101,242,0.4)' }}
                   >
                     CONNECT DISCORD
+                  </button>
+                )}
+
+                {/* Full sign-out (clears name + discord) */}
+                {effectiveId && effectiveId !== 'guest' && (
+                  <button
+                    onPointerDown={e=>{e.preventDefault();handleSignOut();}}
+                    style={{ background:'none', border:'none', fontSize:10, color:'rgba(255,255,255,0.4)', cursor:'pointer', padding:'9px 4px', textDecoration:'underline', textTransform:'uppercase', letterSpacing:'0.1em', fontFamily:'inherit', whiteSpace:'nowrap' }}
+                  >
+                    SIGN OUT
                   </button>
                 )}
               </div>

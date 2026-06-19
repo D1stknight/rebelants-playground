@@ -14,10 +14,12 @@ const JP = `'Noto Serif JP', 'Hiragino Mincho ProN', serif`;
 // ── Identity helper (same as lobby) ──────────────────────────────────────────
 function deriveIdentity(p: Profile | null): { playerId: string; displayName: string } | null {
   if (!p) return null;
+  // Only a real, signed-in identity counts. A signed-in commander-name user
+  // always has primaryId = "name:<slug>" (set by /api/commander/sign-in), a
+  // Discord user "discord:<id>", a wallet user "wallet:0x...". A bare leftover
+  // name with NO primaryId is NOT signed in -> return null so the sign-in gate
+  // shows (fixes guests / stale-name visitors bypassing the challenge gate).
   if (p.primaryId) return { playerId: p.primaryId, displayName: p.discordName || p.name || "Anonymous" };
-  if (p.name && p.name !== "guest" && p.name.trim().length > 0) {
-    return { playerId: `commander:${p.name}`, displayName: p.name };
-  }
   return null;
 }
 

@@ -969,42 +969,7 @@ export default function Raid() {
   }, [nextClaimTs]);
 
 
-  // DRIP migrate (mirrors Shuffle)
-  const [showDripMigrate, setShowDripMigrate] = useState(false);
   const [showRules, setShowRules] = useState(false);
-  const [dripBalance, setDripBalance]         = useState<number|null>(null);
-  const [dripAmount, setDripAmount]           = useState<number>(0);
-  const [dripBusy, setDripBusy]               = useState(false);
-  const [dripStatus, setDripStatus]           = useState("");
-
-  async function openDripModal() {
-    setDripStatus(""); setDripBusy(true); setDripBalance(null);
-    try {
-      const r = await fetch("/api/drip/balance",{cache:"no-store"});
-      const j = await r.json().catch(()=>null);
-      if (!r.ok||!j?.ok){setDripStatus(j?.error||"Could not load DRIP balance.");setShowDripMigrate(true);return;}
-      setDripBalance(Number(j.balance||0)); setDripAmount(0); setShowDripMigrate(true);
-    } catch(e:any){setDripStatus(e?.message||"DRIP error");setShowDripMigrate(true);}
-    finally{setDripBusy(false);}
-  }
-
-  async function migrateDripNow() {
-    const amt = Math.floor(Number(dripAmount||0));
-    if (!amt||amt<=0){setDripStatus("Enter an amount greater than 0.");return;}
-    setDripBusy(true); setDripStatus("Migrating…");
-    try {
-      const idem = `${Date.now()}-${Math.random().toString(36).slice(2,10)}`;
-      const r = await fetch("/api/drip/migrate",{method:"POST",headers:{"Content-Type":"application/json","x-idempotency-key":idem},body:JSON.stringify({amount:amt,playerId:effectivePlayerId,idempotencyKey:idem})});
-      const j = await r.json().catch(()=>null);
-      if (!r.ok||!j?.ok){setDripStatus(j?.error||"Migrate failed.");if(typeof j?.dripBalance==="number")setDripBalance(j.dripBalance);return;}
-      setDripStatus(`✅ Migrated ${amt} points into the game.`);
-      await refresh();
-      const br = await fetch("/api/drip/balance",{cache:"no-store"});
-      const bj = await br.json().catch(()=>null);
-      if(br.ok&&bj?.ok)setDripBalance(Number(bj.balance||0));
-    } catch(e:any){setDripStatus(e?.message||"Migrate error");}
-    finally{setDripBusy(false);}
-  }
 
   // Game state
   const [squad, setSquad]                 = useState<AntRole[]>([]);
@@ -1439,12 +1404,6 @@ export default function Raid() {
             style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", padding:'7px 14px', fontSize:10, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background: dailyClaimed ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg,#ef4444,#f97316)', border: dailyClaimed ? '1px solid rgba(255,255,255,0.1)' : 'none', borderRadius:50, color: dailyClaimed ? 'rgba(255,255,255,0.3)' : 'white', cursor: dailyClaimed ? 'not-allowed' : 'pointer', whiteSpace:'nowrap', boxShadow: dailyClaimed ? 'none' : '0 0 12px rgba(239,68,68,0.3)' }}>
             {dailyClaimed ? (countdownStr ? `⏱ NEXT IN ${countdownStr}` : '✓ CLAIMED TODAY') : `⚡ CLAIM +${cfg?.dailyClaim} REBEL`}
           </button>
-          {isDiscordConnected && (
-            <button type="button" onClick={async()=>{ if(isDiscordConnected) await openDripModal(); }} disabled={dripBusy}
-              style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", padding:'7px 12px', fontSize:10, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:50, color:'rgba(255,255,255,0.5)', cursor:'pointer', whiteSpace:'nowrap' }}>
-              {dripBusy ? 'LOADING...' : 'MIGRATE DRIP'}
-            </button>
-          )}
         </div>
 
         <div style={{ marginBottom:20 }}>
@@ -1496,33 +1455,6 @@ export default function Raid() {
         </div>
       )}
 
-      {showDripMigrate && (
-        <div style={{ position:'fixed', inset:0, zIndex:2500, background:'rgba(0,0,0,.6)', display:'grid', placeItems:'center', padding:16 }} role="dialog" aria-modal="true">
-          <div style={{ width:'min(520px, 95vw)', borderRadius:16, border:'1px solid rgba(255,255,255,.18)', background:'rgba(4,9,22,.97)', boxShadow:'0 28px 60px rgba(0,0,0,.55)', padding:20, color:'white' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', gap:12, alignItems:'center', marginBottom:12 }}>
-              <div style={{ fontWeight:900, fontSize:16 }}>Migrate DRIP Points → Game</div>
-              <button className="btn" onClick={()=>setShowDripMigrate(false)} style={{ padding:'8px 12px' }}>Close</button>
-            </div>
-            <div style={{ fontSize:13, opacity:0.9, lineHeight:1.4, marginBottom:12 }}>
-              This will <b>deduct</b> points from DRIP (Discord) and <b>credit</b> the same amount into the game.
-            </div>
-            <div style={{ fontSize:13, opacity:0.95, marginBottom:12 }}>DRIP Balance: <b>{typeof dripBalance==='number'?dripBalance:'—'}</b></div>
-            <div style={{ display:'grid', gap:8, marginBottom:14 }}>
-              <label style={{ fontSize:12, opacity:0.9 }}>Amount to migrate</label>
-              <input value={dripAmount===0?'':String(dripAmount)}
-                onChange={(e)=>{ const raw=String(e.target.value||'').replace(/^0+/,''); const n=parseInt(raw,10); setDripAmount(isNaN(n)?0:Math.max(0,Math.min(n,typeof dripBalance==='number'?dripBalance:0))); }}
-                type="number" min={0} max={typeof dripBalance==='number'?dripBalance:0} placeholder="0"
-                style={{ padding:10, borderRadius:10, border:'1px solid rgba(255,255,255,.18)', background:'rgba(15,23,42,.55)', color:'inherit', fontSize:15, width:160 }} />
-            </div>
-            <div style={{ display:'flex', gap:8 }}>
-              <button className="btn" onClick={migrateDripNow} disabled={dripBusy||dripAmount<=0} style={{ padding:'10px 18px', fontSize:13 }}>
-                {dripBusy?'Migrating…':`Migrate ${dripAmount} ${cfg?.currency}`}
-              </button>
-            </div>
-            {dripStatus && <div style={{ marginTop:10, fontSize:13 }}>{dripStatus}</div>}
-          </div>
-        </div>
-      )}
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;700;900&display=swap');

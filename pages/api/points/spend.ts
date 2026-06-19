@@ -2,6 +2,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
 import { pointsConfig as defaultPointsConfig } from "../../../lib/pointsConfig";
+import { resolveFromRequest, economyDebit, idemKey } from "../../../lib/economy";
 
 function balKey(playerId: string) {
   return `ra:points:bal:${playerId}`;
@@ -115,9 +116,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ ok: false, error: "Invalid amount" });
     }
 
-    // Current balance
-    const balRaw = await redis.get<number>(balKey(playerId));
-    const bal = Number(balRaw || 0);
+    // Current balance now comes from the central economy ledger.
+    // Spending requires a signed-in identity (no guest spends).
+    const economyUser = await resolveFromRequest(req);
+    if (!economyUser) {
+      return res
+        .status(401)
+        .json({ ok: false, error: "Sign in with Discord to play." });
+    }
+    const bal = economyUser.balance;
 
     if (bal < amt) {
       return res.status(400).json({ ok: false, error: "Insufficient balance", balance: bal });
@@ -175,8 +182,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       totalPlayRoom = remainingDaily + capBank;
     }
 
-    // Deduct balance
-    const newBal = await redis.incrby(balKey(playerId), -amt);
+    // Deduct from the central economy ledger (shared balance).
+    const debit = await economyDebit({
+      userId: economyUser.userId,
+      amount: amt,
+      reason: reason || "Playground spend",
+      idempotencyKey: idemKey(["spend", economyUser.userId, Date.now(), amt, reason || "play"]),
+      metadata: { playerId, reason: reason || undefined },
+    });
+    if (!debit.ok) {
+      return res
+        .status(502)
+        .json({ ok: false, error: "Economy debit failed" });
+    }
+    const newBal = debit.balance;
 
        return res.status(200).json({
       ok: true,

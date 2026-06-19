@@ -13,6 +13,12 @@
 // challengeId format: 12 chars [a-z0-9], URL-safe.
 
 import { redis } from "./redis";
+import {
+  resolveByPlayerId,
+  economyDebit,
+  economyCredit,
+  idemKey,
+} from "../economy";
 import type { PvpMatch, PvpBet, PvpBetsState, PvpSide, ChatMessage, ChatMute, ChatRole, Tournament, TournamentParticipant, TournamentRound, TournamentBracketSlot, TournamentStatus } from "../types/fwpvp";
 
 const MATCH_KEY = (id: string) => `ra:fwpvp:match:${id}`;
@@ -245,7 +251,7 @@ export async function countSpectators(challengeId: string): Promise<number> {
 // circulates: 300 in from challenger + 300 from opponent = 600 out to winner
 // (loser gets 0). Net flow is zero across the two players.
 
-const REBEL_BAL_KEY = (pid: string) => `ra:points:bal:${pid}`;
+// (REBEL_BAL_KEY removed — balances now live in the central economy ledger)
 
 // Default values used when admin config is absent or partially populated.
 const PVP_COST_DEFAULT = 300;
@@ -576,9 +582,11 @@ export async function getCrateRewards(): Promise<CrateRewards> {
 // Reads a player's current REBEL balance.
 export async function getREBELBalance(playerId: string): Promise<number> {
   if (!playerId) return 0;
+  // Routed to the central economy ledger. Guests / unresolvable ids -> 0.
   try {
-    const raw = await redis.get<number>(REBEL_BAL_KEY(playerId));
-    return Number(raw || 0);
+    const user = await resolveByPlayerId(playerId);
+    if (!user) return 0;
+    return Number(user.balance || 0);
   } catch {
     return 0;
   }
@@ -592,14 +600,28 @@ export async function getREBELBalance(playerId: string): Promise<number> {
 // could race past the check, but the 300-REBEL stakes here mean the worst case
 // is a player going slightly negative. We guard create/accept against this by
 // rejecting matches if balance is too low BEFORE the spend.
-export async function spendREBEL(playerId: string, amount: number): Promise<number | null> {
+export async function spendREBEL(
+  playerId: string,
+  amount: number,
+  opts?: { reason?: string; idem?: string; metadata?: Record<string, unknown> },
+): Promise<number | null> {
   if (!playerId) return null;
   if (!Number.isFinite(amount) || amount <= 0) return null;
-  const bal = await getREBELBalance(playerId);
-  if (bal < amount) return null;
+  // Routed to the central economy ledger. The economy enforces the balance
+  // check atomically and rejects overdrafts, so we return null on failure.
   try {
-    const newBal = await redis.incrby(REBEL_BAL_KEY(playerId), -amount);
-    return Number(newBal || 0);
+    const user = await resolveByPlayerId(playerId);
+    if (!user) return null;
+    const res = await economyDebit({
+      userId: user.userId,
+      amount,
+      type: "game_spend",
+      reason: opts?.reason || "PvP stake",
+      idempotencyKey: opts?.idem || idemKey(["pvp-spend", playerId, String(amount), String(Date.now())]),
+      metadata: { playerId, ...(opts?.metadata || {}) },
+    });
+    if (!res || !res.ok) return null;
+    return Number(res.balance ?? 0);
   } catch {
     return null;
   }
@@ -607,12 +629,28 @@ export async function spendREBEL(playerId: string, amount: number): Promise<numb
 
 // Credit REBEL to a player's balance. Used for refunds (cancel) and pot
 // payouts (winner on completion). Returns new balance on success.
-export async function creditREBEL(playerId: string, amount: number): Promise<number | null> {
+export async function creditREBEL(
+  playerId: string,
+  amount: number,
+  opts?: { reason?: string; idem?: string; type?: "game_reward" | "refund"; metadata?: Record<string, unknown> },
+): Promise<number | null> {
   if (!playerId) return null;
   if (!Number.isFinite(amount) || amount <= 0) return null;
+  // Routed to the central economy ledger. Used for refunds (cancel) and pot
+  // payouts (winner on completion).
   try {
-    const newBal = await redis.incrby(REBEL_BAL_KEY(playerId), amount);
-    return Number(newBal || 0);
+    const user = await resolveByPlayerId(playerId);
+    if (!user) return null;
+    const res = await economyCredit({
+      userId: user.userId,
+      amount,
+      type: opts?.type || "refund",
+      reason: opts?.reason || "PvP payout",
+      idempotencyKey: opts?.idem || idemKey(["pvp-credit", playerId, String(amount), String(Date.now())]),
+      metadata: { playerId, ...(opts?.metadata || {}) },
+    });
+    if (!res || !res.ok) return null;
+    return Number(res.balance ?? 0);
   } catch {
     return null;
   }
