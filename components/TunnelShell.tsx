@@ -425,12 +425,7 @@ export default function TunnelShell() {
   const [dailyClaimed,   setDailyClaimed]   = useState(false);
   const [nextClaimTs,    setNextClaimTs]    = useState<number|null>(null);
   const [countdownStr,   setCountdownStr]   = useState("");
-  const [dripAmount,     setDripAmount]     = useState(0);
   const [profileVersion, setProfileVersion] = useState(0);
-  const [dripPanelOpen,  setDripPanelOpen]  = useState(false);
-  const [dripBusy,       setDripBusy]       = useState(false);
-  const [dripBalance,    setDripBalance]    = useState<number|null>(null);
-  const [dripStatus,     setDripStatus]     = useState("");
   const [showBuyPoints, setShowBuyPoints] = useState(false);
   const [showRules, setShowRules] = useState(false);
   const { muted, toggleMute, startAmbient, stopAmbient, sfx } = useAudio();
@@ -1287,29 +1282,11 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
         } as any);
         setProfileVersion(v => v + 1);
         setEffectivePlayerId(`discord:${sj.discordUserId}`);
-        // Reload DRIP balance now that discord is connected
-        try {
-          const br = await fetch("/api/drip/balance", { cache: "no-store" });
-          const bj = await br.json().catch(() => null);
-          if (br.ok && bj?.ok) setDripBalance(Number(bj.balance || 0));
-        } catch {}
       } catch {}
     })();
     return () => { cancelled = true; };
   }, []);
 
-  // ── Load DRIP balance when discord is connected ──────────────────────────
-  React.useEffect(() => {
-    const p = loadProfile();
-    if (!(p as any)?.discordUserId) return;
-    (async () => {
-      try {
-        const r = await fetch("/api/drip/balance", { cache: "no-store" });
-        const j = await r.json().catch(() => null);
-        if (r.ok && j?.ok) setDripBalance(Number(j.balance || 0));
-      } catch {}
-    })();
-  }, [effectivePlayerId]);
 
   // ── Discord identity (computed inline like Raid.tsx) ─────────────────────
   const _profile = loadProfile();
@@ -1476,43 +1453,10 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                 <button onClick={()=>{const p=loadProfile();saveProfile({...(p as any),discordSkipLink:false} as any);window.location.href="/api/auth/discord/login";}} style={{padding:'8px 16px',borderRadius:20,border:'none',cursor:'pointer',fontWeight:700,fontSize:11,background:'#5865F2',color:'white',letterSpacing:'0.08em',textTransform:'uppercase'}}>CONNECT DISCORD</button>
               )}
               <button onClick={()=>setShowBuyPoints(true)} style={{padding:'8px 16px',borderRadius:20,border:'1px solid rgba(251,191,36,0.3)',cursor:'pointer',fontWeight:700,fontSize:11,background:'rgba(251,191,36,0.08)',color:'#fbbf24',letterSpacing:'0.08em',textTransform:'uppercase'}}>💎 BUY POINTS</button>
-              {showDisconnect && (<button onClick={()=>setDripPanelOpen(v=>!v)} style={{padding:'8px 16px',borderRadius:20,border:'1px solid rgba(255,255,255,0.12)',cursor:'pointer',fontWeight:700,fontSize:11,background:'rgba(255,255,255,0.04)',color:'rgba(255,255,255,0.5)',letterSpacing:'0.08em',textTransform:'uppercase'}}>MIGRATE DRIP</button>)}
-              {showDisconnect && dripBalance !== null && (<div style={{fontSize:11,opacity:0.5,letterSpacing:'0.06em',textTransform:'uppercase'}}>DRIP: <b>{dripBalance}</b></div>)}
             </div>
           </div>
         </div>
 
-        {/* ── DRIP migrate panel ── */}
-        {dripPanelOpen && showDisconnect && (
-          <div style={{maxWidth:900,margin:'0 auto 14px',padding:'0 4px'}}>
-            <div style={{borderRadius:14,border:'1px solid rgba(255,255,255,0.12)',background:'rgba(5,10,25,0.95)',padding:'14px 16px'}}>
-              <div style={{fontWeight:900,fontSize:14,marginBottom:8}}>Migrate DRIP Points → Game</div>
-              <div style={{fontSize:12,opacity:0.8,marginBottom:10}}>This will <b>deduct</b> points from DRIP (Discord) and <b>credit</b> them into the game.</div>
-              {dripBalance !== null && <div style={{fontSize:13,marginBottom:8}}>DRIP Balance: <b>{dripBalance}</b></div>}
-              <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-                <label style={{fontSize:12,opacity:0.8}}>Amount:</label>
-                <input type="number" min={1} value={dripAmount||""} onChange={e=>setDripAmount(Number(e.target.value))}
-                  style={{width:100,padding:'6px 10px',borderRadius:10,border:'1px solid rgba(255,255,255,0.2)',background:'rgba(15,23,42,0.55)',color:'inherit',fontSize:15}} placeholder="e.g. 100" />
-                <button disabled={dripBusy||!dripAmount} onClick={async()=>{
-                  if(!dripAmount||dripAmount<=0)return;
-                  setDripBusy(true);setDripStatus("");
-                  try{
-                    const idem=Date.now().toString(36);
-                    const r=await fetch("/api/drip/migrate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({playerId:effectivePlayerId,amount:dripAmount,idempotencyKey:idem})});
-                    const j=await r.json().catch(()=>null);
-                    if(r.ok&&j?.ok){await refresh();setDripBalance(b=>b!==null?b-dripAmount:null);setDripStatus(`✅ Migrated ${dripAmount} points!`);setDripPanelOpen(false);setDripAmount(0);}
-                    else setDripStatus(j?.error||"Migration failed.");
-                  }catch(e:any){setDripStatus(e?.message||"Error.");}
-                  finally{setDripBusy(false);}
-                }} style={{padding:'8px 16px',borderRadius:14,border:'none',cursor:dripBusy?'default':'pointer',fontWeight:700,background:dripBusy?'rgba(255,255,255,0.1)':'#3b82f6',color:'white',opacity:dripBusy||!dripAmount?0.5:1}}>
-                  {dripBusy?"Migrating…":`Migrate ${dripAmount}`}
-                </button>
-                <button onClick={()=>{setDripPanelOpen(false);setDripStatus("");}} style={{padding:'8px 12px',borderRadius:12,border:'1px solid rgba(255,255,255,0.15)',cursor:'pointer',background:'transparent',color:'rgba(255,255,255,0.6)'}}>Close</button>
-              </div>
-              {dripStatus && <div style={{marginTop:8,fontSize:12,fontWeight:700,color:dripStatus.includes("✅")?"#4ade80":"#f87171"}}>{dripStatus}</div>}
-            </div>
-          </div>
-        )}
 
         {/* ── Layout chooser + Name row ── */}
         <div style={{maxWidth:900,margin:'0 auto 12px',padding:'0 4px',display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
