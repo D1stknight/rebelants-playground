@@ -44,7 +44,6 @@ export default function LandingPage() {
   const [cardsIn,  setCardsIn]  = useState(false);
   const [hovered,  setHovered]  = useState('');
   const [legends,  setLegends]  = useState<Legend[]>([]);
-  const [ctaHover, setCtaHover] = useState(false);
   const [musicMuted, setMusicMuted] = useState(false);
   const audioRef = React.useRef<HTMLAudioElement|null>(null);
   const audioUnlocked = React.useRef(false);
@@ -581,23 +580,6 @@ export default function LandingPage() {
               </span>
             </p>
 
-            <button
-              onClick={() => { if ((discordLinked || (profile?.primaryId?.startsWith('name:')))) router.push('/faction-wars'); else { const el = document.getElementById('commander-strip'); el?.scrollIntoView({ behavior:'smooth' }); } }}
-              onMouseEnter={() => setCtaHover(true)}
-              onMouseLeave={() => setCtaHover(false)}
-              style={{
-                fontFamily: JP,
-                padding:'18px 60px', fontSize:15, fontWeight:900, letterSpacing:'0.2em',
-                textTransform:'uppercase', background:'linear-gradient(135deg,#ef4444,#f97316)',
-                border:'none', borderRadius:50, color:'white', cursor:'pointer',
-                opacity: ctaIn ? ((discordLinked || (profile?.primaryId?.startsWith('name:'))) ? 1 : 0.55) : 0,
-                transform: ctaIn ? (ctaHover ? 'translateY(-3px) scale(1.04)' : 'translateY(0) scale(1)') : 'translateY(24px) scale(0.92)',
-                transition:'all 0.5s cubic-bezier(0.34,1.56,0.64,1)',
-                boxShadow: ctaHover
-                  ? '0 0 60px rgba(239,68,68,0.7), 0 0 120px rgba(239,68,68,0.3), 0 8px 32px rgba(0,0,0,0.5)'
-                  : '0 0 40px rgba(239,68,68,0.4), 0 0 80px rgba(239,68,68,0.15), 0 4px 16px rgba(0,0,0,0.4)',
-              }}
-            >{(discordLinked || (profile?.primaryId?.startsWith('name:'))) ? '⚔️  ENTER THE PLAYGROUND' : '⚔️  SET YOUR NAME TO ENTER'}</button>
 
             <div style={{ position:'absolute', bottom:28, left:'50%', transform:'translateX(-50%)', opacity:0.35, animation:'bounce 2s ease-in-out infinite', fontSize:22 }}>↓</div>
           </div>
