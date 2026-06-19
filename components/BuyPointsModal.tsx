@@ -313,21 +313,10 @@ if (typeof window !== "undefined") {
           </button>
         </div>
 
-       <div style={{ marginTop: 10, fontSize: 13, opacity: 0.9, lineHeight: 1.4 }}>
-  You are buying <b>REBEL Points</b> with <b>APE</b>.<br />
-  APE is sent to the Rebel Ants treasury wallet.<br />
-  Rate locked: <b>1 APE = 100 pts</b>. No refunds.<br />
-  Each purchase lets you <b>keep playing and earning even after you hit the daily limit</b>.
-</div>
-
-<div style={{ marginTop: 10, fontSize: 12, opacity: 0.85, lineHeight: 1.4 }}>
-  <b>Important:</b> Points are credited to the identity you’re currently playing as.<br />
-  • If you are not connected to Discord, your purchase is credited to your <b>Guest ID</b> on this device.<br />
-  • If you connect Discord, your points follow your <b>Discord identity</b> across devices.<br />
-  <span style={{ opacity: 0.9 }}>
-    Joining Discord is recommended for account recovery, cross-device play, and community perks.
-  </span>
-</div>
+        <div style={{ marginTop: 10, fontSize: 13, opacity: 0.9, lineHeight: 1.5 }}>
+          Pay with APE on ApeChain. Points credit your Rebel account.<br />
+          Rate locked. No refunds. Lets you keep playing past the daily limit.
+        </div>
 
         <div style={{ marginTop: 12 }}>
   <ConnectButton />
