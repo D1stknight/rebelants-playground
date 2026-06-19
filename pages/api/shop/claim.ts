@@ -3,6 +3,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { createPublicClient, http } from "viem";
 import { redis } from "../../../lib/server/redis";
 import { rateLimit } from "../../../lib/server/ratelimit";
+import { resolveFromRequest, resolveByPlayerId, economyCredit, idemKey } from "../../../lib/economy";
 
 const RPC_URL = process.env.APECHAIN_RPC_URL || "";
 const SHOP_ADDRESS = (process.env.APECHAIN_SHOP_ADDRESS || "").toLowerCase();
@@ -173,11 +174,23 @@ for (const log of matches) {
     await redis.set(walletToPlayerKey(walletAddress), playerId);
     await redis.set(playerToWalletKey(playerId), walletAddress);
 
-        // --------- Credit points to player balance ----------
-    const beforeRaw = await redis.get<number>(balKey(playerId));
-    const before = Number(beforeRaw || 0);
-    const after = before + found.points;
-    await redis.set(balKey(playerId), after);
+        // --------- Credit points to the ECONOMY ledger (source of truth) ----------
+    // Resolve the buyer to their economy user: prefer the signed-in session,
+    // fall back to the supplied playerId. Purchases credit real $REBEL now,
+    // not the old Redis balance key.
+    let resolved = await resolveFromRequest(req);
+    if (!resolved) resolved = await resolveByPlayerId(playerId);
+    if (!resolved) {
+      return res.status(401).json({ ok: false, error: "Could not resolve account. Sign in and try again." });
+    }
+    await economyCredit({
+      userId: resolved.userId,
+      amount: found.points,
+      type: "earn",
+      reason: `APE purchase - pack ${found.packId}`,
+      idempotencyKey: idemKey(["shop", txHash.toLowerCase(), String(found.logIndex)]),
+      metadata: { txHash: txHash.toLowerCase(), logIndex: found.logIndex, packId: found.packId, walletAddress, chain: "apechain" },
+    });
 
     // --------- Add purchased cap bank (stacks permanently until used) ----------
     const capBankAfter = await redis.incrby(capBankKey(playerId), found.points);
@@ -188,7 +201,7 @@ for (const log of matches) {
       walletAddress,
       packId: found.packId,
       points: found.points,
-      balance: after,
+      credited: found.points,
       capBank: Number(capBankAfter || 0),
     });
   } catch (err: any) {
