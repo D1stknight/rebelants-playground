@@ -462,7 +462,6 @@ export default function LandingPage() {
                   GUARD BOTH WELL, COMMANDER.
                 </div>
               </>)}
-              <button onPointerDown={()=>setNameClaimed('')} style={{ fontFamily:'inherit', padding:'12px 32px', fontSize:12, fontWeight:900, letterSpacing:'0.2em', textTransform:'uppercase', background:'linear-gradient(135deg,#ef4444,#f97316)', border:'none', borderRadius:50, color:'white', cursor:'pointer' }}>ENTER THE PLAYGROUND →</button>
             </div>
           </div>
         )}
