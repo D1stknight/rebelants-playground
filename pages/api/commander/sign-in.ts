@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
 import { createHash } from "crypto";
+import { signNameSession, nameSessionSetCookie } from "../../../lib/name-session";
 
 function hashPin(name: string, pin: string): string {
   return createHash("sha256")
@@ -41,5 +42,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // Get display name
   const displayName = await redis.get<string>(`ra:commander:player:name:${name}`) || raw;
 
+  // Issue a server-verified session cookie for this name identity.
+  // No-op until NAME_SESSION_SECRET is set (signNameSession returns null).
+  const sessionToken = signNameSession("name:" + name);
+  if (sessionToken) res.setHeader("Set-Cookie", nameSessionSetCookie(sessionToken));
   return res.status(200).json({ ok: true, name, playerId: `name:${name}`, displayName });
 }
