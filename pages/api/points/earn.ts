@@ -3,7 +3,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
 import { pointsConfig as defaultPointsConfig } from "../../../lib/pointsConfig";
 import { addToEarnedTotal, updateBalanceLeaderboard } from "../../../lib/server/leaderboards";
-import { resolveFromRequest, resolveByPlayerId, economyCredit, idemKey } from "../../../lib/economy";
+import { resolveFromRequest, resolveByPlayerId, getVerifiedNameUser, economyCredit, idemKey } from "../../../lib/economy";
 
 function balKey(playerId: string) {
   return `ra:points:bal:${playerId}`;
@@ -65,7 +65,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Rewards now credit the central economy ledger (shared balance).
     // Earning requires a signed-in identity; guests cannot mint points.
-    const economyUser = (await resolveByPlayerId(pid)) ?? (await resolveFromRequest(req));
+    const economyUser = (pid.startsWith("name:") ? await getVerifiedNameUser(req) : null) ?? (await resolveByPlayerId(pid)) ?? (await resolveFromRequest(req));
     if (!economyUser) {
       return res
         .status(401)
