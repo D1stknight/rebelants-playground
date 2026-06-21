@@ -60,7 +60,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Balance now comes from the central economy ledger (shared with
     // After Dark + Discord). Signed-in Discord users get their real
     // economy balance; guests (no Discord) see 0 until they sign in.
-    const economyUser = (await resolveFromRequest(req)) ?? (await resolveByPlayerId(pid));
+    const economyUser = (await resolveByPlayerId(pid)) ?? (await resolveFromRequest(req));
     const balance = economyUser ? economyUser.balance : 0;
 
        // ✅ Read the SAME key spend.ts writes to
