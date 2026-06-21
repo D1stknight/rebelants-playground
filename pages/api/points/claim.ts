@@ -2,7 +2,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
 import { pointsConfig as defaultPointsConfig } from "../../../lib/pointsConfig";
-import { resolveFromRequest, resolveByPlayerId, economyCredit, idemKey } from "../../../lib/economy";
+import { resolveFromRequest, resolveByPlayerId, getVerifiedNameUser, economyCredit, idemKey } from "../../../lib/economy";
 
 function balKey(playerId: string) {
   return `ra:points:bal:${playerId}`;
@@ -98,7 +98,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Daily claim now credits the central economy ledger.
     // Requires a signed-in identity (no guest claims).
-    const economyUser = (await resolveByPlayerId(playerId)) ?? (await resolveFromRequest(req));
+    const economyUser = (playerId.startsWith("name:") ? await getVerifiedNameUser(req) : null) ?? (await resolveByPlayerId(playerId)) ?? (await resolveFromRequest(req));
     if (!economyUser) {
       return res
         .status(401)
