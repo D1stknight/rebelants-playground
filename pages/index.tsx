@@ -197,7 +197,7 @@ export default function LandingPage() {
       const j = await r.json();
       if (!r.ok || !j.ok) { setNameAvailMsg(j.error || 'Failed — try another name'); setNameClaiming(false); return; }
       // Save to profile
-      saveProfile({ primaryId: `name:${clean}`, name: j.displayName || clean, discordSkipLink: false });
+      saveProfile({ primaryId: `name:${clean}`, name: j.displayName || clean, discordSkipLink: true });
       window.dispatchEvent(new Event('ra:identity-changed'));
       setNameClaimed(j.displayName || clean);
       setShowNameClaim(false);
@@ -215,7 +215,7 @@ export default function LandingPage() {
       const r = await fetch('/api/commander/sign-in', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, pin }) });
       const j = await r.json();
       if (!r.ok || !j.ok) { setSignInMsg(j.error || 'Sign in failed'); setSignInLoading(false); return; }
-      saveProfile({ primaryId: j.playerId, name: j.displayName || name, discordSkipLink: false });
+      saveProfile({ primaryId: j.playerId, name: j.displayName || name, discordSkipLink: true });
       window.dispatchEvent(new Event('ra:identity-changed'));
       setShowNameClaim(false); setSignInMsg(''); setPinInput(''); setSignInName('');
     } catch { setSignInMsg('Error — try again'); }
