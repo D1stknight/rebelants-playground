@@ -15,6 +15,7 @@
 // economy is just the ledger of record.
 // ─────────────────────────────────────────────────────────────
 import type { NextApiRequest } from "next";
+import { verifyNameSession, NAME_SESSION_COOKIE } from "./name-session";
 
 const ECONOMY_BASE_URL =
   process.env.ECONOMY_BASE_URL || "https://economy.rebelants.io";
@@ -130,6 +131,19 @@ export async function resolveByPlayerId(
   }
   if (!discordId) return null;
   return resolveEconomyUser({ discordId, username, displayName: null });
+}
+
+// Resolve a verified Commander Name/PIN identity from its signed cookie.
+// Returns the economy user only if the ra_name_session HMAC is valid.
+// If NAME_SESSION_SECRET is unset, this is always null (feature off).
+export async function getVerifiedNameUser(
+  req: NextApiRequest,
+): Promise<ResolvedUser | null> {
+  const tok = readCookie(req, NAME_SESSION_COOKIE);
+  if (!tok) return null;
+  const playerId = verifyNameSession(tok);
+  if (!playerId) return null;
+  return resolveByPlayerId(playerId);
 }
 
 export function getSessionToken(req: NextApiRequest): string | null {
