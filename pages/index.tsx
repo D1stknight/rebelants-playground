@@ -293,6 +293,9 @@ export default function LandingPage() {
   const handleSignOut = useCallback(() => {
     signOutProfile();
     window.dispatchEvent(new Event('ra:identity-changed'));
+    // Clear the server session cookie too (not just localStorage) so a stale
+    // discord session can't override identity after sign-out. Redirects to Shuffle.
+    window.location.href = '/api/auth/discord/logout';
   }, []);
 
   // Unlock & start music on first user interaction (iOS requirement)
