@@ -2,7 +2,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
 import { pointsConfig as defaultPointsConfig } from "../../../lib/pointsConfig";
-import { resolveFromRequest, resolveByPlayerId, economyDebit, idemKey } from "../../../lib/economy";
+import { resolveFromRequest, resolveByPlayerId, getVerifiedNameUser, economyDebit, idemKey } from "../../../lib/economy";
 
 function balKey(playerId: string) {
   return `ra:points:bal:${playerId}`;
@@ -118,7 +118,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Current balance now comes from the central economy ledger.
     // Spending requires a signed-in identity (no guest spends).
-    const economyUser = (await resolveByPlayerId(playerId)) ?? (await resolveFromRequest(req));
+    const economyUser = (playerId.startsWith("name:") ? await getVerifiedNameUser(req) : null) ?? (await resolveByPlayerId(playerId)) ?? (await resolveFromRequest(req));
     if (!economyUser) {
       return res
         .status(401)
