@@ -2,7 +2,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
 import { pointsConfig as defaultPointsConfig } from "../../../lib/pointsConfig";
-import { resolveFromRequest, resolveByPlayerId } from "../../../lib/economy";
+import { resolveFromRequest, resolveByPlayerId, getVerifiedNameUser } from "../../../lib/economy";
 
 function balKey(playerId: string) {
   return `ra:points:bal:${playerId}`;
@@ -60,7 +60,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Balance now comes from the central economy ledger (shared with
     // After Dark + Discord). Signed-in Discord users get their real
     // economy balance; guests (no Discord) see 0 until they sign in.
-    const economyUser = (await resolveByPlayerId(pid)) ?? (await resolveFromRequest(req));
+    const economyUser = (pid.startsWith("name:") ? await getVerifiedNameUser(req) : null) ?? (await resolveByPlayerId(pid)) ?? (await resolveFromRequest(req));
     const balance = economyUser ? economyUser.balance : 0;
 
        // ✅ Read the SAME key spend.ts writes to
