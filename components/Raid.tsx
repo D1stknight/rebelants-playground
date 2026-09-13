@@ -55,6 +55,7 @@ function useRaidAudio() {
 }
 import { addWin } from "../lib/winsStore";
 import BuyPointsModal from "./BuyPointsModal";
+import RaidBattleCanvas from "./RaidBattleCanvas";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -135,6 +136,12 @@ const DEFAULT_SQUAD: AntRole[] = [
   "scout","soldier","guard","carrier","bomber",
   "guard","carrier","soldier","scout","soldier",
 ];
+
+const FACTION_IDS = ['ashigaru','ronin','samurai','bushi','warrior','shogun','buke','kenshi','wokou','sohei','yamabushi'];
+function pickEnemyFaction(mine: string): string {
+  const pool = FACTION_IDS.filter(f => f !== mine);
+  return pool[Math.floor(Math.random() * pool.length)] || 'ronin';
+}
 
 // ── Battle Engine ─────────────────────────────────────────────────────────────
 
@@ -975,6 +982,8 @@ export default function Raid() {
   const [squad, setSquad]                 = useState<AntRole[]>([]);
   const [lastSquad,setLastSquad]=useState<AntRole[]|null>(()=>{if(typeof window==="undefined")return null;try{const v=localStorage.getItem(LAST_SQUAD_KEY);return v?JSON.parse(v):null;}catch{return null;}});
   const [phase, setPhase]                 = useState<Phase>("idle");
+  const battleDoneRef = useRef<(() => void) | null>(null);
+  const [enemyFactionId, setEnemyFactionId] = useState<string>('ronin');
   const { muted: raidMuted, toggleMute: toggleRaidMute, startMarch, stopMarch, sfx: raidSfx } = useRaidAudio();
   const [busy, setBusy]                   = useState(false);
   const [slots, setSlots]                 = useState<AntSlot[]>([]);
@@ -1053,12 +1062,14 @@ export default function Raid() {
     const battleSlots = simulateBattle(squad, cfg, isRepeatSquad ? 0.9 : 1.0);
     setSlots(battleSlots); setPhase("battling");
 
-    for (let i=1; i<=SQUAD_SIZE; i++) {
-      await new Promise(r=>setTimeout(r,REVEAL_MS));
-      setRevealedCount(i);
-      if (battleSlots[i-1]?.survived) raidSfx.survive(); else raidSfx.die();
-    }
-    await new Promise(r=>setTimeout(r,800));
+    // ── Live battle: RaidBattleCanvas drives the reveal (onUnitResolved) and resolves this promise when the war is over
+  setEnemyFactionId(pickEnemyFaction(factionId));
+  await Promise.race([
+    new Promise<void>(resolve => { battleDoneRef.current = resolve; }),
+    new Promise<void>(resolve => setTimeout(resolve, 45000)), // safety: never hang the raid if the canvas fails
+  ]);
+  battleDoneRef.current = null;
+  void REVEAL_MS;
 
     const prof  = loadProfile();
     const pid   = String(effectivePlayerId||getEffectivePlayerId(prof)||prof?.id||"guest").trim().slice(0,64)||"guest";
@@ -1215,6 +1226,36 @@ export default function Raid() {
           </div>
         </div>
 
+        {/* ── BATTLE SCENE ── */}
+        {(phase==='battling'||phase==='revealed') && slots.length>0 && (
+          <div style={{ marginBottom:16 }}>
+          <RaidBattleCanvas key={`${factionId}-${enemyFactionId}-${slots.length}`} slots={slots} faction={faction} enemy={FACTION_DATA[enemyFactionId] ?? FACTION_DATA['ronin']}
+            onUnitResolved={(i, s) => { setRevealedCount(i + 1); if (s) raidSfx.survive(); else raidSfx.die(); }}
+            onComplete={() => { battleDoneRef.current?.(); }} />
+          <div style={{ height:12 }} />
+          <div style={{ marginBottom:16, borderRadius:20, overflow:'hidden',
+            background:'linear-gradient(135deg, rgba(3,10,28,0.95), rgba(8,20,50,0.98))',
+            border:`1px solid ${faction.colors.primary}33`,
+            boxShadow:`0 0 60px ${faction.colors.glow.replace('0.5','0.1')}, inset 0 1px 0 ${faction.colors.primary}22`,
+            padding:'20px' }}>
+            <div style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:11, fontWeight:900, letterSpacing:'0.25em', textTransform:'uppercase', color: faction.colors.text, marginBottom:14, filter:`drop-shadow(0 0 8px ${faction.colors.glow})` }}>
+              ⚔️ BATTLE REPORT
+            </div>
+            <BattleScene slots={slots} revealedCount={revealedCount} phase={phase}
+              ultraCarriers={ultraCarriersThreshold} ultraRatio={ultraRatioThreshold} faction={faction} />
+          </div>
+          </div>
+        )}
+
+        {phase==='launching' && <LaunchAnimation />}
+
+        {phase==='battling' && (
+          <div style={{ marginTop:8, fontSize:12, textAlign:'center', fontWeight:900, fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", letterSpacing:'0.2em', textTransform:'uppercase', color:'#22d3ee', animation:'raidPulse 1s ease-in-out infinite', filter:'drop-shadow(0 0 8px rgba(34,211,238,0.6))' }}>
+            🐜 ANT {Math.min(revealedCount+1,SQUAD_SIZE)} OF {SQUAD_SIZE} REPORTING IN…
+          </div>
+        )}
+
+        
         {/* ── SQUAD BUILDER ── */}
         <div style={{ marginBottom:16, borderRadius:20, overflow:'hidden',
           background:'linear-gradient(135deg, rgba(3,10,28,0.9), rgba(5,15,35,0.95))',
@@ -1280,29 +1321,6 @@ export default function Raid() {
             />
           </div>
         </div>
-
-        {/* ── BATTLE SCENE ── */}
-        {(phase==='battling'||phase==='revealed') && slots.length>0 && (
-          <div style={{ marginBottom:16, borderRadius:20, overflow:'hidden',
-            background:'linear-gradient(135deg, rgba(3,10,28,0.95), rgba(8,20,50,0.98))',
-            border:`1px solid ${faction.colors.primary}33`,
-            boxShadow:`0 0 60px ${faction.colors.glow.replace('0.5','0.1')}, inset 0 1px 0 ${faction.colors.primary}22`,
-            padding:'20px' }}>
-            <div style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:11, fontWeight:900, letterSpacing:'0.25em', textTransform:'uppercase', color: faction.colors.text, marginBottom:14, filter:`drop-shadow(0 0 8px ${faction.colors.glow})` }}>
-              ⚔️ BATTLE REPORT
-            </div>
-            <BattleScene slots={slots} revealedCount={revealedCount} phase={phase}
-              ultraCarriers={ultraCarriersThreshold} ultraRatio={ultraRatioThreshold} faction={faction} />
-          </div>
-        )}
-
-        {phase==='launching' && <LaunchAnimation />}
-
-        {phase==='battling' && (
-          <div style={{ marginTop:8, fontSize:12, textAlign:'center', fontWeight:900, fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", letterSpacing:'0.2em', textTransform:'uppercase', color:'#22d3ee', animation:'raidPulse 1s ease-in-out infinite', filter:'drop-shadow(0 0 8px rgba(34,211,238,0.6))' }}>
-            🐜 ANT {Math.min(revealedCount+1,SQUAD_SIZE)} OF {SQUAD_SIZE} REPORTING IN…
-          </div>
-        )}
 
         {/* ── ACTION ROW ── */}
         <div style={{ display:'flex', gap:10, flexWrap:'wrap', alignItems:'center', marginTop:16, marginBottom:12 }}>
