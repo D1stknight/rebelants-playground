@@ -45,6 +45,26 @@ function knockOutBackground(c: HTMLCanvasElement) {
     d[i * 4 + 3] = 0;
     push(x + 1, y); push(x - 1, y); push(x, y + 1); push(x, y - 1);
   }
+  // second pass: enclosed pockets of background (between legs, under arms) that the edge fill can't reach.
+  // Flood each unvisited near-bg component; wipe it if it's small relative to the sprite (armor plates are large and stay).
+  const pocketMax = Math.floor(w * h * 0.05);
+  const comp: number[] = [];
+  for (let start = 0; start < w * h; start++) {
+    if (seen[start] || !near(start * 4)) continue;
+    comp.length = 0; stack.push(start); seen[start] = 1;
+    while (stack.length) {
+      const i = stack.pop() as number; comp.push(i); const x = i % w, y = (i - x) / w;
+      const nb = [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]];
+      for (const [nx, ny] of nb) { if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue; const j = ny * w + nx; if (seen[j]) continue; seen[j] = 1; if (near(j * 4)) stack.push(j); }
+    }
+    if (comp.length <= pocketMax) for (const i of comp) d[i * 4 + 3] = 0;
+  }
+  // painted ground shadow (light, desaturated, bottom quarter) — we draw our own, so fade it out
+  for (let y = Math.floor(h * 0.72); y < h; y++) for (let x = 0; x < w; x++) {
+    const o = (y * w + x) * 4; if (d[o + 3] === 0) continue;
+    const r = d[o], g = d[o + 1], b = d[o + 2]; const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    if (mn > 140 && mx - mn < 30) d[o + 3] = Math.min(d[o + 3], Math.max(0, Math.round((200 - mn) * 2)));
+  }
   const a2 = new Uint8ClampedArray(d.length); a2.set(d);
   for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
     const o = (y * w + x) * 4; if (d[o + 3] === 0) continue;
@@ -128,7 +148,7 @@ export default function RaidBattleCanvas({ slots, faction, enemy, stepMs = 1150,
 
     // ── world layout (perspective ground: back rows higher + smaller)
     const ROWS = 5;
-    const groundTop = () => H * 0.40, groundBot = () => H * 0.88;
+    const groundTop = () => H * 0.30, groundBot = () => H * 0.80;
     const rowY = (row: number) => groundTop() + (groundBot() - groundTop()) * ((row + 0.5) / ROWS);
     const rowScale = (row: number) => 0.74 + (row / (ROWS - 1)) * 0.40;      // 0.74 back → 1.14 front
     const baseScale = () => Math.max(0.36, Math.min(0.6, W / 1400)) * (H / 540);
@@ -156,7 +176,7 @@ export default function RaidBattleCanvas({ slots, faction, enemy, stepMs = 1150,
     const allies = units.filter(u => u.side === "ally"), enemies = units.filter(u => u.side === "enemy");
 
     const particles: Particle[] = []; const bombs: Bomb[] = [];
-    let shake = 0, zoom = 1, zoomTarget = 1, focusX = W / 2, focusY = H * 0.64, focusTX = W / 2, focusTY = H * 0.64;
+    let shake = 0, zoom = 1, zoomTarget = 1, focusX = W / 2, focusY = H * 0.56, focusTX = W / 2, focusTY = H * 0.56;
     let hitStop = 0;                    // seconds of near-freeze remaining
     let flashWhite = 0;                 // full-screen flash alpha
     let feedId = 0; const pushFeed = (text: string, tone: Feed["tone"]) => { setFeed(f => [...f.slice(-4), { id: ++feedId, text, tone }]); };
@@ -250,7 +270,7 @@ export default function RaidBattleCanvas({ slots, faction, enemy, stepMs = 1150,
       // march-in: armies walk on, then hold the line
       if (t < MARCH) {
         for (const u of units) { u.tx = u.homeX; u.ty = u.homeY; u.speed = 0.75 + (u.row * 0.05) + ((u.slotIdx * 7) % 5) * 0.04; }
-      } else if (!clashCalled) { clashCalled = true; ring(MID(), H * 0.62, "rgba(253,224,71,0.5)", 120, 0.9, "shock"); shake = 4; }
+      } else if (!clashCalled) { clashCalled = true; ring(MID(), H * 0.55, "rgba(253,224,71,0.5)", 120, 0.9, "shock"); shake = 4; }
 
       // acts
       for (let i = 0; i < N; i++) {
@@ -288,7 +308,7 @@ export default function RaidBattleCanvas({ slots, faction, enemy, stepMs = 1150,
       if (t > nextSkirmish && t < battleEnd) { skirmish(); nextSkirmish = t + 500 + rand() * 900; }
 
       // finale
-      if (t > battleEnd && !finaleShown) { finaleShown = true; zoomTarget = 1; focusTX = W / 2; focusTY = H * 0.64; setHud(h => ({ ...h, phase: "FINALE", done: true })); }
+      if (t > battleEnd && !finaleShown) { finaleShown = true; zoomTarget = 1; focusTX = W / 2; focusTY = H * 0.56; setHud(h => ({ ...h, phase: "FINALE", done: true })); }
       if (t > battleEnd + FINALE && !completed) { completed = true; cbRef.current.onComplete?.(); }
 
       // bombs
@@ -319,7 +339,7 @@ export default function RaidBattleCanvas({ slots, faction, enemy, stepMs = 1150,
       for (let i = particles.length - 1; i >= 0; i--) { const p = particles[i]; p.life += dt; if (p.life > p.max) { particles.splice(i, 1); continue; } p.vy += p.grav * dt; p.x += p.vx * 60 * dt; p.y += p.vy * 60 * dt; }
       // camera
       shake = Math.max(0, shake - dt * 26); flashWhite = Math.max(0, flashWhite - dt * 2.2);
-      focusTX = Math.max(W * 0.38, Math.min(W * 0.62, focusTX)); focusTY = Math.max(H * 0.58, Math.min(H * 0.68, focusTY));
+      focusTX = Math.max(W * 0.38, Math.min(W * 0.62, focusTX)); focusTY = Math.max(H * 0.50, Math.min(H * 0.60, focusTY));
       zoom += (zoomTarget - zoom) * Math.min(1, dt * 2.4); focusX += (focusTX - focusX) * Math.min(1, dt * 2.6); focusY += (focusTY - focusY) * Math.min(1, dt * 2.6);
     };
 
@@ -390,7 +410,7 @@ export default function RaidBattleCanvas({ slots, faction, enemy, stepMs = 1150,
       // camera
       ctx.save();
       const sx = (rand() - 0.5) * shake, sy = (rand() - 0.5) * shake;
-      ctx.translate(W / 2 + sx, H * 0.64 + sy); ctx.scale(zoom, zoom); ctx.translate(-focusX, -focusY);
+      ctx.translate(W / 2 + sx, H * 0.56 + sy); ctx.scale(zoom, zoom); ctx.translate(-focusX, -focusY);
 
       // ground fog band
       const fog = ctx.createLinearGradient(0, groundTop() - 30, 0, groundBot() + 40); fog.addColorStop(0, "rgba(120,90,70,0)"); fog.addColorStop(0.5, "rgba(120,90,70,0.10)"); fog.addColorStop(1, "rgba(30,20,20,0.35)"); ctx.fillStyle = fog; ctx.fillRect(-200, groundTop() - 30, W + 400, groundBot() - groundTop() + 80);
