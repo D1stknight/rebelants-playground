@@ -1,5 +1,6 @@
 // pages/api/auth/discord/logout.ts
 import type { NextApiRequest, NextApiResponse } from "next";
+import { nameSessionClearCookies } from "../../../../lib/name-session";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // allow GET or POST
@@ -24,6 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 ];
 
   res.setHeader("Cache-Control", "no-store, max-age=0");
+  cookies.push(...nameSessionClearCookies());
   res.setHeader("Set-Cookie", cookies);
 
   // Go back to Shuffle
