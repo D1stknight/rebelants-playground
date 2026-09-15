@@ -4,6 +4,7 @@
 export const BOUNTY_DEFAULT_COST = 100;      // REBEL to start a hunt (admin override: pointsConfig.bountyCost)
 export const BOUNTY_DEATH_KEEP = 0.5;        // share of collected bounty kept on game over
 export const BOUNTY_LIVES = 3;
+export const BOUNTY_HP = 4;                  // hits per life — bullets/contact 1, spikes 2, liquids/pits/crushers take the whole bar
 
 export type BiomeId = "jungle" | "sewers" | "fortress" | "throne";
 
@@ -36,7 +37,7 @@ export const BOARDS: Board[] = WORLDS.flatMap((w, wi) => [0, 1, 2].map((si) => {
     id: `w${world}s${stage}`, n, world, stage, biome: w.biome,
     name: `${w.name} ${stage}: ${w.stages[si]}`, subtitle: w.subs[si],
     boss: captain ? { id: "captain", name: `${w.name.toUpperCase()} CAPTAIN`, bounty: 40 * world + 30 * stage, hp: 14 + 6 * n, captain: true } : { ...w.boss, captain: false },
-    length: 150 + n * 12 + (stage === 3 ? 20 : 0),
+    length: 170 + n * 16 + (stage === 3 ? 24 : 0),
     difficulty: n,
     accent: w.accent, music: w.music,
   };

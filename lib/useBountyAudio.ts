@@ -49,6 +49,7 @@ export function useBountyAudio() {
       kill: () => play("fw-hit-heavy", 0.55, 80),
       bossdie: () => play("fw-territory-win", 0.8),
       die: () => play("ant-die", 0.8),
+      hurt: () => play("spider-hit", 0.55, 150),
       jump: () => play("fw-trick-dodge", 0.18, 120),
       coin: () => play("collect-crumb", 0.5, 80),
       heal: () => play("fw-heal", 0.6),

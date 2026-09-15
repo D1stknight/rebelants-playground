@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { usePoints } from "../../lib/usePoints";
 import { loadProfile, getEffectivePlayerId } from "../../lib/profile";
 import { pointsConfig as defaultPointsConfig } from "../../lib/pointsConfig";
-import { BOARDS, BOUNTY_DEATH_KEEP, BOUNTY_DEFAULT_COST, BOUNTY_LIVES, KILL_BOUNTY, type Board } from "../../lib/bountyConfig";
+import { BOARDS, BOUNTY_DEATH_KEEP, BOUNTY_DEFAULT_COST, BOUNTY_HP, BOUNTY_LIVES, KILL_BOUNTY, type Board } from "../../lib/bountyConfig";
 import { preloadBoard } from "./game";
 import { DESCENT_FACTIONS } from "../../lib/descentConfig";
 
@@ -161,7 +161,7 @@ const BountyHunters: React.FC = () => {
       <div style={{ maxWidth: 1000, margin: "30px auto 0", padding: "0 16px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 10 }}>
         {[
           { t: "CONTROLS", c: "#c4b5fd", d: "← → run · Z / Space jump · X / Shift fire · ↑ aim up · ↓ crouch, or drop through a platform. Touch pads on phones." },
-          { t: "ONE HIT", c: "#f87171", d: "Like the old days: anything that touches you takes a life. Bullets, wasps, spikes, pits. You respawn at the last checkpoint with a plain rifle." },
+          { t: "HEALTH", c: "#f87171", d: `${BOUNTY_HP} hits per life, ${BOUNTY_LIVES} lives. Bullets and bugs take 1, spikes take 2, liquids, pits and crushers take the whole bar. Honey drops heal 1, hearts add a life. You respawn at the last checkpoint with a plain rifle.` },
           { t: "GUNS", c: "#7ad4ff", d: "Crates drop capsules. S = spread (3 shots), L = laser (fast, goes through), F = flame (short, rapid). Dying puts you back on the rifle." },
           { t: "THE TARGET", c: "#fbbf24", d: "Every board ends in a locked arena: a captain on stages 1–2, the world boss on stage 3. Its bounty is the real money — kills on the way are tips." },
           { t: "THE HIVE FIGHTS BACK", c: "#a78bfa", d: "Deeper boards add moving and crumbling platforms, crushers, timed spikes, cannons, springs, brick walls and hopping spiders. Watch the rhythm, then go." },

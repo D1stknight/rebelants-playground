@@ -1,7 +1,7 @@
 // components/BountyHunters/game.ts
 // Bounty Hunters — canvas-2D run-and-gun engine. Fixed 400×225 internal resolution, nearest-neighbour upscale.
 // Pure game logic + rendering; React only mounts the canvas and forwards input (see BountyGame.tsx).
-import { BOARDS, BOUNTY_LIVES, KILL_BOUNTY, type Board } from "../../lib/bountyConfig";
+import { BOARDS, BOUNTY_HP, BOUNTY_LIVES, KILL_BOUNTY, type Board } from "../../lib/bountyConfig";
 import { buildLevel, ROWS, TILE, type Level, type Spawn } from "./levels";
 
 export const VW = 400, VH = 225;
@@ -9,7 +9,7 @@ const GRAV = 640, PSPEED = 92, JUMP = 262, BULLET = 280;
 
 export type Weapon = "rifle" | "spread" | "laser" | "flame";
 export type Input = { left: boolean; right: boolean; up: boolean; down: boolean; jump: boolean; fire: boolean };
-export type Hud = { lives: number; weapon: Weapon; bounty: number; board: Board; bossHp: number | null; bossMax: number; kills: number; progress: number; state: GameState; msg: string | null };
+export type Hud = { lives: number; hp: number; maxHp: number; weapon: Weapon; bounty: number; board: Board; bossHp: number | null; bossMax: number; kills: number; progress: number; state: GameState; msg: string | null };
 export type GameState = "intro" | "play" | "dying" | "boss" | "cleared" | "gameover";
 export type Callbacks = { onHud: (h: Hud) => void; onSfx: (name: string) => void; onEnd: (r: { cleared: boolean; bounty: number; kills: number; boardN: number }) => void };
 
@@ -38,7 +38,7 @@ export class BountyGame {
   ents: Ent[] = []; player: Ent;
   cam = 0; camLock: number | null = null;
   state: GameState = "intro"; stateT = 0;
-  lives = BOUNTY_LIVES; bounty = 0; kills = 0; weapon: Weapon = "rifle";
+  lives = BOUNTY_LIVES; hp = BOUNTY_HP; maxHp = BOUNTY_HP; bounty = 0; kills = 0; weapon: Weapon = "rifle";
   input: Input = { left: false, right: false, up: false, down: false, jump: false, fire: false };
   prevJump = false; fireCd = 0; invuln = 0; shake = 0; flash = 0; t = 0; checkpoint = 0;
   boss: Ent | null = null; msg: string | null = null; hitStop = 0;
@@ -49,7 +49,7 @@ export class BountyGame {
   constructor(canvas: HTMLCanvasElement, board: Board, cb: Callbacks, faction = "samurai") {
     this.ctx = canvas.getContext("2d")!; this.ctx.imageSmoothingEnabled = false;
     this.board = board; this.cb = cb; this.level = buildLevel(board);
-    this.hunter = load(`hunter_${faction}`, 64, 64, 10); this.items = load("items", 16, 16, 15); this.hud = this.items;
+    this.hunter = load(`hunter_${faction}`, 64, 64, 10); this.items = load("items", 16, 16, 16); this.hud = this.items;
     this.tiles = load(`tiles_${board.biome}`, 16, 16, 16);
     this.bg = [load(`bg_${board.biome}_far`, 480, 225, 1), load(`bg_${board.biome}_mid`, 480, 225, 1), load(`bg_${board.biome}_near`, 480, 64, 1)];
     this.bossSheet = board.boss.captain ? load("elite", 64, 64, 7) : load(`boss_${board.boss.id}`, 64, 64, 6);
@@ -89,7 +89,8 @@ export class BountyGame {
   // ── tiles
   tile(tx: number, ty: number) { if (ty >= ROWS) return 1; if (ty < 0 || tx < 0 || tx >= this.level.cols) return tx < 0 ? 1 : 0; return this.level.tiles[ty * this.level.cols + tx]; }
   solidAt(x: number, y: number) { const v = this.tile(Math.floor(x / TILE), Math.floor(y / TILE)); return v === 1; }
-  spikeAt(x: number, y: number) { const v = this.tile(Math.floor(x / TILE), Math.floor(y / TILE)); if (v === 3 || v === 15) return true; if (v === 11) return this.spikePhase(0); if (v === 12) return this.spikePhase(1); return false; }
+  spikeAt(x: number, y: number) { const v = this.tile(Math.floor(x / TILE), Math.floor(y / TILE)); if (v === 11) return this.spikePhase(0); if (v === 12) return this.spikePhase(1); return false; }
+  liquidAt(x: number, y: number) { const v = this.tile(Math.floor(x / TILE), Math.floor(y / TILE)); return v === 3 || v === 15; }
   spikePhase(k: number) { const c = (this.t % 2.6) / 2.6; return k === 0 ? c < 0.45 : c >= 0.5 && c < 0.95; }
 
   // move an entity with tile collision (AABB, one-way platforms)
@@ -137,7 +138,7 @@ export class BountyGame {
   start() { this.last = performance.now(); const loop = (now: number) => { if (this.over) return; const dt = Math.min(0.05, (now - this.last) / 1000); this.last = now; this.acc += dt; while (this.acc >= 1 / 120) { this.step(1 / 120); this.acc -= 1 / 120; } this.render(); this.raf = requestAnimationFrame(loop); }; this.raf = requestAnimationFrame(loop); }
   stop() { this.over = true; cancelAnimationFrame(this.raf); }
 
-  pushHud() { this.cb.onHud({ lives: this.lives, weapon: this.weapon, bounty: this.bounty, board: this.board, bossHp: this.boss && this.state === "boss" ? Math.max(0, this.boss.hp) : null, bossMax: this.board.boss.hp, kills: this.kills, progress: Math.min(1, this.player.x / this.level.bossX), state: this.state, msg: this.msg }); }
+  pushHud() { this.cb.onHud({ lives: this.lives, hp: this.hp, maxHp: this.maxHp, weapon: this.weapon, bounty: this.bounty, board: this.board, bossHp: this.boss && this.state === "boss" ? Math.max(0, this.boss.hp) : null, bossMax: this.board.boss.hp, kills: this.kills, progress: Math.min(1, this.player.x / this.level.bossX), state: this.state, msg: this.msg }); }
   setState(s: GameState, msg: string | null = null) { this.state = s; this.stateT = 0; this.msg = msg; this.pushHud(); }
   sfx(n: string) { this.cb.onSfx(n); }
 
@@ -157,7 +158,7 @@ export class BountyGame {
       if (this.stateT > 1.4) { this.lives--; this.pushHud(); if (this.lives <= 0) { this.setState("gameover", "THE HIVE COLLECTS"); this.sfx("lose"); } else { this.respawn(); } }
     } else if (this.state === "play" || this.state === "boss") {
       const inp = this.input; const crouch = inp.down && p.ground && !inp.left && !inp.right;
-      p.vx = crouch ? 0 : inp.left ? -PSPEED : inp.right ? PSPEED : 0;
+      if (p.data.knock > 0) { p.data.knock -= dt; } else p.vx = crouch ? 0 : inp.left ? -PSPEED : inp.right ? PSPEED : 0;
       if (inp.left) p.dir = -1; if (inp.right) p.dir = 1;
       if (inp.jump && !this.prevJump && p.ground) { if (inp.down && this.tile(Math.floor((p.x + p.w / 2) / TILE), Math.floor((p.y + p.h + 1) / TILE)) === 2) { p.data.dropThrough = 0.25; } else { p.vy = -JUMP; p.data.jumping = true; this.sfx("jump"); } }
       if (!inp.jump && p.data.jumping && p.vy < -80) p.vy = -80;   // variable jump height (player jumps only, not springs)
@@ -177,7 +178,8 @@ export class BountyGame {
       if (inp.fire && this.fireCd <= 0) { this.shoot(p, aim, crouch); }
       if (this.invuln > 0) this.invuln -= dt;
       // hazards
-      if (p.y > ROWS * TILE + 20 || this.spikeAt(p.x + p.w / 2, p.y + p.h - 2)) this.kill();
+      if (p.y > ROWS * TILE + 20 || this.liquidAt(p.x + p.w / 2, p.y + p.h - 2)) this.kill();
+      else if (this.spikeAt(p.x + p.w / 2, p.y + p.h - 2)) this.damage(2);
       // camera / boss trigger
       if (this.state === "play" && p.x >= this.level.bossX) { this.camLock = this.level.bossX - 40; this.setState("boss", `WANTED · ${this.board.boss.name}`); if (this.boss) this.boss.state = "enter"; this.sfx("ambush"); }
       if (p.ground && this.state === "play" && !this.spikeAt(p.x + p.w / 2, p.y + p.h + 2)) { if (Math.floor(p.x / 64) !== Math.floor(this.checkpoint / 64)) this.checkpoint = p.x; }
@@ -195,7 +197,7 @@ export class BountyGame {
           if (e.hp <= 0) { e.state = "dead"; e.t += 0; if (e.t > 1.2) e.dead = true; break; }
           if (!near) break;
           e.dir = dx < 0 ? -1 : 1;
-          const speed = e.kind === "elite" ? 46 : 34;
+          const speed = (e.kind === "elite" ? 46 : 34) + this.board.difficulty * 1.5;
           const far = Math.abs(dx) > 120;
           e.vx = far ? e.dir * speed : (Math.abs(dx) < 40 ? -e.dir * speed * 0.6 : 0);
           // don't walk off ledges
@@ -218,7 +220,7 @@ export class BountyGame {
           if (!near) break;
           const ph = e.data.ph + this.t * 3;
           const tx = p.x - (dx > 0 ? 24 : -24);
-          e.vx += ((tx - e.x) * 1.6 - e.vx) * dt * 1.2; e.vx = Math.max(-110, Math.min(110, e.vx));
+          e.vx += ((tx - e.x) * 1.6 - e.vx) * dt * 1.2; const wv = 100 + this.board.difficulty * 4; e.vx = Math.max(-wv, Math.min(wv, e.vx));
           const ty = Math.min(e.data.baseY + 30, Math.max(20, p.y - 40 + Math.sin(ph) * 22));
           e.vy = (ty - e.y) * 2.4;
           e.x += e.vx * dt; e.y += e.vy * dt; e.dir = e.vx < 0 ? -1 : 1;
@@ -298,7 +300,7 @@ export class BountyGame {
         case "ebullet": {
           e.x += e.vx * dt; e.y += e.vy * dt; e.data.life -= dt;
           if (e.data.life <= 0 || this.solidAt(e.x + 3, e.y + 3)) e.dead = true;
-          if ((this.state === "play" || this.state === "boss") && this.invuln <= 0 && this.overlap(e, this.hit(p))) { e.dead = true; this.kill(); }
+          if ((this.state === "play" || this.state === "boss") && this.invuln <= 0 && this.overlap(e, this.hit(p))) { e.dead = true; this.damage(e.data.big ? 2 : 1); }
           break;
         }
         case "item": {
@@ -307,6 +309,7 @@ export class BountyGame {
             e.dead = true; const it = e.data.item;
             if (it === 0) { this.bounty += 5; this.sfx("coin"); }
             else if (it === 5) { this.lives = Math.min(5, this.lives + 1); this.sfx("heal"); }
+            else if (it === 15) { this.hp = Math.min(this.maxHp, this.hp + 1); this.sfx("heal"); }
             else { this.weapon = (["", "spread", "laser", "flame", "rifle"] as Weapon[])[it]; this.sfx("power"); this.msg = this.weapon.toUpperCase() + " GUN"; setTimeout(() => { if (this.msg?.endsWith("GUN")) { this.msg = null; this.pushHud(); } }, 1400); }
             this.pushHud();
           }
@@ -327,7 +330,16 @@ export class BountyGame {
   updateParts(dt: number) { for (const q of this.parts) { q.life -= dt; q.x += q.vx * dt; q.y += q.vy * dt; q.vy += 200 * dt; } this.parts = this.parts.filter((q) => q.life > 0); }
   hit(p: Ent) { return p.data.crouch ? { ...p, y: p.y + 10, h: p.h - 10 } : p; }
   overlap(a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
-  touch(e: Ent, _dmg: number) { if ((this.state === "play" || this.state === "boss") && this.invuln <= 0 && e.hp > 0 && this.overlap(e, this.hit(this.player))) this.kill(); }
+  touch(e: Ent, dmg: number) { if ((this.state === "play" || this.state === "boss") && this.invuln <= 0 && e.hp > 0 && this.overlap(e, this.hit(this.player))) this.damage(dmg, e); }
+  /** lose HP; at 0 the life is gone. Knockback away from `from` (or backwards). */
+  damage(n: number, from?: Ent) {
+    if (this.state !== "play" && this.state !== "boss") return; if (this.invuln > 0) return;
+    this.hp -= n;
+    if (this.hp <= 0) { this.hp = 0; this.kill(); return; }
+    const p = this.player; const away = from ? (p.x + p.w / 2 < from.x + from.w / 2 ? -1 : 1) : -p.dir;
+    p.vx = away * 90; p.vy = Math.min(p.vy, -140); p.data.knock = 0.18; this.invuln = 1.1; this.flash = 0.7; this.shake = 0.6; this.hitStop = 0.04;
+    this.burst(p.x + p.w / 2, p.y + p.h / 2, 8, "#ff6060", 90, 2); this.sfx("hurt"); this.pushHud();
+  }
 
   shoot(p: Ent, aim: number, crouch: boolean) {
     const a = (-aim * Math.PI) / 180; const dirx = aim === 90 ? 0 : p.dir; const cx = p.x + p.w / 2 + dirx * 12, cy = p.y + (crouch ? 18 : 10);
@@ -344,13 +356,13 @@ export class BountyGame {
 
   onKill(o: Ent) {
     if (o.kind === "brick") { this.sfx("crate"); return; }
-    if (o.kind === "crate") { this.burst(o.x + 8, o.y + 8, 10, "#c8a070", 90, 2); const roll = Math.random(); const it = this.mk("item", o.x + 2, o.y, 12, 12); it.vy = -120; it.data.item = roll < 0.45 ? 0 : roll < 0.65 ? 1 : roll < 0.8 ? 2 : roll < 0.92 ? 3 : 5; this.sfx("crate"); return; }
+    if (o.kind === "crate") { this.burst(o.x + 8, o.y + 8, 10, "#c8a070", 90, 2); const roll = Math.random(); const it = this.mk("item", o.x + 2, o.y, 12, 12); it.vy = -120; it.data.item = roll < 0.32 ? 0 : roll < 0.5 ? 15 : roll < 0.66 ? 1 : roll < 0.8 ? 2 : roll < 0.92 ? 3 : 5; this.sfx("crate"); return; }
     this.kills++; this.bounty += KILL_BOUNTY[o.kind] || 0;
     this.burst(o.x + o.w / 2, o.y + o.h / 2, 12, o.kind === "wasp" ? "#f8c840" : "#9be080", 100, 2);
     if (o.kind === "wasp") { o.vy = -60; } else if (o.kind === "boss") { this.onBossDown(o); } else { o.t = 0; }
     this.sfx(o.kind === "boss" ? "bossdie" : "kill"); this.hitStop = 0.03;
     // bounty tag pops out of anything that isn't a boss
-    if (o.kind !== "boss" && Math.random() < 0.35) { const it = this.mk("item", o.x + o.w / 2 - 6, o.y, 12, 12); it.vy = -140; it.vx = (Math.random() - 0.5) * 60; it.data.item = 0; }
+    if (o.kind !== "boss") { const roll = Math.random(); if (roll < 0.42) { const it = this.mk("item", o.x + o.w / 2 - 6, o.y, 12, 12); it.vy = -140; it.vx = (Math.random() - 0.5) * 60; it.data.item = roll < 0.3 ? 0 : 15; } }
     this.pushHud();
   }
 
@@ -360,7 +372,7 @@ export class BountyGame {
     this.burst(p.x + p.w / 2, p.y + p.h / 2, 16, "#ff6060", 120, 2); this.sfx("die"); this.setState("dying");
   }
   respawn() {
-    const p = this.player; p.x = this.camLock != null ? this.camLock + 30 : this.checkpoint; p.y = 20; p.vx = 0; p.vy = 0; this.invuln = 2.2; this.weapon = "rifle";
+    const p = this.player; p.x = this.camLock != null ? this.camLock + 30 : this.checkpoint; p.y = 20; p.vx = 0; p.vy = 0; this.invuln = 2.2; this.weapon = "rifle"; this.hp = this.maxHp;
     // find ground under the checkpoint
     for (let y = 0; y < ROWS; y++) { if (this.tile(Math.floor((p.x + p.w / 2) / TILE), y) === 1) { p.y = y * TILE - p.h - 2; break; } }
     for (const e of this.ents) if (e.kind === "ebullet") e.dead = true;
@@ -527,7 +539,7 @@ export class BountyGame {
       case "spring": { const x = Math.floor(e.x), y = Math.floor(e.y); const sq = e.data.k > 0 ? 3 : 0; c.fillStyle = "#c8c8d8"; c.fillRect(x, y + 6, 14, 2); c.fillStyle = "#8a8aa0"; for (let i = 0; i < 3; i++) c.fillRect(x + 2, y + 1 + sq * 0.5 + i * 1.7, 10, 1); c.fillStyle = "#ff6b6b"; c.fillRect(x, y - 2 + sq, 14, 3); break; }
       case "cannon": { const x = Math.floor(e.x), y = Math.floor(e.y); c.fillStyle = "#2a2630"; c.fillRect(x + 2, y + 6, 12, 10); c.fillStyle = "#4a4658"; c.fillRect(e.dir > 0 ? x + 6 : x - 4, y + 4, 14, 8); c.fillStyle = "#15131a"; c.fillRect(e.dir > 0 ? x + 17 : x - 4, y + 6, 3, 4); if (e.data.flash > 0) { c.fillStyle = "#ffe08a"; c.fillRect(e.dir > 0 ? x + 20 : x - 8, y + 5, 5, 6); } break; }
       case "hopper": { const s = sheets.turret; const f = e.state === "dead" ? 3 : e.data.hurt > 0 ? 2 : (e.ground ? Math.floor(this.t * 4) % 2 : 1); this.frame(s, f, e.x - 4, e.y - 8, e.dir < 0); break; }
-      case "item": { const bob = Math.sin(this.t * 6) * 1.5; this.frame(this.items, e.data.item === 0 ? 0 : e.data.item === 5 ? 5 : e.data.item, e.x - 2, e.y - 2 + bob, false); break; }
+      case "item": { const bob = Math.sin(this.t * 6) * 1.5; this.frame(this.items, e.data.item, e.x - 2, e.y - 2 + bob, false); break; }
       case "bullet": {
         if (e.data.laser) { c.save(); c.translate(e.x + 3, e.y + 3); c.rotate(Math.atan2(e.vy, e.vx)); this.frame(this.items, 8, -8, -8, false); c.restore(); }
         else if (e.data.flame) this.frame(this.items, 9, e.x - 5, e.y - 5, false);

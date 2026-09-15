@@ -54,7 +54,10 @@ export default function BountyGameView({ board, faction = "samurai", onEnd, onQu
         {hud && (
           <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
             <div style={{ position: "absolute", top: 8, left: 10, display: "flex", gap: 10, alignItems: "center" }}>
-              <div style={{ display: "flex", gap: 3 }}>{Array.from({ length: Math.max(0, hud.lives) }, (_, i) => <span key={i} style={{ fontSize: 12 * Math.max(1, scale / 2) }}>❤️</span>)}</div>
+              <div>
+                <div style={{ display: "flex", gap: 3 }}>{Array.from({ length: Math.max(0, hud.lives) }, (_, i) => <span key={i} style={{ fontSize: 11 * Math.max(1, scale / 2) }}>❤️</span>)}</div>
+                <div style={{ display: "flex", gap: 2, marginTop: 3 }}>{Array.from({ length: hud.maxHp }, (_, i) => <div key={i} style={{ width: 10 * Math.max(1, scale / 2), height: 4 * Math.max(1, scale / 2), background: i < hud.hp ? (hud.hp <= 1 ? "#ff4d4d" : "#7cf07c") : "rgba(255,255,255,0.15)", border: "1px solid rgba(0,0,0,0.7)" }} />)}</div>
+              </div>
               <div style={{ fontSize: 9 * Math.max(1, scale / 2), letterSpacing: "0.2em", fontWeight: 800, color: hud.weapon === "rifle" ? "#ddd" : hud.weapon === "spread" ? "#ff7070" : hud.weapon === "laser" ? "#7ad4ff" : "#ffa040" }}>{hud.weapon.toUpperCase()}</div>
             </div>
             <div style={{ position: "absolute", top: 8, right: 10, textAlign: "right" }}>
