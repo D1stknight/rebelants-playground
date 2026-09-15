@@ -9,6 +9,7 @@ export function useDescentAudio() {
   const mutedRef = React.useRef(muted); mutedRef.current = muted;
   const musicRef = React.useRef<HTMLAudioElement | null>(null);
   const trackRef = React.useRef<string | null>(null);
+  const wantRef = React.useRef<{ file: string; vol: number } | null>(null);   // last requested track, so unmuting mid-floor starts it
   const lastPlay = React.useRef<Record<string, number>>({});
 
   const play = React.useCallback((file: string, vol = 1, minGapMs = 60) => {
@@ -19,6 +20,7 @@ export function useDescentAudio() {
 
   const music = React.useCallback((file: string | null, vol = 0.35) => {
     if (typeof window === "undefined") return;
+    wantRef.current = file ? { file, vol } : null;
     if (!file || mutedRef.current) { if (musicRef.current) { musicRef.current.pause(); musicRef.current = null; } trackRef.current = null; return; }
     if (trackRef.current === file && musicRef.current && !musicRef.current.paused) { try { musicRef.current.volume = vol; } catch {} return; }
     if (musicRef.current) { musicRef.current.pause(); musicRef.current = null; }
@@ -29,9 +31,11 @@ export function useDescentAudio() {
     const next = !mutedRef.current;
     try { localStorage.setItem("ra:hd:muted", next ? "1" : "0"); } catch {}
     mutedRef.current = next;
-    if (musicRef.current) { if (next) musicRef.current.pause(); else void musicRef.current.play().catch(() => {}); }
+    if (next) { if (musicRef.current) musicRef.current.pause(); }
+    else if (musicRef.current) void musicRef.current.play().catch(() => {});
+    else if (wantRef.current) music(wantRef.current.file, wantRef.current.vol);
     setMuted(next);
-  }, []);
+  }, [music]);
 
   React.useEffect(() => () => { if (musicRef.current) { musicRef.current.pause(); musicRef.current = null; } }, []);
 
