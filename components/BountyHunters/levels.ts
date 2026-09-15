@@ -18,7 +18,7 @@ export function buildLevel(board: Board): Level {
   const set = (x: number, y: number, v: number) => { if (x >= 0 && x < cols && y >= 0 && y < ROWS) t[y * cols + x] = v; };
   const get = (x: number, y: number) => (x >= 0 && x < cols && y >= 0 && y < ROWS ? t[y * cols + x] : 1);
   const column = (x: number, groundY: number) => { for (let y = groundY; y < ROWS; y++) set(x, y, 1); };
-  const pit = (x: number, w: number, hazard = 3) => { for (let i = 0; i < w; i++) for (let y = 0; y < ROWS; y++) set(x + i, y, y === ROWS - 1 ? hazard : 0); };
+  const pit = (x: number, w: number) => { for (let i = 0; i < w; i++) for (let y = 0; y < ROWS; y++) set(x + i, y, y === ROWS - 1 ? 15 : y === ROWS - 2 ? 3 : 0); };
   const d = board.difficulty;                   // 1..12
   const w = board.world;                        // 1..4
   const enemyKind = () => (r() < 0.2 + d * 0.04 ? "elite" : "grunt") as SpawnKind;
@@ -26,7 +26,7 @@ export function buildLevel(board: Board): Level {
 
   // safe start
   let x = 0; let ground = 11;
-  for (; x < 20; x++) column(x, ground);
+  for (; x < 26; x++) column(x, ground);
   const startX = 3 * TILE;
 
   // segment menu grows with difficulty
@@ -70,6 +70,19 @@ export function buildLevel(board: Board): Level {
     x += len; ground = nh; for (let i = 0; i < 4; i++) column(x + i, ground);
     if (r() < 0.25) spawns.push({ kind: "heart", x: (x + 2) * TILE, y: (ground - 1) * TILE });
     x += 4;
+  });
+  add(2.5, () => {                                          // Contra-style tiered ledges
+    const len = 12 + Math.floor(r() * 6);
+    for (let i = 0; i < len; i++) column(x + i, ground);
+    const tiers = 2 + (d >= 4 ? 1 : 0);
+    for (let tI = 0; tI < tiers; tI++) {
+      const py = ground - 3 * (tI + 1); const px = x + 1 + Math.floor(r() * 3) + tI * 2; const pw = 4 + Math.floor(r() * 5);
+      for (let i = 0; i < pw && px + i < x + len - 1; i++) set(px + i, py, 2);
+      if (r() < 0.7) spawns.push({ kind: enemyKind(), x: (px + 1 + Math.floor(r() * Math.max(1, pw - 2))) * TILE, y: (py - 1) * TILE });
+      if (tI === tiers - 1 && r() < 0.5) spawns.push({ kind: "crate", x: (px + Math.floor(pw / 2)) * TILE, y: (py - 1) * TILE });
+    }
+    if (d >= 3 && r() < 0.5) spawns.push({ kind: "turret", x: (x + len - 4) * TILE, y: (ground - 2) * TILE });
+    x += len;
   });
   if (d >= 2) add(2.5, () => {                              // moving platforms over a wide pit
     const pw = 6 + Math.floor(r() * 4); pit(x, pw);

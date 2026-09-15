@@ -50,11 +50,11 @@ export class BountyGame {
     this.ctx = canvas.getContext("2d")!; this.ctx.imageSmoothingEnabled = false;
     this.board = board; this.cb = cb; this.level = buildLevel(board);
     this.hunter = load(`hunter_${faction}`, 64, 64, 10); this.items = load("items", 16, 16, 15); this.hud = this.items;
-    this.tiles = load(`tiles_${board.biome}`, 16, 16, 11);
+    this.tiles = load(`tiles_${board.biome}`, 16, 16, 16);
     this.bg = [load(`bg_${board.biome}_far`, 480, 225, 1), load(`bg_${board.biome}_mid`, 480, 225, 1), load(`bg_${board.biome}_near`, 480, 64, 1)];
     this.bossSheet = board.boss.captain ? load("elite", 64, 64, 7) : load(`boss_${board.boss.id}`, 64, 64, 6);
     load("grunt", 64, 64, 7); load("elite", 64, 64, 7); load("wasp", 32, 32, 5); load("turret", 32, 32, 4);
-    this.player = this.mk("player", this.level.startX, 9 * TILE, 14, 38); this.player.hp = 1; this.checkpoint = this.level.startX; this.invuln = 2.5;
+    this.player = this.mk("player", this.level.startX, 9 * TILE, 12, 30); this.player.hp = 1; this.checkpoint = this.level.startX; this.invuln = 2.5;
     for (const s of this.level.spawns) this.spawn(s);
     this.pushHud();
   }
@@ -65,14 +65,14 @@ export class BountyGame {
   }
   spawn(s: Spawn) {
     switch (s.kind) {
-      case "grunt": { const e = this.mk("grunt", s.x, s.y - 22, 14, 38); e.hp = 2; e.dir = -1; e.data.shootCd = 1 + Math.random(); break; }
-      case "elite": { const e = this.mk("elite", s.x, s.y - 22, 14, 38); e.hp = 4; e.dir = -1; e.data.shootCd = 1; break; }
+      case "grunt": { const e = this.mk("grunt", s.x, s.y - 14, 12, 30); e.hp = 2; e.dir = -1; e.data.shootCd = 1 + Math.random(); break; }
+      case "elite": { const e = this.mk("elite", s.x, s.y - 14, 12, 30); e.hp = 4; e.dir = -1; e.data.shootCd = 1; break; }
       case "wasp": { const e = this.mk("wasp", s.x, s.y, 22, 16); e.hp = 1; e.data.baseY = s.y; e.data.ph = Math.random() * 6; break; }
       case "turret": { const e = this.mk("turret", s.x, s.y + 2, 26, 26); e.hp = 3; e.data.shootCd = 1.5; break; }
       case "crate": { const e = this.mk("crate", s.x, s.y, 16, 16); e.hp = 1; break; }
       case "heart": { const e = this.mk("item", s.x, s.y - 2, 12, 12); e.data.item = 5; break; }
       case "boss": {
-        if (this.board.boss.captain) { const e = this.mk("boss", s.x + 16, s.y + 8, 20, 52); e.hp = this.board.boss.hp; e.dir = -1; e.state = "sleep"; e.data.captain = true; this.boss = e; }
+        if (this.board.boss.captain) { const e = this.mk("boss", s.x + 16, s.y + 18, 16, 42); e.hp = this.board.boss.hp; e.dir = -1; e.state = "sleep"; e.data.captain = true; this.boss = e; }
         else { const e = this.mk("boss", s.x, s.y, 52, 40); e.hp = this.board.boss.hp; e.dir = -1; e.state = "sleep"; e.data.pat = 0; this.boss = e; }
         break;
       }
@@ -89,7 +89,7 @@ export class BountyGame {
   // ── tiles
   tile(tx: number, ty: number) { if (ty >= ROWS) return 1; if (ty < 0 || tx < 0 || tx >= this.level.cols) return tx < 0 ? 1 : 0; return this.level.tiles[ty * this.level.cols + tx]; }
   solidAt(x: number, y: number) { const v = this.tile(Math.floor(x / TILE), Math.floor(y / TILE)); return v === 1; }
-  spikeAt(x: number, y: number) { const v = this.tile(Math.floor(x / TILE), Math.floor(y / TILE)); if (v === 3) return true; if (v === 11) return this.spikePhase(0); if (v === 12) return this.spikePhase(1); return false; }
+  spikeAt(x: number, y: number) { const v = this.tile(Math.floor(x / TILE), Math.floor(y / TILE)); if (v === 3 || v === 15) return true; if (v === 11) return this.spikePhase(0); if (v === 12) return this.spikePhase(1); return false; }
   spikePhase(k: number) { const c = (this.t % 2.6) / 2.6; return k === 0 ? c < 0.45 : c >= 0.5 && c < 0.95; }
 
   // move an entity with tile collision (AABB, one-way platforms)
@@ -189,7 +189,7 @@ export class BountyGame {
       e.t += dt;
       const dx = p.x - e.x; const onScreen = e.x + e.w > this.cam - 24 && e.x < this.cam + VW + 24;
       if (onScreen && e.data.awake == null) e.data.awake = 0; if (e.data.awake != null) e.data.awake += dt;
-      const near = onScreen && e.data.awake > 0.5 && this.state !== "intro";
+      const near = onScreen && e.data.awake > 0.5 && this.state !== "intro" && (this.t > 4 || p.x > this.level.startX + 100);
       switch (e.kind) {
         case "grunt": case "elite": {
           if (e.hp <= 0) { e.state = "dead"; e.t += 0; if (e.t > 1.2) e.dead = true; break; }
@@ -203,10 +203,10 @@ export class BountyGame {
           if (e.vx !== 0 && !this.solidAt(aheadX, e.y + e.h + 4) && e.ground) e.vx = 0;
           e.vy = Math.min(420, e.vy + GRAV * dt); this.move(e, dt);
           e.data.shootCd -= dt;
-          if (e.data.shootCd <= 0 && Math.abs(dx) < 200 && Math.abs(p.y - e.y) < 48 && this.state !== "dying") {
+          if (e.data.shootCd <= 0 && Math.abs(dx) < 200 && Math.abs(p.y - e.y) < 40 && this.state !== "dying") {
             e.data.shootCd = e.kind === "elite" ? 1.4 : 2.2 - this.board.difficulty * 0.2; e.data.flash = 0.15;
             const n = e.kind === "elite" ? 2 : 1;
-            for (let i = 0; i < n; i++) { const b = this.mk("ebullet", e.x + (e.dir > 0 ? e.w : -6), e.y + 14, 6, 6); b.vx = e.dir * (120 + this.board.difficulty * 8); b.vy = (i - (n - 1) / 2) * 40; b.data.life = 3; }
+            for (let i = 0; i < n; i++) { const b = this.mk("ebullet", e.x + (e.dir > 0 ? e.w : -6), e.y + 10, 6, 6); b.vx = e.dir * (120 + this.board.difficulty * 8); b.vy = (i - (n - 1) / 2) * 40; b.data.life = 3; }
             this.sfx("eshot");
           }
           if (e.data.flash > 0) e.data.flash -= dt;
@@ -325,12 +325,12 @@ export class BountyGame {
   }
 
   updateParts(dt: number) { for (const q of this.parts) { q.life -= dt; q.x += q.vx * dt; q.y += q.vy * dt; q.vy += 200 * dt; } this.parts = this.parts.filter((q) => q.life > 0); }
-  hit(p: Ent) { return p.data.crouch ? { ...p, y: p.y + 14, h: p.h - 14 } : p; }
+  hit(p: Ent) { return p.data.crouch ? { ...p, y: p.y + 10, h: p.h - 10 } : p; }
   overlap(a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
   touch(e: Ent, _dmg: number) { if ((this.state === "play" || this.state === "boss") && this.invuln <= 0 && e.hp > 0 && this.overlap(e, this.hit(this.player))) this.kill(); }
 
   shoot(p: Ent, aim: number, crouch: boolean) {
-    const a = (-aim * Math.PI) / 180; const dirx = aim === 90 ? 0 : p.dir; const cx = p.x + p.w / 2 + dirx * 14, cy = p.y + (crouch ? 24 : 14);
+    const a = (-aim * Math.PI) / 180; const dirx = aim === 90 ? 0 : p.dir; const cx = p.x + p.w / 2 + dirx * 12, cy = p.y + (crouch ? 18 : 10);
     const fire = (ang: number, speed: number, dmg: number, extra: any = {}) => { const b = this.mk("bullet", cx - 3, cy - 3, 6, 6); b.vx = Math.cos(ang) * speed * (dirx === 0 ? 1 : 1); b.vy = Math.sin(ang) * speed; b.data = { life: 1.2, dmg, ...extra }; if (dirx === 0) { b.vx = 0; b.vy = -speed; } };
     const base = dirx < 0 ? Math.PI - a : a;
     switch (this.weapon) {
@@ -412,7 +412,7 @@ export class BountyGame {
     } else if (e.state === "burst") {
       e.vx = 0; e.vy = Math.min(420, e.vy + GRAV * dt); this.move(e, dt, false);
       const shots = 3, gap = 0.22; const k = Math.floor(e.t / gap);
-      if (k < shots && e.data.lastShot !== k) { e.data.lastShot = k; e.data.flash = 0.12; const b = this.mk("ebullet", e.x + (e.dir > 0 ? e.w : -6), e.y + 18, 6, 6); b.vx = e.dir * (150 + d * 5); b.vy = (k - 1) * 30; b.data.life = 3; this.sfx("eshot"); }
+      if (k < shots && e.data.lastShot !== k) { e.data.lastShot = k; e.data.flash = 0.12; const b = this.mk("ebullet", e.x + (e.dir > 0 ? e.w : -6), e.y + 14, 6, 6); b.vx = e.dir * (150 + d * 5); b.vy = (k - 1) * 30; b.data.life = 3; this.sfx("eshot"); }
       if (e.t > shots * gap + 0.5) { e.state = "walk"; e.t = 0; }
     } else if (e.state === "leap") {
       if (!e.data.jumped) { e.data.jumped = true; e.vy = -290; e.vx = e.dir * 140; this.sfx("jump"); }
@@ -448,8 +448,8 @@ export class BountyGame {
         const v = this.tile(tx, ty); if (!v) continue;
         let id = 1;
         if (v === 1) { const up = this.tile(tx, ty - 1); if (up !== 1) { const l = this.tile(tx - 1, ty), r = this.tile(tx + 1, ty); id = l !== 1 ? 4 : r !== 1 ? 5 : 0; } else { const l = this.tile(tx - 1, ty), r = this.tile(tx + 1, ty), dn = this.tile(tx, ty + 1); id = l !== 1 ? 6 : r !== 1 ? 7 : dn !== 1 && ty < ROWS - 1 ? 9 : 1; } }
-        else if (v === 2) id = 2; else if (v === 3) id = 3; else if (v === 8) id = 8; else if (v === 10) id = 10;
-        else if (v === 11 || v === 12) { const on = this.spikePhase(v === 11 ? 0 : 1); if (on) id = 3; else { c.fillStyle = "#55505a"; c.fillRect(tx * TILE, ty * TILE + 13, 16, 3); continue; } }
+        else if (v === 2) id = 2; else if (v === 3) id = Math.floor(this.t * 3) % 2 ? 13 : 3; else if (v === 15) id = 15; else if (v === 8) id = 8; else if (v === 10) id = 10;
+        else if (v === 11 || v === 12) { const on = this.spikePhase(v === 11 ? 0 : 1); if (on) id = 14; else { c.fillStyle = "#55505a"; c.fillRect(tx * TILE, ty * TILE + 13, 16, 3); continue; } }
         c.drawImage(ts.img, id * 16, 0, 16, 16, tx * TILE, ty * TILE, 16, 16);
       }
     }
