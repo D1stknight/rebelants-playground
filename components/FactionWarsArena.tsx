@@ -44,12 +44,12 @@ declare global {
 function mix(a: string, b: string, t: number) { return "#" + new Color(a).lerp(new Color(b), t).getHexString(); }
 function palette(defenderColor: string, playerColor: string) {
   return {
-    skyTop: mix(defenderColor, "#000000", 0.55),
-    skyBottom: mix(defenderColor, "#05060a", 0.86),
-    fog: mix(defenderColor, "#05060a", 0.8),
-    ambient: mix(defenderColor, "#ffffff", 0.35),
-    key: mix(defenderColor, "#ffffff", 0.45),
-    rim: mix(playerColor, "#ffffff", 0.5),
+    skyTop: mix(defenderColor, "#000000", 0.62),
+    skyBottom: mix(defenderColor, "#05060a", 0.88),
+    fog: mix(defenderColor, "#05060a", 0.84),
+    ambient: mix(defenderColor, "#ffffff", 0.6),
+    key: mix(defenderColor, "#ffffff", 0.7),
+    rim: mix(playerColor, "#ffffff", 0.65),
     ring: defenderColor,
     motes: mix(defenderColor, "#ffffff", 0.3),
   };
@@ -80,8 +80,8 @@ function CameraRig({ shake }: { shake: number }) {
   const shakeRef = useRef(0); shakeRef.current = shake;
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime(); const s = shakeRef.current;
-    camera.position.set(Math.sin(t * 0.25) * 0.1 + (Math.random() - 0.5) * s * 0.07, 1.2 + Math.sin(t * 0.4) * 0.03 + (Math.random() - 0.5) * s * 0.05, 5.1);
-    camera.lookAt(0, 0.85, 0);
+    camera.position.set(Math.sin(t * 0.25) * 0.1 + (Math.random() - 0.5) * s * 0.07, 1.05 + Math.sin(t * 0.4) * 0.03 + (Math.random() - 0.5) * s * 0.05, 3.9);
+    camera.lookAt(0, 0.92, 0);
   });
   return null;
 }
@@ -169,10 +169,10 @@ export default function FactionWarsArena({ player, enemy, battleAnim, registerGl
     <div style={{ position: "relative", width: "100%", height, borderRadius: 14, overflow: "hidden", marginBottom: 14, border: "1px solid rgba(255,255,255,0.08)",
       background: `radial-gradient(ellipse at 50% 15%, ${pal.skyTop} 0%, ${pal.skyBottom} 60%, #000 100%)` }}>
       <div style={{ position: "absolute", inset: 0, background: `radial-gradient(ellipse at 22% 55%, ${player.color}33 0%, transparent 55%), radial-gradient(ellipse at 78% 55%, ${enemy.color}33 0%, transparent 55%)`, transition: "background .5s" }} />
-      <Canvas dpr={[1, 1.5]} shadows gl={{ alpha: true, antialias: true }} camera={{ position: [0, 1.2, 5.1], fov: 38, near: 0.1, far: 40 }} style={{ position: "absolute", inset: 0 }}>
+      <Canvas dpr={[1, 1.5]} shadows gl={{ alpha: true, antialias: true }} camera={{ position: [0, 1.05, 3.9], fov: 36, near: 0.1, far: 40 }} style={{ position: "absolute", inset: 0 }}>
         <Atmosphere fog={pal.fog} />
         <CameraRig shake={shake} />
-        <ambientLight color={pal.ambient} intensity={1.0} />
+        <ambientLight color={pal.ambient} intensity={1.15} />
         <hemisphereLight args={[pal.key, "#05060a", 0.6]} />
         <directionalLight position={[2.5, 4, 3]} intensity={1.9} color={pal.key} castShadow shadow-mapSize={[1024, 1024]} />
         <directionalLight position={[-3, 2.5, 2]} intensity={0.9} color={pal.rim} />
@@ -182,10 +182,10 @@ export default function FactionWarsArena({ player, enemy, battleAnim, registerGl
         <Motes color={pal.motes} />
         <Suspense fallback={null}>
           <Lunge side={1} active={clash}>
-            <ArenaCharacter factionId={player.id} anim={p.anim} animKey={p.key} position={[-1.15, 0, 0.1]} rotationY={0.75} dead={playerLost} holdOn={HOLD} />
+            <ArenaCharacter factionId={player.id} anim={p.anim} animKey={p.key} position={[-0.9, 0, 0.1]} rotationY={0.75} dead={playerLost} holdOn={HOLD} />
           </Lunge>
           <Lunge side={-1} active={clash}>
-            <ArenaCharacter factionId={enemy.id} anim={e.anim} animKey={e.key} position={[1.15, 0, 0.1]} rotationY={-0.75} dead={enemyLost} holdOn={HOLD} />
+            <ArenaCharacter factionId={enemy.id} anim={e.anim} animKey={e.key} position={[0.9, 0, 0.1]} rotationY={-0.75} dead={enemyLost} holdOn={HOLD} />
           </Lunge>
         </Suspense>
       </Canvas>
