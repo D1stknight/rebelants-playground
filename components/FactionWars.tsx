@@ -1529,6 +1529,7 @@ setPlayerHp(MAX_HP); setEnemyHp(MAX_HP); setCurrentRound(0); setRoundLog([]); se
                   player={{ id: currentPlayerFD.id, name: currentPlayerFD.name, color: currentPlayerFD.color, borderColor: currentPlayerFD.borderColor, anim: player3DAnim, hp: playerHp, label: `Warrior ${currentFactionIdx+1}/${TEAM_SIZE}`, symbolSrc: factionImgPath(currentPlayerFD.id,"symbol") }}
                   enemy={{ id: currentDefenderFD.id, name: currentDefenderFD.name, color: currentDefenderFD.color, borderColor: currentDefenderFD.borderColor, anim: enemy3DAnim, hp: enemyHp, label: "Territory Defender", symbolSrc: factionImgPath(currentDefenderFD.id,"symbol") }}
                   battleAnim={battleAnim}
+                  preload={[...team, ...defenders]}
                 />
 
                 {/* ── HP BARS ── MK Style ───────────────────────── */}

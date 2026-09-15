@@ -8,7 +8,7 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Color, Fog, type Group } from "three";
-import ArenaCharacter, { type ArenaAnim } from "./arena/ArenaCharacter";
+import ArenaCharacter, { preloadFaction, type ArenaAnim } from "./arena/ArenaCharacter";
 
 export type FWAnim = ArenaAnim;
 export type FWBattleAnim = "idle" | "clash" | "win" | "lose";
@@ -31,6 +31,8 @@ export type FactionWarsArenaProps = {
   /** Register the legacy window.__fw3dPlay* globals (solo mode calls them). Default true. */
   registerGlobals?: boolean;
   height?: string;       // CSS height; default clamp(230px, 40vw, 340px)
+  /** Faction ids to warm up in the background (the whole team + all defenders) so rotations are instant. */
+  preload?: string[];
 };
 
 declare global {
@@ -134,7 +136,9 @@ function useAnimChannel(propAnim: FWAnim) {
 
 const HOLD: FWAnim[] = ["win", "lose"];
 
-export default function FactionWarsArena({ player, enemy, battleAnim, registerGlobals = true, height = "clamp(230px, 40vw, 340px)" }: FactionWarsArenaProps) {
+export default function FactionWarsArena({ player, enemy, battleAnim, registerGlobals = true, height = "clamp(230px, 40vw, 340px)", preload }: FactionWarsArenaProps) {
+  const preloadKey = (preload || []).join(",");
+  useEffect(() => { preloadKey.split(",").filter(Boolean).forEach((f) => { try { preloadFaction(f); } catch {} }); }, [preloadKey]);
   const p = useAnimChannel(player.anim);
   const e = useAnimChannel(enemy.anim);
 

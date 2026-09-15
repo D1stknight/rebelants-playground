@@ -128,3 +128,10 @@ export default function ArenaCharacter({ factionId, anim, animKey, position = [0
 }
 
 SUPPORTED.forEach((f) => useGLTF.preload(modelPath(f)));
+
+/** Warm the GLB + all 8 animation clips for a faction so it appears instantly when it enters the arena. */
+export function preloadFaction(factionId: string) {
+  const fid = SUPPORTED.includes(factionId) ? factionId : "samurai";
+  useGLTF.preload(modelPath(fid));
+  useLoader.preload(FBXLoader, ANIMS.map((a) => animPath(fid, a)));
+}
