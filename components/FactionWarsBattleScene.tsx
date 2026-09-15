@@ -306,6 +306,7 @@ export function FactionWarsBattleScene({ state, actions, enableHealing = true, s
               enemy={{ id: currentDefenderFD.id, name: currentDefenderFD.name, color: currentDefenderFD.color, borderColor: currentDefenderFD.borderColor, anim: enemy3DAnim, hp: enemyHp, label: "Territory Defender", symbolSrc: factionImgPath(currentDefenderFD.id,"symbol") }}
               battleAnim={battleAnim}
               preload={[...team, ...defenders]}
+              title={`TERRITORY ${currentTerritory+1} · ${currentDefenderFD.name.toUpperCase()}\u2019S HOLD`}
             />
 
             {/* ── HP BARS ── MK Style ───────────────────────── */}

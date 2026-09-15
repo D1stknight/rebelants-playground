@@ -45,9 +45,14 @@ export type ArenaCharacterProps = {
   corruptColor?: string;
   dead?: boolean;
   holdOn?: ArenaAnim[];            // one-shot anims that freeze on their last frame instead of returning to idle (default: lose)
+  speedRef?: React.MutableRefObject<number>; // shared time scale (hit-stop, slow-mo); 1 = normal
+  flashKey?: number;               // bump to flash the model red (took a hit)
+  idleSpeed?: number;              // idle clip time scale (heavier breathing at low HP)
 };
 
-export default function ArenaCharacter({ factionId, anim, animKey, position = [0, 0, 0], rotationY = 0, scale = 1, corrupted = false, corruptColor = "#ff3399", dead = false, holdOn = DEFAULT_HOLD }: ArenaCharacterProps) {
+export default function ArenaCharacter({ factionId, anim, animKey, position = [0, 0, 0], rotationY = 0, scale = 1, corrupted = false, corruptColor = "#ff3399", dead = false, holdOn = DEFAULT_HOLD, speedRef, flashKey = 0, idleSpeed = 1 }: ArenaCharacterProps) {
+  const matsRef = useRef<any[]>([]);
+  const flashRef = useRef({ until: 0, applied: false });
   const fid = SUPPORTED.includes(factionId) ? factionId : "samurai";
   const groupRef = useRef<Group | null>(null);
   const mixerRef = useRef<AnimationMixer | null>(null);
@@ -60,6 +65,7 @@ export default function ArenaCharacter({ factionId, anim, animKey, position = [0
 
   const scene = useMemo(() => {
     const s = clone(gltf.scene);
+    const mats: any[] = [];
     s.traverse((o: any) => {
       if (o.isMesh || o.isSkinnedMesh) {
         o.visible = true; o.frustumCulled = false; o.castShadow = true;
@@ -71,7 +77,7 @@ export default function ArenaCharacter({ factionId, anim, animKey, position = [0
             if (mm.color) mm.color = mm.color.clone().multiplyScalar(0.45).lerp(new Color(corruptColor), 0.18);
             if ("emissive" in mm) { mm.emissive = new Color(corruptColor); mm.emissiveIntensity = 0.55; }
           }
-          mm.needsUpdate = true; return mm;
+          mm.needsUpdate = true; mats.push(mm); return mm;
         });
         o.material = Array.isArray(o.material) ? cloned : cloned[0];
       }
@@ -81,6 +87,7 @@ export default function ArenaCharacter({ factionId, anim, animKey, position = [0
     s.updateMatrixWorld(true);
     const box = new Box3().setFromObject(s);
     s.position.set(0, (Number.isFinite(box.min.y) ? -box.min.y : 0) + 0.02, 0);
+    matsRef.current = mats;
     return s;
   }, [gltf.scene, corrupted, corruptColor]);
 
@@ -111,8 +118,17 @@ export default function ArenaCharacter({ factionId, anim, animKey, position = [0
     currentRef.current = next;
   }, [anim, animKey]);
 
+  useEffect(() => { if (flashKey > 0) flashRef.current.until = performance.now() + 140; }, [flashKey]);
+  useEffect(() => { const idle = actionsRef.current.idle; if (idle) idle.timeScale = idleSpeed; }, [idleSpeed, scene, fbxs]);
+
   useFrame(({ clock }, dt) => {
-    mixerRef.current?.update(dt);
+    mixerRef.current?.update(dt * (speedRef ? speedRef.current : 1));
+    const fl = flashRef.current; const now = performance.now();
+    if (now < fl.until) {
+      if (!fl.applied) { matsRef.current.forEach((m) => { if (m && m.emissive) { m.userData._e = m.emissive.clone(); m.userData._i = m.emissiveIntensity; m.emissive.set("#ff2a2a"); m.emissiveIntensity = 0.9; } }); fl.applied = true; }
+    } else if (fl.applied) {
+      matsRef.current.forEach((m) => { if (m && m.userData._e) { m.emissive.copy(m.userData._e); m.emissiveIntensity = m.userData._i; } }); fl.applied = false;
+    }
     const g = groupRef.current; if (!g) return;
     const t = clock.getElapsedTime();
     g.position.set(position[0], position[1] + (dead ? 0 : Math.sin(t * 2.1) * 0.006), position[2]);
