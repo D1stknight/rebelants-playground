@@ -62,6 +62,7 @@ export default function ArenaCharacter({ factionId, anim, animKey, position = [0
 
   const gltf = useGLTF(modelPath(fid)) as any;
   const fbxs = useLoader(FBXLoader, ANIMS.map((a) => animPath(fid, a))) as any[];
+  const fbxsRef = useRef(fbxs); fbxsRef.current = fbxs;   // useLoader hands back a fresh array each render — never depend on it directly
 
   const scene = useMemo(() => {
     const s = clone(gltf.scene);
@@ -92,6 +93,7 @@ export default function ArenaCharacter({ factionId, anim, animKey, position = [0
   }, [gltf.scene, corrupted, corruptColor]);
 
   useEffect(() => {
+    const fbxs = fbxsRef.current;
     if (!scene || !fbxs?.length) return;
     const mixer = new AnimationMixer(scene);
     const actions: Partial<Record<ArenaAnim, AnimationAction>> = {};
@@ -105,8 +107,10 @@ export default function ArenaCharacter({ factionId, anim, animKey, position = [0
     const onFinished = () => { if (holdRef.current) return; const idle = actionsRef.current.idle; if (idle && currentRef.current !== idle) { currentRef.current?.fadeOut(0.15); idle.reset().fadeIn(0.15).play(); currentRef.current = idle; } };
     mixer.addEventListener("finished", onFinished);
     const idle = actions.idle; if (idle) { idle.reset().play(); currentRef.current = idle; }
+    const want = actions[anim]; if (want && anim !== "idle") { holdRef.current = holdOn.includes(anim); idle?.stop(); want.reset().play(); currentRef.current = want; }
     return () => { mixer.removeEventListener("finished", onFinished); mixer.stopAllAction(); mixerRef.current = null; actionsRef.current = {}; currentRef.current = null; };
-  }, [scene, fbxs]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scene, fid]);
 
   // play on (anim, animKey) change
   useEffect(() => {
@@ -119,7 +123,7 @@ export default function ArenaCharacter({ factionId, anim, animKey, position = [0
   }, [anim, animKey]);
 
   useEffect(() => { if (flashKey > 0) flashRef.current.until = performance.now() + 140; }, [flashKey]);
-  useEffect(() => { const idle = actionsRef.current.idle; if (idle) idle.timeScale = idleSpeed; }, [idleSpeed, scene, fbxs]);
+  useEffect(() => { const idle = actionsRef.current.idle; if (idle) idle.timeScale = idleSpeed; }, [idleSpeed, scene]);
 
   useFrame(({ clock }, dt) => {
     mixerRef.current?.update(dt * (speedRef ? speedRef.current : 1));
