@@ -69,8 +69,8 @@ export const BIOMES: Biome[] = [
   },
   {
     floor: 4,
-    name: "The Spider Queen",
-    subtitle: "She has eight eyes and remembers them all",
+    name: "The Brood Mother",
+    subtitle: "She raised them all. Now she eats them.",
     kind: "mini_boss",
     enemyTypes: ["spider_queen"],
     skyTop: "#1a0420",
@@ -129,8 +129,8 @@ export const BIOMES: Biome[] = [
   },
   {
     floor: 8,
-    name: "The Twin Mantis",
-    subtitle: "Two blades, one mind",
+    name: "The Twin Generals",
+    subtitle: "Two blades, one hollow mind",
     kind: "mini_boss",
     enemyTypes: ["twin_mantis"],
     skyTop: "#180818",
@@ -159,7 +159,7 @@ export const BIOMES: Biome[] = [
   },
   {
     floor: 10,
-    name: "THE QUEEN",
+    name: "THE CORRUPTED QUEEN",
     subtitle: "The hive's heart still beats. End it.",
     kind: "final_boss",
     enemyTypes: ["the_queen"],

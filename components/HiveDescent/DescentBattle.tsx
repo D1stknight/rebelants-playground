@@ -10,6 +10,7 @@ import { biomeOf, beginBattle, playCard, endTurn, chooseReward, canPlay, cardCos
 import { getRarityColor } from "./relics";
 import { rarityColor, POWERS, type Card } from "../../lib/descentCards";
 import { DESCENT_TOTAL_FLOORS } from "../../lib/descentConfig";
+import { useDescentAudio } from "../../lib/useDescentAudio";
 
 const DescentStage = dynamic(() => import("./DescentStage"), { ssr: false });
 
@@ -43,6 +44,10 @@ export default function DescentBattle({ run, onRun, onAbandon }: Props) {
   const [targetId, setTargetId] = useState<number | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
   const [showPile, setShowPile] = useState<"draw" | "discard" | "exhaust" | null>(null);
+  const [dissolve, setDissolve] = useState<Record<string, number>>({});   // enemy id → when it started disintegrating
+  const [gone, setGone] = useState<Record<string, boolean>>({});          // fully disintegrated → unmounted
+  const audio = useDescentAudio();
+  const lowHpFired = useRef(false);
   const speedRef = useRef(1);
   const idRef = useRef(1);
   const timers = useRef<number[]>([]);
@@ -70,7 +75,7 @@ export default function DescentBattle({ run, onRun, onAbandon }: Props) {
   const spawnFx = useCallback((kind: StageFx["kind"], who: Who, color: string) => {
     const id = idRef.current++; const life = FX_LIFE[kind];
     let x = PLAYER_POS[0], z = PLAYER_POS[2];
-    if (who !== "player") { const idx = run.enemies.filter((e) => e.alive).findIndex((e) => e.id === who.enemy); const slots = enemySlots(aliveEnemies(run).length); const s = slots[Math.max(0, idx)]; if (s) { x = s[0]; z = s[2]; } }
+    if (who !== "player") { const idx = run.enemies.findIndex((e) => e.id === who.enemy); const s = enemySlots(run.enemies.length)[Math.max(0, idx)]; if (s) { x = s[0]; z = s[2]; } }
     setFx((f) => [...f, { id, kind, x, z, color, t0: performance.now(), life }]);
     later(life + 50, () => setFx((f) => f.filter((v) => v.id !== id)));
   }, [later, run]);
@@ -84,8 +89,10 @@ export default function DescentBattle({ run, onRun, onAbandon }: Props) {
   // ── floor intro
   useEffect(() => {
     if (run.phase !== "intro") return;
-    setDead({}); setEAnims({}); setPAnim({ anim: "idle", key: 0 }); setSelected(null);
+    setDead({}); setEAnims({}); setPAnim({ anim: "idle", key: 0 }); setSelected(null); setDissolve({}); setGone({}); lowHpFired.current = false;
     setBanner(`FLOOR ${run.floor} · ${biome.name}`);
+    audio.music(biome.kind === "combat" ? "ambient-tunnel" : "fw-battle-epic", biome.kind === "combat" ? 0.4 : 0.45);
+    if (biome.kind !== "combat") audio.sfx.ambush();
     const t = setTimeout(() => { setBanner(null); const r = beginBattle(run); onRun(r.run); pushLog(`${aliveEnemies(r.run).map((e) => e.name).join(", ")} — ${aliveEnemies(r.run).length > 1 ? "step forward" : "steps forward"}`, "info"); }, 1900);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -101,6 +108,7 @@ export default function DescentBattle({ run, onRun, onAbandon }: Props) {
         case "anim": {
           playAnim(ev.who, ev.anim);
           if (ev.anim === "lose") setDead((d) => ({ ...d, [key(ev.who)]: true }));
+          if (ev.anim === "magic") audio.sfx.magic(); else if (ev.anim === "trick") audio.sfx.trick(); else if (ev.anim === "defend") audio.sfx.block();
           if (ev.anim === "attack" && ev.who !== "player") { await sleep(300 * f); }
           else if (ev.anim === "attack" || ev.anim === "magic" || ev.anim === "trick") await sleep(260 * f);
           else if (ev.anim === "defend") { spawnFx("dome", ev.who, ev.who === "player" ? "#67e8f9" : biome.particleColor); await sleep(200 * f); }
@@ -120,7 +128,7 @@ export default function DescentBattle({ run, onRun, onAbandon }: Props) {
             float(ev.who === "player" ? "player" : ev.who.enemy, txt, ev.who === "player" ? "#f87171" : ev.crit ? "#fde68a" : ev.amount === 0 ? "#9ca3af" : "#ffffff", big);
             if (ev.who !== "player") { spawnFx("slash", ev.who, "#ffffff"); spawnFx("sparks", ev.who, biome.particleColor); }
             else { spawnFx("sparks", "player", "#ff6b6b"); }
-            if (total > 0) { hitFlash(ev.who); hitStop(big ? 110 : 70); setShake(ev.who === "player" ? (big ? 1.6 : 1) : big ? 1.1 : 0.6); }
+            if (total > 0) { hitFlash(ev.who); hitStop(big ? 110 : 70); setShake(ev.who === "player" ? (big ? 1.6 : 1) : big ? 1.1 : 0.6); if (ev.who === "player") audio.sfx.playerHit(); else if (big) audio.sfx.heavy(); else audio.sfx.hit(); if (ev.amount === 0 && ev.blocked > 0) audio.sfx.block(); }
             if (ev.who === "player" && ev.amount > 0) setFlash("rgba(255,40,60,0.3)");
             if (ev.who !== "player" && ev.amount > 0) playAnim(ev.who, "hit");
             later(240, () => { setShake(0); setFlash(null); });
@@ -137,12 +145,12 @@ export default function DescentBattle({ run, onRun, onAbandon }: Props) {
         case "draw": await sleep(120 * f); break;
         case "text": pushLog(ev.text, ev.tone ?? "info"); await sleep(160 * f); break;
         case "turn": if (ev.n > 1) pushLog(`— turn ${ev.n} —`, "info"); break;
-        case "enemyDown": pushLog(`${ev.name} destroyed · +${ev.rebel} REBEL`, "good"); spawnFx("dust", { enemy: ev.enemy }, "#8a8073"); await sleep(700 * f); break;
-        case "floorClear": pushLog(`Floor ${ev.floor} cleared`, "boom"); setFlash("rgba(255,255,255,0.35)"); later(300, () => setFlash(null)); await sleep(900); break;
-        case "playerDown": if (ev.revived) { setDead((d) => ({ ...d, player: false })); setPAnim((a) => ({ anim: "idle", key: a.key + 1 })); } await sleep(ev.revived ? 900 : 1400); break;
+        case "enemyDown": { pushLog(`${ev.name} destroyed · +${ev.rebel} REBEL`, "good"); audio.sfx.enemyDie(); const id = ev.enemy; later(350, () => { setDissolve((d) => ({ ...d, [String(id)]: performance.now() })); spawnFx("dissolve", { enemy: id }, biome.particleColor); }); later(1900, () => setGone((g) => ({ ...g, [String(id)]: true }))); await sleep(800 * f); break; }
+        case "floorClear": pushLog(`Floor ${ev.floor} cleared`, "boom"); audio.sfx.floorClear(); setFlash("rgba(255,255,255,0.35)"); later(300, () => setFlash(null)); await sleep(900); break;
+        case "playerDown": if (ev.revived) { audio.sfx.rally(); setDead((d) => ({ ...d, player: false })); setPAnim((a) => ({ anim: "idle", key: a.key + 1 })); } else { audio.music(null); audio.sfx.lose(); } await sleep(ev.revived ? 900 : 1400); break;
       }
     }
-  }, [biome.particleColor, float, hitFlash, hitStop, later, playAnim, pushLog, spawnFx]);
+  }, [biome.particleColor, float, hitFlash, hitStop, later, playAnim, pushLog, spawnFx, audio]);
 
   // ── actions
   const doPlay = useCallback((idx: number) => {
@@ -152,22 +160,22 @@ export default function DescentBattle({ run, onRun, onAbandon }: Props) {
     const { run: next, evs } = playCard(run, idx, tgt);
     if (next === run) return;
     setSelected(null);
-    setBusy(true);
+    setBusy(true); audio.sfx.card();
     onRun(next);            // hand + energy update instantly; visuals catch up
     void (async () => { await playEvents(evs, { fast: true }); setBusy(false); })();
-  }, [busy, run, targetId, alive, onRun, playEvents]);
+  }, [busy, run, targetId, alive, onRun, playEvents, audio]);
 
   const doEndTurn = useCallback(() => {
     if (busy || run.phase !== "battle") return;
     const { run: next, evs } = endTurn(run);
     setBusy(true); setSelected(null);
     void (async () => {
-      pushLog("Enemy turn", "bad");
+      pushLog("Enemy turn", "bad"); audio.sfx.deselect();
       await playEvents(evs);
       onRun(next);
       setBusy(false);
     })();
-  }, [busy, run, onRun, playEvents, pushLog]);
+  }, [busy, run, onRun, playEvents, pushLog, audio]);
 
   const onCardClick = useCallback((idx: number) => {
     if (busy) return;
@@ -179,8 +187,8 @@ export default function DescentBattle({ run, onRun, onAbandon }: Props) {
 
   const onPickTarget = useCallback((id: number) => {
     setTargetId(id);
-    if (selected != null) { const idx = selected; setSelected(null); if (canPlay(run, idx)) { const { run: next, evs } = playCard(run, idx, id); if (next !== run) { setBusy(true); onRun(next); void (async () => { await playEvents(evs, { fast: true }); setBusy(false); })(); } } }
-  }, [selected, run, onRun, playEvents]);
+    if (selected != null) { const idx = selected; setSelected(null); if (canPlay(run, idx)) { const { run: next, evs } = playCard(run, idx, id); if (next !== run) { setBusy(true); audio.sfx.card(); onRun(next); void (async () => { await playEvents(evs, { fast: true }); setBusy(false); })(); } } }
+  }, [selected, run, onRun, playEvents, audio]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "e" || e.key === "Enter") doEndTurn(); const n = parseInt(e.key, 10); if (n >= 1 && n <= run.hand.length) onCardClick(n - 1); if (e.key === "Escape") setSelected(null); };
@@ -189,8 +197,9 @@ export default function DescentBattle({ run, onRun, onAbandon }: Props) {
 
   // ── stage props
   const p = run.player;
-  const playerActor: StageActor = { id: -1, factionId: run.factionId, anim: pAnim.anim, animKey: pAnim.key, dead: !!dead.player, scale: 1, flashKey: flashes.player || 0 };
-  const enemyActors: StageActor[] = run.enemies.filter((e) => e.alive || dead[String(e.id)]).map((e) => ({ id: e.id, factionId: e.factionId, anim: eAnims[e.id]?.anim ?? "idle", animKey: eAnims[e.id]?.key ?? 0, dead: !!dead[String(e.id)] || !e.alive, scale: e.scale, flashKey: flashes[String(e.id)] || 0 }));
+  const playerActor: StageActor = { id: -1, factionId: run.factionId, anim: pAnim.anim, animKey: pAnim.key, dead: !!dead.player, scale: 1, flashKey: flashes.player || 0, pos: PLAYER_POS };
+  const slots = enemySlots(run.enemies.length);
+  const enemyActors: StageActor[] = run.enemies.map((e, i) => ({ e, i })).filter(({ e }) => (e.alive || dead[String(e.id)]) && !gone[String(e.id)]).map(({ e, i }) => ({ id: e.id, factionId: e.factionId, anim: eAnims[e.id]?.anim ?? "idle", animKey: eAnims[e.id]?.key ?? 0, dead: !!dead[String(e.id)] || !e.alive, scale: e.scale, flashKey: flashes[String(e.id)] || 0, pos: slots[i], dissolveAt: dissolve[String(e.id)] ?? null }));
   const enemyById = useMemo(() => Object.fromEntries(run.enemies.map((e) => [e.id, e])) as Record<number, Enemy>, [run.enemies]);
 
   const renderEnemyLabel = useCallback((id: number) => {
@@ -225,6 +234,8 @@ export default function DescentBattle({ run, onRun, onAbandon }: Props) {
   ), [floats]);
 
   const hpPct = Math.max(0, Math.min(1, (dispHp.player ?? p.hp) / p.maxHp));
+  useEffect(() => { if (hpPct > 0 && hpPct < 0.25 && !lowHpFired.current) { lowHpFired.current = true; audio.sfx.lowHp(); } if (hpPct >= 0.25) lowHpFired.current = false; }, [hpPct, audio]);
+  useEffect(() => { if (run.phase === "victory") { audio.music(null); audio.sfx.win(); } if (run.phase === "cashout") { audio.music(null); audio.sfx.floorClear(); } }, [run.phase, audio]);
   const pBlock = dispBlock.player ?? p.block;
   const canEnd = run.phase === "battle" && !busy;
   const powers = Object.entries(p.powers).filter(([, n]) => n > 0);
@@ -246,6 +257,7 @@ export default function DescentBattle({ run, onRun, onAbandon }: Props) {
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", pointerEvents: "auto" }}>
           <div style={{ background: "rgba(0,0,0,0.6)", border: "1px solid rgba(251,191,36,0.4)", borderRadius: 999, padding: "6px 12px", fontSize: 11, fontWeight: 800, color: "#fbbf24" }}>💎 +{run.unbanked}</div>
+          <button type="button" onClick={audio.toggleMute} title={audio.muted ? "Unmute" : "Mute"} style={{ background: "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 999, width: 30, height: 30, color: "#fff", fontSize: 13, cursor: "pointer" }}>{audio.muted ? "🔇" : "🔊"}</button>
           <button type="button" onClick={onAbandon} style={{ background: "rgba(0,0,0,0.6)", border: "1px solid rgba(248,113,113,0.4)", borderRadius: 999, padding: "6px 10px", color: "#f87171", fontSize: 10, fontWeight: 800, letterSpacing: "0.12em", cursor: "pointer", fontFamily: FONT }}>✕ ABANDON</button>
         </div>
       </div>

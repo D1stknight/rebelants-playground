@@ -32,10 +32,11 @@ const ENEMY_HP_BASE = 0.8, ENEMY_DMG_BASE = 0.55;   // archetype stats were tune
 
 export const ALL_FACTION_IDS = ["ashigaru", "ronin", "samurai", "bushi", "warrior", "shogun", "buke", "kenshi", "wokou", "sohei", "yamabushi"] as const;
 
+// They are ants — the hive's own castes, hollowed out by the corruption.
 export const ENEMY_NAMES: Record<EnemyKind, string> = {
-  scout_beetle: "Scout Beetle", worker_drone: "Worker Drone", spider_drone: "Spider Drone", crystal_mite: "Crystal Mite",
-  spider_queen: "The Spider Queen", flame_wasp: "Flame Wasp", ice_mantis: "Ice Mantis", acid_slug: "Acid Slug",
-  twin_mantis: "The Twin Mantis", elite_guard: "Elite Guard", the_queen: "THE QUEEN",
+  scout_beetle: "Hollowed Scout", worker_drone: "Husk Worker", spider_drone: "Webbed Forager", crystal_mite: "Shardback Drone",
+  spider_queen: "The Brood Mother", flame_wasp: "Ember Soldier", ice_mantis: "Frostbitten Major", acid_slug: "Bile Carrier",
+  twin_mantis: "The Twin Generals", elite_guard: "Royal Guard", the_queen: "THE CORRUPTED QUEEN",
 };
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -133,7 +134,7 @@ function makeEnemy(run: Run, floor: number, idx: number, kind: EnemyKind, packSi
 }
 function rollIntent(run: Run, e: Enemy): Intent {
   const dmg = e.baseDmg + e.strength;
-  if (e.isBoss && e.turn > 0 && e.turn % 3 === 2) { const d = Math.round(dmg * 0.6); return { kind: "special", dmg: d, hits: 3, label: `☠ ${e.name.replace(/^The /i, "")} unleashes`, hint: `${d} × 3` }; }
+  if (e.isBoss && e.turn > 0 && e.turn % 3 === 2) { const d = Math.round(dmg * 0.6); return { kind: "special", dmg: d, hits: 3, label: `☠ ${e.name.replace(/^The /i, "").replace(/^THE /, "")} unleashes`, hint: `${d} × 3` }; }
   const r = roll(run.seed, `in${run.floor}.${e.id}.${e.turn}`);
   if (r < 0.45) return { kind: "attack", dmg, hits: 1, label: "⚔ Attack", hint: `${dmg}` };
   if (r < 0.62) { const d = Math.round(dmg * 1.6); return { kind: "heavy", dmg: d, hits: 1, label: "⚠ Heavy", hint: `${d}` }; }

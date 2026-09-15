@@ -48,9 +48,11 @@ export type ArenaCharacterProps = {
   speedRef?: React.MutableRefObject<number>; // shared time scale (hit-stop, slow-mo); 1 = normal
   flashKey?: number;               // bump to flash the model red (took a hit)
   idleSpeed?: number;              // idle clip time scale (heavier breathing at low HP)
+  dissolveAt?: number | null;      // performance.now() when the body started disintegrating (1.3s: glow, fade, rise, gone)
 };
 
-export default function ArenaCharacter({ factionId, anim, animKey, position = [0, 0, 0], rotationY = 0, scale = 1, corrupted = false, corruptColor = "#ff3399", dead = false, holdOn = DEFAULT_HOLD, speedRef, flashKey = 0, idleSpeed = 1 }: ArenaCharacterProps) {
+export default function ArenaCharacter({ factionId, anim, animKey, position = [0, 0, 0], rotationY = 0, scale = 1, corrupted = false, corruptColor = "#ff3399", dead = false, holdOn = DEFAULT_HOLD, speedRef, flashKey = 0, idleSpeed = 1, dissolveAt = null }: ArenaCharacterProps) {
+  const dissolveRef = useRef({ started: false, done: false });
   const matsRef = useRef<any[]>([]);
   const flashRef = useRef({ until: 0, applied: false });
   const fid = SUPPORTED.includes(factionId) ? factionId : "samurai";
@@ -135,6 +137,15 @@ export default function ArenaCharacter({ factionId, anim, animKey, position = [0
     }
     const g = groupRef.current; if (!g) return;
     const t = clock.getElapsedTime();
+    // disintegration: pink glow, fade to nothing, drift upward
+    if (dissolveAt != null) {
+      const k = Math.min(1, (now - dissolveAt) / 1300); const ds = dissolveRef.current;
+      if (!ds.started) { ds.started = true; matsRef.current.forEach((m) => { if (!m) return; m.transparent = true; m.depthWrite = true; if (m.emissive) { m.emissive.set(corruptColor); } }); }
+      matsRef.current.forEach((m) => { if (!m) return; m.opacity = Math.max(0, 1 - Math.pow(k, 1.6)); if (m.emissive) m.emissiveIntensity = 0.6 + k * 2.2; });
+      g.position.set(position[0], position[1] + k * 0.35, position[2]); g.rotation.y = rotationY; g.scale.setScalar(scale * (1 - k * 0.15));
+      if (k >= 1 && !ds.done) { ds.done = true; g.visible = false; }
+      return;
+    }
     g.position.set(position[0], position[1] + (dead ? 0 : Math.sin(t * 2.1) * 0.006), position[2]);
     g.rotation.y = rotationY + (dead ? 0 : Math.sin(t * 1.4) * 0.02);
     g.scale.setScalar(scale * (1 + Math.sin(t * 2.2) * 0.003));

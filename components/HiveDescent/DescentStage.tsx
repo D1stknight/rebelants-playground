@@ -8,8 +8,8 @@ import { AdditiveBlending, Color, DoubleSide, Fog, type Group, type Mesh } from 
 import ArenaCharacter, { type ArenaAnim } from "../arena/ArenaCharacter";
 import type { Biome } from "./biomes";
 
-export type StageActor = { id: number; factionId: string; anim: ArenaAnim; animKey: number; dead: boolean; scale: number; flashKey: number };
-export type StageFx = { id: number; kind: "sparks" | "slash" | "glyph" | "dome" | "poison" | "dust"; x: number; z: number; color: string; t0: number; life: number };
+export type StageActor = { id: number; factionId: string; anim: ArenaAnim; animKey: number; dead: boolean; scale: number; flashKey: number; pos: [number, number, number]; dissolveAt?: number | null };
+export type StageFx = { id: number; kind: "sparks" | "slash" | "glyph" | "dome" | "poison" | "dust" | "dissolve"; x: number; z: number; color: string; t0: number; life: number };
 
 type Props = {
   biome: Biome;
@@ -40,7 +40,7 @@ export function enemySlots(n: number): [number, number, number][] {
   if (n === 2) return [[-1.05, 0, -1.35], [1.35, 0, -1.75]];
   return [[-1.7, 0, -1.2], [-0.1, 0, -2.0], [1.6, 0, -1.5]];
 }
-export const FX_LIFE: Record<StageFx["kind"], number> = { sparks: 450, slash: 280, glyph: 900, dome: 700, poison: 800, dust: 900 };
+export const FX_LIFE: Record<StageFx["kind"], number> = { sparks: 450, slash: 280, glyph: 900, dome: 700, poison: 800, dust: 900, dissolve: 1400 };
 
 function Atmosphere({ biome }: { biome: Biome }) {
   const { scene } = useThree();
@@ -49,19 +49,30 @@ function Atmosphere({ biome }: { biome: Biome }) {
 }
 
 function Tunnel({ biome }: { biome: Biome }) {
-  const rings = useMemo(() => Array.from({ length: 9 }, (_, i) => -2.5 - i * 1.6), []);
+  const rings = useMemo(() => Array.from({ length: 7 }, (_, i) => -3.2 - i * 1.7), []);
+  // hanging roots / stalactites along both walls, thinning as they recede
+  const roots = useMemo(() => Array.from({ length: 22 }, (_, i) => {
+    const side = i % 2 ? 1 : -1; const r = (Math.sin(i * 12.9898) * 43758.5453) % 1; const r2 = (Math.sin(i * 78.233) * 43758.5453) % 1;
+    return { x: side * (2.4 + Math.abs(r) * 1.1), z: -1.0 - (i / 22) * 11, h: 1.6 + Math.abs(r2) * 2.2, tilt: side * (0.15 + Math.abs(r) * 0.25), w: 0.05 + Math.abs(r2) * 0.06 };
+  }), []);
   return (
     <group>
       {rings.map((z, i) => (
-        <mesh key={i} position={[0, 1.4, z]} rotation={[0, 0, (i % 2) * 0.35]}>
-          <torusGeometry args={[3.1 - i * 0.12, 0.09, 8, 40]} />
-          <meshStandardMaterial color={biome.skyTop} emissive={biome.particleColor} emissiveIntensity={0.25 - i * 0.02} roughness={0.9} />
+        <mesh key={i} position={[0, 1.5, z]} rotation={[0, 0, (i % 2) * 0.35]}>
+          <torusGeometry args={[3.0 - i * 0.1, 0.07, 8, 40]} />
+          <meshStandardMaterial color={biome.skyTop} emissive={biome.particleColor} emissiveIntensity={0.18 - i * 0.02} roughness={0.9} />
         </mesh>
       ))}
-      {/* walls */}
-      <mesh position={[0, 1.4, -6]}>
-        <cylinderGeometry args={[3.4, 3.6, 16, 24, 1, true]} />
-        <meshStandardMaterial color={biome.skyBottom} roughness={1} side={DoubleSide} />
+      {roots.map((r, i) => (
+        <mesh key={`r${i}`} position={[r.x, 3.2 - r.h / 2, r.z]} rotation={[0, 0, r.tilt]}>
+          <cylinderGeometry args={[r.w * 0.4, r.w, r.h, 6]} />
+          <meshStandardMaterial color={biome.skyTop} emissive={biome.particleColor} emissiveIntensity={0.08} roughness={1} />
+        </mesh>
+      ))}
+      {/* far end of the shaft: a soft glow disc the fog eats into */}
+      <mesh position={[0, 1.3, -14]}>
+        <circleGeometry args={[3.2, 32]} />
+        <meshBasicMaterial color={biome.particleColor} transparent opacity={0.12} />
       </mesh>
     </group>
   );
@@ -126,6 +137,7 @@ function FxNode({ fx }: { fx: StageFx }) {
       case "dome": { const m = G.children[0] as Mesh; m.position.set(x, 0.85, z); m.scale.setScalar(0.9 + Math.sin(k * Math.PI) * 0.12); (m.material as any).opacity = 0.2 * Math.sin(k * Math.PI); break; }
       case "poison": G.children.forEach((m, i) => { const s = seeds[i]; m.position.set(x + Math.cos(s.a) * s.r * 0.6, 0.2 + e * (1.2 + s.v * 0.6), z + Math.sin(s.a) * s.r * 0.4); m.scale.setScalar(0.03 * (1 - k)); }); break;
       case "dust": { const m = G.children[0] as Mesh; m.position.set(x, 0.04, z); m.scale.setScalar(0.3 + e * 1.4); (m.material as any).opacity = 0.55 * (1 - k); break; }
+      case "dissolve": G.children.forEach((m, i) => { const s = seeds[i]; const kk = Math.min(1, Math.max(0, (k - (i % 5) * 0.08) / 0.8)); m.position.set(x + Math.cos(s.a + kk * 2) * s.r * 0.45, 0.3 + kk * (1.6 + s.v * 0.7), z + Math.sin(s.a + kk * 2) * s.r * 0.3); m.scale.setScalar(0.04 * Math.sin(kk * Math.PI) * s.v); }); break;
     }
   });
   return (
@@ -136,6 +148,7 @@ function FxNode({ fx }: { fx: StageFx }) {
       {fx.kind === "dome" && (<mesh><sphereGeometry args={[0.75, 24, 16]} /><meshBasicMaterial color={fx.color} transparent opacity={0.2} side={DoubleSide} blending={AdditiveBlending} depthWrite={false} /></mesh>)}
       {fx.kind === "poison" && seeds.map((_, i) => (<mesh key={i}><sphereGeometry args={[1, 5, 5]} /><meshBasicMaterial color={fx.color} transparent blending={AdditiveBlending} depthWrite={false} /></mesh>))}
       {fx.kind === "dust" && (<mesh rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[0.5, 0.9, 32]} /><meshBasicMaterial color="#8a8073" transparent opacity={0.55} side={DoubleSide} depthWrite={false} /></mesh>)}
+      {fx.kind === "dissolve" && seeds.map((_, i) => (<mesh key={i}><sphereGeometry args={[1, 5, 5]} /><meshBasicMaterial color={i % 4 ? fx.color : "#ffffff"} transparent blending={AdditiveBlending} depthWrite={false} /></mesh>))}
     </group>
   );
 }
@@ -153,9 +166,8 @@ function TargetRing({ pos, color }: { pos: [number, number, number]; color: stri
 
 export default function DescentStage({ biome, player, enemies, targetId, onPickTarget, shake, speedRef, fx, renderEnemyLabel, renderEnemyFloats }: Props) {
   const shakeRef = useRef(0); useEffect(() => { if (shake > 0) shakeRef.current = Math.max(shakeRef.current, shake); }, [shake]);
-  const slots = enemySlots(enemies.length);
   const focus = useRef<[number, number, number] | null>(null);
-  const ti = enemies.findIndex((e) => e.id === targetId); focus.current = ti >= 0 ? slots[ti] : null;
+  const target = enemies.find((e) => e.id === targetId) || null; focus.current = target ? target.pos : null;
   return (
     <div style={{ position: "absolute", inset: 0, background: `radial-gradient(ellipse at 50% 30%, ${biome.skyTop} 0%, ${biome.skyBottom} 55%, #000 100%)` }}>
       <Canvas dpr={[1, 1.5]} shadows gl={{ alpha: true, antialias: true }} camera={{ position: CAM_POS, fov: 42, near: 0.1, far: 40 }} style={{ position: "absolute", inset: 0 }}>
@@ -170,22 +182,22 @@ export default function DescentStage({ biome, player, enemies, targetId, onPickT
         <Tunnel biome={biome} />
         <Ground biome={biome} />
         <Motes color={biome.particleColor} />
-        {ti >= 0 && <TargetRing pos={slots[ti]} color="#ffd166" />}
+        {target && !target.dead && <TargetRing pos={target.pos} color="#ffd166" />}
         <Suspense fallback={null}>
           <ArenaCharacter factionId={player.factionId} anim={player.anim} animKey={player.animKey} position={PLAYER_POS} rotationY={Math.PI - 0.15} dead={player.dead} speedRef={speedRef} flashKey={player.flashKey} holdOn={["lose"]} />
-          {enemies.map((e, i) => (
+          {enemies.map((e) => (
             <group key={e.id}>
-              <ArenaCharacter factionId={e.factionId} anim={e.anim} animKey={e.animKey} position={slots[i]} rotationY={-slots[i][0] * 0.25} scale={e.scale} corrupted corruptColor={biome.particleColor} dead={e.dead} speedRef={speedRef} flashKey={e.flashKey} holdOn={["lose"]} />
+              <ArenaCharacter factionId={e.factionId} anim={e.anim} animKey={e.animKey} position={e.pos} rotationY={-e.pos[0] * 0.25} scale={e.scale} corrupted corruptColor={biome.particleColor} dead={e.dead} speedRef={speedRef} flashKey={e.flashKey} holdOn={["lose"]} dissolveAt={e.dissolveAt ?? null} />
               {!e.dead && (
-                <mesh position={[slots[i][0], 0.95 * e.scale, slots[i][2]]} onClick={(ev) => { ev.stopPropagation(); onPickTarget(e.id); }}>
+                <mesh position={[e.pos[0], 0.95 * e.scale, e.pos[2]]} onClick={(ev) => { ev.stopPropagation(); onPickTarget(e.id); }}>
                   <boxGeometry args={[0.9, 1.9 * e.scale, 0.6]} />
                   <meshBasicMaterial transparent opacity={0} depthWrite={false} />
                 </mesh>
               )}
-              <Html position={[slots[i][0], 2.05 * e.scale + 0.15, slots[i][2]]} center zIndexRange={[20, 10]} style={{ pointerEvents: "none" }}>
+              <Html position={[e.pos[0], 2.05 * e.scale + 0.15, e.pos[2]]} center zIndexRange={[20, 10]} style={{ pointerEvents: "none" }}>
                 {renderEnemyLabel(e.id)}
               </Html>
-              <Html position={[slots[i][0], 1.3 * e.scale, slots[i][2]]} center zIndexRange={[30, 20]} style={{ pointerEvents: "none" }}>
+              <Html position={[e.pos[0], 1.3 * e.scale, e.pos[2]]} center zIndexRange={[30, 20]} style={{ pointerEvents: "none" }}>
                 {renderEnemyFloats(e.id)}
               </Html>
             </group>
