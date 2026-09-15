@@ -183,7 +183,7 @@ export default function DescentStage({ biome, player, enemies, targetId, onPickT
         <Ground biome={biome} />
         <Motes color={biome.particleColor} />
         {target && !target.dead && <TargetRing pos={target.pos} color="#ffd166" />}
-        <Suspense fallback={null}>
+        <Suspense fallback={<Html center zIndexRange={[5, 0]} style={{ pointerEvents: "none" }}><div style={{ fontFamily: "'Noto Serif JP', serif", letterSpacing: "0.4em", fontSize: 12, color: biome.particleColor, whiteSpace: "nowrap", textShadow: "0 0 20px #000", animation: "hdPulse 1.2s ease-in-out infinite" }}>◆ THE HIVE STIRS ◆</div><style>{`@keyframes hdPulse{0%,100%{opacity:.35}50%{opacity:1}}`}</style></Html>}>
           <ArenaCharacter factionId={player.factionId} anim={player.anim} animKey={player.animKey} position={PLAYER_POS} rotationY={Math.PI - 0.15} dead={player.dead} speedRef={speedRef} flashKey={player.flashKey} holdOn={["lose"]} />
           {enemies.map((e) => (
             <group key={e.id}>
