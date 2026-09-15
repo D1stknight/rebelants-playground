@@ -184,7 +184,7 @@ export default function DescentBattle({ run, onRun, onAbandon }: Props) {
           <div style={{ width: `${hpPct * 100}%`, height: "100%", background: `linear-gradient(90deg, ${hpColor}, ${hpColor}99)`, boxShadow: `0 0 12px ${hpColor}88`, transition: "width .35s, background .3s" }} />
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          {btn("Attack", `${BASE_ATTACK_DAMAGE} dmg`, "1", "#f87171", true, () => act("attack"))}
+          {btn("Attack", `${Math.round(BASE_ATTACK_DAMAGE * p.dmgMult * p.buffMult)} dmg`, "1", "#f87171", true, () => act("attack"))}
           {btn("Defend", "take 35% · +5 HP", "2", "#67e8f9", true, () => act("defend"))}
           {btn(run.faction.specialName, run.faction.blurb.split(".")[0], "3", "#fbbf24", specialReady, () => act("special"), specialReady ? "READY" : `${p.specialCd}`)}
           {btn("Magic", `${MAGIC_DAMAGE} dmg · ignores guard`, "4", "#c084fc", magicReady, () => act("magic"), magicReady ? undefined : `${p.magicCd}`)}

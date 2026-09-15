@@ -326,6 +326,7 @@ export function chooseReward(run0: Run, offer: RewardOffer): Run {
   else if (offer.kind === "cashout") { run.phase = "cashout"; run.banked = run.unbanked; return run; }
   // next floor
   run.floor++; run.enemyIdx = 0; run.enemies = spawnFloor(run); run.phase = "intro"; run.rewardOffers = [];
+  run.maxFloorReached = Math.max(run.maxFloorReached, run.floor);
   run.player.specialCd = 0; run.player.magicCd = 0; run.player.guardThisTurn = null; run.player.takenMultThisTurn = 1;
   return run;
 }

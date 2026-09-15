@@ -101,7 +101,7 @@ const HiveDescent: React.FC = () => {
         <div style={{ fontSize: 12, color, letterSpacing: "0.5em", marginBottom: 14 }}>{victory ? "★ ★ ★ VICTORY ★ ★ ★" : cashed ? "⚑ ESCAPED ⚑" : "☠ DEFEATED ☠"}</div>
         <h1 style={{ fontSize: "clamp(34px, 8vw, 84px)", margin: 0, fontWeight: 900, letterSpacing: "0.06em", color, textShadow: `0 0 40px ${color}88` }}>{title}</h1>
         <div style={{ fontSize: 15, color: "rgba(255,255,255,0.8)", marginTop: 14, fontStyle: "italic", maxWidth: 520 }}>{sub}</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10, marginTop: 28, width: "100%", maxWidth: 620 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 10, marginTop: 28, width: "100%", maxWidth: 640 }}>
           {[
             { l: "BANKED", v: `+${run.banked}`, c: "#fbbf24" },
             { l: "DEEPEST", v: `Floor ${run.maxFloorReached}`, c: "#ff99dd" },
