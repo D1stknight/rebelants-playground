@@ -4,7 +4,7 @@
 import React, { useEffect, useMemo, useRef } from "react";
 import { useFrame, useLoader } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
-import { AnimationClip, AnimationMixer, Color, DoubleSide, LoopOnce, LoopRepeat, type AnimationAction, type Group } from "three";
+import { AnimationClip, AnimationMixer, Box3, Color, DoubleSide, LoopOnce, LoopRepeat, type AnimationAction, type Group } from "three";
 import { clone } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 
@@ -16,7 +16,7 @@ const modelPath = (f: string) => `/faction-wars/characters/${f}/${f}.glb`;
 const animPath = (f: string, a: DescentAnim) => `/faction-wars/characters/${f}/${a === "trick" ? "special" : a}.fbx`;
 
 // FW's own canvas uses 0.02 with a far camera; the shared duel arena sits much closer.
-const BASE_MODEL_SCALE = 0.0085;
+const BASE_MODEL_SCALE = 0.011;
 /** Dev tuning: `?hdscale=0.009` overrides the model scale (no rebuild needed to eyeball sizes). */
 export function modelScale(): number {
   if (typeof window === "undefined") return BASE_MODEL_SCALE;
@@ -73,8 +73,11 @@ export default function DescentCharacter({ factionId, anim, animKey, position = 
         o.material = Array.isArray(o.material) ? cloned : cloned[0];
       }
     });
-    s.position.set(0, 0.02, 0);
     s.scale.setScalar(modelScale());
+    // the GLB pivot sits around the hips: drop the model so its feet touch the arena floor
+    s.updateMatrixWorld(true);
+    const box = new Box3().setFromObject(s);
+    s.position.set(0, (Number.isFinite(box.min.y) ? -box.min.y : 0) + 0.02, 0);
     return s;
   }, [gltf.scene, corrupted, corruptColor]);
 
