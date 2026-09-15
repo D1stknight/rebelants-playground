@@ -221,7 +221,7 @@ function FxNode({ fx }: { fx: Fx }) {
       case "glyph": { const m = G.children[0] as Mesh; m.position.set(x, 0.035, 0.1); m.rotation.z = e * 2.5; m.scale.setScalar(0.6 + e * 0.5); (m.material as any).opacity = 0.9 * (1 - k * k); break; }
       case "embers": G.children.forEach((m, i) => { const s = seeds[i]; m.position.set(x + Math.cos(s.a) * s.r * 0.7, 0.1 + e * (1.4 + s.v * 0.8), 0.1 + Math.sin(s.a) * s.r * 0.5); m.scale.setScalar(0.028 * (1 - k)); }); break;
       case "shadow": { const m = G.children[0] as Mesh; m.position.set(x, 0.9, 0.1); m.scale.set(0.5 + e * 1.3, 0.9 + e * 0.6, 1); (m.material as any).opacity = 0.7 * (1 - k); break; }
-      case "dome": { const m = G.children[0] as Mesh; m.position.set(x, 0.85, 0.1); m.scale.setScalar(0.9 + Math.sin(k * Math.PI) * 0.12); (m.material as any).opacity = 0.35 * Math.sin(k * Math.PI); break; }
+      case "dome": { const m = G.children[0] as Mesh; m.position.set(x, 0.85, 0.1); m.scale.setScalar(0.9 + Math.sin(k * Math.PI) * 0.12); (m.material as any).opacity = 0.2 * Math.sin(k * Math.PI); break; }
       case "dust": { const m = G.children[0] as Mesh; m.position.set(x, 0.04, 0.1); m.scale.setScalar(0.3 + e * 1.4); (m.material as any).opacity = 0.55 * (1 - k); break; }
     }
   });
@@ -232,7 +232,7 @@ function FxNode({ fx }: { fx: Fx }) {
       {fx.kind === "glyph" && (<mesh rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[0.45, 0.62, 6, 1]} /><meshBasicMaterial color={fx.color} transparent opacity={0.9} side={DoubleSide} blending={AdditiveBlending} depthWrite={false} /></mesh>)}
       {fx.kind === "embers" && seeds.map((_, i) => (<mesh key={i}><sphereGeometry args={[1, 5, 5]} /><meshBasicMaterial color={fx.color} transparent blending={AdditiveBlending} depthWrite={false} /></mesh>))}
       {fx.kind === "shadow" && (<mesh><planeGeometry args={[1, 1]} /><meshBasicMaterial color="#1a0a2a" transparent opacity={0.7} depthWrite={false} /></mesh>)}
-      {fx.kind === "dome" && (<mesh><sphereGeometry args={[0.95, 24, 16]} /><meshBasicMaterial color={fx.color} transparent opacity={0.3} side={DoubleSide} blending={AdditiveBlending} depthWrite={false} /></mesh>)}
+      {fx.kind === "dome" && (<mesh><sphereGeometry args={[0.72, 24, 16]} /><meshBasicMaterial color={fx.color} transparent opacity={0.2} side={DoubleSide} blending={AdditiveBlending} depthWrite={false} /></mesh>)}
       {fx.kind === "dust" && (<mesh rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[0.5, 0.9, 32]} /><meshBasicMaterial color="#8a8073" transparent opacity={0.55} side={DoubleSide} depthWrite={false} /></mesh>)}
     </group>
   );
