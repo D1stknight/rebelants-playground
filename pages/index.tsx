@@ -23,6 +23,7 @@ const GAMES = [
   { id:'tunnel', title:'ANT TUNNEL',         desc:'NAVIGATE THE UNDERGROUND. COLLECT CRYSTALS. OUTRUN THE SPIDER.', icon:'🐜', path:'/tunnel',       color:'#3b82f6', glow:'rgba(59,130,246,0.4)', badge:'ARCADE',   bg:'rgba(59,130,246,0.08)'  },
   { id:'shuffle',title:"QUEEN'S EGG SHUFFLE",desc:"FIND THE QUEEN'S EGG. BEAT THE ODDS. WIN BIG.",               icon:'🥚',  path:'/shuffle',       color:'#a855f7', glow:'rgba(168,85,247,0.4)', badge:'LUCK',     bg:'rgba(168,85,247,0.08)'  },
   { id:'descent',title:'HIVE DESCENT',        desc:'DESCEND THROUGH 10 FLOORS. FACE THE QUEEN. WIN OR DIE.', icon:'🐜',  path:'/descent',     color:'#ff3399', glow:'rgba(255,51,153,0.45)',badge:'ROGUELITE', bg:'rgba(255,51,153,0.08)' },
+  { id:'bounty', title:'BOUNTY HUNTERS',      desc:'RUN. GUN. TAKE THE HEAD. FOUR BOARDS OF CORRUPTED HIVE, FOUR WANTED BOSSES.', icon:'🏹',  path:'/bounty',      color:'#a78bfa', glow:'rgba(167,139,250,0.45)', badge:'RUN & GUN', bg:'rgba(167,139,250,0.08)', comingSoon:true },
 ];
 
 const ECONOMY = [
@@ -767,7 +768,6 @@ export default function LandingPage() {
 
               {/* ── Coming Soon Games ── */}
               {[
-                { id:'cs1', icon:'🏹', title:'BOUNTY HUNTERS', tag:'COMING SOON', color:'#a78bfa', glow:'rgba(167,139,250,0.35)', bg:'rgba(167,139,250,0.04)', desc:'TRACK TARGETS. COLLECT BOUNTIES. BECOME THE MOST FEARED HUNTER IN THE COLONY.' },
                 { id:'cs2', icon:'🧬', title:'HIVE GENETICS', tag:'COMING SOON', color:'#34d399', glow:'rgba(52,211,153,0.35)', bg:'rgba(52,211,153,0.04)', desc:'SPLICE GENES. EVOLVE YOUR ANT. BUILD THE PERFECT SUPER-SOLDIER FOR THE QUEEN.' },
                 { id:'cs3', icon:'⚡', title:'LIGHTNING RAIDS', tag:'COMING SOON', color:'#fbbf24', glow:'rgba(251,191,36,0.35)', bg:'rgba(251,191,36,0.04)', desc:'STRIKE FAST. HIT HARD. VANISH BEFORE THEY KNOW YOU WERE THERE.' },
               ].map((g, i) => (
