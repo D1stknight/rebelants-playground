@@ -107,7 +107,7 @@ const HiveDescent: React.FC = () => {
             { l: "DEEPEST", v: `Floor ${run.maxFloorReached}`, c: "#ff99dd" },
             { l: "TURNS", v: String(run.turns), c: "#67e8f9" },
             { l: "KILLS", v: String(run.kills), c: "#f87171" },
-            { l: "CRITS", v: String(run.crits), c: "#fde68a" },
+            { l: "CARDS", v: String(run.cardsPlayed), c: "#fde68a" },
           ].map((s) => (<div key={s.l} style={{ background: "rgba(0,0,0,0.45)", border: `1px solid ${s.c}33`, borderRadius: 12, padding: "12px 8px" }}><div style={{ fontSize: 20, fontWeight: 900, color: s.c }}>{s.v}</div><div style={{ fontSize: 9, letterSpacing: "0.25em", opacity: 0.55, marginTop: 4 }}>{s.l}</div></div>))}
         </div>
         {run.relics.length > 0 && <div style={{ marginTop: 16, fontSize: 11, opacity: 0.7 }}>Relics: {run.relics.map((r) => r.name).join(" · ")}</div>}
@@ -135,7 +135,7 @@ const HiveDescent: React.FC = () => {
         <h1 style={{ fontSize: "clamp(38px, 9vw, 88px)", margin: 0, fontWeight: 900, letterSpacing: "0.04em", lineHeight: 0.95, background: "linear-gradient(180deg, #fff 0%, #ff99dd 60%, #aa3388 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>THE HIVE</h1>
         <h1 style={{ fontSize: "clamp(38px, 9vw, 88px)", margin: 0, fontWeight: 900, letterSpacing: "0.04em", lineHeight: 0.95, background: "linear-gradient(180deg, #ff99dd 0%, #aa3388 50%, #4a0a30 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>DESCENT</h1>
         <div style={{ fontSize: "clamp(13px, 2vw, 16px)", color: "rgba(255,255,255,0.7)", marginTop: 18, maxWidth: 580, marginLeft: "auto", marginRight: "auto", fontStyle: "italic", lineHeight: 1.5 }}>
-          "The Queen has been corrupted. Ten floors stand between you and her throne. Read the enemy. Pick your moment. Bank your loot — or lose half of it in the dark."
+          "The Queen has been corrupted. Ten floors stand between you and her throne. Build your deck. Read the enemy. Bank your loot — or lose half of it in the dark."
         </div>
       </div>
 
@@ -151,9 +151,9 @@ const HiveDescent: React.FC = () => {
       {/* How it plays */}
       <div style={{ maxWidth: 980, margin: "26px auto 0", padding: "0 16px", position: "relative", zIndex: 2, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 10 }}>
         {[
-          { t: "READ THE ENEMY", d: "Every foe shows its next move. Heavy strike coming? Defend. Guarding? Hit it with Magic.", c: "#67e8f9" },
-          { t: "FOUR MOVES", d: "Attack · Defend · your faction's Special · Magic. Cooldowns make every turn a decision.", c: "#f87171" },
-          { t: "BOONS BETWEEN FLOORS", d: "Mend, sharpen, or take a relic. 22 relics, three rarities, real build paths.", c: "#c084fc" },
+          { t: "READ THE ENEMY", d: "Up to three foes at once, each showing its next move. Block the heavy hitter, finish the wounded, stun the boss.", c: "#67e8f9" },
+          { t: "PLAY YOUR HAND", d: "3 energy a turn, 5 cards from your deck. Strikes, guards, your faction's signature card — spend it well.", c: "#f87171" },
+          { t: "BUILD BETWEEN FLOORS", d: "Add a card, take a relic, or heal. 30 cards, 22 relics, powers that stack. No two runs alike.", c: "#c084fc" },
           { t: "BANK OR PUSH", d: "Escape with your loot on floors 3, 6 and 9. Die and you keep half. Slay the Queen and keep it all.", c: "#fbbf24" },
         ].map((x) => (<div key={x.t} style={{ background: "rgba(0,0,0,0.4)", border: `1px solid ${x.c}33`, borderRadius: 12, padding: "12px 14px" }}><div style={{ fontSize: 10, letterSpacing: "0.25em", color: x.c, fontWeight: 700 }}>{x.t}</div><div style={{ fontSize: 12, opacity: 0.8, marginTop: 6, lineHeight: 1.5 }}>{x.d}</div></div>))}
       </div>
@@ -181,7 +181,7 @@ const HiveDescent: React.FC = () => {
         {!canStart && !starting && <div style={{ marginTop: 10, fontSize: 12, color: "#ff99aa" }}>⚠ Need {cost} REBEL to descend. You have {balance}.</div>}
         {err && <div style={{ marginTop: 10, fontSize: 12, color: "#ff99aa" }}>{err}</div>}
         <div style={{ marginTop: 14, fontSize: 11, color: "rgba(255,255,255,0.5)", letterSpacing: "0.05em", lineHeight: 1.7 }}>
-          🐜 {DESCENT_FACTIONS.length} factions, each with its own Special · ❤️ 100 HP · 🎲 Turn-based — no twitch, all nerve<br />
+          🐜 {DESCENT_FACTIONS.length} factions, each with its own signature card · ❤️ 100 HP · 🃏 Deckbuilder — no twitch, all nerve<br />
           💎 Up to {totalPossibleRebel().toLocaleString()} REBEL on a perfect {DESCENT_TOTAL_FLOORS}-floor run
         </div>
       </div>

@@ -1,263 +1,405 @@
 // components/HiveDescent/DescentBattle.tsx
-// Turn-based duel UI on top of the DescentArena. Drives the pure engine, animates its events, offers rewards.
-import React, { useCallback, useEffect, useRef, useState } from "react";
+// Hive Descent v3 battle UI: card hand + energy on top of the over-the-shoulder stage.
+// Drives the pure engine, animates its events, offers boons between floors.
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import type { ArenaActor } from "./DescentArena";
-import type { DescentAnim } from "./DescentCharacter";
-import { biomeOf, currentEnemy, takeTurn, beginBattle, chooseReward, specialCooldownTurns, type Run, type Action, type Ev, type RewardOffer } from "./descentEngine";
+import type { ArenaAnim } from "../arena/ArenaCharacter";
+import type { StageActor, StageFx } from "./DescentStage";
+import { enemySlots, PLAYER_POS, FX_LIFE } from "./DescentStage";
+import { biomeOf, beginBattle, playCard, endTurn, chooseReward, canPlay, cardCost, aliveEnemies, HEAL_REWARD, type Run, type Ev, type RewardOffer, type Enemy, type Who } from "./descentEngine";
 import { getRarityColor } from "./relics";
-import { DESCENT_TOTAL_FLOORS, MAGIC_COOLDOWN_TURNS, MAGIC_DAMAGE, BASE_ATTACK_DAMAGE } from "../../lib/descentConfig";
+import { rarityColor, POWERS, type Card } from "../../lib/descentCards";
+import { DESCENT_TOTAL_FLOORS } from "../../lib/descentConfig";
 
-const DescentArena = dynamic(() => import("./DescentArena"), { ssr: false });
+const DescentStage = dynamic(() => import("./DescentStage"), { ssr: false });
 
 const FONT = "'Noto Serif JP', 'Hiragino Mincho ProN', serif";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-type Float = { id: number; who: "player" | "enemy"; text: string; color: string };
+type Float = { id: number; who: "player" | number; text: string; color: string; big?: boolean };
 type Log = { id: number; text: string; tone: string };
+type AnimState = { anim: ArenaAnim; key: number };
 
 type Props = { run: Run; onRun: (r: Run) => void; onAbandon: () => void };
 
+const TYPE_COLOR: Record<Card["type"], string> = { attack: "#f87171", skill: "#67e8f9", power: "#c084fc" };
+
 export default function DescentBattle({ run, onRun, onAbandon }: Props) {
   const biome = biomeOf(run);
-  const enemy = currentEnemy(run);
+  const alive = aliveEnemies(run);
   const [busy, setBusy] = useState(false);
-  const [pAnim, setPAnim] = useState<{ anim: DescentAnim; key: number }>({ anim: "idle", key: 0 });
-  const [eAnim, setEAnim] = useState<{ anim: DescentAnim; key: number }>({ anim: "idle", key: 0 });
-  const [pDead, setPDead] = useState(false);
-  const [eDead, setEDead] = useState(false);
-  const [dispHp, setDispHp] = useState({ p: run.player.hp, e: enemy?.hp ?? 0 });
+  const [pAnim, setPAnim] = useState<AnimState>({ anim: "idle", key: 0 });
+  const [eAnims, setEAnims] = useState<Record<number, AnimState>>({});
+  const [flashes, setFlashes] = useState<Record<string, number>>({});
+  const [dead, setDead] = useState<Record<string, boolean>>({});
+  const [dispHp, setDispHp] = useState<Record<string, number>>({});
+  const [dispBlock, setDispBlock] = useState<Record<string, number>>({});
   const [floats, setFloats] = useState<Float[]>([]);
+  const [fx, setFx] = useState<StageFx[]>([]);
   const [log, setLog] = useState<Log[]>([]);
   const [shake, setShake] = useState(0);
   const [flash, setFlash] = useState<string | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
+  const [targetId, setTargetId] = useState<number | null>(null);
+  const [selected, setSelected] = useState<number | null>(null);
+  const [showPile, setShowPile] = useState<"draw" | "discard" | "exhaust" | null>(null);
+  const speedRef = useRef(1);
   const idRef = useRef(1);
+  const timers = useRef<number[]>([]);
+  const later = useCallback((ms: number, fn: () => void) => { timers.current.push(window.setTimeout(fn, ms)); }, []);
+  useEffect(() => () => { timers.current.forEach(clearTimeout); }, []);
   const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
 
-  // keep displayed HP in sync when not animating (new floor / new enemy / rewards)
-  useEffect(() => { if (!busy) setDispHp({ p: run.player.hp, e: enemy?.hp ?? 0 }); }, [run, busy, enemy]);
+  // displayed HP/block follow the run when not animating
+  useEffect(() => {
+    if (busy) return;
+    const hp: Record<string, number> = { player: run.player.hp }; const bl: Record<string, number> = { player: run.player.block };
+    run.enemies.forEach((e) => { hp[e.id] = e.hp; bl[e.id] = e.block; });
+    setDispHp(hp); setDispBlock(bl);
+  }, [run, busy]);
+
+  // default target = first living enemy
+  useEffect(() => { if (targetId == null || !alive.some((e) => e.id === targetId)) setTargetId(alive[0]?.id ?? null); }, [alive, targetId]);
 
   const pushLog = useCallback((text: string, tone = "info") => setLog((l) => [...l.slice(-5), { id: idRef.current++, text, tone }]), []);
-  const float = useCallback((who: "player" | "enemy", text: string, color: string) => {
+  const float = useCallback((who: "player" | number, text: string, color: string, big = false) => {
     const id = idRef.current++;
-    setFloats((f) => [...f, { id, who, text, color }]);
-    setTimeout(() => setFloats((f) => f.filter((x) => x.id !== id)), 1100);
+    setFloats((f) => [...f, { id, who, text, color, big }]);
+    later(1100, () => setFloats((f) => f.filter((x) => x.id !== id)));
+  }, [later]);
+  const spawnFx = useCallback((kind: StageFx["kind"], who: Who, color: string) => {
+    const id = idRef.current++; const life = FX_LIFE[kind];
+    let x = PLAYER_POS[0], z = PLAYER_POS[2];
+    if (who !== "player") { const idx = run.enemies.filter((e) => e.alive).findIndex((e) => e.id === who.enemy); const slots = enemySlots(aliveEnemies(run).length); const s = slots[Math.max(0, idx)]; if (s) { x = s[0]; z = s[2]; } }
+    setFx((f) => [...f, { id, kind, x, z, color, t0: performance.now(), life }]);
+    later(life + 50, () => setFx((f) => f.filter((v) => v.id !== id)));
+  }, [later, run]);
+  const playAnim = useCallback((who: Who, anim: ArenaAnim) => {
+    if (who === "player") setPAnim((a) => ({ anim, key: a.key + 1 }));
+    else setEAnims((m) => ({ ...m, [who.enemy]: { anim, key: (m[who.enemy]?.key || 0) + 1 } }));
   }, []);
+  const hitFlash = useCallback((who: Who) => { const k = who === "player" ? "player" : String(who.enemy); setFlashes((f) => ({ ...f, [k]: (f[k] || 0) + 1 })); }, []);
+  const hitStop = useCallback((ms = 80) => { speedRef.current = 0.02; later(ms, () => { speedRef.current = 1; }); }, [later]);
 
   // ── floor intro
   useEffect(() => {
     if (run.phase !== "intro") return;
-    setEDead(false); setPDead(false);
+    setDead({}); setEAnims({}); setPAnim({ anim: "idle", key: 0 }); setSelected(null);
     setBanner(`FLOOR ${run.floor} · ${biome.name}`);
-    const t = setTimeout(() => { setBanner(null); onRun(beginBattle(run)); pushLog(`${enemy?.name ?? "The hive"} steps forward`, "info"); }, 1900);
+    const t = setTimeout(() => { setBanner(null); const r = beginBattle(run); onRun(r.run); pushLog(`${aliveEnemies(r.run).map((e) => e.name).join(", ")} — ${aliveEnemies(r.run).length > 1 ? "step forward" : "steps forward"}`, "info"); }, 1900);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [run.phase, run.floor]);
 
-  // ── play an engine event list
-  const playEvents = useCallback(async (evs: Ev[], next: Run) => {
-    let enemyName = enemy?.name ?? "";
+  // ── event playback
+  const playEvents = useCallback(async (evs: Ev[], opts: { fast?: boolean } = {}) => {
+    const f = opts.fast ? 0.55 : 1;
+    const key = (w: Who) => (w === "player" ? "player" : String(w.enemy));
     for (const ev of evs) {
-      if (ev.t === "anim") {
-        if (ev.who === "player") setPAnim((a) => ({ anim: ev.anim, key: a.key + 1 })); else setEAnim((a) => ({ anim: ev.anim, key: a.key + 1 }));
-        if (ev.anim === "lose") { if (ev.who === "player") setPDead(true); else setEDead(true); }
-        await sleep(ev.ms ?? (ev.anim === "attack" || ev.anim === "magic" || ev.anim === "trick" ? 650 : 400));
-      } else if (ev.t === "dmg") {
-        if (ev.kind === "dodge") { float("player", "DODGE", "#67e8f9"); await sleep(350); continue; }
-        const color = ev.who === "player" ? "#f87171" : ev.crit ? "#fde68a" : ev.kind === "burn" ? "#fb923c" : ev.kind === "poison" ? "#a3e635" : "#ffffff";
-        const label = (ev.crit ? "CRIT " : "") + `-${ev.amount}` + (ev.kind === "blocked" ? " (blocked)" : ev.kind === "burn" ? " 🔥" : ev.kind === "poison" ? " ☠" : "");
-        float(ev.who, label, color);
-        setDispHp((h) => ({ ...h, [ev.who === "player" ? "p" : "e"]: Math.max(0, (ev.who === "player" ? h.p : h.e) - ev.amount) }));
-        if (ev.who === "player") { setShake(ev.amount > 20 ? 1.6 : 1); setFlash("rgba(255,40,60,0.35)"); }
-        else { setShake(ev.crit ? 1.2 : 0.6); if (ev.amount > 0 && !ev.kind) setEAnim((a) => ({ anim: "hit", key: a.key + 1 })); }
-        setTimeout(() => { setShake(0); setFlash(null); }, 260);
-        await sleep(ev.kind === "burn" || ev.kind === "poison" ? 320 : 420);
-      } else if (ev.t === "heal") { float(ev.who, `+${ev.amount}`, "#4ade80"); setDispHp((h) => ({ ...h, [ev.who === "player" ? "p" : "e"]: (ev.who === "player" ? h.p : h.e) + ev.amount })); await sleep(300); }
-      else if (ev.t === "text") { pushLog(ev.text, ev.tone ?? "info"); await sleep(180); }
-      else if (ev.t === "enemyDown") { pushLog(`${ev.name} destroyed · +${ev.rebel} REBEL`, "good"); await sleep(1000); enemyName = ""; }
-      else if (ev.t === "floorClear") { pushLog(`Floor ${ev.floor} cleared`, "boom"); setFlash("rgba(255,255,255,0.35)"); setTimeout(() => setFlash(null), 300); await sleep(900); }
-      else if (ev.t === "playerDown") { if (ev.revived) { setPDead(false); setPAnim((a) => ({ anim: "idle", key: a.key + 1 })); } await sleep(ev.revived ? 900 : 1400); }
+      switch (ev.t) {
+        case "play": pushLog(`${ev.card.name}`, ev.card.type === "attack" ? "bad" : "info"); break;
+        case "anim": {
+          playAnim(ev.who, ev.anim);
+          if (ev.anim === "lose") setDead((d) => ({ ...d, [key(ev.who)]: true }));
+          if (ev.anim === "attack" && ev.who !== "player") { await sleep(300 * f); }
+          else if (ev.anim === "attack" || ev.anim === "magic" || ev.anim === "trick") await sleep(260 * f);
+          else if (ev.anim === "defend") { spawnFx("dome", ev.who, ev.who === "player" ? "#67e8f9" : biome.particleColor); await sleep(200 * f); }
+          else if (ev.anim === "lose") await sleep(150 * f);
+          break;
+        }
+        case "dmg": {
+          const k = key(ev.who);
+          const total = ev.amount + ev.blocked;
+          if (ev.kind === "poison") { float(ev.who === "player" ? "player" : ev.who.enemy, `☠ -${ev.amount}`, "#a3e635"); spawnFx("poison", ev.who, "#a3e635"); }
+          else if (ev.kind === "burn") float(ev.who === "player" ? "player" : ev.who.enemy, `🔥 -${ev.amount}`, "#fb923c");
+          else if (ev.kind === "thorns") float(ev.who === "player" ? "player" : ev.who.enemy, `⚘ -${ev.amount}`, "#f472b6");
+          else if (ev.kind === "self") float("player", `-${ev.amount}`, "#f87171");
+          else {
+            const big = ev.amount >= 15;
+            const txt = ev.amount === 0 && ev.blocked > 0 ? "BLOCKED" : `${ev.crit ? "CRIT " : ""}-${ev.amount}${ev.blocked > 0 ? ` (${ev.blocked} blocked)` : ""}`;
+            float(ev.who === "player" ? "player" : ev.who.enemy, txt, ev.who === "player" ? "#f87171" : ev.crit ? "#fde68a" : ev.amount === 0 ? "#9ca3af" : "#ffffff", big);
+            if (ev.who !== "player") { spawnFx("slash", ev.who, "#ffffff"); spawnFx("sparks", ev.who, biome.particleColor); }
+            else { spawnFx("sparks", "player", "#ff6b6b"); }
+            if (total > 0) { hitFlash(ev.who); hitStop(big ? 110 : 70); setShake(ev.who === "player" ? (big ? 1.6 : 1) : big ? 1.1 : 0.6); }
+            if (ev.who === "player" && ev.amount > 0) setFlash("rgba(255,40,60,0.3)");
+            if (ev.who !== "player" && ev.amount > 0) playAnim(ev.who, "hit");
+            later(240, () => { setShake(0); setFlash(null); });
+          }
+          setDispBlock((b) => ({ ...b, [k]: Math.max(0, (b[k] ?? 0) - ev.blocked) }));
+          setDispHp((h) => ({ ...h, [k]: Math.max(0, (h[k] ?? 0) - ev.amount) }));
+          await sleep((ev.kind ? 260 : 380) * f);
+          break;
+        }
+        case "dodge": float("player", "DODGE", "#67e8f9"); await sleep(300 * f); break;
+        case "block": { const k = key(ev.who); setDispBlock((b) => ({ ...b, [k]: (b[k] ?? 0) + ev.amount })); float(ev.who === "player" ? "player" : ev.who.enemy, `🛡 +${ev.amount}`, "#67e8f9"); await sleep(220 * f); break; }
+        case "heal": { const k = key(ev.who); setDispHp((h) => ({ ...h, [k]: (h[k] ?? 0) + ev.amount })); float(ev.who === "player" ? "player" : ev.who.enemy, `+${ev.amount}`, "#4ade80"); await sleep(260 * f); break; }
+        case "status": { const label = ev.status === "energy" ? `⚡ +${ev.amount}` : POWERS[ev.status] ? POWERS[ev.status].name : `${ev.status} +${ev.amount}`; float(ev.who === "player" ? "player" : ev.who.enemy, label, ev.who === "player" ? "#fbbf24" : "#c084fc"); if (ev.status === "poison") spawnFx("poison", ev.who, "#a3e635"); if (POWERS[ev.status]) spawnFx("glyph", "player", "#c084fc"); await sleep(220 * f); break; }
+        case "draw": await sleep(120 * f); break;
+        case "text": pushLog(ev.text, ev.tone ?? "info"); await sleep(160 * f); break;
+        case "turn": if (ev.n > 1) pushLog(`— turn ${ev.n} —`, "info"); break;
+        case "enemyDown": pushLog(`${ev.name} destroyed · +${ev.rebel} REBEL`, "good"); spawnFx("dust", { enemy: ev.enemy }, "#8a8073"); await sleep(700 * f); break;
+        case "floorClear": pushLog(`Floor ${ev.floor} cleared`, "boom"); setFlash("rgba(255,255,255,0.35)"); later(300, () => setFlash(null)); await sleep(900); break;
+        case "playerDown": if (ev.revived) { setDead((d) => ({ ...d, player: false })); setPAnim((a) => ({ anim: "idle", key: a.key + 1 })); } await sleep(ev.revived ? 900 : 1400); break;
+      }
     }
-    void enemyName;
-    // next enemy on the same floor?
-    const ne = currentEnemy(next);
-    if (next.phase === "battle" && ne && enemy && (ne !== enemy) && ne.turn === 0) { setEDead(false); setEAnim({ anim: "idle", key: 0 }); pushLog(`${ne.name} steps forward`, "info"); }
-    setPAnim((a) => (a.anim === "lose" ? a : { anim: "idle", key: a.key + 1 }));
-    onRun(next);
-    setBusy(false);
-  }, [enemy, float, pushLog, onRun]);
+  }, [biome.particleColor, float, hitFlash, hitStop, later, playAnim, pushLog, spawnFx]);
 
-  const act = useCallback((action: Action) => {
-    if (busy || run.phase !== "battle") return;
-    if (action === "special" && run.player.specialCd > 0) return;
-    if (action === "magic" && run.player.magicCd > 0) return;
+  // ── actions
+  const doPlay = useCallback((idx: number) => {
+    if (busy || run.phase !== "battle" || !canPlay(run, idx)) return;
+    const card = run.hand[idx];
+    const tgt = card.target === "enemy" ? (targetId ?? alive[0]?.id ?? null) : null;
+    const { run: next, evs } = playCard(run, idx, tgt);
+    if (next === run) return;
+    setSelected(null);
     setBusy(true);
-    const { run: next, evs } = takeTurn(run, action);
-    void playEvents(evs, next);
-  }, [busy, run, playEvents]);
+    onRun(next);            // hand + energy update instantly; visuals catch up
+    void (async () => { await playEvents(evs, { fast: true }); setBusy(false); })();
+  }, [busy, run, targetId, alive, onRun, playEvents]);
+
+  const doEndTurn = useCallback(() => {
+    if (busy || run.phase !== "battle") return;
+    const { run: next, evs } = endTurn(run);
+    setBusy(true); setSelected(null);
+    void (async () => {
+      pushLog("Enemy turn", "bad");
+      await playEvents(evs);
+      onRun(next);
+      setBusy(false);
+    })();
+  }, [busy, run, onRun, playEvents, pushLog]);
+
+  const onCardClick = useCallback((idx: number) => {
+    if (busy) return;
+    const card = run.hand[idx];
+    if (!canPlay(run, idx)) return;
+    if (card.target === "enemy" && alive.length > 1 && selected !== idx) { setSelected(idx); return; }  // pick a target next
+    doPlay(idx);
+  }, [busy, run, alive.length, selected, doPlay]);
+
+  const onPickTarget = useCallback((id: number) => {
+    setTargetId(id);
+    if (selected != null) { const idx = selected; setSelected(null); if (canPlay(run, idx)) { const { run: next, evs } = playCard(run, idx, id); if (next !== run) { setBusy(true); onRun(next); void (async () => { await playEvents(evs, { fast: true }); setBusy(false); })(); } } }
+  }, [selected, run, onRun, playEvents]);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { const k = e.key; if (k === "1") act("attack"); else if (k === "2") act("defend"); else if (k === "3") act("special"); else if (k === "4") act("magic"); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "e" || e.key === "Enter") doEndTurn(); const n = parseInt(e.key, 10); if (n >= 1 && n <= run.hand.length) onCardClick(n - 1); if (e.key === "Escape") setSelected(null); };
     window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey);
-  }, [act]);
+  }, [doEndTurn, onCardClick, run.hand.length]);
 
+  // ── stage props
   const p = run.player;
-  const playerActor: ArenaActor = { factionId: run.factionId, anim: pAnim.anim, animKey: pAnim.key, dead: pDead };
-  const enemyActor: ArenaActor | null = enemy ? { factionId: enemy.factionId, anim: eAnim.anim, animKey: eAnim.key, dead: eDead, scale: enemy.scale, corrupted: true } : null;
-  const hpPct = Math.max(0, Math.min(1, dispHp.p / p.maxHp));
-  const ehpPct = enemy ? Math.max(0, Math.min(1, dispHp.e / enemy.maxHp)) : 0;
-  const hpColor = hpPct > 0.55 ? "#4ade80" : hpPct > 0.28 ? "#fbbf24" : "#f87171";
-  const specialReady = p.specialCd === 0, magicReady = p.magicCd === 0;
-  const intent = enemy?.intent;
-  const intentColor = intent?.kind === "heavy" ? "#fb923c" : intent?.kind === "special" ? "#ff3399" : intent?.kind === "guard" ? "#67e8f9" : "#f87171";
+  const playerActor: StageActor = { id: -1, factionId: run.factionId, anim: pAnim.anim, animKey: pAnim.key, dead: !!dead.player, scale: 1, flashKey: flashes.player || 0 };
+  const enemyActors: StageActor[] = run.enemies.filter((e) => e.alive || dead[String(e.id)]).map((e) => ({ id: e.id, factionId: e.factionId, anim: eAnims[e.id]?.anim ?? "idle", animKey: eAnims[e.id]?.key ?? 0, dead: !!dead[String(e.id)] || !e.alive, scale: e.scale, flashKey: flashes[String(e.id)] || 0 }));
+  const enemyById = useMemo(() => Object.fromEntries(run.enemies.map((e) => [e.id, e])) as Record<number, Enemy>, [run.enemies]);
 
-  const btn = (label: string, sub: string, key: string, color: string, ready: boolean, onClick: () => void, badge?: string) => (
-    <button type="button" disabled={busy || !ready || run.phase !== "battle"} onClick={onClick}
-      style={{ flex: 1, minWidth: 0, fontFamily: FONT, padding: isMobile ? "10px 6px" : "12px 10px", borderRadius: 14, border: `1px solid ${ready ? color + "88" : "rgba(255,255,255,0.12)"}`, background: ready ? `linear-gradient(180deg, ${color}26, rgba(0,0,0,0.55))` : "rgba(0,0,0,0.5)", color: ready ? "#fff" : "rgba(255,255,255,0.35)", cursor: busy || !ready ? "not-allowed" : "pointer", boxShadow: ready && !busy ? `0 0 18px ${color}44` : "none", position: "relative", textAlign: "center", opacity: busy ? 0.7 : 1, transition: "all .15s" }}>
-      <div style={{ fontSize: isMobile ? 12 : 14, fontWeight: 900, letterSpacing: "0.14em", textTransform: "uppercase" }}>{label}</div>
-      <div style={{ fontSize: isMobile ? 9 : 10, opacity: 0.7, marginTop: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sub}</div>
-      {!isMobile && <div style={{ position: "absolute", top: 6, left: 8, fontSize: 9, opacity: 0.4, fontFamily: "monospace" }}>{key}</div>}
-      {badge && <div style={{ position: "absolute", top: 6, right: 8, fontSize: 10, fontWeight: 900, color, fontFamily: "monospace" }}>{badge}</div>}
-    </button>
-  );
+  const renderEnemyLabel = useCallback((id: number) => {
+    const e = enemyById[id]; if (!e || !e.alive) return null;
+    const hp = dispHp[String(id)] ?? e.hp; const bl = dispBlock[String(id)] ?? e.block; const pct = Math.max(0, Math.min(1, hp / e.maxHp));
+    const isT = id === targetId;
+    const statuses = [e.poison > 0 && `☠${e.poison}`, e.burn > 0 && `🔥${e.burn}`, e.stun > 0 && `💫${e.stun}`, e.vulnerable > 0 && `▼${e.vulnerable}`, e.weak > 0 && `≈${e.weak}`, e.strength > 0 && `↑${e.strength}`].filter(Boolean) as string[];
+    return (
+      <div style={{ width: 168, fontFamily: FONT, textAlign: "center", transform: "translateY(-6px)", filter: isT ? "drop-shadow(0 0 10px #ffd166aa)" : "none" }}>
+        <div style={{ fontSize: 10, fontWeight: 900, letterSpacing: "0.14em", color: isT ? "#ffd166" : "#fff", textShadow: "0 1px 6px #000" }}>{e.isBoss ? "☠ " : ""}{e.name.toUpperCase()}</div>
+        <div style={{ margin: "4px auto 0", height: 6, width: 120, background: "rgba(0,0,0,0.6)", borderRadius: 4, overflow: "hidden", border: "1px solid rgba(255,255,255,0.15)" }}>
+          <div style={{ height: "100%", width: `${pct * 100}%`, background: `linear-gradient(90deg, ${biome.particleColor}, #ff3366)`, transition: "width .3s" }} />
+        </div>
+        <div style={{ fontSize: 9, opacity: 0.8, marginTop: 2, textShadow: "0 1px 4px #000" }}>{hp}/{e.maxHp}{bl > 0 ? <span style={{ color: "#67e8f9" }}> 🛡{bl}</span> : null} {statuses.length ? <span style={{ color: "#c084fc" }}> {statuses.join(" ")}</span> : null}</div>
+        {e.stun > 0 ? (
+          <div style={{ marginTop: 4, display: "inline-block", padding: "3px 8px", borderRadius: 8, background: "rgba(0,0,0,0.7)", border: "1px solid #c084fc66", fontSize: 9, color: "#c084fc" }}>💫 STUNNED</div>
+        ) : (
+          <div style={{ marginTop: 4, display: "inline-block", padding: "3px 8px", borderRadius: 8, background: "rgba(0,0,0,0.7)", border: `1px solid ${e.intent.kind === "guard" || e.intent.kind === "buff" ? "#67e8f966" : e.intent.kind === "special" || e.intent.kind === "heavy" ? "#f8717166" : "rgba(255,255,255,0.2)"}`, fontSize: 10, fontWeight: 800, color: e.intent.kind === "guard" || e.intent.kind === "buff" ? "#67e8f9" : e.intent.kind === "special" || e.intent.kind === "heavy" ? "#f87171" : "#fff" }}>
+            {e.intent.label} <span style={{ opacity: 0.8, fontWeight: 400 }}>{e.intent.hint}</span>
+          </div>
+        )}
+      </div>
+    );
+  }, [enemyById, dispHp, dispBlock, targetId, biome.particleColor]);
+
+  const renderEnemyFloats = useCallback((id: number) => (
+    <div style={{ position: "relative", width: 160, height: 60, fontFamily: FONT }}>
+      {floats.filter((f) => f.who === id).map((f) => (
+        <div key={f.id} style={{ position: "absolute", left: "50%", bottom: 0, transform: "translateX(-50%)", fontWeight: 900, fontSize: f.big ? 30 : 20, color: f.color, whiteSpace: "nowrap", textShadow: `0 0 16px ${f.color}aa, 0 2px 4px #000`, animation: "hdFloat 1s cubic-bezier(0.2,0.9,0.3,1) both" }}>{f.text}</div>
+      ))}
+    </div>
+  ), [floats]);
+
+  const hpPct = Math.max(0, Math.min(1, (dispHp.player ?? p.hp) / p.maxHp));
+  const pBlock = dispBlock.player ?? p.block;
+  const canEnd = run.phase === "battle" && !busy;
+  const powers = Object.entries(p.powers).filter(([, n]) => n > 0);
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "#000", color: "#fff", overflow: "hidden", fontFamily: FONT }}>
-      <DescentArena biome={biome} player={playerActor} enemy={enemyActor} shake={shake} flash={flash} />
+      <DescentStage biome={biome} player={playerActor} enemies={enemyActors} targetId={targetId} onPickTarget={onPickTarget} shake={shake} speedRef={speedRef} fx={fx} renderEnemyLabel={renderEnemyLabel} renderEnemyFloats={renderEnemyFloats} />
+      {flash && <div style={{ position: "absolute", inset: 0, background: flash, pointerEvents: "none", animation: "hdFlash .35s ease-out both" }} />}
 
-      {/* floating numbers */}
-      {floats.map((f) => (
-        <div key={f.id} style={{ position: "absolute", left: f.who === "player" ? "30%" : "70%", top: "38%", transform: "translateX(-50%)", color: f.color, fontWeight: 900, fontSize: f.text.startsWith("CRIT") ? 34 : 26, textShadow: "0 2px 12px #000, 0 0 20px " + f.color, animation: "hdFloat 1.1s ease-out both", pointerEvents: "none", whiteSpace: "nowrap" }}>{f.text}</div>
-      ))}
-
-      {/* top HUD */}
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, padding: `calc(env(safe-area-inset-top, 0px) + 10px) 12px 8px`, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, background: "linear-gradient(180deg, rgba(0,0,0,0.7), transparent)", pointerEvents: "none" }}>
-        <div style={{ pointerEvents: "auto" }}>
-          <div style={{ fontSize: 10, letterSpacing: "0.3em", color: biome.particleColor, fontWeight: 700 }}>FLOOR {run.floor} / {DESCENT_TOTAL_FLOORS} · {biome.name.toUpperCase()}</div>
-          <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: "0.1em", marginTop: 2 }}>🐜 {run.faction.name.toUpperCase()}</div>
-          {run.relics.length > 0 && (
-            <div style={{ display: "flex", gap: 4, marginTop: 6, flexWrap: "wrap", maxWidth: 260 }}>
-              {run.relics.map((r) => (<span key={r.id} title={`${r.name} — ${r.flavor}`} style={{ fontSize: 9, letterSpacing: "0.08em", padding: "2px 7px", borderRadius: 999, border: `1px solid ${getRarityColor(r.rarity)}88`, color: getRarityColor(r.rarity), background: "rgba(0,0,0,0.5)" }}>{r.name}</span>))}
-            </div>
-          )}
+      {/* top bar */}
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", pointerEvents: "none" }}>
+        <div>
+          <div style={{ fontSize: 10, letterSpacing: "0.3em", color: biome.particleColor, fontWeight: 800 }}>FLOOR {run.floor} / {DESCENT_TOTAL_FLOORS} · {biome.name.toUpperCase()}</div>
+          <div style={{ fontSize: 12, fontWeight: 900, marginTop: 2 }}>{run.faction.name.toUpperCase()} <span style={{ opacity: 0.5, fontWeight: 400, fontSize: 10 }}>· turn {run.turnNo}</span></div>
+          <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+            {run.relics.map((r) => (<span key={r.id} title={r.flavor} style={{ fontSize: 9, padding: "2px 7px", borderRadius: 999, border: `1px solid ${getRarityColor(r.rarity)}66`, color: getRarityColor(r.rarity), background: "rgba(0,0,0,0.55)" }}>{r.name}</span>))}
+            {powers.map(([k, n]) => (<span key={k} title={POWERS[k]?.text} style={{ fontSize: 9, padding: "2px 7px", borderRadius: 999, border: "1px solid #c084fc66", color: "#c084fc", background: "rgba(0,0,0,0.55)" }}>{POWERS[k]?.name || k}{n > 1 ? ` ×${n}` : ""}</span>))}
+          </div>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", pointerEvents: "auto" }}>
-          <div style={{ background: "rgba(0,0,0,0.6)", border: "1px solid rgba(251,191,36,0.4)", borderRadius: 999, padding: "6px 12px", fontSize: 12, fontWeight: 900, color: "#fbbf24", letterSpacing: "0.06em" }}>💎 +{run.unbanked}</div>
+          <div style={{ background: "rgba(0,0,0,0.6)", border: "1px solid rgba(251,191,36,0.4)", borderRadius: 999, padding: "6px 12px", fontSize: 11, fontWeight: 800, color: "#fbbf24" }}>💎 +{run.unbanked}</div>
           <button type="button" onClick={onAbandon} style={{ background: "rgba(0,0,0,0.6)", border: "1px solid rgba(248,113,113,0.4)", borderRadius: 999, padding: "6px 10px", color: "#f87171", fontSize: 10, fontWeight: 800, letterSpacing: "0.12em", cursor: "pointer", fontFamily: FONT }}>✕ ABANDON</button>
         </div>
       </div>
 
-      {/* enemy plate */}
-      {enemy && (
-        <div style={{ position: "absolute", top: isMobile ? 84 : 92, right: 14, width: isMobile ? "min(46vw, 230px)" : 260, pointerEvents: "none" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-            <div style={{ fontSize: enemy.isBoss ? 14 : 12, fontWeight: 900, letterSpacing: "0.12em", color: enemy.isBoss ? "#ff3399" : "#fff", textShadow: "0 1px 6px #000" }}>{enemy.name.toUpperCase()}</div>
-            <div style={{ fontSize: 10, opacity: 0.7, fontFamily: "monospace" }}>{Math.ceil(dispHp.e)}/{enemy.maxHp}</div>
-          </div>
-          <div style={{ height: 8, borderRadius: 4, background: "rgba(0,0,0,0.65)", border: "1px solid rgba(255,255,255,0.15)", overflow: "hidden", marginTop: 4 }}>
-            <div style={{ width: `${ehpPct * 100}%`, height: "100%", background: `linear-gradient(90deg, #ff3399, ${biome.particleColor})`, transition: "width .35s" }} />
-          </div>
-          {(enemy.burn > 0 || enemy.poison > 0 || enemy.stunned > 0) && <div style={{ marginTop: 4, fontSize: 9, letterSpacing: "0.1em", opacity: 0.85 }}>{enemy.burn > 0 ? "🔥 BURNING  " : ""}{enemy.poison > 0 ? "☠ POISONED  " : ""}{enemy.stunned > 0 ? "💫 STUNNED" : ""}</div>}
-          {intent && run.phase === "battle" && (
-            <div style={{ marginTop: 8, padding: "7px 10px", borderRadius: 10, background: "rgba(0,0,0,0.65)", border: `1px solid ${intentColor}66`, boxShadow: `0 0 14px ${intentColor}33` }}>
-              <div style={{ fontSize: 9, letterSpacing: "0.25em", color: intentColor, fontWeight: 700 }}>NEXT MOVE</div>
-              <div style={{ fontSize: 12, fontWeight: 900, marginTop: 1 }}>{intent.label}</div>
-              <div style={{ fontSize: 10, opacity: 0.7, marginTop: 1 }}>{intent.hint}</div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* log */}
-      <div style={{ position: "absolute", left: 14, bottom: isMobile ? 132 : 150, width: "min(44vw, 340px)", pointerEvents: "none", display: "flex", flexDirection: "column", gap: 2 }}>
-        {log.map((l, i) => (<div key={l.id} style={{ fontSize: isMobile ? 10 : 11, color: l.tone === "good" ? "#86efac" : l.tone === "bad" ? "#fca5a5" : l.tone === "boom" ? "#fde68a" : "rgba(255,255,255,0.75)", opacity: 0.35 + ((i + 1) / log.length) * 0.65, textShadow: "0 1px 3px #000", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.text}</div>))}
-      </div>
-
-      {/* bottom: HP + actions */}
-      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: `10px 12px calc(env(safe-area-inset-bottom, 0px) + 12px)`, background: "linear-gradient(0deg, rgba(0,0,0,0.85), rgba(0,0,0,0.4) 70%, transparent)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
-          <div style={{ fontSize: 10, letterSpacing: "0.25em", fontWeight: 700, color: hpColor }}>HP · {Math.ceil(dispHp.p)} / {p.maxHp}</div>
-          <div style={{ fontSize: 9, letterSpacing: "0.15em", opacity: 0.55 }}>DMG ×{(p.dmgMult * p.buffMult).toFixed(2)} · CRIT {Math.round(p.critChance * 100)}%{p.buffTurns > 0 ? ` · RALLY ${p.buffTurns}` : ""}</div>
-        </div>
-        <div style={{ height: 12, borderRadius: 6, background: "rgba(0,0,0,0.7)", border: "1px solid rgba(255,255,255,0.15)", overflow: "hidden", marginBottom: 10 }}>
-          <div style={{ width: `${hpPct * 100}%`, height: "100%", background: `linear-gradient(90deg, ${hpColor}, ${hpColor}99)`, boxShadow: `0 0 12px ${hpColor}88`, transition: "width .35s, background .3s" }} />
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          {btn("Attack", `${Math.round(BASE_ATTACK_DAMAGE * p.dmgMult * p.buffMult)} dmg`, "1", "#f87171", true, () => act("attack"))}
-          {btn("Defend", "take 35% · +5 HP", "2", "#67e8f9", true, () => act("defend"))}
-          {btn(run.faction.specialName, run.faction.blurb.split(".")[0], "3", "#fbbf24", specialReady, () => act("special"), specialReady ? "READY" : `${p.specialCd}`)}
-          {btn("Magic", `${MAGIC_DAMAGE} dmg · ignores guard`, "4", "#c084fc", magicReady, () => act("magic"), magicReady ? undefined : `${p.magicCd}`)}
-        </div>
-        {!isMobile && <div style={{ fontSize: 9, opacity: 0.35, letterSpacing: "0.2em", marginTop: 6, textAlign: "center" }}>KEYS 1 · 2 · 3 · 4 — SPECIAL RECHARGES IN {specialCooldownTurns(p)} TURNS, MAGIC IN {MAGIC_COOLDOWN_TURNS}</div>}
-      </div>
-
       {/* floor banner */}
       {banner && (
-        <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", pointerEvents: "none", background: "rgba(0,0,0,0.35)" }}>
-          <div style={{ textAlign: "center", animation: "hdBanner 1.9s ease-out both" }}>
-            <div style={{ fontSize: 11, letterSpacing: "0.5em", color: biome.particleColor }}>{biome.kind === "final_boss" ? "◆ FINAL FLOOR ◆" : biome.kind === "mini_boss" ? "◆ BOSS FLOOR ◆" : "◆ DESCENDING ◆"}</div>
-            <div style={{ fontSize: "clamp(28px, 6vw, 60px)", fontWeight: 900, letterSpacing: "0.12em", marginTop: 8, textShadow: `0 0 40px ${biome.particleColor}` }}>{banner}</div>
-            <div style={{ fontSize: 13, opacity: 0.75, fontStyle: "italic", marginTop: 8 }}>{biome.subtitle}</div>
+        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none", animation: "hdBanner 1.9s ease-out both" }}>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 11, letterSpacing: "0.5em", color: biome.particleColor, marginBottom: 8 }}>◆ DESCENDING ◆</div>
+            <div style={{ fontSize: "clamp(26px, 6vw, 56px)", fontWeight: 900, letterSpacing: "0.12em", textShadow: `0 0 40px ${biome.particleColor}` }}>{banner}</div>
+            <div style={{ fontSize: 12, opacity: 0.7, marginTop: 8, fontStyle: "italic" }}>{biome.subtitle}</div>
           </div>
         </div>
       )}
 
-      {/* reward overlay */}
-      {run.phase === "reward" && !busy && (
-        <RewardOverlay run={run} onPick={(o) => onRun(chooseReward(run, o))} />
+      {/* player floats */}
+      <div style={{ position: "absolute", left: isMobile ? "18%" : "22%", bottom: isMobile ? 250 : 265, width: 200, height: 80, pointerEvents: "none" }}>
+        {floats.filter((f) => f.who === "player").map((f) => (
+          <div key={f.id} style={{ position: "absolute", left: "50%", bottom: 0, transform: "translateX(-50%)", fontWeight: 900, fontSize: f.big ? 32 : 22, color: f.color, whiteSpace: "nowrap", textShadow: `0 0 16px ${f.color}aa, 0 2px 4px #000`, animation: "hdFloat 1s cubic-bezier(0.2,0.9,0.3,1) both" }}>{f.text}</div>
+        ))}
+      </div>
+
+      {/* log */}
+      <div style={{ position: "absolute", right: 14, bottom: isMobile ? 236 : 250, width: isMobile ? 160 : 260, pointerEvents: "none", textAlign: "right" }}>
+        {log.map((l, i) => (<div key={l.id} style={{ fontSize: isMobile ? 9 : 11, opacity: 0.35 + (i / Math.max(1, log.length - 1)) * 0.65, color: l.tone === "good" ? "#4ade80" : l.tone === "bad" ? "#f87171" : l.tone === "boom" ? "#fbbf24" : "#e5e7eb", textShadow: "0 1px 4px #000", marginTop: 2 }}>{l.text}</div>))}
+      </div>
+
+      {/* bottom HUD: HP/energy + hand + end turn */}
+      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: isMobile ? "8px 8px 10px" : "10px 16px 14px", background: "linear-gradient(180deg, transparent, rgba(0,0,0,0.85) 30%)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, gap: 10 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, letterSpacing: "0.15em", marginBottom: 3 }}>
+              <span style={{ color: hpPct < 0.25 ? "#f87171" : "#4ade80" }}>HP · {dispHp.player ?? p.hp} / {p.maxHp}{pBlock > 0 ? <span style={{ color: "#67e8f9" }}>  🛡 {pBlock}</span> : null}</span>
+              <span style={{ opacity: 0.55 }}>{p.strength > 0 ? `STR +${p.strength} · ` : ""}{p.tempStrength > 0 ? `+${p.tempStrength} this turn · ` : ""}DMG ×{p.dmgMult.toFixed(2)}</span>
+            </div>
+            <div style={{ height: 8, background: "rgba(255,255,255,0.08)", borderRadius: 4, overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${hpPct * 100}%`, background: hpPct < 0.25 ? "linear-gradient(90deg,#f87171,#fca5a5)" : "linear-gradient(90deg,#16a34a,#4ade80)", transition: "width .3s" }} />
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "flex-end", gap: isMobile ? 6 : 12 }}>
+          {/* energy + piles */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, minWidth: isMobile ? 54 : 70 }}>
+            <div style={{ width: isMobile ? 48 : 60, height: isMobile ? 48 : 60, borderRadius: "50%", border: "2px solid #fbbf24", background: "radial-gradient(circle at 40% 35%, #fde68a, #b45309)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: isMobile ? 18 : 22, fontWeight: 900, color: "#1a1206", boxShadow: "0 0 24px #fbbf2466" }}>{p.energy}<span style={{ fontSize: 10, opacity: 0.7 }}>/{p.maxEnergy + (p.powers.momentum || 0)}</span></div>
+            <button type="button" onClick={() => setShowPile(showPile === "draw" ? null : "draw")} style={{ fontFamily: FONT, background: "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 8, padding: "3px 8px", color: "#fff", fontSize: 9, cursor: "pointer" }}>DRAW {run.draw.length}</button>
+          </div>
+
+          {/* hand */}
+          <div style={{ flex: 1, display: "flex", gap: isMobile ? 4 : 8, justifyContent: "center", alignItems: "flex-end", overflowX: "auto", padding: "6px 2px" }}>
+            {run.hand.map((c, i) => {
+              const cost = c.effect.xCost ? p.energy : cardCost(run, c);
+              const ok = canPlay(run, i) && !busy && run.phase === "battle";
+              const sel = selected === i; const col = TYPE_COLOR[c.type]; const rc = rarityColor(c.rarity);
+              return (
+                <button key={`${c.id}-${i}`} type="button" onClick={() => onCardClick(i)} title={c.text}
+                  style={{ fontFamily: FONT, flex: "0 0 auto", width: isMobile ? 84 : 118, height: isMobile ? 118 : 156, borderRadius: 12, textAlign: "left", padding: isMobile ? 6 : 9, position: "relative",
+                    border: `1px solid ${sel ? "#ffd166" : ok ? col + "99" : "rgba(255,255,255,0.12)"}`, background: ok ? `linear-gradient(180deg, ${col}22, rgba(8,8,14,0.92))` : "rgba(10,10,14,0.85)",
+                    color: ok ? "#fff" : "rgba(255,255,255,0.35)", cursor: ok ? "pointer" : "not-allowed", boxShadow: sel ? "0 0 26px #ffd16688" : ok ? `0 0 14px ${col}33` : "none",
+                    transform: sel ? "translateY(-14px) scale(1.04)" : "none", transition: "all .15s", animation: `hdCard .35s ${i * 0.05}s ease-out both` }}>
+                  <div style={{ position: "absolute", top: -8, left: -8, width: 24, height: 24, borderRadius: "50%", background: ok ? "#fbbf24" : "#555", color: "#1a1206", fontWeight: 900, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid #000" }}>{c.effect.xCost ? "X" : cost}</div>
+                  <div style={{ fontSize: isMobile ? 10 : 12, fontWeight: 900, lineHeight: 1.1, color: ok ? rc : undefined }}>{c.name}</div>
+                  <div style={{ fontSize: 8, letterSpacing: "0.15em", color: col, marginTop: 3 }}>{c.type.toUpperCase()}{c.target === "all" ? " · ALL" : ""}</div>
+                  <div style={{ fontSize: isMobile ? 9 : 10, marginTop: 6, lineHeight: 1.3, opacity: 0.9 }}>{c.text}</div>
+                  {!isMobile && <div style={{ position: "absolute", bottom: 6, right: 8, fontSize: 9, opacity: 0.35 }}>{i + 1}</div>}
+                </button>
+              );
+            })}
+            {run.hand.length === 0 && run.phase === "battle" && <div style={{ fontSize: 11, opacity: 0.5, padding: 20 }}>No cards in hand</div>}
+          </div>
+
+          {/* end turn */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, minWidth: isMobile ? 64 : 90 }}>
+            <button type="button" onClick={doEndTurn} disabled={!canEnd} style={{ fontFamily: FONT, width: isMobile ? 62 : 88, height: isMobile ? 62 : 88, borderRadius: "50%", border: `2px solid ${canEnd ? "#f87171" : "rgba(255,255,255,0.15)"}`, background: canEnd ? "radial-gradient(circle at 40% 35%, #fca5a5, #7f1d1d)" : "rgba(0,0,0,0.5)", color: canEnd ? "#fff" : "rgba(255,255,255,0.3)", fontSize: isMobile ? 9 : 11, fontWeight: 900, letterSpacing: "0.12em", cursor: canEnd ? "pointer" : "not-allowed", boxShadow: canEnd ? "0 0 24px #f8717166" : "none" }}>{busy ? "…" : "END\nTURN"}</button>
+            <button type="button" onClick={() => setShowPile(showPile === "discard" ? null : "discard")} style={{ fontFamily: FONT, background: "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 8, padding: "3px 8px", color: "#fff", fontSize: 9, cursor: "pointer" }}>DISCARD {run.discard.length}</button>
+          </div>
+        </div>
+        {selected != null && <div style={{ textAlign: "center", fontSize: 10, color: "#ffd166", letterSpacing: "0.2em", marginTop: 6 }}>CHOOSE A TARGET · tap an enemy</div>}
+        {!isMobile && selected == null && <div style={{ textAlign: "center", fontSize: 9, opacity: 0.35, letterSpacing: "0.2em", marginTop: 6 }}>KEYS 1–{Math.max(1, run.hand.length)} PLAY · E END TURN · CLICK AN ENEMY TO TARGET</div>}
+      </div>
+
+      {showPile && (
+        <div onClick={() => setShowPile(null)} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.75)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 40 }}>
+          <div style={{ maxWidth: 720, width: "100%" }}>
+            <div style={{ fontSize: 11, letterSpacing: "0.4em", color: "#fbbf24", textAlign: "center", marginBottom: 12 }}>{showPile.toUpperCase()} PILE · {(showPile === "draw" ? run.draw : showPile === "discard" ? run.discard : run.exhaust).length}</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center" }}>
+              {(showPile === "draw" ? [...run.draw].sort((a, b) => a.name.localeCompare(b.name)) : showPile === "discard" ? run.discard : run.exhaust).map((c, i) => (
+                <div key={i} style={{ width: 120, padding: 8, borderRadius: 10, border: `1px solid ${TYPE_COLOR[c.type]}66`, background: "rgba(8,8,14,0.9)" }}>
+                  <div style={{ fontSize: 11, fontWeight: 900, color: rarityColor(c.rarity) }}>{c.name} <span style={{ color: "#fbbf24" }}>{c.effect.xCost ? "X" : c.cost}</span></div>
+                  <div style={{ fontSize: 9, opacity: 0.85, marginTop: 4 }}>{c.text}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
 
+      {run.phase === "reward" && <RewardOverlay run={run} onChoose={(o) => onRun(chooseReward(run, o))} />}
+
       <style>{`
-        @keyframes hdFloat{0%{transform:translate(-50%,0) scale(.7);opacity:0}15%{transform:translate(-50%,-10px) scale(1.15);opacity:1}100%{transform:translate(-50%,-70px) scale(1);opacity:0}}
-        @keyframes hdBanner{0%{opacity:0;transform:scale(.8) translateY(10px)}15%{opacity:1;transform:scale(1) translateY(0)}80%{opacity:1}100%{opacity:0;transform:scale(1.05)}}
-        @keyframes hdCard{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes hdFlash{from{opacity:.9}to{opacity:0}}
+        @keyframes hdFloat{0%{opacity:0;transform:translate(-50%,10px) scale(.6)}18%{opacity:1;transform:translate(-50%,-4px) scale(1.15)}70%{opacity:1;transform:translate(-50%,-26px) scale(1)}100%{opacity:0;transform:translate(-50%,-46px) scale(.95)}}
+        @keyframes hdBanner{0%{opacity:0;transform:scale(1.1)}15%{opacity:1;transform:scale(1)}80%{opacity:1}100%{opacity:0}}
+        @keyframes hdCard{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:none}}
       `}</style>
     </div>
   );
 }
 
-function RewardOverlay({ run, onPick }: { run: Run; onPick: (o: RewardOffer) => void }) {
+function RewardOverlay({ run, onChoose }: { run: Run; onChoose: (o: RewardOffer) => void }) {
   const [sel, setSel] = useState<number | null>(null);
-  const colorFor = (o: RewardOffer) => o.kind === "heal" ? "#4ade80" : o.kind === "power" ? "#f87171" : o.kind === "cashout" ? "#fbbf24" : getRarityColor(o.relic!.rarity);
+  const offers = run.rewardOffers;
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
   return (
-    <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.78)", backdropFilter: "blur(6px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 16, overflowY: "auto" }}>
+    <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.78)", backdropFilter: "blur(6px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 50, overflowY: "auto" }}>
       <div style={{ fontSize: 11, letterSpacing: "0.5em", color: "#fbbf24" }}>FLOOR {run.floor} CLEARED · +{run.unbanked} REBEL UNBANKED</div>
-      <div style={{ fontSize: "clamp(22px,4vw,36px)", fontWeight: 900, letterSpacing: "0.1em", marginTop: 8, textAlign: "center" }}>CHOOSE YOUR BOON</div>
-      <div style={{ fontSize: 12, opacity: 0.65, marginTop: 6, textAlign: "center" }}>HP {run.player.hp}/{run.player.maxHp} · Next: {run.floor + 1 <= DESCENT_TOTAL_FLOORS ? `Floor ${run.floor + 1}` : "—"}</div>
-      <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fit, minmax(170px, 1fr))`, gap: 12, width: "100%", maxWidth: 820, marginTop: 22 }}>
-        {run.rewardOffers.map((o, i) => {
-          const c = colorFor(o); const isSel = sel === i;
+      <div style={{ fontSize: "clamp(22px, 4vw, 34px)", fontWeight: 900, letterSpacing: "0.15em", marginTop: 6 }}>CHOOSE YOUR BOON</div>
+      <div style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>HP {run.player.hp}/{run.player.maxHp} · Deck {run.deck.length} cards · Next: Floor {run.floor + 1}</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "center", width: "100%", maxWidth: 980, marginTop: 22 }}>
+        {offers.map((o, i) => {
+          const isSel = sel === i;
+          const c = o.kind === "card" ? rarityColor(o.card.rarity) : o.kind === "relic" ? getRarityColor(o.relic.rarity) : o.kind === "heal" ? "#4ade80" : "#fbbf24";
+          const tag = o.kind === "card" ? `${o.card.rarity.toUpperCase()} CARD · ${o.card.type.toUpperCase()} · ${o.card.effect.xCost ? "X" : o.card.cost} ⚡` : o.kind === "relic" ? `${o.relic.rarity.toUpperCase()} RELIC` : o.kind === "heal" ? "HEAL" : "BANK IT";
           return (
-            <button key={i} type="button" onClick={() => setSel(i)} style={{ animation: `hdCard .4s ${i * 0.08}s ease-out both`, textAlign: "left", fontFamily: FONT, padding: 16, borderRadius: 16, border: `1px solid ${isSel ? c : c + "55"}`, background: isSel ? `linear-gradient(180deg, ${c}33, rgba(0,0,0,0.6))` : "rgba(0,0,0,0.5)", color: "#fff", cursor: "pointer", boxShadow: isSel ? `0 0 30px ${c}66` : "none", transform: isSel ? "translateY(-4px)" : "none", transition: "all .15s" }}>
-              <div style={{ fontSize: 9, letterSpacing: "0.3em", color: c, fontWeight: 700 }}>{o.kind === "relic" ? o.relic!.rarity.toUpperCase() + " RELIC" : o.kind.toUpperCase()}</div>
-              <div style={{ fontSize: 17, fontWeight: 900, marginTop: 6, letterSpacing: "0.04em" }}>{o.title}</div>
-              <div style={{ fontSize: 12, opacity: 0.8, marginTop: 6, fontStyle: o.kind === "relic" ? "italic" : "normal", lineHeight: 1.45 }}>{o.desc}</div>
-              {o.kind === "relic" && <div style={{ fontSize: 10, marginTop: 8, color: c, opacity: 0.9 }}>{describeRelic(o)}</div>}
+            <button key={i} type="button" onClick={() => setSel(i)} style={{ animation: `hdCard .4s ${i * 0.06}s ease-out both`, width: isMobile ? "46%" : 200, textAlign: "left", fontFamily: FONT, padding: 14, borderRadius: 16, border: `1px solid ${isSel ? c : c + "55"}`, background: isSel ? `linear-gradient(180deg, ${c}33, rgba(0,0,0,0.6))` : "rgba(0,0,0,0.5)", color: "#fff", cursor: "pointer", boxShadow: isSel ? `0 0 30px ${c}66` : "none", transform: isSel ? "translateY(-4px)" : "none", transition: "all .15s" }}>
+              <div style={{ fontSize: 8, letterSpacing: "0.2em", color: c }}>{tag}</div>
+              <div style={{ fontSize: 15, fontWeight: 900, marginTop: 4 }}>{o.title}</div>
+              <div style={{ fontSize: 11, opacity: 0.85, marginTop: 6, lineHeight: 1.35 }}>{o.desc}</div>
+              {o.kind === "relic" && <div style={{ fontSize: 9, marginTop: 6, color: c }}>{describeRelic(o.relic.effect)}</div>}
+              {o.kind === "heal" && <div style={{ fontSize: 9, marginTop: 6, opacity: 0.6 }}>+{HEAL_REWARD} HP now</div>}
             </button>
           );
         })}
       </div>
-      <button type="button" disabled={sel === null} onClick={() => sel !== null && onPick(run.rewardOffers[sel])} style={{ marginTop: 22, fontFamily: FONT, padding: "14px 36px", borderRadius: 999, border: "none", background: sel === null ? "rgba(255,255,255,0.1)" : "linear-gradient(135deg,#ff3399,#aa0066)", color: "#fff", fontSize: 14, fontWeight: 900, letterSpacing: "0.2em", cursor: sel === null ? "not-allowed" : "pointer", boxShadow: sel === null ? "none" : "0 0 30px rgba(255,51,153,0.5)" }}>
-        {sel !== null && run.rewardOffers[sel].kind === "cashout" ? "⚑ ESCAPE WITH THE LOOT" : "⚔ DESCEND"}
+      <button type="button" disabled={sel == null} onClick={() => sel != null && onChoose(offers[sel])} style={{ fontFamily: FONT, marginTop: 22, padding: "14px 34px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.2)", background: sel == null ? "rgba(255,255,255,0.08)" : "linear-gradient(180deg,#ff3399,#a3126b)", color: sel == null ? "rgba(255,255,255,0.35)" : "#fff", fontWeight: 900, letterSpacing: "0.2em", fontSize: 13, cursor: sel == null ? "not-allowed" : "pointer", boxShadow: sel == null ? "none" : "0 0 30px #ff339966" }}>
+        {sel != null && offers[sel].kind === "cashout" ? "⚑ ESCAPE WITH THE LOOT" : "⚔ DESCEND"}
       </button>
     </div>
   );
 }
 
-function describeRelic(o: RewardOffer): string {
-  const e = o.relic!.effect; const parts: string[] = [];
-  if (e.damageMult) parts.push(`+${Math.round((e.damageMult - 1) * 100)}% dmg`);
-  if (e.maxHpAdd) parts.push(`${e.maxHpAdd > 0 ? "+" : ""}${e.maxHpAdd} max HP`);
-  if (e.critChanceAdd) parts.push(`+${Math.round(e.critChanceAdd * 100)}% crit`);
-  if (e.critDamageAdd) parts.push(`+${Math.round(e.critDamageAdd * 100)}% crit dmg`);
-  if (e.healOnKill) parts.push(`+${e.healOnKill} HP per kill`);
-  if (e.ignite) parts.push("attacks burn");
-  if (e.reviveOnce) parts.push("revive once at 50%");
-  if (e.dodgeIframesAdd) parts.push(`+${Math.round(e.dodgeIframesAdd / 20)}% dodge`);
-  if (e.speedMult) parts.push(`+${Math.round((e.speedMult - 1) * 50)}% dodge`);
-  if (e.attackSpeedMult) parts.push(`${Math.round((e.attackSpeedMult - 1) * 100)}% follow-up hit`);
-  if (e.specialCooldownMult) parts.push("faster special");
-  if (e.rebelGainMult) parts.push(`+${Math.round((e.rebelGainMult - 1) * 100)}% REBEL`);
-  return parts.join(" · ");
+function describeRelic(e: import("./relics").RelicEffect): string {
+  const bits: string[] = [];
+  if (e.damageMult) bits.push(`${e.damageMult > 1 ? "+" : ""}${Math.round((e.damageMult - 1) * 100)}% dmg`);
+  if (e.maxHpAdd) bits.push(`${e.maxHpAdd > 0 ? "+" : ""}${e.maxHpAdd} max HP`);
+  if (e.critChanceAdd) bits.push(`+${Math.round(e.critChanceAdd * 100)}% crit`);
+  if (e.critDamageAdd) bits.push(`+${Math.round(e.critDamageAdd * 30)}% dmg`);
+  if (e.healOnKill) bits.push(`heal ${e.healOnKill} per kill`);
+  if (e.ignite) bits.push("attacks burn");
+  if (e.reviveOnce) bits.push("revive once at 40%");
+  if (e.dodgeIframesAdd) bits.push(`+${Math.round(e.dodgeIframesAdd / 20)}% dodge`);
+  if (e.speedMult) bits.push(`+${Math.round((e.speedMult - 1) * 50)}% dodge`);
+  if (e.attackSpeedMult) bits.push(`${Math.round((e.attackSpeedMult - 1) * 100)}% follow-up hit`);
+  if (e.specialCooldownMult) bits.push("faction card costs 1 less");
+  if (e.rebelGainMult) bits.push(`+${Math.round((e.rebelGainMult - 1) * 100)}% REBEL`);
+  return bits.join(" · ");
 }

@@ -2,7 +2,8 @@
 // Pre-run faction selection. Cinematic grid of the 11 factions with their turn-combat Special.
 
 import React, { useState } from "react";
-import { DESCENT_FACTIONS, SPECIAL_COOLDOWN_TURNS } from "../../lib/descentConfig";
+import { DESCENT_FACTIONS } from "../../lib/descentConfig";
+import { FACTION_CARDS } from "../../lib/descentCards";
 
 type Props = {
   onConfirm: (factionId: string) => void;
@@ -34,7 +35,7 @@ const FactionPicker: React.FC<Props> = ({ onConfirm, onCancel }) => {
               </div>
               <div style={{ padding: "10px 10px 12px" }}>
                 <div style={{ fontSize: 13, fontWeight: 800, letterSpacing: "0.08em", color: isSel ? "#ff99dd" : "#fff" }}>{f.name.toUpperCase()}</div>
-                <div style={{ fontSize: 10, color: isSel ? "#ffccee" : "rgba(255,255,255,0.6)", marginTop: 4, fontWeight: 700 }}>⚡ {f.specialName}</div>
+                <div style={{ fontSize: 10, color: isSel ? "#ffccee" : "rgba(255,255,255,0.6)", marginTop: 4, fontWeight: 700 }}>⚡ {FACTION_CARDS[f.id]?.name || f.specialName}</div>
               </div>
             </button>
           );
@@ -44,9 +45,9 @@ const FactionPicker: React.FC<Props> = ({ onConfirm, onCancel }) => {
       {sel && (
         <div style={{ maxWidth: 600, margin: "20px auto 0", background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,102,204,0.3)", borderRadius: 12, padding: 16, textAlign: "center" }}>
           <div style={{ fontSize: 11, color: "#ff66cc", letterSpacing: "0.2em", marginBottom: 4 }}>SPECIAL</div>
-          <div style={{ fontSize: 18, fontWeight: 800, color: "#fff", marginBottom: 6 }}>⚡ {sel.specialName}</div>
-          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.75)", fontStyle: "italic" }}>"{sel.blurb}"</div>
-          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginTop: 8 }}>Recharges every {SPECIAL_COOLDOWN_TURNS} turns</div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: "#fff", marginBottom: 6 }}>⚡ {FACTION_CARDS[sel.id]?.name || sel.specialName} <span style={{ fontSize: 12, color: "#fbbf24" }}>{FACTION_CARDS[sel.id]?.cost ?? 2} ⚡</span></div>
+          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.75)", fontStyle: "italic" }}>"{FACTION_CARDS[sel.id]?.text || sel.blurb}"</div>
+          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginTop: 8 }}>Two copies in your starting deck of 12</div>
         </div>
       )}
 
