@@ -7,6 +7,7 @@ import { loadProfile, getEffectivePlayerId } from "../../lib/profile";
 import { pointsConfig as defaultPointsConfig } from "../../lib/pointsConfig";
 import { BOARDS, BOUNTY_DEATH_KEEP, BOUNTY_DEFAULT_COST, BOUNTY_LIVES, KILL_BOUNTY, type Board } from "../../lib/bountyConfig";
 import { preloadBoard } from "./game";
+import { DESCENT_FACTIONS } from "../../lib/descentConfig";
 
 const BountyGameView = dynamic(() => import("./BountyGame"), { ssr: false });
 
@@ -26,12 +27,14 @@ const BountyHunters: React.FC = () => {
 
   const [phase, setPhase] = useState<Phase>("lobby");
   const [board, setBoard] = useState<Board>(BOARDS[0]);
+  const [faction, setFaction] = useState<string>(() => { try { return localStorage.getItem("ra:bh:faction") || "samurai"; } catch { return "samurai"; } });
+  useEffect(() => { try { localStorage.setItem("ra:bh:faction", faction); } catch {} }, [faction]);
   const [best, setBest] = useState<Best>({});
   const [starting, setStarting] = useState(false);
   const [err, setErr] = useState("");
   const [result, setResult] = useState<{ cleared: boolean; bounty: number; kills: number; boardN: number; paid: number } | null>(null);
   useEffect(() => { setBest(loadBest()); }, []);
-  useEffect(() => { preloadBoard(board); }, [board]);
+  useEffect(() => { preloadBoard(board, faction); }, [board, faction]);
   const unlockedN = useMemo(() => { let n = 1; for (const b of BOARDS) if (best[b.n]?.cleared) n = Math.max(n, b.n + 1); return Math.min(n, BOARDS.length); }, [best]);
   const canStart = balance >= cost && !starting && board.n <= unlockedN;
 
@@ -57,7 +60,7 @@ const BountyHunters: React.FC = () => {
     await refresh().catch(() => {});
   }, [earn, pid, refresh]);
 
-  if (phase === "playing") return <BountyGameView board={board} onEnd={onEnd} onQuit={() => onEnd({ cleared: false, bounty: 0, kills: 0, boardN: board.n })} />;
+  if (phase === "playing") return <BountyGameView board={board} faction={faction} onEnd={onEnd} onQuit={() => onEnd({ cleared: false, bounty: 0, kills: 0, boardN: board.n })} />;
 
   if (phase === "result" && result) {
     const b = BOARDS.find((x) => x.n === result.boardN) || board; const next = BOARDS.find((x) => x.n === result.boardN + 1);
@@ -90,6 +93,22 @@ const BountyHunters: React.FC = () => {
         <h1 style={{ fontSize: "clamp(40px, 8vw, 88px)", margin: "8px 0 0", fontWeight: 900, letterSpacing: "0.04em", lineHeight: 0.95, background: "linear-gradient(180deg, #fff 0%, #c4b5fd 55%, #6d4ec9 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>BOUNTY<br />HUNTERS</h1>
         <div style={{ fontSize: "clamp(13px, 1.8vw, 16px)", color: "rgba(255,255,255,0.75)", marginTop: 16, maxWidth: 560, marginLeft: "auto", marginRight: "auto", lineHeight: 1.55 }}>
           Four boards, four targets, {BOUNTY_LIVES} lives. Run, jump and shoot your way through the corrupted hive, collect bounty tags off everything you drop, and take the boss's head for the big payout.
+        </div>
+      </div>
+
+      {/* hunter select */}
+      <div style={{ maxWidth: 1000, margin: "22px auto 0", padding: "0 16px" }}>
+        <div style={{ fontSize: 11, color: "#a78bfa", letterSpacing: "0.4em", textAlign: "center", marginBottom: 10 }}>◆ YOUR HUNTER ◆</div>
+        <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap" }}>
+          {DESCENT_FACTIONS.map((f) => {
+            const on = f.id === faction;
+            return (
+              <button key={f.id} type="button" onClick={() => setFaction(f.id)} title={f.name} style={{ fontFamily: FONT, width: 68, padding: 0, background: on ? "rgba(167,139,250,0.2)" : "rgba(0,0,0,0.5)", border: on ? "1px solid #a78bfa" : "1px solid rgba(255,255,255,0.12)", borderRadius: 10, color: "#fff", cursor: "pointer", overflow: "hidden", boxShadow: on ? "0 0 16px rgba(167,139,250,0.5)" : "none", transform: on ? "translateY(-4px)" : "none", transition: "all .15s" }}>
+                <div style={{ height: 60, display: "flex", alignItems: "flex-end", justifyContent: "center", paddingTop: 4 }}><img src={`/descent/portraits/${f.id}.png`} alt={f.name} style={{ height: "94%", objectFit: "contain", filter: on ? "none" : "brightness(0.6) saturate(0.6)" }} /></div>
+                <div style={{ fontSize: 7, fontWeight: 800, letterSpacing: "0.08em", padding: "4px 2px 6px", color: on ? "#c4b5fd" : "rgba(255,255,255,0.7)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{f.name.toUpperCase()}</div>
+              </button>
+            );
+          })}
         </div>
       </div>
 

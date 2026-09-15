@@ -28,8 +28,8 @@ function load(name: string, fw: number, fh: number, cols: number) {
   const img = new Image(); img.src = `/bounty/${name}.png`;
   return (sheets[name] = { img, fw, fh, cols });
 }
-export function preloadBoard(board: Board) {
-  ["hunter", "grunt", "elite", "wasp", "turret", "items", `boss_${board.boss.id}`, `tiles_${board.id}`, `bg_${board.id}_far`, `bg_${board.id}_mid`, `bg_${board.id}_near`].forEach((n) => { const i = new Image(); i.src = `/bounty/${n}.png`; });
+export function preloadBoard(board: Board, faction = "samurai") {
+  [`hunter_${faction}`, "grunt", "elite", "wasp", "turret", "items", `boss_${board.boss.id}`, `tiles_${board.id}`, `bg_${board.id}_far`, `bg_${board.id}_mid`, `bg_${board.id}_near`].forEach((n) => { const i = new Image(); i.src = `/bounty/${n}.png`; });
 }
 
 export class BountyGame {
@@ -46,15 +46,15 @@ export class BountyGame {
   parts: { x: number; y: number; vx: number; vy: number; life: number; c: string; s: number }[] = [];
   hud: Sheet; hunter: Sheet; items: Sheet; tiles: Sheet; bg: Sheet[]; bossSheet: Sheet;
 
-  constructor(canvas: HTMLCanvasElement, board: Board, cb: Callbacks) {
+  constructor(canvas: HTMLCanvasElement, board: Board, cb: Callbacks, faction = "samurai") {
     this.ctx = canvas.getContext("2d")!; this.ctx.imageSmoothingEnabled = false;
     this.board = board; this.cb = cb; this.level = buildLevel(board);
-    this.hunter = load("hunter", 40, 44, 10); this.items = load("items", 16, 16, 15); this.hud = this.items;
+    this.hunter = load(`hunter_${faction}`, 64, 64, 10); this.items = load("items", 16, 16, 15); this.hud = this.items;
     this.tiles = load(`tiles_${board.id}`, 16, 16, 11);
     this.bg = [load(`bg_${board.id}_far`, 480, 225, 1), load(`bg_${board.id}_mid`, 480, 225, 1), load(`bg_${board.id}_near`, 480, 64, 1)];
     this.bossSheet = load(`boss_${board.boss.id}`, 64, 64, 6);
-    load("grunt", 40, 44, 7); load("elite", 40, 44, 7); load("wasp", 32, 32, 5); load("turret", 32, 32, 4);
-    this.player = this.mk("player", this.level.startX, 9 * TILE, 12, 30); this.player.hp = 1; this.checkpoint = this.level.startX; this.invuln = 2.5;
+    load("grunt", 64, 64, 7); load("elite", 64, 64, 7); load("wasp", 32, 32, 5); load("turret", 32, 32, 4);
+    this.player = this.mk("player", this.level.startX, 9 * TILE, 14, 38); this.player.hp = 1; this.checkpoint = this.level.startX; this.invuln = 2.5;
     for (const s of this.level.spawns) this.spawn(s);
     this.pushHud();
   }
@@ -65,8 +65,8 @@ export class BountyGame {
   }
   spawn(s: Spawn) {
     switch (s.kind) {
-      case "grunt": { const e = this.mk("grunt", s.x, s.y - 14, 12, 30); e.hp = 2; e.dir = -1; e.data.shootCd = 1 + Math.random(); break; }
-      case "elite": { const e = this.mk("elite", s.x, s.y - 14, 12, 30); e.hp = 4; e.dir = -1; e.data.shootCd = 1; break; }
+      case "grunt": { const e = this.mk("grunt", s.x, s.y - 22, 14, 38); e.hp = 2; e.dir = -1; e.data.shootCd = 1 + Math.random(); break; }
+      case "elite": { const e = this.mk("elite", s.x, s.y - 22, 14, 38); e.hp = 4; e.dir = -1; e.data.shootCd = 1; break; }
       case "wasp": { const e = this.mk("wasp", s.x, s.y, 22, 16); e.hp = 1; e.data.baseY = s.y; e.data.ph = Math.random() * 6; break; }
       case "turret": { const e = this.mk("turret", s.x, s.y + 2, 26, 26); e.hp = 3; e.data.shootCd = 1.5; break; }
       case "crate": { const e = this.mk("crate", s.x, s.y, 16, 16); e.hp = 1; break; }
@@ -176,10 +176,10 @@ export class BountyGame {
           if (e.vx !== 0 && !this.solidAt(aheadX, e.y + e.h + 4) && e.ground) e.vx = 0;
           e.vy = Math.min(420, e.vy + GRAV * dt); this.move(e, dt);
           e.data.shootCd -= dt;
-          if (e.data.shootCd <= 0 && Math.abs(dx) < 200 && Math.abs(p.y - e.y) < 40 && this.state !== "dying") {
+          if (e.data.shootCd <= 0 && Math.abs(dx) < 200 && Math.abs(p.y - e.y) < 48 && this.state !== "dying") {
             e.data.shootCd = e.kind === "elite" ? 1.4 : 2.2 - this.board.difficulty * 0.2; e.data.flash = 0.15;
             const n = e.kind === "elite" ? 2 : 1;
-            for (let i = 0; i < n; i++) { const b = this.mk("ebullet", e.x + (e.dir > 0 ? e.w : -6), e.y + 9, 6, 6); b.vx = e.dir * (120 + this.board.difficulty * 8); b.vy = (i - (n - 1) / 2) * 40; b.data.life = 3; }
+            for (let i = 0; i < n; i++) { const b = this.mk("ebullet", e.x + (e.dir > 0 ? e.w : -6), e.y + 14, 6, 6); b.vx = e.dir * (120 + this.board.difficulty * 8); b.vy = (i - (n - 1) / 2) * 40; b.data.life = 3; }
             this.sfx("eshot");
           }
           if (e.data.flash > 0) e.data.flash -= dt;
@@ -257,12 +257,12 @@ export class BountyGame {
   }
 
   updateParts(dt: number) { for (const q of this.parts) { q.life -= dt; q.x += q.vx * dt; q.y += q.vy * dt; q.vy += 200 * dt; } this.parts = this.parts.filter((q) => q.life > 0); }
-  hit(p: Ent) { return p.data.crouch ? { ...p, y: p.y + 10, h: p.h - 10 } : p; }
+  hit(p: Ent) { return p.data.crouch ? { ...p, y: p.y + 14, h: p.h - 14 } : p; }
   overlap(a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
   touch(e: Ent, _dmg: number) { if ((this.state === "play" || this.state === "boss") && this.invuln <= 0 && e.hp > 0 && this.overlap(e, this.hit(this.player))) this.kill(); }
 
   shoot(p: Ent, aim: number, crouch: boolean) {
-    const a = (-aim * Math.PI) / 180; const dirx = aim === 90 ? 0 : p.dir; const cx = p.x + p.w / 2 + dirx * 10, cy = p.y + (crouch ? 16 : 9);
+    const a = (-aim * Math.PI) / 180; const dirx = aim === 90 ? 0 : p.dir; const cx = p.x + p.w / 2 + dirx * 14, cy = p.y + (crouch ? 24 : 14);
     const fire = (ang: number, speed: number, dmg: number, extra: any = {}) => { const b = this.mk("bullet", cx - 3, cy - 3, 6, 6); b.vx = Math.cos(ang) * speed * (dirx === 0 ? 1 : 1); b.vy = Math.sin(ang) * speed; b.data = { life: 1.2, dmg, ...extra }; if (dirx === 0) { b.vx = 0; b.vy = -speed; } };
     const base = dirx < 0 ? Math.PI - a : a;
     switch (this.weapon) {
@@ -387,8 +387,8 @@ export class BountyGame {
     else if (p.vx !== 0) f = 2 + Math.floor((this.t * 12) % 6);
     else f = p.data.muzzle > 0 ? 9 : Math.floor(this.t * 2) % 2;
     if (p.data.muzzle > 0) p.data.muzzle -= 1 / 120;
-    // sprite is 40×44; hitbox 12×30 sits at sprite x 14..26, y 14..44
-    this.frame(s, f, p.x - 14 - (p.dir < 0 ? 0 : 0), p.y + p.h - 44, p.dir < 0);
+    // 64×64 frames, feet 4px above the frame bottom, centred on the 14-wide hitbox
+    this.frame(s, f, p.x + p.w / 2 - 32, p.y + p.h + 4 - 64, p.dir < 0);
   }
   drawEnt(e: Ent) {
     const c = this.ctx;
@@ -397,7 +397,7 @@ export class BountyGame {
         const s = sheets[e.kind]; let f = 0;
         if (e.state === "dead") f = 10 + Math.min(2, Math.floor(e.t / 0.3));
         else if (e.data.hurt > 0) f = 13; else if (e.data.flash > 0) f = 8; else if (e.vx !== 0) f = 2 + Math.floor((this.t * 10) % 6); else f = Math.floor(this.t * 2) % 2;
-        this.frame(s, f, e.x - 14, e.y + e.h - 44, e.dir < 0); break;
+        this.frame(s, f, e.x + e.w / 2 - 32, e.y + e.h + 4 - 64, e.dir < 0); break;
       }
       case "wasp": { const s = sheets.wasp; const f = e.hp <= 0 ? 3 + Math.min(1, Math.floor(e.t / 0.3)) : e.data.hurt > 0 ? 2 : Math.floor(this.t * 16) % 2; this.frame(s, f, e.x - 5, e.y - 8, e.dir < 0); break; }
       case "turret": { const s = sheets.turret; const f = e.state === "dead" ? 3 : e.data.flash > 0.1 ? 2 : Math.floor(this.t * 3) % 2; this.frame(s, f, e.x - 3, e.y - 4, e.dir < 0); break; }

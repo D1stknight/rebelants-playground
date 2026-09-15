@@ -8,9 +8,9 @@ import { useBountyAudio } from "../../lib/useBountyAudio";
 const FONT = "'Noto Serif JP', 'Hiragino Mincho ProN', serif";
 const KEYS: Record<string, keyof Input> = { ArrowLeft: "left", a: "left", A: "left", ArrowRight: "right", d: "right", D: "right", ArrowUp: "up", w: "up", W: "up", ArrowDown: "down", s: "down", S: "down", " ": "jump", z: "jump", Z: "jump", j: "jump", J: "jump", x: "fire", X: "fire", k: "fire", K: "fire", Shift: "fire" };
 
-type Props = { board: Board; onEnd: (r: { cleared: boolean; bounty: number; kills: number; boardN: number }) => void; onQuit: () => void };
+type Props = { board: Board; faction?: string; onEnd: (r: { cleared: boolean; bounty: number; kills: number; boardN: number }) => void; onQuit: () => void };
 
-export default function BountyGameView({ board, onEnd, onQuit }: Props) {
+export default function BountyGameView({ board, faction = "samurai", onEnd, onQuit }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const gameRef = useRef<BountyGame | null>(null);
   const [hud, setHud] = useState<Hud | null>(null);
@@ -30,7 +30,7 @@ export default function BountyGameView({ board, onEnd, onQuit }: Props) {
       onHud: (h) => setHud({ ...h }),
       onSfx: (n) => { const s = (audioRef.current.sfx as any)[n]; if (s) s(); },
       onEnd: (r) => { audioRef.current.music(null); onEnd(r); },
-    });
+    }, faction);
     gameRef.current = g; (window as any).__bg = g; g.start();
     audioRef.current.music(board.music, 0.35);
     const kd = (e: KeyboardEvent) => { const k = KEYS[e.key]; if (k) { g.input[k] = true; e.preventDefault(); } if (e.key === "Escape") onQuit(); };
