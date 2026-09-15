@@ -126,9 +126,10 @@ function CameraRig({ dir }: { dir: React.MutableRefObject<Director> }) {
     } else if (d.ko) {
       const k = Math.min(1, (now - d.ko.at) / 1100);
       const sx = SIDE_X[d.ko.side];
-      tx = sx * 0.55; ty = 0.95; tz = 2.9; lx = sx * 0.8; ly = 0.7 + 0.1 * (1 - k); ease = 3.5;
+      // drift toward the fallen fighter but keep the whole body in frame (fighters are ~2 units tall)
+      tx = sx * 0.4; ty = 1.15 - 0.05 * k; tz = 3.35; lx = sx * 0.55; ly = 0.95; ease = 3;
     }
-    d.punch *= Math.exp(-dt * 9); tz -= d.punch * 0.35;
+    d.punch *= Math.exp(-dt * 9); tz -= d.punch * (d.ko ? 0.12 : 0.35);
     d.shake *= Math.exp(-dt * 7);
     const s = d.shake;
     const c = cur.current; const a = Math.min(1, dt * ease);
