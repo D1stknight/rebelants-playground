@@ -108,7 +108,7 @@ function Motes({ color, count = 45 }: { color: string; count?: number }) {
   );
 }
 
-const CAM_BASE = { y: 1.05, z: 3.9, lookY: 0.92 };
+const CAM_BASE = { y: 1.1, z: 4.15, lookY: 0.98 };
 
 function CameraRig({ dir }: { dir: React.MutableRefObject<Director> }) {
   const { camera } = useThree();
@@ -258,7 +258,7 @@ function useAnimChannel(propAnim: FWAnim) {
 const HOLD: FWAnim[] = ["win", "lose"];
 type Float = { id: number; side: Side; text: string; color: string; big: boolean };
 
-export default function FactionWarsArena({ player, enemy, battleAnim, registerGlobals = true, height = "clamp(230px, 40vw, 340px)", preload, title }: FactionWarsArenaProps) {
+export default function FactionWarsArena({ player, enemy, battleAnim, registerGlobals = true, height = "clamp(250px, 44vw, 380px)", preload, title }: FactionWarsArenaProps) {
   const p = useAnimChannel(player.anim);
   const e = useAnimChannel(enemy.anim);
   const dir = useRef<Director>(newDirector());
