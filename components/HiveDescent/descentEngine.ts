@@ -225,7 +225,7 @@ function playerAct(c: Ctx, action: Action) {
 function enemyAct(c: Ctx) {
   const p = c.p, e = c.e; const it = e.intent;
   if (e.stunned > 0) { e.stunned--; c.evs.push({ t: "text", text: `${e.name} is stunned and loses its turn`, tone: "info" }); return; }
-  if (it.kind === "guard") { e.guarding = true; c.evs.push({ t: "anim", who: "enemy", anim: "defend" }); c.evs.push({ t: "text", text: `${e.name} guards`, tone: "info" }); return; }
+  if (it.kind === "guard") { c.evs.push({ t: "anim", who: "enemy", anim: "defend" }); c.evs.push({ t: "text", text: `${e.name} holds its guard`, tone: "info" }); return; }
   c.evs.push({ t: "anim", who: "enemy", anim: it.kind === "special" ? "trick" : it.kind === "heavy" ? "magic" : "attack" });
   if (p.dodge > 0 && r(c, "dodge") < Math.min(0.5, p.dodge)) { c.evs.push({ t: "dmg", who: "player", amount: 0, kind: "dodge" }); c.evs.push({ t: "text", text: "Dodged!", tone: "good" }); return; }
   let dmg = it.dmg * p.takenMultThisTurn;
@@ -253,12 +253,15 @@ export function takeTurn(run0: Run, action: Action): { run: Run; evs: Ev[] } {
   const c: Ctx = { run, e, p, evs, scope: `t${run.floor}.${run.enemyIdx}.${e.turn}`, k: 0 };
   run.turns++;
 
-  // cooldowns tick at the start of the player's turn
-  if (p.specialCd > 0) p.specialCd--; if (p.magicCd > 0) p.magicCd--;
-  if (p.buffTurns > 0) { p.buffTurns--; if (p.buffTurns === 0) p.buffMult = 1; }
+  // a telegraphed Guard is up before the player swings (Magic ignores it)
+  e.guarding = e.intent.kind === "guard" && e.stunned === 0;
 
   playerAct(c, action);
   tickDots(c);
+
+  // cooldowns + buffs tick once the player has acted (UI shows the remaining blocked turns directly)
+  if (p.specialCd > 0) p.specialCd--; if (p.magicCd > 0) p.magicCd--;
+  if (p.buffTurns > 0) { p.buffTurns--; if (p.buffTurns === 0) p.buffMult = 1; }
 
   if (e.hp <= 0) {
     onEnemyDown(run, evs); return { run, evs };
