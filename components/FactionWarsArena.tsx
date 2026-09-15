@@ -138,7 +138,13 @@ const HOLD: FWAnim[] = ["win", "lose"];
 
 export default function FactionWarsArena({ player, enemy, battleAnim, registerGlobals = true, height = "clamp(230px, 40vw, 340px)", preload }: FactionWarsArenaProps) {
   const preloadKey = (preload || []).join(",");
-  useEffect(() => { preloadKey.split(",").filter(Boolean).forEach((f) => { try { preloadFaction(f); } catch {} }); }, [preloadKey]);
+  // warm the rest of the roster only after the current pair has had the network to itself
+  useEffect(() => {
+    const ids = Array.from(new Set(preloadKey.split(",").filter(Boolean)));
+    if (!ids.length) return;
+    const t = setTimeout(() => ids.forEach((f) => { try { preloadFaction(f); } catch {} }), 6000);
+    return () => clearTimeout(t);
+  }, [preloadKey]);
   const p = useAnimChannel(player.anim);
   const e = useAnimChannel(enemy.anim);
 
