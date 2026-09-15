@@ -16,6 +16,7 @@ const DescentStage = dynamic(() => import("./DescentStage"), { ssr: false });
 
 const FONT = "'Noto Serif JP', 'Hiragino Mincho ProN', serif";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const IMPACT_MS = 340;   // player swing → contact (clips run at 1.25×); the hit lands when the blade does
 
 type Float = { id: number; who: "player" | number; text: string; color: string; big?: boolean };
 type Log = { id: number; text: string; tone: string };
@@ -91,7 +92,7 @@ export default function DescentBattle({ run, onRun, onAbandon }: Props) {
     if (run.phase !== "intro") return;
     setDead({}); setEAnims({}); setPAnim({ anim: "idle", key: 0 }); setSelected(null); setDissolve({}); setGone({}); lowHpFired.current = false;
     setBanner(`FLOOR ${run.floor} · ${biome.name}`);
-    audio.music(biome.kind === "combat" ? "ambient-tunnel" : "fw-battle-epic", biome.kind === "combat" ? 0.4 : 0.45);
+    audio.music("hd-war", biome.kind === "combat" ? 0.38 : 0.48);
     if (biome.kind !== "combat") audio.sfx.ambush();
     const t = setTimeout(() => { setBanner(null); const r = beginBattle(run); onRun(r.run); pushLog(`${aliveEnemies(r.run).map((e) => e.name).join(", ")} — ${aliveEnemies(r.run).length > 1 ? "step forward" : "steps forward"}`, "info"); }, 1900);
     return () => clearTimeout(t);
@@ -110,7 +111,7 @@ export default function DescentBattle({ run, onRun, onAbandon }: Props) {
           if (ev.anim === "lose") setDead((d) => ({ ...d, [key(ev.who)]: true }));
           if (ev.anim === "magic") audio.sfx.magic(); else if (ev.anim === "trick") audio.sfx.trick(); else if (ev.anim === "defend") audio.sfx.block();
           if (ev.anim === "attack" && ev.who !== "player") { await sleep(300 * f); }
-          else if (ev.anim === "attack" || ev.anim === "magic" || ev.anim === "trick") await sleep(260 * f);
+          else if (ev.anim === "attack" || ev.anim === "magic" || ev.anim === "trick") await sleep(IMPACT_MS);
           else if (ev.anim === "defend") { spawnFx("dome", ev.who, ev.who === "player" ? "#67e8f9" : biome.particleColor); await sleep(200 * f); }
           else if (ev.anim === "lose") await sleep(150 * f);
           break;
@@ -176,6 +177,14 @@ export default function DescentBattle({ run, onRun, onAbandon }: Props) {
       setBusy(false);
     })();
   }, [busy, run, onRun, playEvents, pushLog, audio]);
+
+  // once the hand is spent the enemies act on their own — END TURN is only for passing early
+  useEffect(() => {
+    if (busy || run.phase !== "battle") return;
+    if (run.hand.some((_, i) => canPlay(run, i))) return;
+    const t = window.setTimeout(() => doEndTurn(), 750);
+    return () => clearTimeout(t);
+  }, [busy, run, doEndTurn]);
 
   const onCardClick = useCallback((idx: number) => {
     if (busy) return;
@@ -336,7 +345,7 @@ export default function DescentBattle({ run, onRun, onAbandon }: Props) {
           </div>
         </div>
         {selected != null && <div style={{ textAlign: "center", fontSize: 10, color: "#ffd166", letterSpacing: "0.2em", marginTop: 6 }}>CHOOSE A TARGET · tap an enemy</div>}
-        {!isMobile && selected == null && <div style={{ textAlign: "center", fontSize: 9, opacity: 0.35, letterSpacing: "0.2em", marginTop: 6 }}>KEYS 1–{Math.max(1, run.hand.length)} PLAY · E END TURN · CLICK AN ENEMY TO TARGET</div>}
+        {!isMobile && selected == null && <div style={{ textAlign: "center", fontSize: 9, opacity: 0.35, letterSpacing: "0.2em", marginTop: 6 }}>KEYS 1–{Math.max(1, run.hand.length)} PLAY · SPEND YOUR ENERGY AND THE HIVE ANSWERS · E TO PASS EARLY</div>}
       </div>
 
       {showPile && (
@@ -369,7 +378,8 @@ export default function DescentBattle({ run, onRun, onAbandon }: Props) {
 
 function RewardOverlay({ run, onChoose }: { run: Run; onChoose: (o: RewardOffer) => void }) {
   const [sel, setSel] = useState<number | null>(null);
-  const offers = run.rewardOffers;
+  const offers = run.rewardOffers.filter((o) => o.kind !== "cashout");
+  const cash = run.rewardOffers.find((o) => o.kind === "cashout");
   const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
   return (
     <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.78)", backdropFilter: "blur(6px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 50, overflowY: "auto" }}>
@@ -393,8 +403,14 @@ function RewardOverlay({ run, onChoose }: { run: Run; onChoose: (o: RewardOffer)
         })}
       </div>
       <button type="button" disabled={sel == null} onClick={() => sel != null && onChoose(offers[sel])} style={{ fontFamily: FONT, marginTop: 22, padding: "14px 34px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.2)", background: sel == null ? "rgba(255,255,255,0.08)" : "linear-gradient(180deg,#ff3399,#a3126b)", color: sel == null ? "rgba(255,255,255,0.35)" : "#fff", fontWeight: 900, letterSpacing: "0.2em", fontSize: 13, cursor: sel == null ? "not-allowed" : "pointer", boxShadow: sel == null ? "none" : "0 0 30px #ff339966" }}>
-        {sel != null && offers[sel].kind === "cashout" ? "⚑ ESCAPE WITH THE LOOT" : "⚔ DESCEND"}
+        ⚔ DESCEND TO FLOOR {run.floor + 1}
       </button>
+      <div style={{ fontSize: 10, opacity: 0.55, marginTop: 10, letterSpacing: "0.15em" }}>{DESCENT_TOTAL_FLOORS} FLOORS · BOSSES ON 4 · 8 · 10 · DIE AND YOU KEEP HALF</div>
+      {cash && (
+        <button type="button" onClick={() => onChoose(cash)} style={{ fontFamily: FONT, marginTop: 14, padding: "10px 22px", borderRadius: 12, border: "1px solid rgba(251,191,36,0.45)", background: "rgba(0,0,0,0.5)", color: "#fbbf24", fontWeight: 800, letterSpacing: "0.15em", fontSize: 11, cursor: "pointer" }}>
+          ⚑ OR ESCAPE NOW · BANK {run.unbanked} REBEL AND END THE RUN
+        </button>
+      )}
     </div>
   );
 }

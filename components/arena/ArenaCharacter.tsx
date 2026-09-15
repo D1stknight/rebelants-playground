@@ -49,9 +49,10 @@ export type ArenaCharacterProps = {
   flashKey?: number;               // bump to flash the model red (took a hit)
   idleSpeed?: number;              // idle clip time scale (heavier breathing at low HP)
   dissolveAt?: number | null;      // performance.now() when the body started disintegrating (1.3s: glow, fade, rise, gone)
+  actionSpeed?: number;            // time scale for attack/magic/trick clips (1 = as authored)
 };
 
-export default function ArenaCharacter({ factionId, anim, animKey, position = [0, 0, 0], rotationY = 0, scale = 1, corrupted = false, corruptColor = "#ff3399", dead = false, holdOn = DEFAULT_HOLD, speedRef, flashKey = 0, idleSpeed = 1, dissolveAt = null }: ArenaCharacterProps) {
+export default function ArenaCharacter({ factionId, anim, animKey, position = [0, 0, 0], rotationY = 0, scale = 1, corrupted = false, corruptColor = "#ff3399", dead = false, holdOn = DEFAULT_HOLD, speedRef, flashKey = 0, idleSpeed = 1, dissolveAt = null, actionSpeed = 1 }: ArenaCharacterProps) {
   const dissolveRef = useRef({ started: false, done: false });
   const matsRef = useRef<any[]>([]);
   const flashRef = useRef({ until: 0, applied: false });
@@ -120,6 +121,7 @@ export default function ArenaCharacter({ factionId, anim, animKey, position = [0
     holdRef.current = holdOn.includes(anim);
     const cur = currentRef.current;
     if (cur && cur !== next) cur.fadeOut(0.12);
+    next.timeScale = anim === "attack" || anim === "magic" || anim === "trick" ? actionSpeed : 1;
     next.reset().fadeIn(0.12).play();
     currentRef.current = next;
   }, [anim, animKey]);

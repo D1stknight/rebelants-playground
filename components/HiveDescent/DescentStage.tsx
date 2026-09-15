@@ -3,8 +3,8 @@
 // to the camera; 1–3 corrupted enemies face you in an arc. Presentation only — driven by props.
 import React, { Suspense, useEffect, useMemo, useRef } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Html } from "@react-three/drei";
-import { AdditiveBlending, Color, DoubleSide, Fog, type Group, type Mesh } from "three";
+import { Html, useTexture } from "@react-three/drei";
+import { AdditiveBlending, BackSide, Color, CylinderGeometry, DoubleSide, Fog, RepeatWrapping, SRGBColorSpace, type Group, type Mesh, type PerspectiveCamera, type Texture } from "three";
 import ArenaCharacter, { type ArenaAnim } from "../arena/ArenaCharacter";
 import type { Biome } from "./biomes";
 
@@ -32,58 +32,77 @@ function q3(name: string, def: [number, number, number]): [number, number, numbe
   const raw = new URLSearchParams(window.location.search).get(name); if (!raw) return def;
   const p = raw.split(",").map(Number); return p.length === 3 && p.every(Number.isFinite) ? (p as [number, number, number]) : def;
 }
-export const PLAYER_POS: [number, number, number] = q3("hdp", [0.55, 0, 0.35]);
-const CAM_POS = q3("hdcam", [-1.15, 1.9, 3.9]);
-const CAM_LOOK = q3("hdlook", [0.05, 1.0, -1.2]);
+export const PLAYER_POS: [number, number, number] = q3("hdp", [0.95, 0, 0.2]);
+const CAM_POS = q3("hdcam", [-0.9, 1.85, 3.9]);
+const HFOV_DEG = 64;
+const CAM_LOOK = q3("hdlook", [0.1, 1.0, -1.3]);
 export function enemySlots(n: number): [number, number, number][] {
   if (n <= 1) return [[-0.1, 0, -1.5]];
-  if (n === 2) return [[-1.05, 0, -1.35], [1.35, 0, -1.75]];
-  return [[-1.7, 0, -1.2], [-0.1, 0, -2.0], [1.6, 0, -1.5]];
+  if (n === 2) return [[-1.0, 0, -1.4], [0.9, 0, -2.1]];
+  return [[-1.6, 0, -1.2], [-0.25, 0, -2.3], [0.85, 0, -1.9]];
 }
 export const FX_LIFE: Record<StageFx["kind"], number> = { sparks: 450, slash: 280, glyph: 900, dome: 700, poison: 800, dust: 900, dissolve: 1400 };
 
 function Atmosphere({ biome }: { biome: Biome }) {
   const { scene } = useThree();
-  useEffect(() => { scene.fog = new Fog(new Color(biome.fogColor), 3, 11); return () => { scene.fog = null; }; }, [scene, biome.fogColor]);
+  useEffect(() => { scene.fog = new Fog(new Color(biome.fogColor).multiplyScalar(0.45), 4, 15); return () => { scene.fog = null; }; }, [scene, biome.fogColor]);
   return null;
 }
 
+const TEX = ["/descent/tex/cave_diff.jpg", "/descent/tex/cave_nrm.jpg", "/descent/tex/cave_rough.jpg"];
+function prepTex(t: Texture, rx: number, ry: number, srgb = false) { t.wrapS = t.wrapT = RepeatWrapping; t.repeat.set(rx, ry); t.anisotropy = 4; if (srgb) t.colorSpace = SRGBColorSpace; t.needsUpdate = true; return t; }
+function wallTint(biome: Biome) { return new Color("#ffffff").lerp(new Color(biome.particleColor), 0.18); }
+
+/** Packed-earth shaft: a lumpy inverted cylinder with a tiled rock texture + normal map, so the walls catch the lights. */
 function Tunnel({ biome }: { biome: Biome }) {
-  const rings = useMemo(() => Array.from({ length: 7 }, (_, i) => -3.2 - i * 1.7), []);
-  // hanging roots / stalactites along both walls, thinning as they recede
-  const roots = useMemo(() => Array.from({ length: 22 }, (_, i) => {
-    const side = i % 2 ? 1 : -1; const r = (Math.sin(i * 12.9898) * 43758.5453) % 1; const r2 = (Math.sin(i * 78.233) * 43758.5453) % 1;
-    return { x: side * (2.4 + Math.abs(r) * 1.1), z: -1.0 - (i / 22) * 11, h: 1.6 + Math.abs(r2) * 2.2, tilt: side * (0.15 + Math.abs(r) * 0.25), w: 0.05 + Math.abs(r2) * 0.06 };
+  const [map, nrm, rough] = useTexture(TEX) as Texture[];
+  const maps = useMemo(() => [prepTex(map.clone(), 4, 4, true), prepTex(nrm.clone(), 4, 4), prepTex(rough.clone(), 4, 4)], [map, nrm, rough]);
+  const geo = useMemo(() => {
+    const g = new CylinderGeometry(3.7, 3.0, 22, 56, 28, true);
+    const pos = g.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i); const a = Math.atan2(z, x); const r = Math.hypot(x, z);
+      const n = Math.sin(a * 3 + y * 0.7) * 0.22 + Math.sin(a * 7 - y * 1.3) * 0.1 + Math.sin(a * 13 + y * 2.9) * 0.05 + Math.sin(y * 0.9) * 0.12;
+      const k = (r + n) / r; pos.setX(i, x * k); pos.setZ(i, z * k);
+    }
+    g.computeVertexNormals(); return g;
+  }, []);
+  const roots = useMemo(() => Array.from({ length: 14 }, (_, i) => {
+    const side = i % 2 ? 1 : -1; const r = Math.abs((Math.sin(i * 12.9898) * 43758.5453) % 1); const r2 = Math.abs((Math.sin(i * 78.233) * 43758.5453) % 1);
+    const x = side * (1.6 + r * 1.4); const h = 0.9 + r2 * 1.6; const ceil = 1.35 + Math.sqrt(Math.max(0, 3.4 * 3.4 - x * x));
+    return { x, y: ceil - h / 2 + 0.15, z: -2.2 - (i / 14) * 10, h, tilt: side * (0.1 + r * 0.25), w: 0.05 + r2 * 0.06 };
   }), []);
+  const tint = useMemo(() => wallTint(biome), [biome]);
   return (
     <group>
-      {rings.map((z, i) => (
-        <mesh key={i} position={[0, 1.5, z]} rotation={[0, 0, (i % 2) * 0.35]}>
-          <torusGeometry args={[3.0 - i * 0.1, 0.07, 8, 40]} />
-          <meshStandardMaterial color={biome.skyTop} emissive={biome.particleColor} emissiveIntensity={0.18 - i * 0.02} roughness={0.9} />
-        </mesh>
-      ))}
-      {roots.map((r, i) => (
-        <mesh key={`r${i}`} position={[r.x, 3.2 - r.h / 2, r.z]} rotation={[0, 0, r.tilt]}>
-          <cylinderGeometry args={[r.w * 0.4, r.w, r.h, 6]} />
-          <meshStandardMaterial color={biome.skyTop} emissive={biome.particleColor} emissiveIntensity={0.08} roughness={1} />
-        </mesh>
-      ))}
-      {/* far end of the shaft: a soft glow disc the fog eats into */}
-      <mesh position={[0, 1.3, -14]}>
-        <circleGeometry args={[3.2, 32]} />
-        <meshBasicMaterial color={biome.particleColor} transparent opacity={0.12} />
+      <mesh geometry={geo} position={[0, 1.35, -7]} rotation={[Math.PI / 2, 0, 0]} receiveShadow>
+        <meshStandardMaterial map={maps[0]} normalMap={maps[1]} roughnessMap={maps[2]} normalScale={[1.4, 1.4] as any} side={BackSide} color={tint} roughness={1} metalness={0} />
       </mesh>
+      {roots.map((r, i) => (
+        <mesh key={`r${i}`} position={[r.x, r.y, r.z]} rotation={[0, 0, r.tilt]} castShadow>
+          <cylinderGeometry args={[r.w * 0.3, r.w, r.h, 6]} />
+          <meshStandardMaterial color="#2a1a12" roughness={1} />
+        </mesh>
+      ))}
+      {/* far end: darkness with a faint glow the fog eats into */}
+      <mesh position={[0, 1.35, -17.9]}>
+        <circleGeometry args={[4.2, 32]} />
+        <meshBasicMaterial color="#000000" />
+      </mesh>
+      <pointLight position={[0, 2.2, -6]} intensity={2.2} distance={7} color={biome.particleColor} />
+      <pointLight position={[0, 1.8, -11]} intensity={1.6} distance={7} color={biome.keyLightColor} />
     </group>
   );
 }
 
 function Ground({ biome }: { biome: Biome }) {
+  const [map, nrm, rough] = useTexture(TEX) as Texture[];
+  const maps = useMemo(() => [prepTex(map.clone(), 2.5, 5, true), prepTex(nrm.clone(), 2.5, 5), prepTex(rough.clone(), 2.5, 5)], [map, nrm, rough]);
   return (
     <group>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, -0.5]} receiveShadow>
-        <circleGeometry args={[4.2, 48]} />
-        <meshStandardMaterial color={biome.skyBottom} roughness={0.95} metalness={0.05} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.0, -6]} receiveShadow>
+        <planeGeometry args={[10, 24]} />
+        <meshStandardMaterial map={maps[0]} normalMap={maps[1]} roughnessMap={maps[2]} normalScale={[0.9, 0.9] as any} color="#8a7466" roughness={1} metalness={0} />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, -1.7]}>
         <ringGeometry args={[2.3, 2.38, 64]} />
@@ -108,8 +127,13 @@ function Motes({ color, count = 50 }: { color: string; count?: number }) {
 }
 
 function CameraRig({ shakeRef, focus }: { shakeRef: React.MutableRefObject<number>; focus: React.MutableRefObject<[number, number, number] | null> }) {
-  const { camera } = useThree();
+  const { camera, size } = useThree();
   const cur = useRef({ lx: CAM_LOOK[0], ly: CAM_LOOK[1], lz: CAM_LOOK[2] });
+  useEffect(() => {
+    const cam = camera as PerspectiveCamera; const aspect = size.width / Math.max(1, size.height);
+    const vf = Math.max(38, Math.min(80, (2 * Math.atan(Math.tan((HFOV_DEG * Math.PI) / 360) / aspect) * 180) / Math.PI));
+    cam.fov = vf; cam.updateProjectionMatrix();
+  }, [camera, size.width, size.height]);
   useFrame(({ clock }, dt) => {
     const t = clock.getElapsedTime(); const s = shakeRef.current; shakeRef.current *= Math.exp(-dt * 7);
     const f = focus.current;
@@ -179,15 +203,14 @@ export default function DescentStage({ biome, player, enemies, targetId, onPickT
         <directionalLight position={[-3, 3, -2]} intensity={0.7} color="#ffffff" />
         <pointLight position={[0.2, 2.0, -1.6]} intensity={3} distance={6} color={biome.particleColor} />
         <pointLight position={[-0.6, 1.4, 2.2]} intensity={1.6} distance={4} color="#ffe9c4" />
-        <Tunnel biome={biome} />
-        <Ground biome={biome} />
+        <Suspense fallback={null}><Tunnel biome={biome} /><Ground biome={biome} /></Suspense>
         <Motes color={biome.particleColor} />
         {target && !target.dead && <TargetRing pos={target.pos} color="#ffd166" />}
         <Suspense fallback={<Html center zIndexRange={[5, 0]} style={{ pointerEvents: "none" }}><div style={{ fontFamily: "'Noto Serif JP', serif", letterSpacing: "0.4em", fontSize: 12, color: biome.particleColor, whiteSpace: "nowrap", textShadow: "0 0 20px #000", animation: "hdPulse 1.2s ease-in-out infinite" }}>◆ THE HIVE STIRS ◆</div><style>{`@keyframes hdPulse{0%,100%{opacity:.35}50%{opacity:1}}`}</style></Html>}>
-          <ArenaCharacter factionId={player.factionId} anim={player.anim} animKey={player.animKey} position={PLAYER_POS} rotationY={Math.PI - 0.15} dead={player.dead} speedRef={speedRef} flashKey={player.flashKey} holdOn={["lose"]} />
+          <ArenaCharacter factionId={player.factionId} anim={player.anim} animKey={player.animKey} position={PLAYER_POS} rotationY={Math.PI - 0.15} dead={player.dead} speedRef={speedRef} flashKey={player.flashKey} holdOn={["lose"]} actionSpeed={1.25} />
           {enemies.map((e) => (
             <group key={e.id}>
-              <ArenaCharacter factionId={e.factionId} anim={e.anim} animKey={e.animKey} position={e.pos} rotationY={-e.pos[0] * 0.25} scale={e.scale} corrupted corruptColor={biome.particleColor} dead={e.dead} speedRef={speedRef} flashKey={e.flashKey} holdOn={["lose"]} dissolveAt={e.dissolveAt ?? null} />
+              <ArenaCharacter factionId={e.factionId} anim={e.anim} animKey={e.animKey} position={e.pos} rotationY={-e.pos[0] * 0.25} scale={e.scale} corrupted corruptColor={biome.particleColor} dead={e.dead} speedRef={speedRef} flashKey={e.flashKey} holdOn={["lose"]} dissolveAt={e.dissolveAt ?? null} actionSpeed={1.15} />
               {!e.dead && (
                 <mesh position={[e.pos[0], 0.95 * e.scale, e.pos[2]]} onClick={(ev) => { ev.stopPropagation(); onPickTarget(e.id); }}>
                   <boxGeometry args={[0.9, 1.9 * e.scale, 0.6]} />
