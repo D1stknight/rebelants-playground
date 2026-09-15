@@ -120,7 +120,7 @@ function CameraRig({ dir }: { dir: React.MutableRefObject<Director> }) {
       const k = Math.min(1, (now - d.intro) / 1500);
       const e = 1 - Math.pow(1 - k, 3);
       // start low over the player's shoulder, swing round to the duel angle
-      tx = -2.2 * (1 - e); ty = 0.9 + (CAM_BASE.y - 0.9) * e; tz = 1.0 + (CAM_BASE.z - 1.0) * e;
+      tx = -2.6 * (1 - e); ty = 1.25 - (1.25 - CAM_BASE.y) * e; tz = 1.9 + (CAM_BASE.z - 1.9) * e;
       lx = 0.9 * (1 - e); ly = 1.0 - 0.08 * e; ease = 30;
       if (k >= 1) d.intro = null;
     } else if (d.ko) {
