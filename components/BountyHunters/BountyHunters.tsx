@@ -68,13 +68,13 @@ const BountyHunters: React.FC = () => {
       <div style={{ minHeight: "100vh", color: "#fff", fontFamily: FONT, background: `radial-gradient(ellipse at center, ${result.cleared ? "#3a2a00" : "#2a0010"} 0%, #05000a 60%, #000 100%)`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 20, textAlign: "center" }}>
         <div style={{ fontSize: 12, color: result.cleared ? "#fbbf24" : "#ff3366", letterSpacing: "0.5em", marginBottom: 14 }}>{result.cleared ? "⚑ BOUNTY COLLECTED ⚑" : "☠ HUNT FAILED ☠"}</div>
         <h1 style={{ fontSize: "clamp(30px, 7vw, 72px)", margin: 0, fontWeight: 900, letterSpacing: "0.06em", color: result.cleared ? "#ffd700" : "#ff3366", textShadow: `0 0 40px ${result.cleared ? "#ffd70088" : "#ff336688"}` }}>{result.cleared ? `${b.boss.name} IS DOWN` : "THE HIVE COLLECTS"}</h1>
-        <div style={{ fontSize: 15, color: "rgba(255,255,255,0.8)", marginTop: 12, fontStyle: "italic", maxWidth: 520 }}>{result.cleared ? `Board ${b.n} cleared. The whole bounty is yours.` : `You fell on board ${b.n}. Half the tags you collected made it back.`}</div>
+        <div style={{ fontSize: 15, color: "rgba(255,255,255,0.8)", marginTop: 12, fontStyle: "italic", maxWidth: 520 }}>{result.cleared ? `${b.name} cleared. The whole bounty is yours.` : `You fell on ${b.name}. Half the tags you collected made it back.`}</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10, marginTop: 28, width: "100%", maxWidth: 480 }}>
           {[{ l: "PAID OUT", v: `+${result.paid}`, c: "#fbbf24" }, { l: "COLLECTED", v: String(result.bounty), c: "#ff99dd" }, { l: "KILLS", v: String(result.kills), c: "#f87171" }].map((s) => (<div key={s.l} style={{ background: "rgba(0,0,0,0.45)", border: `1px solid ${s.c}33`, borderRadius: 12, padding: "12px 8px" }}><div style={{ fontSize: 22, fontWeight: 900, color: s.c }}>{s.v}</div><div style={{ fontSize: 9, letterSpacing: "0.25em", opacity: 0.55, marginTop: 4 }}>{s.l}</div></div>))}
         </div>
         <div style={{ display: "flex", gap: 10, marginTop: 26, flexWrap: "wrap", justifyContent: "center" }}>
           <button type="button" onClick={() => setPhase("lobby")} style={{ fontFamily: FONT, padding: "14px 28px", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 12, background: "rgba(255,255,255,0.06)", color: "#fff", fontWeight: 900, fontSize: 13, letterSpacing: "0.15em", cursor: "pointer" }}>↻ LOBBY</button>
-          {result.cleared && next && <button type="button" onClick={() => { setBoard(next); setPhase("lobby"); }} style={{ fontFamily: FONT, padding: "14px 28px", border: "none", borderRadius: 12, background: "linear-gradient(180deg, #ffd700 0%, #aa6600 100%)", color: "#000", fontWeight: 900, fontSize: 13, letterSpacing: "0.15em", cursor: "pointer" }}>NEXT: {next.name.toUpperCase()} →</button>}
+          {result.cleared && next && <button type="button" onClick={() => { setBoard(next); setPhase("lobby"); }} style={{ fontFamily: FONT, padding: "14px 28px", border: "none", borderRadius: 12, background: "linear-gradient(180deg, #ffd700 0%, #aa6600 100%)", color: "#000", fontWeight: 900, fontSize: 13, letterSpacing: "0.15em", cursor: "pointer" }}>NEXT: {next.world}-{next.stage} {next.name.split(": ")[1].toUpperCase()} →</button>}
           {!result.cleared && <button type="button" onClick={() => setPhase("lobby")} style={{ fontFamily: FONT, padding: "14px 28px", border: "none", borderRadius: 12, background: "linear-gradient(180deg, #a78bfa 0%, #5b3fb0 100%)", color: "#fff", fontWeight: 900, fontSize: 13, letterSpacing: "0.15em", cursor: "pointer" }}>⚔ HUNT AGAIN</button>}
         </div>
       </div>
@@ -92,7 +92,7 @@ const BountyHunters: React.FC = () => {
         <div style={{ fontSize: 11, color: "#a78bfa", letterSpacing: "0.45em", fontWeight: 700 }}>◆ RUN & GUN ◆</div>
         <h1 style={{ fontSize: "clamp(40px, 8vw, 88px)", margin: "8px 0 0", fontWeight: 900, letterSpacing: "0.04em", lineHeight: 0.95, background: "linear-gradient(180deg, #fff 0%, #c4b5fd 55%, #6d4ec9 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>BOUNTY<br />HUNTERS</h1>
         <div style={{ fontSize: "clamp(13px, 1.8vw, 16px)", color: "rgba(255,255,255,0.75)", marginTop: 16, maxWidth: 560, marginLeft: "auto", marginRight: "auto", lineHeight: 1.55 }}>
-          Four boards, four targets, {BOUNTY_LIVES} lives. Run, jump and shoot your way through the corrupted hive, collect bounty tags off everything you drop, and take the boss's head for the big payout.
+          Four worlds, twelve boards, {BOUNTY_LIVES} lives. Run, jump and shoot your way through the corrupted hive, collect bounty tags off everything you drop, and take the boss's head for the big payout.
         </div>
       </div>
 
@@ -112,35 +112,42 @@ const BountyHunters: React.FC = () => {
         </div>
       </div>
 
-      {/* board select */}
+      {/* board select — 4 worlds × 3 stages */}
       <div style={{ maxWidth: 1000, margin: "26px auto 0", padding: "0 16px" }}>
-        <div style={{ fontSize: 11, color: "#a78bfa", letterSpacing: "0.4em", textAlign: "center", marginBottom: 12 }}>◆ PICK YOUR HUNT ◆</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 12 }}>
-          {BOARDS.map((b) => {
-            const locked = b.n > unlockedN; const on = board.n === b.n; const bb = best[b.n];
-            return (
-              <button key={b.id} type="button" disabled={locked} onClick={() => setBoard(b)} style={{ fontFamily: FONT, textAlign: "left", padding: 0, borderRadius: 14, overflow: "hidden", border: on ? `2px solid ${b.accent}` : "1px solid rgba(255,255,255,0.12)", background: "#0b0812", color: "#fff", cursor: locked ? "not-allowed" : "pointer", opacity: locked ? 0.45 : 1, boxShadow: on ? `0 0 26px ${b.accent}55` : "none", transition: "all .15s" }}>
-                <div style={{ height: 96, backgroundImage: `url(/bounty/bg_${b.id}_far.png), url(/bounty/bg_${b.id}_mid.png)`, backgroundSize: "cover", backgroundPosition: "center 70%", position: "relative" }}>
-                  <div style={{ position: "absolute", inset: 0, backgroundImage: `url(/bounty/bg_${b.id}_mid.png)`, backgroundSize: "cover", backgroundPosition: "center 100%" }} />
-                  <div style={{ position: "absolute", top: 8, left: 10, fontSize: 9, letterSpacing: "0.3em", fontWeight: 800, color: b.accent, textShadow: "0 1px 4px #000" }}>BOARD {b.n}{locked ? " · LOCKED" : bb?.cleared ? " · CLEARED" : ""}</div>
-                  <img src={`/bounty/boss_${b.boss.id}.png`} alt="" style={{ position: "absolute", right: 6, bottom: -4, width: 64, height: 64, objectFit: "none", objectPosition: "0 0", imageRendering: "pixelated", transform: "scale(1.2)", transformOrigin: "bottom right", filter: locked ? "brightness(0.2)" : "drop-shadow(0 2px 4px #000)" }} />
-                </div>
-                <div style={{ padding: "10px 12px 12px" }}>
-                  <div style={{ fontSize: 14, fontWeight: 900, letterSpacing: "0.06em" }}>{b.name.toUpperCase()}</div>
-                  <div style={{ fontSize: 10, opacity: 0.6, fontStyle: "italic", marginTop: 2 }}>{b.subtitle}</div>
-                  <div style={{ fontSize: 10, marginTop: 8, color: "#fbbf24", fontWeight: 800 }}>WANTED · {b.boss.name} · {b.boss.bounty} REBEL</div>
-                  {bb && <div style={{ fontSize: 9, opacity: 0.55, marginTop: 4 }}>Best payout +{bb.bounty}</div>}
-                </div>
-              </button>
-            );
-          })}
-        </div>
+        <div style={{ fontSize: 11, color: "#a78bfa", letterSpacing: "0.4em", textAlign: "center", marginBottom: 12 }}>◆ PICK YOUR HUNT · {BOARDS.length} BOARDS ◆</div>
+        {[1, 2, 3, 4].map((w) => {
+          const stages = BOARDS.filter((b) => b.world === w); const first = stages[0];
+          return (
+            <div key={w} style={{ display: "grid", gridTemplateColumns: "150px 1fr", gap: 10, alignItems: "stretch", marginBottom: 10 }}>
+              <div style={{ borderRadius: 14, overflow: "hidden", position: "relative", minHeight: 96, backgroundImage: `url(/bounty/bg_${first.biome}_far.png)`, backgroundSize: "cover", backgroundPosition: "center 60%" }}>
+                <div style={{ position: "absolute", inset: 0, backgroundImage: `url(/bounty/bg_${first.biome}_mid.png)`, backgroundSize: "cover", backgroundPosition: "center 100%" }} />
+                <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(0,0,0,0.1), rgba(0,0,0,0.75))" }} />
+                <div style={{ position: "absolute", left: 10, bottom: 8 }}><div style={{ fontSize: 9, letterSpacing: "0.3em", color: first.accent, fontWeight: 800 }}>WORLD {w}</div><div style={{ fontSize: 15, fontWeight: 900, letterSpacing: "0.06em", textShadow: "0 1px 4px #000" }}>{first.name.split(" ")[0].toUpperCase()}</div></div>
+                <img src={`/bounty/boss_${stages[2].boss.id}.png`} alt="" style={{ position: "absolute", right: 2, top: 6, width: 64, height: 64, objectFit: "none", objectPosition: "0 0", imageRendering: "pixelated", filter: stages[2].n > unlockedN ? "brightness(0.25)" : "drop-shadow(0 2px 4px #000)" }} />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+                {stages.map((b) => {
+                  const locked = b.n > unlockedN; const on = board.n === b.n; const bb = best[b.n];
+                  return (
+                    <button key={b.id} type="button" disabled={locked} onClick={() => setBoard(b)} style={{ fontFamily: FONT, textAlign: "left", padding: "10px 12px", borderRadius: 12, border: on ? `2px solid ${b.accent}` : "1px solid rgba(255,255,255,0.12)", background: on ? `linear-gradient(180deg, ${b.accent}22, rgba(10,8,16,0.9))` : "rgba(10,8,16,0.8)", color: "#fff", cursor: locked ? "not-allowed" : "pointer", opacity: locked ? 0.4 : 1, boxShadow: on ? `0 0 22px ${b.accent}55` : "none", transition: "all .15s" }}>
+                      <div style={{ fontSize: 9, letterSpacing: "0.25em", fontWeight: 800, color: b.accent }}>{w}-{b.stage}{locked ? " · LOCKED" : bb?.cleared ? " · CLEARED" : ""}</div>
+                      <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: "0.04em", marginTop: 4 }}>{b.name.split(": ")[1].toUpperCase()}</div>
+                      <div style={{ fontSize: 9, opacity: 0.6, fontStyle: "italic", marginTop: 2, minHeight: 12 }}>{b.subtitle}</div>
+                      <div style={{ fontSize: 9, marginTop: 6, color: "#fbbf24", fontWeight: 800 }}>{b.boss.captain ? "CAPTAIN" : "☠ BOSS"} · {b.boss.name} · {b.boss.bounty}</div>
+                      {bb && <div style={{ fontSize: 8, opacity: 0.5, marginTop: 3 }}>best +{bb.bounty}</div>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* start */}
       <div style={{ maxWidth: 640, margin: "26px auto 0", padding: "0 16px", textAlign: "center" }}>
         <button type="button" onClick={start} disabled={!canStart} style={{ fontFamily: FONT, width: "100%", padding: "20px 24px", fontSize: "clamp(15px, 3.5vw, 21px)", fontWeight: 900, letterSpacing: "0.15em", color: "#fff", border: "none", borderRadius: 14, background: canStart ? "linear-gradient(180deg, #a78bfa 0%, #6d4ec9 55%, #3b2a70 100%)" : "linear-gradient(180deg, rgba(60,50,90,0.5) 0%, rgba(30,20,50,0.7) 100%)", cursor: canStart ? "pointer" : "not-allowed", boxShadow: canStart ? "0 0 40px rgba(167,139,250,0.45), inset 0 1px 0 rgba(255,255,255,0.2)" : "none", opacity: canStart ? 1 : 0.6 }}>
-          🏹 HUNT ON BOARD {board.n} · {cost} REBEL
+          🏹 HUNT {board.world}-{board.stage} · {board.name.split(": ")[1].toUpperCase()} · {cost} REBEL
         </button>
         {!canStart && !starting && balance < cost && <div style={{ marginTop: 10, fontSize: 12, color: "#ff99aa" }}>⚠ Need {cost} REBEL to hunt. You have {balance}.</div>}
         {err && <div style={{ marginTop: 10, fontSize: 12, color: "#ff99aa" }}>{err}</div>}
@@ -156,7 +163,8 @@ const BountyHunters: React.FC = () => {
           { t: "CONTROLS", c: "#c4b5fd", d: "← → run · Z / Space jump · X / Shift fire · ↑ aim up · ↓ crouch, or drop through a platform. Touch pads on phones." },
           { t: "ONE HIT", c: "#f87171", d: "Like the old days: anything that touches you takes a life. Bullets, wasps, spikes, pits. You respawn at the last checkpoint with a plain rifle." },
           { t: "GUNS", c: "#7ad4ff", d: "Crates drop capsules. S = spread (3 shots), L = laser (fast, goes through), F = flame (short, rapid). Dying puts you back on the rifle." },
-          { t: "THE TARGET", c: "#fbbf24", d: "Every board ends in a locked arena with a wanted boss. Its bounty is the real money — kills on the way are tips." },
+          { t: "THE TARGET", c: "#fbbf24", d: "Every board ends in a locked arena: a captain on stages 1–2, the world boss on stage 3. Its bounty is the real money — kills on the way are tips." },
+          { t: "THE HIVE FIGHTS BACK", c: "#a78bfa", d: "Deeper boards add moving and crumbling platforms, crushers, timed spikes, cannons, springs, brick walls and hopping spiders. Watch the rhythm, then go." },
         ].map((x) => (<div key={x.t} style={{ background: "rgba(0,0,0,0.4)", border: `1px solid ${x.c}33`, borderRadius: 12, padding: "12px 14px" }}><div style={{ fontSize: 10, letterSpacing: "0.25em", color: x.c, fontWeight: 700 }}>{x.t}</div><div style={{ fontSize: 12, opacity: 0.8, marginTop: 6, lineHeight: 1.5 }}>{x.d}</div></div>))}
       </div>
       <div style={{ textAlign: "center", padding: "30px 16px", fontSize: 10, color: "rgba(255,255,255,0.25)", letterSpacing: "0.1em" }}>© 2026 Rebel Ants Playground · Bounty Hunters</div>

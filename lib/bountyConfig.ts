@@ -5,26 +5,42 @@ export const BOUNTY_DEFAULT_COST = 100;      // REBEL to start a hunt (admin ove
 export const BOUNTY_DEATH_KEEP = 0.5;        // share of collected bounty kept on game over
 export const BOUNTY_LIVES = 3;
 
-export type BoardId = "jungle" | "sewers" | "fortress" | "throne";
+export type BiomeId = "jungle" | "sewers" | "fortress" | "throne";
 
 export type Board = {
-  id: BoardId;
-  n: number;
+  id: string;             // "w1s2"
+  n: number;              // 1..12 running number (unlock order)
+  world: number;          // 1..4
+  stage: number;          // 1..3 — stage 3 is the world boss, 1–2 end with a captain
+  biome: BiomeId;
   name: string;
   subtitle: string;
-  boss: { id: string; name: string; bounty: number; hp: number };
+  boss: { id: string; name: string; bounty: number; hp: number; captain: boolean };
   length: number;         // tiles
-  difficulty: number;     // 1..4 scales enemy density / speed
+  difficulty: number;     // 1..12 scales density / speed / hazards
   accent: string;
   music: string;
 };
 
-export const BOARDS: Board[] = [
-  { id: "jungle",   n: 1, name: "Jungle Outskirts",   subtitle: "The hive's first raiders",  boss: { id: "grubthorn",  name: "GRUBTHORN",       bounty: 150, hp: 36 }, length: 190, difficulty: 1, accent: "#7ad27a", music: "hd-war" },
-  { id: "sewers",   n: 2, name: "Hive Sewers",        subtitle: "Where the corrupted breed", boss: { id: "sludge",     name: "SLUDGE MAW",      bounty: 250, hp: 50 }, length: 210, difficulty: 2, accent: "#5ff0b4", music: "hd-war" },
-  { id: "fortress", n: 3, name: "Wasp Fortress",      subtitle: "The mercenary stronghold",  boss: { id: "warden",     name: "THE WARDEN",      bounty: 400, hp: 64 }, length: 230, difficulty: 3, accent: "#ffa03c", music: "fw-battle-epic" },
-  { id: "throne",   n: 4, name: "Corrupted Throne",   subtitle: "Her royal guard",           boss: { id: "queenguard", name: "QUEEN'S HEADSMAN", bounty: 600, hp: 84 }, length: 250, difficulty: 4, accent: "#ff50c8", music: "fw-battle-epic" },
+const WORLDS: { biome: BiomeId; name: string; accent: string; music: string; boss: { id: string; name: string; bounty: number; hp: number }; stages: [string, string, string]; subs: [string, string, string] }[] = [
+  { biome: "jungle",   name: "Jungle",   accent: "#7ad27a", music: "hd-war",         boss: { id: "grubthorn",  name: "GRUBTHORN",        bounty: 150, hp: 36 },  stages: ["Outskirts", "Canopy Trail", "Grub's Hollow"],      subs: ["The hive's first raiders", "Wasps in the branches", "The beetle general's lair"] },
+  { biome: "sewers",   name: "Sewers",   accent: "#5ff0b4", music: "hd-war",         boss: { id: "sludge",     name: "SLUDGE MAW",       bounty: 250, hp: 50 },  stages: ["Drain Pipes", "Crusher Works", "The Sump"],           subs: ["Where the corrupted breed", "Machinery that never stops", "Something feeds in the dark"] },
+  { biome: "fortress", name: "Fortress", accent: "#ffa03c", music: "fw-battle-epic", boss: { id: "warden",     name: "THE WARDEN",       bounty: 400, hp: 64 },  stages: ["Outer Wall", "Cannon Gallery", "Warden's Keep"],      subs: ["The mercenary stronghold", "Cross the line of fire", "The keeper of the gate"] },
+  { biome: "throne",   name: "Throne",   accent: "#ff50c8", music: "fw-battle-epic", boss: { id: "queenguard", name: "QUEEN'S HEADSMAN", bounty: 600, hp: 84 },  stages: ["Brood Chambers", "Royal Gauntlet", "Corrupted Throne"], subs: ["Her nursery, her rules", "Everything at once", "Her royal guard"] },
 ];
 
+export const BOARDS: Board[] = WORLDS.flatMap((w, wi) => [0, 1, 2].map((si) => {
+  const world = wi + 1, stage = si + 1, n = wi * 3 + stage;
+  const captain = stage < 3;
+  return {
+    id: `w${world}s${stage}`, n, world, stage, biome: w.biome,
+    name: `${w.name} ${stage}: ${w.stages[si]}`, subtitle: w.subs[si],
+    boss: captain ? { id: "captain", name: `${w.name.toUpperCase()} CAPTAIN`, bounty: 40 * world + 30 * stage, hp: 14 + 6 * n, captain: true } : { ...w.boss, captain: false },
+    length: 150 + n * 12 + (stage === 3 ? 20 : 0),
+    difficulty: n,
+    accent: w.accent, music: w.music,
+  };
+}));
+
 // REBEL per kill
-export const KILL_BOUNTY: Record<string, number> = { grunt: 4, elite: 8, wasp: 3, turret: 6 };
+export const KILL_BOUNTY: Record<string, number> = { grunt: 4, elite: 8, wasp: 3, turret: 6, hopper: 5 };

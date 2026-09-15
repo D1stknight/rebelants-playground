@@ -29,7 +29,7 @@ function load(name: string, fw: number, fh: number, cols: number) {
   return (sheets[name] = { img, fw, fh, cols });
 }
 export function preloadBoard(board: Board, faction = "samurai") {
-  [`hunter_${faction}`, "grunt", "elite", "wasp", "turret", "items", `boss_${board.boss.id}`, `tiles_${board.id}`, `bg_${board.id}_far`, `bg_${board.id}_mid`, `bg_${board.id}_near`].forEach((n) => { const i = new Image(); i.src = `/bounty/${n}.png`; });
+  [`hunter_${faction}`, "grunt", "elite", "wasp", "turret", "items", board.boss.captain ? "elite" : `boss_${board.boss.id}`, `tiles_${board.biome}`, `bg_${board.biome}_far`, `bg_${board.biome}_mid`, `bg_${board.biome}_near`].forEach((n) => { const i = new Image(); i.src = `/bounty/${n}.png`; });
 }
 
 export class BountyGame {
@@ -50,9 +50,9 @@ export class BountyGame {
     this.ctx = canvas.getContext("2d")!; this.ctx.imageSmoothingEnabled = false;
     this.board = board; this.cb = cb; this.level = buildLevel(board);
     this.hunter = load(`hunter_${faction}`, 64, 64, 10); this.items = load("items", 16, 16, 15); this.hud = this.items;
-    this.tiles = load(`tiles_${board.id}`, 16, 16, 11);
-    this.bg = [load(`bg_${board.id}_far`, 480, 225, 1), load(`bg_${board.id}_mid`, 480, 225, 1), load(`bg_${board.id}_near`, 480, 64, 1)];
-    this.bossSheet = load(`boss_${board.boss.id}`, 64, 64, 6);
+    this.tiles = load(`tiles_${board.biome}`, 16, 16, 11);
+    this.bg = [load(`bg_${board.biome}_far`, 480, 225, 1), load(`bg_${board.biome}_mid`, 480, 225, 1), load(`bg_${board.biome}_near`, 480, 64, 1)];
+    this.bossSheet = board.boss.captain ? load("elite", 64, 64, 7) : load(`boss_${board.boss.id}`, 64, 64, 6);
     load("grunt", 64, 64, 7); load("elite", 64, 64, 7); load("wasp", 32, 32, 5); load("turret", 32, 32, 4);
     this.player = this.mk("player", this.level.startX, 9 * TILE, 14, 38); this.player.hp = 1; this.checkpoint = this.level.startX; this.invuln = 2.5;
     for (const s of this.level.spawns) this.spawn(s);
@@ -71,14 +71,26 @@ export class BountyGame {
       case "turret": { const e = this.mk("turret", s.x, s.y + 2, 26, 26); e.hp = 3; e.data.shootCd = 1.5; break; }
       case "crate": { const e = this.mk("crate", s.x, s.y, 16, 16); e.hp = 1; break; }
       case "heart": { const e = this.mk("item", s.x, s.y - 2, 12, 12); e.data.item = 5; break; }
-      case "boss": { const e = this.mk("boss", s.x, s.y, 52, 40); e.hp = this.board.boss.hp; e.dir = -1; e.state = "sleep"; e.data.pat = 0; this.boss = e; break; }
+      case "boss": {
+        if (this.board.boss.captain) { const e = this.mk("boss", s.x + 16, s.y + 8, 20, 52); e.hp = this.board.boss.hp; e.dir = -1; e.state = "sleep"; e.data.captain = true; this.boss = e; }
+        else { const e = this.mk("boss", s.x, s.y, 52, 40); e.hp = this.board.boss.hp; e.dir = -1; e.state = "sleep"; e.data.pat = 0; this.boss = e; }
+        break;
+      }
+      case "hopper": { const e = this.mk("hopper", s.x, s.y + 6, 24, 20); e.hp = 2; e.data.jumpCd = 0.6 + Math.random(); break; }
+      case "mplat": { const e = this.mk("mplat", s.x, s.y, (s.data?.w || 2) * TILE, 8); e.data = { ...s.data, ox: s.x, oy: s.y, px: s.x, py: s.y }; break; }
+      case "crumble": { const e = this.mk("crumble", s.x, s.y, (s.data?.w || 2) * TILE, 8); e.data = { ox: s.x, oy: s.y, px: s.x, py: s.y, state: "idle", t: 0 }; break; }
+      case "crusher": { const e = this.mk("crusher", s.x, s.y, 32, 32); e.data = { ...s.data, oy: s.y, py: s.y }; break; }
+      case "spring": { const e = this.mk("spring", s.x + 1, s.y + 8, 14, 8); e.data.k = 0; break; }
+      case "cannon": { const e = this.mk("cannon", s.x, s.y, 16, 16); e.data = { ...s.data }; e.dir = s.data?.dir || 1; break; }
+      case "brick": { const e = this.mk("brick", s.x, s.y, 16, 16); e.hp = 2; this.level.tiles[Math.floor(s.y / TILE) * this.level.cols + Math.floor(s.x / TILE)] = 1; break; }
     }
   }
 
   // ── tiles
   tile(tx: number, ty: number) { if (ty >= ROWS) return 1; if (ty < 0 || tx < 0 || tx >= this.level.cols) return tx < 0 ? 1 : 0; return this.level.tiles[ty * this.level.cols + tx]; }
   solidAt(x: number, y: number) { const v = this.tile(Math.floor(x / TILE), Math.floor(y / TILE)); return v === 1; }
-  spikeAt(x: number, y: number) { return this.tile(Math.floor(x / TILE), Math.floor(y / TILE)) === 3; }
+  spikeAt(x: number, y: number) { const v = this.tile(Math.floor(x / TILE), Math.floor(y / TILE)); if (v === 3) return true; if (v === 11) return this.spikePhase(0); if (v === 12) return this.spikePhase(1); return false; }
+  spikePhase(k: number) { const c = (this.t % 2.6) / 2.6; return k === 0 ? c < 0.45 : c >= 0.5 && c < 0.95; }
 
   // move an entity with tile collision (AABB, one-way platforms)
   move(e: Ent, dt: number, oneWay = true) {
@@ -107,6 +119,18 @@ export class BountyGame {
       if (this.solidAt(e.x + 1, ye) || this.solidAt(e.x + e.w - 1, ye)) { ny = (Math.floor(ye / TILE) + 1) * TILE; e.vy = 0; }
     }
     e.y = ny;
+    // entity platforms (moving / crumbling): one-way, land when falling through the top edge
+    if (e.kind === "player" || e.kind === "item" || e.kind === "grunt" || e.kind === "elite" || e.kind === "hopper") {
+      e.data.onPlat = null;
+      if (e.vy >= 0 && !e.data.dropThrough) {
+        const oldBottom = e.y - e.vy * dt + e.h;
+        for (const q of this.ents) {
+          if ((q.kind !== "mplat" && q.kind !== "crumble") || q.dead || q.data.state === "gone") continue;
+          const top = q.y; if (e.x + e.w <= q.x || e.x >= q.x + q.w) continue;
+          if (oldBottom <= top + 4 + Math.max(0, q.data.vyf || 0) && e.y + e.h >= top) { e.y = top - e.h; e.vy = 0; e.ground = true; e.data.onPlat = q; break; }
+        }
+      }
+    }
   }
 
   // ── loop
@@ -135,13 +159,16 @@ export class BountyGame {
       const inp = this.input; const crouch = inp.down && p.ground && !inp.left && !inp.right;
       p.vx = crouch ? 0 : inp.left ? -PSPEED : inp.right ? PSPEED : 0;
       if (inp.left) p.dir = -1; if (inp.right) p.dir = 1;
-      if (inp.jump && !this.prevJump && p.ground) { if (inp.down && this.tile(Math.floor((p.x + p.w / 2) / TILE), Math.floor((p.y + p.h + 1) / TILE)) === 2) { p.data.dropThrough = 0.25; } else { p.vy = -JUMP; this.sfx("jump"); } }
-      if (!inp.jump && p.vy < -80) p.vy = -80;   // variable jump height
+      if (inp.jump && !this.prevJump && p.ground) { if (inp.down && this.tile(Math.floor((p.x + p.w / 2) / TILE), Math.floor((p.y + p.h + 1) / TILE)) === 2) { p.data.dropThrough = 0.25; } else { p.vy = -JUMP; p.data.jumping = true; this.sfx("jump"); } }
+      if (!inp.jump && p.data.jumping && p.vy < -80) p.vy = -80;   // variable jump height (player jumps only, not springs)
+      if (p.vy >= 0) p.data.jumping = false;
       this.prevJump = inp.jump;
       if (p.data.dropThrough > 0) p.data.dropThrough -= dt; else p.data.dropThrough = 0;
       p.vy = Math.min(420, p.vy + GRAV * dt);
+      if (p.data.onPlat && !p.data.onPlat.dead) { p.x += p.data.onPlat.data.dxf || 0; p.y += Math.max(0, p.data.onPlat.data.dyf || 0); }
       this.move(p, dt);
       p.data.crouch = crouch;
+      if (p.data.onPlat?.kind === "crumble" && p.data.onPlat.data.state === "idle") { p.data.onPlat.data.state = "shake"; p.data.onPlat.data.t = 0; }
       // aim
       const aim = inp.up ? (inp.left || inp.right ? 45 : 90) : (inp.down && !p.ground ? -45 : 0);
       p.data.aim = aim;
@@ -211,12 +238,53 @@ export class BountyGame {
           this.touch(e, 1);
           break;
         }
-        case "boss": this.stepBoss(e, dt, dx); break;
+        case "boss": if (e.data.captain) this.stepCaptain(e, dt, dx); else this.stepBoss(e, dt, dx); break;
+        case "hopper": {
+          if (e.hp <= 0) { e.state = "dead"; if (e.t > 0.6) e.dead = true; break; }
+          if (!near) break;
+          e.data.jumpCd -= dt; e.dir = dx < 0 ? -1 : 1;
+          if (e.ground) { e.vx *= 0.8; if (e.data.jumpCd <= 0 && Math.abs(dx) < 220) { e.data.jumpCd = 1.1 + Math.random() * 0.6; e.vy = -(200 + this.board.difficulty * 6); e.vx = e.dir * (70 + Math.min(60, Math.abs(dx) * 0.3)); this.sfx("jump"); } }
+          e.vy = Math.min(420, e.vy + GRAV * dt); this.move(e, dt);
+          this.touch(e, 1); break;
+        }
+        case "mplat": {
+          const d = e.data; const ph = this.t / d.period * Math.PI * 2 + (d.phase || 0) * Math.PI * 2; const k = (Math.sin(ph) + 1) / 2;
+          const nx = d.ox + d.dx * k, ny = d.oy + d.dy * k; d.dxf = nx - e.x; d.dyf = ny - e.y; d.vyf = d.dyf / dt; e.x = nx; e.y = ny; break;
+        }
+        case "crumble": {
+          const d = e.data; d.dxf = 0; d.dyf = 0;
+          if (d.state === "shake") { d.t += dt; if (d.t > 0.55) { d.state = "fall"; d.t = 0; e.vy = 0; } }
+          else if (d.state === "fall") { e.vy = Math.min(300, e.vy + GRAV * dt); const ny = e.y + e.vy * dt; d.dyf = ny - e.y; d.vyf = e.vy; e.y = ny; d.t += dt; if (e.y > ROWS * TILE + 20) { d.state = "gone"; d.t = 0; } }
+          else if (d.state === "gone") { d.t += dt; if (d.t > 3) { d.state = "idle"; e.x = d.ox; e.y = d.oy; e.vy = 0; } }
+          break;
+        }
+        case "crusher": {
+          const d = e.data; const c = ((this.t / d.period) + (d.phase || 0)) % 1;
+          // 0–0.55 wait up · 0.55–0.68 slam · 0.68–0.8 hold · 0.8–1 rise
+          let k = 0; if (c > 0.55 && c <= 0.68) k = (c - 0.55) / 0.13; else if (c > 0.68 && c <= 0.8) k = 1; else if (c > 0.8) k = 1 - (c - 0.8) / 0.2;
+          k = Math.max(0, Math.min(1, k)); const ny = d.oy + d.drop * k; d.slamming = c > 0.55 && c <= 0.7; if (d.slamming && k >= 1 && !d.hitDone) { d.hitDone = true; this.shake = Math.max(this.shake, 0.6); this.sfx("stomp"); } if (c < 0.55) d.hitDone = false;
+          e.y = ny;
+          if ((this.state === "play" || this.state === "boss") && this.invuln <= 0 && this.overlap({ x: e.x + 2, y: e.y + 2, w: e.w - 4, h: e.h - 2 }, this.hit(p))) this.kill();
+          break;
+        }
+        case "spring": {
+          if (e.data.k > 0) e.data.k -= dt * 4;
+          if ((this.state === "play" || this.state === "boss") && p.vy >= 0 && this.overlap({ x: e.x, y: e.y - 6, w: e.w, h: e.h + 6 }, p)) { p.vy = -440; p.y = e.y - p.h - 1; p.data.jumping = false; e.data.k = 1; this.sfx("jump"); }
+          break;
+        }
+        case "cannon": {
+          if (!near) break;
+          const d = e.data; d.cd = (d.cd ?? (d.phase || 0) * d.period) - dt;
+          if (d.cd <= 0 && this.state !== "dying") { d.cd = d.period; d.flash = 0.15; const b = this.mk("ebullet", e.x + (e.dir > 0 ? 16 : -6), e.y + 5, 6, 6); b.vx = e.dir * 130; b.vy = 0; b.data.life = 4; this.sfx("eshot"); }
+          if (d.flash > 0) d.flash -= dt; break;
+        }
+        case "brick": { if (e.hp <= 0) { e.dead = true; this.level.tiles[Math.floor(e.y / TILE) * this.level.cols + Math.floor(e.x / TILE)] = 0; this.burst(e.x + 8, e.y + 8, 8, "#b08a60", 80, 2); if (Math.random() < 0.5) { const it = this.mk("item", e.x + 2, e.y, 12, 12); it.vy = -100; it.data.item = 0; } } break; }
         case "bullet": {
           e.x += e.vx * dt; e.y += e.vy * dt; if (e.data.gravity) e.vy += e.data.gravity * dt; e.data.life -= dt;
           if (e.data.life <= 0 || e.x < this.cam - 20 || e.x > this.cam + VW + 20 || e.y < -20 || e.y > VH + 20 || this.solidAt(e.x + e.w / 2, e.y + e.h / 2)) { if (!e.data.pierce || e.data.life <= 0 || this.solidAt(e.x + e.w / 2, e.y + e.h / 2)) { e.dead = true; if (this.solidAt(e.x + e.w / 2, e.y + e.h / 2)) this.burst(e.x, e.y, 3, "#ffe9a0", 40, 1); } }
+          for (const o of this.ents) { if (o.kind === "crusher" && this.overlap(e, o)) { e.dead = true; this.burst(e.x, e.y, 3, "#ffe9a0", 40, 1); break; } }
           for (const o of this.ents) {
-            if (o.dead || o.hp <= 0 || !(o.kind === "grunt" || o.kind === "elite" || o.kind === "wasp" || o.kind === "turret" || o.kind === "boss" || o.kind === "crate")) continue;
+            if (o.dead || o.hp <= 0 || !(o.kind === "grunt" || o.kind === "elite" || o.kind === "wasp" || o.kind === "turret" || o.kind === "boss" || o.kind === "crate" || o.kind === "brick" || o.kind === "hopper")) continue;
             if (o.kind === "boss" && o.state === "sleep") continue;
             if (this.overlap(e, o) && !(e.data.hitSet && e.data.hitSet.has(o))) {
               o.hp -= e.data.dmg; o.data.hurt = 0.12; this.burst(e.x + e.w / 2, e.y + e.h / 2, 4, "#fff2b0", 60, 1);
@@ -275,6 +343,7 @@ export class BountyGame {
   }
 
   onKill(o: Ent) {
+    if (o.kind === "brick") { this.sfx("crate"); return; }
     if (o.kind === "crate") { this.burst(o.x + 8, o.y + 8, 10, "#c8a070", 90, 2); const roll = Math.random(); const it = this.mk("item", o.x + 2, o.y, 12, 12); it.vy = -120; it.data.item = roll < 0.45 ? 0 : roll < 0.65 ? 1 : roll < 0.8 ? 2 : roll < 0.92 ? 3 : 5; this.sfx("crate"); return; }
     this.kills++; this.bounty += KILL_BOUNTY[o.kind] || 0;
     this.burst(o.x + o.w / 2, o.y + o.h / 2, 12, o.kind === "wasp" ? "#f8c840" : "#9be080", 100, 2);
@@ -329,6 +398,30 @@ export class BountyGame {
     if (e.data.flash > 0) e.data.flash -= dt;
     this.touch(e, 2);
   }
+  stepCaptain(e: Ent, dt: number, dx: number) {
+    const p = this.player;
+    if (e.state === "sleep") return;
+    if (e.hp <= 0) { e.state = "dead"; if (e.t > 1.6) e.dead = true; return; }
+    e.data.hurt = Math.max(0, (e.data.hurt || 0) - dt);
+    if (e.state === "enter") { e.state = "walk"; e.t = 0; }
+    e.dir = dx < 0 ? -1 : 1; const d = this.board.difficulty;
+    if (e.state === "walk") {
+      e.vx = e.dir * (40 + d * 3); if (Math.abs(dx) < 60) e.vx = -e.dir * 30;
+      e.vy = Math.min(420, e.vy + GRAV * dt); this.move(e, dt, false);
+      if (e.t > 1.2 + Math.random() * 0.8) { e.state = Math.random() < 0.55 ? "burst" : "leap"; e.t = 0; e.data.lastShot = -1; }
+    } else if (e.state === "burst") {
+      e.vx = 0; e.vy = Math.min(420, e.vy + GRAV * dt); this.move(e, dt, false);
+      const shots = 3, gap = 0.22; const k = Math.floor(e.t / gap);
+      if (k < shots && e.data.lastShot !== k) { e.data.lastShot = k; e.data.flash = 0.12; const b = this.mk("ebullet", e.x + (e.dir > 0 ? e.w : -6), e.y + 18, 6, 6); b.vx = e.dir * (150 + d * 5); b.vy = (k - 1) * 30; b.data.life = 3; this.sfx("eshot"); }
+      if (e.t > shots * gap + 0.5) { e.state = "walk"; e.t = 0; }
+    } else if (e.state === "leap") {
+      if (!e.data.jumped) { e.data.jumped = true; e.vy = -290; e.vx = e.dir * 140; this.sfx("jump"); }
+      e.vy = Math.min(420, e.vy + GRAV * dt); const wasAir = !e.ground; this.move(e, dt, false);
+      if (e.data.jumped && wasAir && e.ground) { e.state = "walk"; e.t = 0; e.data.jumped = false; e.vx = 0; this.burst(e.x + e.w / 2, e.y + e.h, 8, "#c0a070", 90, 2); }
+    }
+    if (e.data.flash > 0) e.data.flash -= dt;
+    this.touch(e, 2);
+  }
   onBossDown(e: Ent) {
     this.bounty += this.board.boss.bounty; this.shake = 2; this.flash = 1; this.hitStop = 0.25;
     for (let i = 0; i < 6; i++) setTimeout(() => this.burst(e.x + Math.random() * e.w, e.y + Math.random() * e.h, 10, i % 2 ? "#ffd070" : "#ff8040", 140, 3), i * 180);
@@ -356,6 +449,7 @@ export class BountyGame {
         let id = 1;
         if (v === 1) { const up = this.tile(tx, ty - 1); if (up !== 1) { const l = this.tile(tx - 1, ty), r = this.tile(tx + 1, ty); id = l !== 1 ? 4 : r !== 1 ? 5 : 0; } else { const l = this.tile(tx - 1, ty), r = this.tile(tx + 1, ty), dn = this.tile(tx, ty + 1); id = l !== 1 ? 6 : r !== 1 ? 7 : dn !== 1 && ty < ROWS - 1 ? 9 : 1; } }
         else if (v === 2) id = 2; else if (v === 3) id = 3; else if (v === 8) id = 8; else if (v === 10) id = 10;
+        else if (v === 11 || v === 12) { const on = this.spikePhase(v === 11 ? 0 : 1); if (on) id = 3; else { c.fillStyle = "#55505a"; c.fillRect(tx * TILE, ty * TILE + 13, 16, 3); continue; } }
         c.drawImage(ts.img, id * 16, 0, 16, 16, tx * TILE, ty * TILE, 16, 16);
       }
     }
@@ -401,8 +495,38 @@ export class BountyGame {
       }
       case "wasp": { const s = sheets.wasp; const f = e.hp <= 0 ? 3 + Math.min(1, Math.floor(e.t / 0.3)) : e.data.hurt > 0 ? 2 : Math.floor(this.t * 16) % 2; this.frame(s, f, e.x - 5, e.y - 8, e.dir < 0); break; }
       case "turret": { const s = sheets.turret; const f = e.state === "dead" ? 3 : e.data.flash > 0.1 ? 2 : Math.floor(this.t * 3) % 2; this.frame(s, f, e.x - 3, e.y - 4, e.dir < 0); break; }
-      case "boss": { const s = this.bossSheet; const f = e.hp <= 0 ? 4 + Math.min(1, Math.floor(e.t / 0.6)) : e.data.hurt > 0 ? 3 : e.data.flash > 0 ? 2 : Math.floor(this.t * 3) % 2; this.frame(s, f, e.x - 6, e.y + e.h - 62, e.dir < 0); break; }
+      case "boss": {
+        if (e.data.captain) {
+          const s = sheets.elite; let f = 0;
+          if (e.hp <= 0) f = 10 + Math.min(2, Math.floor(e.t / 0.4)); else if (e.data.hurt > 0) f = 13; else if (e.data.flash > 0) f = 8; else if (e.vx !== 0) f = 2 + Math.floor((this.t * 10) % 6); else f = Math.floor(this.t * 2) % 2;
+          c.save(); c.filter = "hue-rotate(-70deg) saturate(1.3) brightness(1.1)"; const sc = 1.4; this.frame(s, f, e.x + e.w / 2 - 32 * sc, e.y + e.h + 4 * sc - 64 * sc, e.dir < 0, 64 * sc, 64 * sc); c.restore();
+          break;
+        }
+        const s = this.bossSheet; const f = e.hp <= 0 ? 4 + Math.min(1, Math.floor(e.t / 0.6)) : e.data.hurt > 0 ? 3 : e.data.flash > 0 ? 2 : Math.floor(this.t * 3) % 2; this.frame(s, f, e.x - 6, e.y + e.h - 62, e.dir < 0); break;
+      }
       case "crate": this.frame(this.items, 14, e.x, e.y, false); break;
+      case "brick": { const ts = this.tiles; if (ts.img.complete) c.drawImage(ts.img, 16, 0, 16, 16, e.x, e.y, 16, 16); c.strokeStyle = "rgba(0,0,0,0.5)"; c.strokeRect(e.x + 0.5, e.y + 0.5, 15, 15); c.fillStyle = "rgba(0,0,0,0.35)"; c.fillRect(e.x + 2, e.y + 7, 12, 1); c.fillRect(e.x + 7, e.y + 2, 1, 5); c.fillRect(e.x + 4, e.y + 9, 1, 5); if (e.hp === 1) { c.fillStyle = "rgba(0,0,0,0.6)"; c.fillRect(e.x + 3, e.y + 3, 1, 4); c.fillRect(e.x + 9, e.y + 10, 3, 1); } break; }
+      case "mplat": case "crumble": {
+        if (e.data.state === "gone") break;
+        const ts = this.tiles; const sh = e.kind === "crumble" && e.data.state === "shake" ? Math.sin(this.t * 60) * 1.5 : 0;
+        if (ts.img.complete) for (let i = 0; i < e.w / 16; i++) c.drawImage(ts.img, 32, 0, 16, 16, Math.floor(e.x + i * 16 + sh), Math.floor(e.y), 16, 16);
+        if (e.kind === "crumble") { c.fillStyle = "rgba(0,0,0,0.4)"; for (let i = 0; i < e.w / 16; i++) { c.fillRect(Math.floor(e.x + i * 16 + 5 + sh), Math.floor(e.y) + 1, 1, 4); c.fillRect(Math.floor(e.x + i * 16 + 11 + sh), Math.floor(e.y) + 2, 1, 3); } }
+        else { c.fillStyle = "rgba(255,255,255,0.25)"; c.fillRect(Math.floor(e.x) + 2, Math.floor(e.y) + 6, e.w - 4, 1); }
+        break;
+      }
+      case "crusher": {
+        const ts = this.tiles; const x = Math.floor(e.x), y = Math.floor(e.y);
+        // chain to the ceiling
+        c.fillStyle = "#3a3540"; for (let yy = e.data.oy - 200; yy < y; yy += 6) c.fillRect(x + 14, yy, 4, 3);
+        if (ts.img.complete) { for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) c.drawImage(ts.img, 16, 0, 16, 16, x + i * 16, y + j * 16, 16, 16); }
+        c.fillStyle = "rgba(0,0,0,0.35)"; c.fillRect(x, y, 32, 2); c.fillRect(x, y, 2, 32); c.fillStyle = "rgba(255,255,255,0.12)"; c.fillRect(x + 30, y, 2, 32);
+        // teeth
+        c.fillStyle = "#d8d8e6"; for (let i = 0; i < 4; i++) { c.beginPath(); c.moveTo(x + i * 8, y + 32); c.lineTo(x + i * 8 + 4, y + 38); c.lineTo(x + i * 8 + 8, y + 32); c.fill(); }
+        break;
+      }
+      case "spring": { const x = Math.floor(e.x), y = Math.floor(e.y); const sq = e.data.k > 0 ? 3 : 0; c.fillStyle = "#c8c8d8"; c.fillRect(x, y + 6, 14, 2); c.fillStyle = "#8a8aa0"; for (let i = 0; i < 3; i++) c.fillRect(x + 2, y + 1 + sq * 0.5 + i * 1.7, 10, 1); c.fillStyle = "#ff6b6b"; c.fillRect(x, y - 2 + sq, 14, 3); break; }
+      case "cannon": { const x = Math.floor(e.x), y = Math.floor(e.y); c.fillStyle = "#2a2630"; c.fillRect(x + 2, y + 6, 12, 10); c.fillStyle = "#4a4658"; c.fillRect(e.dir > 0 ? x + 6 : x - 4, y + 4, 14, 8); c.fillStyle = "#15131a"; c.fillRect(e.dir > 0 ? x + 17 : x - 4, y + 6, 3, 4); if (e.data.flash > 0) { c.fillStyle = "#ffe08a"; c.fillRect(e.dir > 0 ? x + 20 : x - 8, y + 5, 5, 6); } break; }
+      case "hopper": { const s = sheets.turret; const f = e.state === "dead" ? 3 : e.data.hurt > 0 ? 2 : (e.ground ? Math.floor(this.t * 4) % 2 : 1); this.frame(s, f, e.x - 4, e.y - 8, e.dir < 0); break; }
       case "item": { const bob = Math.sin(this.t * 6) * 1.5; this.frame(this.items, e.data.item === 0 ? 0 : e.data.item === 5 ? 5 : e.data.item, e.x - 2, e.y - 2 + bob, false); break; }
       case "bullet": {
         if (e.data.laser) { c.save(); c.translate(e.x + 3, e.y + 3); c.rotate(Math.atan2(e.vy, e.vx)); this.frame(this.items, 8, -8, -8, false); c.restore(); }

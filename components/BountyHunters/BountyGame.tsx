@@ -59,7 +59,7 @@ export default function BountyGameView({ board, faction = "samurai", onEnd, onQu
             </div>
             <div style={{ position: "absolute", top: 8, right: 10, textAlign: "right" }}>
               <div style={{ fontSize: 11 * Math.max(1, scale / 2), fontWeight: 900, color: "#fbbf24", textShadow: "0 1px 3px #000" }}>💎 {hud.bounty}</div>
-              <div style={{ fontSize: 7 * Math.max(1, scale / 2), letterSpacing: "0.25em", opacity: 0.7, marginTop: 2 }}>BOARD {hud.board.n} · {hud.board.name.toUpperCase()}</div>
+              <div style={{ fontSize: 7 * Math.max(1, scale / 2), letterSpacing: "0.25em", opacity: 0.7, marginTop: 2 }}>{hud.board.world}-{hud.board.stage} · {hud.board.name.split(": ")[1].toUpperCase()}</div>
             </div>
             {/* progress */}
             {hud.state !== "boss" && <div style={{ position: "absolute", top: 4, left: "30%", right: "30%", height: 3, background: "rgba(255,255,255,0.15)" }}><div style={{ width: `${hud.progress * 100}%`, height: "100%", background: hud.board.accent }} /></div>}
@@ -76,9 +76,9 @@ export default function BountyGameView({ board, faction = "samurai", onEnd, onQu
             )}
             {hud.state === "intro" && (
               <div style={{ position: "absolute", left: 0, right: 0, top: "34%", textAlign: "center", animation: "bhMsg 1.6s ease-out both" }}>
-                <div style={{ fontSize: 8 * Math.max(1, scale / 2), letterSpacing: "0.4em", color: hud.board.accent }}>BOARD {hud.board.n}</div>
-                <div style={{ fontSize: 18 * Math.max(1, scale / 2), fontWeight: 900, letterSpacing: "0.15em", textShadow: "0 2px 6px #000" }}>{hud.board.name.toUpperCase()}</div>
-                <div style={{ fontSize: 8 * Math.max(1, scale / 2), opacity: 0.75, fontStyle: "italic", marginTop: 4 }}>WANTED: {hud.board.boss.name} · {hud.board.boss.bounty} REBEL</div>
+                <div style={{ fontSize: 8 * Math.max(1, scale / 2), letterSpacing: "0.4em", color: hud.board.accent }}>WORLD {hud.board.world} · STAGE {hud.board.stage}</div>
+                <div style={{ fontSize: 18 * Math.max(1, scale / 2), fontWeight: 900, letterSpacing: "0.15em", textShadow: "0 2px 6px #000" }}>{hud.board.name.split(": ")[1].toUpperCase()}</div>
+                <div style={{ fontSize: 8 * Math.max(1, scale / 2), opacity: 0.75, fontStyle: "italic", marginTop: 4 }}>{hud.board.boss.captain ? "TARGET" : "WANTED"}: {hud.board.boss.name} · {hud.board.boss.bounty} REBEL</div>
               </div>
             )}
           </div>
