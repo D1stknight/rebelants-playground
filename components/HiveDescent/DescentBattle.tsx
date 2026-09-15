@@ -16,7 +16,8 @@ const DescentStage = dynamic(() => import("./DescentStage"), { ssr: false });
 
 const FONT = "'Noto Serif JP', 'Hiragino Mincho ProN', serif";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-const IMPACT_MS = 340;   // player swing → contact (clips run at 1.25×); the hit lands when the blade does
+// swing → contact, from the measured contact frames minus CLIP_OFFSETS, over the actor's clip speed (player 1.25×, enemy 1.15×)
+const IMPACT: Record<string, number> = { "player:attack": 440, "player:magic": 480, "player:trick": 300, "enemy:attack": 480, "enemy:magic": 520, "enemy:trick": 320 };
 
 type Float = { id: number; who: "player" | number; text: string; color: string; big?: boolean };
 type Log = { id: number; text: string; tone: string };
@@ -25,6 +26,7 @@ type AnimState = { anim: ArenaAnim; key: number };
 type Props = { run: Run; onRun: (r: Run) => void; onAbandon: () => void };
 
 const TYPE_COLOR: Record<Card["type"], string> = { attack: "#f87171", skill: "#67e8f9", power: "#c084fc" };
+const TUT_KEY = "ra:hd:tut:v1";
 
 export default function DescentBattle({ run, onRun, onAbandon }: Props) {
   const biome = biomeOf(run);
@@ -48,6 +50,8 @@ export default function DescentBattle({ run, onRun, onAbandon }: Props) {
   const [dissolve, setDissolve] = useState<Record<string, number>>({});   // enemy id → when it started disintegrating
   const [gone, setGone] = useState<Record<string, boolean>>({});          // fully disintegrated → unmounted
   const audio = useDescentAudio();
+  const [showHelp, setShowHelp] = useState(false);
+  const helpShown = useRef(false);
   const lowHpFired = useRef(false);
   const speedRef = useRef(1);
   const idRef = useRef(1);
@@ -99,6 +103,14 @@ export default function DescentBattle({ run, onRun, onAbandon }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [run.phase, run.floor]);
 
+  // first-ever battle: explain the hand before the first card is played
+  useEffect(() => {
+    if (run.phase !== "battle" || helpShown.current) return;
+    helpShown.current = true;
+    try { if (localStorage.getItem(TUT_KEY) !== "1") setShowHelp(true); } catch {}
+  }, [run.phase]);
+  const closeHelp = useCallback(() => { setShowHelp(false); try { localStorage.setItem(TUT_KEY, "1"); } catch {} }, []);
+
   // ── event playback
   const playEvents = useCallback(async (evs: Ev[], opts: { fast?: boolean } = {}) => {
     const f = opts.fast ? 0.55 : 1;
@@ -110,8 +122,7 @@ export default function DescentBattle({ run, onRun, onAbandon }: Props) {
           playAnim(ev.who, ev.anim);
           if (ev.anim === "lose") setDead((d) => ({ ...d, [key(ev.who)]: true }));
           if (ev.anim === "magic") audio.sfx.magic(); else if (ev.anim === "trick") audio.sfx.trick(); else if (ev.anim === "defend") audio.sfx.block();
-          if (ev.anim === "attack" && ev.who !== "player") { await sleep(300 * f); }
-          else if (ev.anim === "attack" || ev.anim === "magic" || ev.anim === "trick") await sleep(IMPACT_MS);
+          if (ev.anim === "attack" || ev.anim === "magic" || ev.anim === "trick") await sleep(IMPACT[`${ev.who === "player" ? "player" : "enemy"}:${ev.anim}`] ?? 400);
           else if (ev.anim === "defend") { spawnFx("dome", ev.who, ev.who === "player" ? "#67e8f9" : biome.particleColor); await sleep(200 * f); }
           else if (ev.anim === "lose") await sleep(150 * f);
           break;
@@ -146,9 +157,9 @@ export default function DescentBattle({ run, onRun, onAbandon }: Props) {
         case "draw": await sleep(120 * f); break;
         case "text": pushLog(ev.text, ev.tone ?? "info"); await sleep(160 * f); break;
         case "turn": if (ev.n > 1) pushLog(`— turn ${ev.n} —`, "info"); break;
-        case "enemyDown": { pushLog(`${ev.name} destroyed · +${ev.rebel} REBEL`, "good"); audio.sfx.enemyDie(); const id = ev.enemy; later(350, () => { setDissolve((d) => ({ ...d, [String(id)]: performance.now() })); spawnFx("dissolve", { enemy: id }, biome.particleColor); }); later(1900, () => setGone((g) => ({ ...g, [String(id)]: true }))); await sleep(800 * f); break; }
-        case "floorClear": pushLog(`Floor ${ev.floor} cleared`, "boom"); audio.sfx.floorClear(); setFlash("rgba(255,255,255,0.35)"); later(300, () => setFlash(null)); await sleep(900); break;
-        case "playerDown": if (ev.revived) { audio.sfx.rally(); setDead((d) => ({ ...d, player: false })); setPAnim((a) => ({ anim: "idle", key: a.key + 1 })); } else { audio.music(null); audio.sfx.lose(); } await sleep(ev.revived ? 900 : 1400); break;
+        case "enemyDown": { pushLog(`${ev.name} destroyed · +${ev.rebel} REBEL`, "good"); audio.sfx.enemyDie(); const id = ev.enemy; later(350, () => { setDissolve((d) => ({ ...d, [String(id)]: performance.now() })); spawnFx("dissolve", { enemy: id }, biome.particleColor); }); later(1900, () => setGone((g) => ({ ...g, [String(id)]: true }))); await sleep(900); break; }
+        case "floorClear": await sleep(1100); pushLog(`Floor ${ev.floor} cleared`, "boom"); audio.sfx.floorClear(); setFlash("rgba(255,255,255,0.35)"); later(300, () => setFlash(null)); await sleep(1000); break;
+        case "playerDown": if (ev.revived) { audio.sfx.rally(); setDead((d) => ({ ...d, player: false })); setPAnim((a) => ({ anim: "idle", key: a.key + 1 })); } else { audio.music(null); audio.sfx.lose(); } await sleep(ev.revived ? 900 : 2400); break;
       }
     }
   }, [biome.particleColor, float, hitFlash, hitStop, later, playAnim, pushLog, spawnFx, audio]);
@@ -162,8 +173,8 @@ export default function DescentBattle({ run, onRun, onAbandon }: Props) {
     if (next === run) return;
     setSelected(null);
     setBusy(true); audio.sfx.card();
-    onRun(next);            // hand + energy update instantly; visuals catch up
-    void (async () => { await playEvents(evs, { fast: true }); setBusy(false); })();
+    if (next.phase === "battle") onRun(next);   // hand + energy update instantly; visuals catch up
+    void (async () => { await playEvents(evs, { fast: true }); if (next.phase !== "battle") onRun(next); setBusy(false); })();
   }, [busy, run, targetId, alive, onRun, playEvents, audio]);
 
   const doEndTurn = useCallback(() => {
@@ -180,11 +191,11 @@ export default function DescentBattle({ run, onRun, onAbandon }: Props) {
 
   // once the hand is spent the enemies act on their own — END TURN is only for passing early
   useEffect(() => {
-    if (busy || run.phase !== "battle") return;
+    if (busy || run.phase !== "battle" || showHelp) return;
     if (run.hand.some((_, i) => canPlay(run, i))) return;
     const t = window.setTimeout(() => doEndTurn(), 750);
     return () => clearTimeout(t);
-  }, [busy, run, doEndTurn]);
+  }, [busy, run, doEndTurn, showHelp]);
 
   const onCardClick = useCallback((idx: number) => {
     if (busy) return;
@@ -196,13 +207,13 @@ export default function DescentBattle({ run, onRun, onAbandon }: Props) {
 
   const onPickTarget = useCallback((id: number) => {
     setTargetId(id);
-    if (selected != null) { const idx = selected; setSelected(null); if (canPlay(run, idx)) { const { run: next, evs } = playCard(run, idx, id); if (next !== run) { setBusy(true); audio.sfx.card(); onRun(next); void (async () => { await playEvents(evs, { fast: true }); setBusy(false); })(); } } }
+    if (selected != null) { const idx = selected; setSelected(null); if (canPlay(run, idx)) { const { run: next, evs } = playCard(run, idx, id); if (next !== run) { setBusy(true); audio.sfx.card(); if (next.phase === "battle") onRun(next); void (async () => { await playEvents(evs, { fast: true }); if (next.phase !== "battle") onRun(next); setBusy(false); })(); } } }
   }, [selected, run, onRun, playEvents, audio]);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "e" || e.key === "Enter") doEndTurn(); const n = parseInt(e.key, 10); if (n >= 1 && n <= run.hand.length) onCardClick(n - 1); if (e.key === "Escape") setSelected(null); };
+    const onKey = (e: KeyboardEvent) => { if (showHelp) { if (e.key === "Escape" || e.key === "Enter") closeHelp(); return; } if (e.key === "e" || e.key === "Enter") doEndTurn(); const n = parseInt(e.key, 10); if (n >= 1 && n <= run.hand.length) onCardClick(n - 1); if (e.key === "Escape") setSelected(null); };
     window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey);
-  }, [doEndTurn, onCardClick, run.hand.length]);
+  }, [doEndTurn, onCardClick, run.hand.length, showHelp, closeHelp]);
 
   // ── stage props
   const p = run.player;
@@ -213,7 +224,7 @@ export default function DescentBattle({ run, onRun, onAbandon }: Props) {
 
   const renderEnemyLabel = useCallback((id: number) => {
     const e = enemyById[id]; if (!e || !e.alive) return null;
-    const hp = dispHp[String(id)] ?? e.hp; const bl = dispBlock[String(id)] ?? e.block; const pct = Math.max(0, Math.min(1, hp / e.maxHp));
+    const hp = dispHp[String(id)] ?? e.hp; if (hp <= 0) return null; const bl = dispBlock[String(id)] ?? e.block; const pct = Math.max(0, Math.min(1, hp / e.maxHp));
     const isT = id === targetId;
     const statuses = [e.poison > 0 && `☠${e.poison}`, e.burn > 0 && `🔥${e.burn}`, e.stun > 0 && `💫${e.stun}`, e.vulnerable > 0 && `▼${e.vulnerable}`, e.weak > 0 && `≈${e.weak}`, e.strength > 0 && `↑${e.strength}`].filter(Boolean) as string[];
     return (
@@ -246,6 +257,8 @@ export default function DescentBattle({ run, onRun, onAbandon }: Props) {
   useEffect(() => { if (hpPct > 0 && hpPct < 0.25 && !lowHpFired.current) { lowHpFired.current = true; audio.sfx.lowHp(); } if (hpPct >= 0.25) lowHpFired.current = false; }, [hpPct, audio]);
   useEffect(() => { if (run.phase === "victory") { audio.music(null); audio.sfx.win(); } if (run.phase === "cashout") { audio.music(null); audio.sfx.floorClear(); } }, [run.phase, audio]);
   const pBlock = dispBlock.player ?? p.block;
+  const incoming = alive.filter((e) => e.stun <= 0 && (e.intent.kind === "attack" || e.intent.kind === "heavy" || e.intent.kind === "multi" || e.intent.kind === "special")).reduce((sum, e) => sum + Math.round(Math.max(0, e.intent.dmg + e.strength) * (e.weak > 0 ? 0.75 : 1)) * Math.max(1, e.intent.hits), 0);
+  const through = Math.max(0, incoming - pBlock);
   const canEnd = run.phase === "battle" && !busy;
   const powers = Object.entries(p.powers).filter(([, n]) => n > 0);
 
@@ -266,6 +279,7 @@ export default function DescentBattle({ run, onRun, onAbandon }: Props) {
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", pointerEvents: "auto" }}>
           <div style={{ background: "rgba(0,0,0,0.6)", border: "1px solid rgba(251,191,36,0.4)", borderRadius: 999, padding: "6px 12px", fontSize: 11, fontWeight: 800, color: "#fbbf24" }}>💎 +{run.unbanked}</div>
+          <button type="button" onClick={() => setShowHelp(true)} title="How to play" style={{ background: "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 999, width: 30, height: 30, color: "#fff", fontSize: 13, fontWeight: 900, cursor: "pointer", fontFamily: FONT }}>?</button>
           <button type="button" onClick={audio.toggleMute} title={audio.muted ? "Unmute" : "Mute"} style={{ background: "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 999, width: 30, height: 30, color: "#fff", fontSize: 13, cursor: "pointer" }}>{audio.muted ? "🔇" : "🔊"}</button>
           <button type="button" onClick={onAbandon} style={{ background: "rgba(0,0,0,0.6)", border: "1px solid rgba(248,113,113,0.4)", borderRadius: 999, padding: "6px 10px", color: "#f87171", fontSize: 10, fontWeight: 800, letterSpacing: "0.12em", cursor: "pointer", fontFamily: FONT }}>✕ ABANDON</button>
         </div>
@@ -300,7 +314,7 @@ export default function DescentBattle({ run, onRun, onAbandon }: Props) {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, letterSpacing: "0.15em", marginBottom: 3 }}>
               <span style={{ color: hpPct < 0.25 ? "#f87171" : "#4ade80" }}>HP · {dispHp.player ?? p.hp} / {p.maxHp}{pBlock > 0 ? <span style={{ color: "#67e8f9" }}>  🛡 {pBlock}</span> : null}</span>
-              <span style={{ opacity: 0.55 }}>{p.strength > 0 ? `STR +${p.strength} · ` : ""}{p.tempStrength > 0 ? `+${p.tempStrength} this turn · ` : ""}DMG ×{p.dmgMult.toFixed(2)}</span>
+              <span style={{ opacity: 0.85 }}>{p.strength > 0 ? `STR +${p.strength} · ` : ""}{p.tempStrength > 0 ? `+${p.tempStrength} this turn · ` : ""}{run.phase === "battle" && incoming > 0 ? <span style={{ color: through > 0 ? "#f87171" : "#4ade80" }} title="What the enemies will deal next turn, after your Block">⚔ INCOMING {incoming}{pBlock > 0 ? ` − 🛡 ${pBlock}` : ""} = {through} TO YOU</span> : <span style={{ opacity: 0.6 }}>DMG ×{p.dmgMult.toFixed(2)}</span>}</span>
             </div>
             <div style={{ height: 8, background: "rgba(255,255,255,0.08)", borderRadius: 4, overflow: "hidden" }}>
               <div style={{ height: "100%", width: `${hpPct * 100}%`, background: hpPct < 0.25 ? "linear-gradient(90deg,#f87171,#fca5a5)" : "linear-gradient(90deg,#16a34a,#4ade80)", transition: "width .3s" }} />
@@ -364,7 +378,8 @@ export default function DescentBattle({ run, onRun, onAbandon }: Props) {
         </div>
       )}
 
-      {run.phase === "reward" && <RewardOverlay run={run} onChoose={(o) => onRun(chooseReward(run, o))} />}
+      {showHelp && <HelpOverlay onClose={closeHelp} factionCard={run.deck.find((c) => c.rarity === "faction")} />}
+      {run.phase === "reward" && !busy && <RewardOverlay run={run} onChoose={(o) => onRun(chooseReward(run, o))} />}
 
       <style>{`
         @keyframes hdFlash{from{opacity:.9}to{opacity:0}}
@@ -372,6 +387,57 @@ export default function DescentBattle({ run, onRun, onAbandon }: Props) {
         @keyframes hdBanner{0%{opacity:0;transform:scale(1.1)}15%{opacity:1;transform:scale(1)}80%{opacity:1}100%{opacity:0}}
         @keyframes hdCard{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:none}}
       `}</style>
+    </div>
+  );
+}
+
+const GLOSSARY: [string, string][] = [
+  ["Energy ⚡", "3 a turn. The gold number on a card is what it costs. Unspent energy is lost."],
+  ["Block 🛡", "Soaks that much damage this turn only. It's gone when your next turn starts."],
+  ["Intent", "The badge over an enemy — exactly what it does next. Attack = damage, Guard = it blocks, Enrage = it gets stronger."],
+  ["Strength", "+1 damage on every hit you make for the rest of this fight."],
+  ["Vulnerable", "Takes +50% damage for that many turns."],
+  ["Weak", "Deals −25% damage for that many turns."],
+  ["Poison ☠", "Loses that much HP each turn, then the number drops by 1."],
+  ["Burn 🔥", "Loses 3 HP a turn for that many turns."],
+  ["Stun 💫", "Skips its next turn entirely."],
+  ["Exhaust", "That card is removed for the rest of this fight after you play it."],
+  ["Power", "A purple card. Played once, it works every turn for the whole fight."],
+  ["Draw / Discard", "You draw 5 from the draw pile; played cards go to discard; when the draw pile is empty the discard is shuffled back."],
+];
+
+function HelpOverlay({ onClose, factionCard }: { onClose: () => void; factionCard?: Card }) {
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
+  const steps = [
+    { n: "1", c: "#f87171", t: "PLAY YOUR HAND", d: `You get 3 ⚡ and 5 cards every turn. Click a card (or press its number) to play it. Strike = 6 damage, Guard = 5 Block${factionCard ? `, ${factionCard.name} = "${factionCard.text}"` : ""}.` },
+    { n: "2", c: "#67e8f9", t: "READ THE INTENT, THEN DECIDE", d: "Every enemy shows its next move. The HUD adds it up: INCOMING 10 − 🛡 5 = 5 TO YOU. If that number is big, Guard. If it's 0, spend everything on damage." },
+    { n: "3", c: "#4ade80", t: "ONE LIFE BAR", d: "Your HP carries across all 10 floors and does not refill. Kill fast, block the heavy turns, take Mend when you're hurt." },
+    { n: "4", c: "#fbbf24", t: "WHEN YOUR ENERGY IS SPENT", d: "The hive takes its turn on its own. Then you draw a fresh hand. Kill everything on the floor and you pick a boon before the next one." },
+  ];
+  return (
+    <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.82)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 60, overflowY: "auto", fontFamily: FONT }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ maxWidth: 900, width: "100%" }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 11, letterSpacing: "0.5em", color: "#ff66cc" }}>◆ HOW TO FIGHT ◆</div>
+          <div style={{ fontSize: "clamp(20px, 3.5vw, 30px)", fontWeight: 900, letterSpacing: "0.15em", marginTop: 6 }}>CARDS, ENERGY, ONE LIFE BAR</div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0, 1fr))", gap: 10, marginTop: 18 }}>
+          {steps.map((x) => (
+            <div key={x.n} style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${x.c}44`, borderLeft: `3px solid ${x.c}`, borderRadius: 12, padding: "12px 14px" }}>
+              <div style={{ fontSize: 10, letterSpacing: "0.25em", fontWeight: 800, color: x.c }}>{x.n} · {x.t}</div>
+              <div style={{ fontSize: 12.5, lineHeight: 1.55, marginTop: 6, opacity: 0.9 }}>{x.d}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ fontSize: 9, letterSpacing: "0.3em", color: "rgba(255,255,255,0.5)", marginTop: 18, textAlign: "center" }}>WORDS ON THE CARDS</div>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, minmax(0, 1fr))", gap: "6px 14px", marginTop: 8 }}>
+          {GLOSSARY.map(([k, v]) => (<div key={k} style={{ fontSize: 11, lineHeight: 1.45 }}><span style={{ color: "#fbbf24", fontWeight: 800 }}>{k}</span> <span style={{ opacity: 0.8 }}>— {v}</span></div>))}
+        </div>
+        <div style={{ textAlign: "center", marginTop: 20 }}>
+          <button type="button" onClick={onClose} style={{ fontFamily: FONT, padding: "14px 36px", borderRadius: 14, border: "none", background: "linear-gradient(180deg,#ff3399,#a3126b)", color: "#fff", fontWeight: 900, letterSpacing: "0.2em", fontSize: 13, cursor: "pointer", boxShadow: "0 0 30px #ff339966" }}>⚔ INTO THE HIVE</button>
+          <div style={{ fontSize: 9, opacity: 0.4, marginTop: 8, letterSpacing: "0.2em" }}>THE ? BUTTON BRINGS THIS BACK</div>
+        </div>
+      </div>
     </div>
   );
 }

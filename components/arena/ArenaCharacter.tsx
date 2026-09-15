@@ -50,9 +50,10 @@ export type ArenaCharacterProps = {
   idleSpeed?: number;              // idle clip time scale (heavier breathing at low HP)
   dissolveAt?: number | null;      // performance.now() when the body started disintegrating (1.3s: glow, fade, rise, gone)
   actionSpeed?: number;            // time scale for attack/magic/trick clips (1 = as authored)
+  clipOffsets?: Partial<Record<ArenaAnim, number>>; // seconds to skip at the start of a clip (trim Mixamo wind-ups)
 };
 
-export default function ArenaCharacter({ factionId, anim, animKey, position = [0, 0, 0], rotationY = 0, scale = 1, corrupted = false, corruptColor = "#ff3399", dead = false, holdOn = DEFAULT_HOLD, speedRef, flashKey = 0, idleSpeed = 1, dissolveAt = null, actionSpeed = 1 }: ArenaCharacterProps) {
+export default function ArenaCharacter({ factionId, anim, animKey, position = [0, 0, 0], rotationY = 0, scale = 1, corrupted = false, corruptColor = "#ff3399", dead = false, holdOn = DEFAULT_HOLD, speedRef, flashKey = 0, idleSpeed = 1, dissolveAt = null, actionSpeed = 1, clipOffsets }: ArenaCharacterProps) {
   const dissolveRef = useRef({ started: false, done: false });
   const matsRef = useRef<any[]>([]);
   const flashRef = useRef({ until: 0, applied: false });
@@ -123,6 +124,7 @@ export default function ArenaCharacter({ factionId, anim, animKey, position = [0
     if (cur && cur !== next) cur.fadeOut(0.12);
     next.timeScale = anim === "attack" || anim === "magic" || anim === "trick" ? actionSpeed : 1;
     next.reset().fadeIn(0.12).play();
+    const off = clipOffsets?.[anim]; if (off) next.time = off;
     currentRef.current = next;
   }, [anim, animKey]);
 

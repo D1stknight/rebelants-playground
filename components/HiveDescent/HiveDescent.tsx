@@ -88,7 +88,7 @@ const HiveDescent: React.FC = () => {
   if (runState === "running" && run) return <DescentBattle run={run} onRun={onRun} onAbandon={handleAbandon} />;
 
   // ===================== PICKING =====================
-  if (runState === "picking") return <FactionPicker onConfirm={handleConfirmFaction} onCancel={() => setRunState("lobby")} />;
+  if (runState === "picking") return <FactionPicker onConfirm={handleConfirmFaction} onCancel={() => setRunState("lobby")} cost={cost} />;
 
   // ===================== RESULT =====================
   if (runState === "result" && run) {
@@ -121,72 +121,81 @@ const HiveDescent: React.FC = () => {
   }
 
   // ===================== LOBBY =====================
+  const STEPS = [
+    { n: "01", t: "PLAY CARDS, NOT BUTTONS", c: "#f87171", d: "Each turn you draw 5 cards and get 3 energy. The gold number on a card is its cost. Strike hits, Guard blocks, your faction card does something only you can do." },
+    { n: "02", t: "READ THE INTENT", c: "#67e8f9", d: "The badge over every enemy is its next move — ⚔ Attack 6 means 6 damage is coming. Block soaks damage for one turn only, so guard the turn it matters and hit the rest of the time." },
+    { n: "03", t: "ONE LIFE BAR, TEN FLOORS", c: "#4ade80", d: "Your HP does not refill between floors. Every point you lose on floor 1 is gone on floor 10 unless you Mend at a boon, heal with a card, or carry a relic that does it for you." },
+    { n: "04", t: "BUILD ON THE WAY DOWN", c: "#fbbf24", d: "After each floor pick a boon: a new card for your deck, a relic that lasts all run, or +30 HP. Bosses guard floors 4, 8 and 10. On 3, 6 and 9 you may escape and bank your REBEL." },
+  ];
   return (
-    <div style={{ minHeight: "100vh", color: "#fff", overflowX: "hidden", fontFamily: FONT, background: "radial-gradient(ellipse at 50% 0%, #2a0830 0%, #0a0210 50%, #000 100%)", position: "relative" }}>
-      <div aria-hidden style={{ position: "absolute", inset: 0, pointerEvents: "none", opacity: 0.6, backgroundImage: "radial-gradient(2px 2px at 20% 30%, #ff66cc, transparent 50%), radial-gradient(1px 1px at 80% 20%, #aa66ff, transparent 50%), radial-gradient(1.5px 1.5px at 60% 70%, #ff88dd, transparent 50%), radial-gradient(1px 1px at 10% 80%, #cc55ee, transparent 50%), radial-gradient(2px 2px at 90% 60%, #ff99dd, transparent 50%)" }} />
+    <div style={{ minHeight: "100vh", color: "#fff", overflowX: "hidden", fontFamily: FONT, background: "#050308", position: "relative" }}>
+      {/* HERO */}
+      <div style={{ position: "relative", minHeight: "min(100vh, 860px)", display: "flex", flexDirection: "column" }}>
+        <div aria-hidden style={{ position: "absolute", inset: 0, backgroundImage: "url(/descent/lobby-hero.jpg)", backgroundSize: "cover", backgroundPosition: "38% 40%" }} />
+        <div aria-hidden style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg, rgba(5,3,8,0.15) 0%, rgba(5,3,8,0.15) 40%, rgba(5,3,8,0.82) 68%, rgba(5,3,8,0.95) 100%), linear-gradient(180deg, rgba(5,3,8,0.7) 0%, rgba(5,3,8,0) 25%, rgba(5,3,8,0) 70%, #050308 100%)" }} />
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px", position: "relative", zIndex: 2 }}>
-        <a href="/" style={{ color: "rgba(255,255,255,0.6)", textDecoration: "none", fontSize: 12, fontWeight: 700, letterSpacing: "0.15em" }}>← PLAYGROUND</a>
-        <div style={{ background: "rgba(0,0,0,0.4)", border: "1px solid rgba(251,191,36,0.35)", borderRadius: 999, padding: "6px 14px", fontSize: 13, fontWeight: 800, color: "#fbbf24" }}>⚡ {(balance || 0).toLocaleString()} <span style={{ fontSize: 10, opacity: 0.7 }}>REBEL</span></div>
-      </div>
+        <div style={{ position: "relative", zIndex: 2, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px" }}>
+          <a href="/" style={{ color: "rgba(255,255,255,0.65)", textDecoration: "none", fontSize: 12, fontWeight: 700, letterSpacing: "0.15em" }}>← PLAYGROUND</a>
+          <div style={{ background: "rgba(0,0,0,0.5)", border: "1px solid rgba(251,191,36,0.35)", borderRadius: 999, padding: "6px 14px", fontSize: 13, fontWeight: 800, color: "#fbbf24" }}>⚡ {(balance || 0).toLocaleString()} <span style={{ fontSize: 10, opacity: 0.7 }}>REBEL</span></div>
+        </div>
 
-      <div style={{ textAlign: "center", padding: "26px 16px 12px", position: "relative", zIndex: 2 }}>
-        <div style={{ fontSize: 11, color: "#ff66cc", letterSpacing: "0.5em", textTransform: "uppercase", marginBottom: 10, fontWeight: 700 }}>◆ Rebel Ants Playground ◆</div>
-        <h1 style={{ fontSize: "clamp(38px, 9vw, 88px)", margin: 0, fontWeight: 900, letterSpacing: "0.04em", lineHeight: 0.95, background: "linear-gradient(180deg, #fff 0%, #ff99dd 60%, #aa3388 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>THE HIVE</h1>
-        <h1 style={{ fontSize: "clamp(38px, 9vw, 88px)", margin: 0, fontWeight: 900, letterSpacing: "0.04em", lineHeight: 0.95, background: "linear-gradient(180deg, #ff99dd 0%, #aa3388 50%, #4a0a30 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>DESCENT</h1>
-        <div style={{ fontSize: "clamp(13px, 2vw, 16px)", color: "rgba(255,255,255,0.7)", marginTop: 18, maxWidth: 580, marginLeft: "auto", marginRight: "auto", fontStyle: "italic", lineHeight: 1.5 }}>
-          "The Queen has been corrupted. Ten floors stand between you and her throne. Build your deck. Read the enemy. Bank your loot — or lose half of it in the dark."
+        <div style={{ position: "relative", zIndex: 2, flex: 1, display: "flex", alignItems: "center", justifyContent: "flex-end", padding: "20px 6vw 40px" }}>
+          <div style={{ maxWidth: 560, width: "100%", textAlign: "left" }}>
+            <div style={{ fontSize: 11, color: "#ff66cc", letterSpacing: "0.45em", fontWeight: 700 }}>◆ DAILY HIVE · {seed} ◆</div>
+            <h1 style={{ fontSize: "clamp(44px, 7.5vw, 96px)", margin: "10px 0 0", fontWeight: 900, letterSpacing: "0.03em", lineHeight: 0.92, textShadow: "0 4px 40px rgba(0,0,0,0.8)" }}>THE HIVE<br /><span style={{ background: "linear-gradient(180deg, #ff99dd 0%, #ff3399 55%, #7a1a55 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>DESCENT</span></h1>
+            <div style={{ fontSize: "clamp(14px, 1.6vw, 17px)", color: "rgba(255,255,255,0.82)", marginTop: 18, lineHeight: 1.55, maxWidth: 480 }}>
+              Ten floors. <b>One life bar.</b> Build a deck of cards on the way down, read what the hive is about to do, and bank your REBEL before it takes it back.
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 18 }}>
+              <span style={{ background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.14)", padding: "6px 12px", borderRadius: 999, fontSize: 11, fontWeight: 800, letterSpacing: "0.1em" }}>SAME FLOORS FOR EVERYONE TODAY</span>
+              <span style={{ background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.14)", padding: "6px 12px", borderRadius: 999, fontSize: 11, fontWeight: 800, letterSpacing: "0.1em" }}>{DESCENT_FACTIONS.length} CHAMPIONS</span>
+              {best && best.seed === seed && <span style={{ background: "rgba(251,191,36,0.15)", border: "1px solid rgba(251,191,36,0.4)", color: "#fbbf24", padding: "6px 12px", borderRadius: 999, fontSize: 11, fontWeight: 800, letterSpacing: "0.1em" }}>YOUR BEST · FLOOR {best.floor}{best.victory ? " · QUEEN SLAIN" : ""} · +{best.banked}</span>}
+            </div>
+            <button type="button" onClick={() => canStart && setRunState("picking")} disabled={!canStart} style={{ fontFamily: FONT, marginTop: 26, padding: "20px 34px", fontSize: "clamp(15px, 2.2vw, 20px)", fontWeight: 900, letterSpacing: "0.18em", color: "#fff", border: "none", borderRadius: 14, background: canStart ? "linear-gradient(180deg, #ff3399 0%, #aa0066 55%, #5a0033 100%)" : "linear-gradient(180deg, rgba(80,30,80,0.5) 0%, rgba(40,10,40,0.7) 100%)", cursor: canStart ? "pointer" : "not-allowed", boxShadow: canStart ? "0 0 46px rgba(255,51,153,0.5), inset 0 1px 0 rgba(255,255,255,0.25)" : "none", opacity: canStart ? 1 : 0.6, transition: "all 0.2s" }}>
+              ⚔ DESCEND · {cost} REBEL
+            </button>
+            {!canStart && !starting && <div style={{ marginTop: 10, fontSize: 12, color: "#ff99aa" }}>⚠ Need {cost} REBEL to descend. You have {balance}.</div>}
+            {err && <div style={{ marginTop: 10, fontSize: 12, color: "#ff99aa" }}>{err}</div>}
+            <div style={{ marginTop: 14, fontSize: 11, color: "rgba(255,255,255,0.5)", letterSpacing: "0.06em", lineHeight: 1.7 }}>
+              Die and you keep half of what you found · escape on 3, 6 or 9 and keep it all · slay the Queen for up to {totalPossibleRebel().toLocaleString()} REBEL
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Daily hive strip */}
-      <div style={{ maxWidth: 760, margin: "18px auto 0", padding: "0 16px", position: "relative", zIndex: 2 }}>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center" }}>
-          <span style={{ background: "rgba(255,102,204,0.15)", color: "#ff99dd", padding: "6px 12px", borderRadius: 999, fontSize: 11, fontWeight: 800, letterSpacing: "0.1em" }}>TODAY'S HIVE · {seed}</span>
-          <span style={{ background: "rgba(255,255,255,0.08)", color: "#fff", padding: "6px 12px", borderRadius: 999, fontSize: 11, fontWeight: 800, letterSpacing: "0.1em" }}>SAME FLOORS FOR EVERY COMMANDER</span>
-          {best && best.seed === seed && <span style={{ background: "rgba(251,191,36,0.15)", color: "#fbbf24", padding: "6px 12px", borderRadius: 999, fontSize: 11, fontWeight: 800, letterSpacing: "0.1em" }}>YOUR BEST TODAY · FLOOR {best.floor}{best.victory ? " · QUEEN SLAIN" : ""} · +{best.banked}</span>}
-        </div>
-      </div>
-
-      {/* How it plays */}
-      <div style={{ maxWidth: 980, margin: "26px auto 0", padding: "0 16px", position: "relative", zIndex: 2, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 10 }}>
-        {[
-          { t: "READ THE ENEMY", d: "Up to three foes at once, each showing its next move. Block the heavy hitter, finish the wounded, stun the boss.", c: "#67e8f9" },
-          { t: "PLAY YOUR HAND", d: "3 energy a turn, 5 cards from your deck. Strikes, guards, your faction's signature card — spend it well.", c: "#f87171" },
-          { t: "BUILD BETWEEN FLOORS", d: "Add a card, take a relic, or heal. 30 cards, 22 relics, powers that stack. No two runs alike.", c: "#c084fc" },
-          { t: "BANK OR PUSH", d: "Escape with your loot on floors 3, 6 and 9. Die and you keep half. Slay the Queen and keep it all.", c: "#fbbf24" },
-        ].map((x) => (<div key={x.t} style={{ background: "rgba(0,0,0,0.4)", border: `1px solid ${x.c}33`, borderRadius: 12, padding: "12px 14px" }}><div style={{ fontSize: 10, letterSpacing: "0.25em", color: x.c, fontWeight: 700 }}>{x.t}</div><div style={{ fontSize: 12, opacity: 0.8, marginTop: 6, lineHeight: 1.5 }}>{x.d}</div></div>))}
-      </div>
-
-      {/* The 10 floors */}
-      <div style={{ maxWidth: 980, margin: "28px auto 0", padding: "0 16px", position: "relative", zIndex: 2 }}>
-        <div style={{ fontSize: 11, color: "#ff66cc", letterSpacing: "0.4em", textTransform: "uppercase", textAlign: "center", marginBottom: 12 }}>⛓ Ten Floors of Hell ⛓</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 8 }}>
-          {BIOMES.map((b) => (
-            <div key={b.floor} style={{ background: `linear-gradient(180deg, ${b.skyTop} 0%, ${b.skyBottom} 100%)`, border: b.kind === "final_boss" ? "2px solid #ff3399" : b.kind === "mini_boss" ? `1.5px solid ${b.particleColor}` : "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "10px 12px", boxShadow: b.kind === "final_boss" ? "0 0 16px rgba(255,51,153,0.4)" : "none" }}>
-              <div style={{ fontSize: 9, letterSpacing: "0.2em", fontWeight: 700, color: b.kind === "combat" ? "rgba(255,255,255,0.45)" : b.particleColor }}>FLOOR {b.floor}{b.kind === "mini_boss" ? " · BOSS" : b.kind === "final_boss" ? " · FINAL" : ""}{[3, 6, 9].includes(b.floor) ? " · ⚑ EXIT" : ""}</div>
-              <div style={{ fontSize: 14, fontWeight: 800, marginTop: 2 }}>{b.name}</div>
-              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.55)", fontStyle: "italic", marginTop: 2 }}>{b.subtitle}</div>
-              <div style={{ fontSize: 10, color: b.particleColor, marginTop: 4, fontWeight: 700 }}>+{b.rebelReward} REBEL</div>
+      {/* HOW A RUN WORKS */}
+      <div style={{ maxWidth: 1080, margin: "0 auto", padding: "10px 20px 0", position: "relative", zIndex: 2 }}>
+        <div style={{ fontSize: 11, color: "#ff66cc", letterSpacing: "0.45em", textAlign: "center", marginBottom: 16 }}>◆ HOW A RUN WORKS ◆</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 12 }}>
+          {STEPS.map((x) => (
+            <div key={x.n} style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.04), rgba(0,0,0,0.35))", border: `1px solid ${x.c}33`, borderTop: `2px solid ${x.c}`, borderRadius: 14, padding: "16px 16px 18px" }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}><span style={{ fontSize: 22, fontWeight: 900, color: x.c, opacity: 0.9 }}>{x.n}</span><span style={{ fontSize: 11, letterSpacing: "0.22em", fontWeight: 800 }}>{x.t}</span></div>
+              <div style={{ fontSize: 12.5, opacity: 0.82, marginTop: 8, lineHeight: 1.6 }}>{x.d}</div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* START */}
-      <div style={{ maxWidth: 720, margin: "34px auto 24px", padding: "0 16px", textAlign: "center", position: "relative", zIndex: 2 }}>
-        <button type="button" onClick={() => canStart && setRunState("picking")} disabled={!canStart} style={{ fontFamily: FONT, width: "100%", padding: "22px 24px", fontSize: "clamp(16px, 4vw, 22px)", fontWeight: 900, letterSpacing: "0.15em", color: "#fff", border: "none", borderRadius: 14, background: canStart ? "linear-gradient(180deg, #ff3399 0%, #aa0066 50%, #5a0033 100%)" : "linear-gradient(180deg, rgba(80,30,80,0.5) 0%, rgba(40,10,40,0.7) 100%)", cursor: canStart ? "pointer" : "not-allowed", boxShadow: canStart ? "0 0 40px rgba(255,51,153,0.5), inset 0 1px 0 rgba(255,255,255,0.2)" : "none", opacity: canStart ? 1 : 0.6, transition: "all 0.2s" }}>
-          ⚔ DESCEND · {cost} REBEL ⚔
-        </button>
-        {!canStart && !starting && <div style={{ marginTop: 10, fontSize: 12, color: "#ff99aa" }}>⚠ Need {cost} REBEL to descend. You have {balance}.</div>}
-        {err && <div style={{ marginTop: 10, fontSize: 12, color: "#ff99aa" }}>{err}</div>}
-        <div style={{ marginTop: 14, fontSize: 11, color: "rgba(255,255,255,0.5)", letterSpacing: "0.05em", lineHeight: 1.7 }}>
-          🐜 {DESCENT_FACTIONS.length} factions, each with its own signature card · ❤️ 100 HP · 🃏 Deckbuilder — no twitch, all nerve<br />
-          💎 Up to {totalPossibleRebel().toLocaleString()} REBEL on a perfect {DESCENT_TOTAL_FLOORS}-floor run
+      {/* THE DESCENT PATH */}
+      <div style={{ maxWidth: 1080, margin: "38px auto 0", padding: "0 20px", position: "relative", zIndex: 2 }}>
+        <div style={{ fontSize: 11, color: "#ff66cc", letterSpacing: "0.45em", textAlign: "center", marginBottom: 16 }}>◆ THE DESCENT ◆</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(96px, 1fr))", gap: 6 }}>
+          {BIOMES.map((b) => {
+            const boss = b.kind !== "combat"; const exit = [3, 6, 9].includes(b.floor);
+            return (
+              <div key={b.floor} title={b.subtitle} style={{ position: "relative", background: `linear-gradient(180deg, ${b.skyTop} 0%, ${b.skyBottom} 100%)`, border: b.kind === "final_boss" ? "2px solid #ff3399" : boss ? `1.5px solid ${b.particleColor}` : "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "10px 8px 10px", textAlign: "center", boxShadow: b.kind === "final_boss" ? "0 0 20px rgba(255,51,153,0.45)" : boss ? `0 0 14px ${b.particleColor}44` : "none", minHeight: 108 }}>
+                <div style={{ fontSize: 22, fontWeight: 900, color: boss ? b.particleColor : "rgba(255,255,255,0.85)", lineHeight: 1 }}>{b.floor}</div>
+                <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.06em", marginTop: 6, lineHeight: 1.25, minHeight: 24 }}>{b.name.toUpperCase()}</div>
+                <div style={{ fontSize: 9, color: b.particleColor, marginTop: 6, fontWeight: 700 }}>+{b.rebelReward}</div>
+                {(boss || exit) && <div style={{ position: "absolute", top: -8, left: "50%", transform: "translateX(-50%)", fontSize: 8, fontWeight: 900, letterSpacing: "0.15em", padding: "2px 7px", borderRadius: 999, background: boss ? (b.kind === "final_boss" ? "#ff3399" : b.particleColor) : "#fbbf24", color: "#000", whiteSpace: "nowrap" }}>{b.kind === "final_boss" ? "☠ QUEEN" : boss ? "☠ BOSS" : "⚑ EXIT"}</div>}
+              </div>
+            );
+          })}
         </div>
+        <div style={{ textAlign: "center", fontSize: 11, opacity: 0.5, marginTop: 12, letterSpacing: "0.08em" }}>Enemies get tougher every floor · 2 enemies early, 3 on the deep floors · the Queen fights with her Royal Guard</div>
       </div>
 
-      <div style={{ textAlign: "center", padding: "20px 16px 30px", fontSize: 10, color: "rgba(255,255,255,0.25)", letterSpacing: "0.1em", position: "relative", zIndex: 2 }}>© 2026 Rebel Ants Playground · Hive Descent</div>
+      <div style={{ textAlign: "center", padding: "40px 16px 30px", fontSize: 10, color: "rgba(255,255,255,0.25)", letterSpacing: "0.1em", position: "relative", zIndex: 2 }}>© 2026 Rebel Ants Playground · Hive Descent</div>
     </div>
   );
 };

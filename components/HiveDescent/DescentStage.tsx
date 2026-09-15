@@ -35,6 +35,10 @@ function q3(name: string, def: [number, number, number]): [number, number, numbe
 export const PLAYER_POS: [number, number, number] = q3("hdp", [0.95, 0, 0.2]);
 const CAM_POS = q3("hdcam", [-0.9, 1.85, 3.9]);
 const HFOV_DEG = 64;
+// The Mixamo clips open with long wind-ups (attack: 0.8s before the blade moves, hit: 0.5s before the flinch).
+// Skip them so a card feels like a swing, not a stance. Contact frames measured on the shared clips:
+// attack ≈ 1.05s, magic ≈ 1.0s, trick ≈ 0.36s, hit recoil ≈ 0.84s (at 1×).
+export const CLIP_OFFSETS = { attack: 0.5, magic: 0.4, hit: 0.45 } as const;
 const CAM_LOOK = q3("hdlook", [0.1, 1.0, -1.3]);
 export function enemySlots(n: number): [number, number, number][] {
   if (n <= 1) return [[-0.1, 0, -1.5]];
@@ -43,7 +47,7 @@ export function enemySlots(n: number): [number, number, number][] {
 }
 export const FX_LIFE: Record<StageFx["kind"], number> = { sparks: 450, slash: 280, glyph: 900, dome: 700, poison: 800, dust: 900, dissolve: 1400 };
 
-function Atmosphere({ biome }: { biome: Biome }) {
+export function Atmosphere({ biome }: { biome: Biome }) {
   const { scene } = useThree();
   useEffect(() => { scene.fog = new Fog(new Color(biome.fogColor).multiplyScalar(0.45), 4, 15); return () => { scene.fog = null; }; }, [scene, biome.fogColor]);
   return null;
@@ -54,7 +58,7 @@ function prepTex(t: Texture, rx: number, ry: number, srgb = false) { t.wrapS = t
 function wallTint(biome: Biome) { return new Color("#ffffff").lerp(new Color(biome.particleColor), 0.18); }
 
 /** Packed-earth shaft: a lumpy inverted cylinder with a tiled rock texture + normal map, so the walls catch the lights. */
-function Tunnel({ biome }: { biome: Biome }) {
+export function Tunnel({ biome }: { biome: Biome }) {
   const [map, nrm, rough] = useTexture(TEX) as Texture[];
   const maps = useMemo(() => [prepTex(map.clone(), 4, 4, true), prepTex(nrm.clone(), 4, 4), prepTex(rough.clone(), 4, 4)], [map, nrm, rough]);
   const geo = useMemo(() => {
@@ -95,7 +99,7 @@ function Tunnel({ biome }: { biome: Biome }) {
   );
 }
 
-function Ground({ biome }: { biome: Biome }) {
+export function Ground({ biome }: { biome: Biome }) {
   const [map, nrm, rough] = useTexture(TEX) as Texture[];
   const maps = useMemo(() => [prepTex(map.clone(), 2.5, 5, true), prepTex(nrm.clone(), 2.5, 5), prepTex(rough.clone(), 2.5, 5)], [map, nrm, rough]);
   return (
@@ -112,7 +116,7 @@ function Ground({ biome }: { biome: Biome }) {
   );
 }
 
-function Motes({ color, count = 50 }: { color: string; count?: number }) {
+export function Motes({ color, count = 50 }: { color: string; count?: number }) {
   const ref = useRef<Group | null>(null);
   const seeds = useMemo(() => Array.from({ length: count }, (_, i) => ({ x: (Math.sin(i * 12.9898) * 43758.5453) % 1, y: (Math.sin(i * 78.233) * 43758.5453) % 1, z: (Math.sin(i * 39.346) * 43758.5453) % 1, s: 0.5 + ((i * 7) % 5) / 5 })), [count]);
   useFrame(({ clock }) => {
@@ -207,10 +211,10 @@ export default function DescentStage({ biome, player, enemies, targetId, onPickT
         <Motes color={biome.particleColor} />
         {target && !target.dead && <TargetRing pos={target.pos} color="#ffd166" />}
         <Suspense fallback={<Html center zIndexRange={[5, 0]} style={{ pointerEvents: "none" }}><div style={{ fontFamily: "'Noto Serif JP', serif", letterSpacing: "0.4em", fontSize: 12, color: biome.particleColor, whiteSpace: "nowrap", textShadow: "0 0 20px #000", animation: "hdPulse 1.2s ease-in-out infinite" }}>◆ THE HIVE STIRS ◆</div><style>{`@keyframes hdPulse{0%,100%{opacity:.35}50%{opacity:1}}`}</style></Html>}>
-          <ArenaCharacter factionId={player.factionId} anim={player.anim} animKey={player.animKey} position={PLAYER_POS} rotationY={Math.PI - 0.15} dead={player.dead} speedRef={speedRef} flashKey={player.flashKey} holdOn={["lose"]} actionSpeed={1.25} />
+          <ArenaCharacter factionId={player.factionId} anim={player.anim} animKey={player.animKey} position={PLAYER_POS} rotationY={Math.PI - 0.15} dead={player.dead} speedRef={speedRef} flashKey={player.flashKey} holdOn={["lose"]} actionSpeed={1.25} clipOffsets={CLIP_OFFSETS} />
           {enemies.map((e) => (
             <group key={e.id}>
-              <ArenaCharacter factionId={e.factionId} anim={e.anim} animKey={e.animKey} position={e.pos} rotationY={-e.pos[0] * 0.25} scale={e.scale} corrupted corruptColor={biome.particleColor} dead={e.dead} speedRef={speedRef} flashKey={e.flashKey} holdOn={["lose"]} dissolveAt={e.dissolveAt ?? null} actionSpeed={1.15} />
+              <ArenaCharacter factionId={e.factionId} anim={e.anim} animKey={e.animKey} position={e.pos} rotationY={-e.pos[0] * 0.25} scale={e.scale} corrupted corruptColor={biome.particleColor} dead={e.dead} speedRef={speedRef} flashKey={e.flashKey} holdOn={["lose"]} dissolveAt={e.dissolveAt ?? null} actionSpeed={1.15} clipOffsets={CLIP_OFFSETS} />
               {!e.dead && (
                 <mesh position={[e.pos[0], 0.95 * e.scale, e.pos[2]]} onClick={(ev) => { ev.stopPropagation(); onPickTarget(e.id); }}>
                   <boxGeometry args={[0.9, 1.9 * e.scale, 0.6]} />
