@@ -33,13 +33,24 @@ function Motes({ color, count = 60 }: { color: string; count?: number }) {
   );
 }
 
+// Dev tuning: `?hdcam=y,z,lookY` (e.g. hdcam=1.1,4.6,0.8)
+function camParams(): [number, number, number] {
+  const def: [number, number, number] = [1.15, 4.7, 0.8];
+  if (typeof window === "undefined") return def;
+  const raw = new URLSearchParams(window.location.search).get("hdcam");
+  if (!raw) return def;
+  const p = raw.split(",").map(Number);
+  return p.length === 3 && p.every((n) => Number.isFinite(n)) ? (p as [number, number, number]) : def;
+}
+
 function CameraRig({ shake }: { shake: number }) {
   const { camera } = useThree();
   const shakeRef = useRef(0); shakeRef.current = shake;
+  const cp = useMemo(camParams, []);
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime(); const s = shakeRef.current;
-    camera.position.set(Math.sin(t * 0.25) * 0.12 + (Math.random() - 0.5) * s * 0.06, 1.25 + Math.sin(t * 0.4) * 0.03 + (Math.random() - 0.5) * s * 0.05, 4.9);
-    camera.lookAt(0, 0.85, 0);
+    camera.position.set(Math.sin(t * 0.25) * 0.12 + (Math.random() - 0.5) * s * 0.06, cp[0] + Math.sin(t * 0.4) * 0.03 + (Math.random() - 0.5) * s * 0.05, cp[1]);
+    camera.lookAt(0, cp[2], 0);
   });
   return null;
 }
@@ -78,9 +89,9 @@ export default function DescentArena({ biome, player, enemy, shake, flash }: Pro
         <Ground biome={biome} />
         <Motes color={biome.particleColor} />
         <Suspense fallback={null}>
-          <DescentCharacter factionId={player.factionId} anim={player.anim} animKey={player.animKey} position={[-1.05, 0, 0.1]} rotationY={0.55} scale={player.scale ?? 1} dead={player.dead} />
+          <DescentCharacter factionId={player.factionId} anim={player.anim} animKey={player.animKey} position={[-0.95, 0, 0.1]} rotationY={0.7} scale={player.scale ?? 1} dead={player.dead} />
           {enemy && (
-            <DescentCharacter key={`${enemy.factionId}-${enemy.scale}`} factionId={enemy.factionId} anim={enemy.anim} animKey={enemy.animKey} position={[1.05, 0, 0.1]} rotationY={-0.55} scale={enemy.scale ?? 1} corrupted={enemy.corrupted !== false} corruptColor={biome.particleColor} dead={enemy.dead} />
+            <DescentCharacter key={`${enemy.factionId}-${enemy.scale}`} factionId={enemy.factionId} anim={enemy.anim} animKey={enemy.animKey} position={[0.95, 0, 0.1]} rotationY={-0.7} scale={enemy.scale ?? 1} corrupted={enemy.corrupted !== false} corruptColor={biome.particleColor} dead={enemy.dead} />
           )}
         </Suspense>
       </Canvas>

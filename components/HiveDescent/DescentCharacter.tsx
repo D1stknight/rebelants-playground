@@ -15,6 +15,15 @@ export const SUPPORTED = ["ashigaru", "buke", "bushi", "kenshi", "ronin", "samur
 const modelPath = (f: string) => `/faction-wars/characters/${f}/${f}.glb`;
 const animPath = (f: string, a: DescentAnim) => `/faction-wars/characters/${f}/${a === "trick" ? "special" : a}.fbx`;
 
+// FW's own canvas uses 0.02 with a far camera; the shared duel arena sits much closer.
+const BASE_MODEL_SCALE = 0.0085;
+/** Dev tuning: `?hdscale=0.009` overrides the model scale (no rebuild needed to eyeball sizes). */
+export function modelScale(): number {
+  if (typeof window === "undefined") return BASE_MODEL_SCALE;
+  const v = parseFloat(new URLSearchParams(window.location.search).get("hdscale") || "");
+  return Number.isFinite(v) && v > 0 ? v : BASE_MODEL_SCALE;
+}
+
 function retarget(clip: AnimationClip) {
   const c = clip.clone();
   c.tracks = c.tracks
@@ -64,8 +73,8 @@ export default function DescentCharacter({ factionId, anim, animKey, position = 
         o.material = Array.isArray(o.material) ? cloned : cloned[0];
       }
     });
-    s.position.set(0, 0.05, 0);
-    s.scale.setScalar(0.020);
+    s.position.set(0, 0.02, 0);
+    s.scale.setScalar(modelScale());
     return s;
   }, [gltf.scene, corrupted, corruptColor]);
 
