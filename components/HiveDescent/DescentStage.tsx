@@ -32,13 +32,13 @@ function q3(name: string, def: [number, number, number]): [number, number, numbe
   const raw = new URLSearchParams(window.location.search).get(name); if (!raw) return def;
   const p = raw.split(",").map(Number); return p.length === 3 && p.every(Number.isFinite) ? (p as [number, number, number]) : def;
 }
-export const PLAYER_POS: [number, number, number] = q3("hdp", [0.85, 0, 0.75]);
-const CAM_POS = q3("hdcam", [-0.95, 1.8, 3.5]);
-const CAM_LOOK = q3("hdlook", [0.15, 1.0, -1.2]);
+export const PLAYER_POS: [number, number, number] = q3("hdp", [0.55, 0, 0.35]);
+const CAM_POS = q3("hdcam", [-1.15, 1.9, 3.9]);
+const CAM_LOOK = q3("hdlook", [0.05, 1.0, -1.2]);
 export function enemySlots(n: number): [number, number, number][] {
-  if (n <= 1) return [[0.1, 0, -1.5]];
-  if (n === 2) return [[-0.9, 0, -1.4], [1.0, 0, -1.6]];
-  return [[-1.6, 0, -1.2], [0.1, 0, -2.0], [1.7, 0, -1.4]];
+  if (n <= 1) return [[-0.1, 0, -1.5]];
+  if (n === 2) return [[-1.05, 0, -1.35], [1.35, 0, -1.75]];
+  return [[-1.7, 0, -1.2], [-0.1, 0, -2.0], [1.6, 0, -1.5]];
 }
 export const FX_LIFE: Record<StageFx["kind"], number> = { sparks: 450, slash: 280, glyph: 900, dome: 700, poison: 800, dust: 900 };
 

@@ -262,7 +262,7 @@ export default function DescentBattle({ run, onRun, onAbandon }: Props) {
       )}
 
       {/* player floats */}
-      <div style={{ position: "absolute", left: isMobile ? "18%" : "22%", bottom: isMobile ? 250 : 265, width: 200, height: 80, pointerEvents: "none" }}>
+      <div style={{ position: "absolute", left: isMobile ? "60%" : "66%", bottom: isMobile ? 250 : 300, width: 200, height: 80, pointerEvents: "none" }}>
         {floats.filter((f) => f.who === "player").map((f) => (
           <div key={f.id} style={{ position: "absolute", left: "50%", bottom: 0, transform: "translateX(-50%)", fontWeight: 900, fontSize: f.big ? 32 : 22, color: f.color, whiteSpace: "nowrap", textShadow: `0 0 16px ${f.color}aa, 0 2px 4px #000`, animation: "hdFloat 1s cubic-bezier(0.2,0.9,0.3,1) both" }}>{f.text}</div>
         ))}
@@ -295,7 +295,7 @@ export default function DescentBattle({ run, onRun, onAbandon }: Props) {
           </div>
 
           {/* hand */}
-          <div style={{ flex: 1, display: "flex", gap: isMobile ? 4 : 8, justifyContent: "center", alignItems: "flex-end", overflowX: "auto", padding: "6px 2px" }}>
+          <div style={{ flex: 1, display: "flex", gap: isMobile ? 4 : 8, justifyContent: run.hand.length > 6 ? "flex-start" : "center", alignItems: "flex-end", overflowX: run.hand.length > 6 ? "auto" : "visible", overflowY: "visible", padding: "16px 8px 4px" }}>
             {run.hand.map((c, i) => {
               const cost = c.effect.xCost ? p.energy : cardCost(run, c);
               const ok = canPlay(run, i) && !busy && run.phase === "battle";
