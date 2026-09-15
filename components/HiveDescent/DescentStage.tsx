@@ -26,11 +26,19 @@ type Props = {
   renderEnemyFloats: (id: number) => React.ReactNode;
 };
 
-export const PLAYER_POS: [number, number, number] = [0.15, 0, 1.55];
+// Dev tuning without a rebuild: ?hdp=x,y,z (player) ?hdcam=x,y,z (camera) ?hdlook=x,y,z (look-at)
+function q3(name: string, def: [number, number, number]): [number, number, number] {
+  if (typeof window === "undefined") return def;
+  const raw = new URLSearchParams(window.location.search).get(name); if (!raw) return def;
+  const p = raw.split(",").map(Number); return p.length === 3 && p.every(Number.isFinite) ? (p as [number, number, number]) : def;
+}
+export const PLAYER_POS: [number, number, number] = q3("hdp", [0.85, 0, 0.75]);
+const CAM_POS = q3("hdcam", [-0.95, 1.8, 3.5]);
+const CAM_LOOK = q3("hdlook", [0.15, 1.0, -1.2]);
 export function enemySlots(n: number): [number, number, number][] {
-  if (n <= 1) return [[0.1, 0, -1.7]];
-  if (n === 2) return [[-0.85, 0, -1.6], [1.0, 0, -1.8]];
-  return [[-1.55, 0, -1.4], [0.1, 0, -2.2], [1.7, 0, -1.6]];
+  if (n <= 1) return [[0.1, 0, -1.5]];
+  if (n === 2) return [[-0.9, 0, -1.4], [1.0, 0, -1.6]];
+  return [[-1.6, 0, -1.2], [0.1, 0, -2.0], [1.7, 0, -1.4]];
 }
 export const FX_LIFE: Record<StageFx["kind"], number> = { sparks: 450, slash: 280, glyph: 900, dome: 700, poison: 800, dust: 900 };
 
@@ -90,14 +98,14 @@ function Motes({ color, count = 50 }: { color: string; count?: number }) {
 
 function CameraRig({ shakeRef, focus }: { shakeRef: React.MutableRefObject<number>; focus: React.MutableRefObject<[number, number, number] | null> }) {
   const { camera } = useThree();
-  const cur = useRef({ lx: 0.2, ly: 1.0, lz: -1.2 });
+  const cur = useRef({ lx: CAM_LOOK[0], ly: CAM_LOOK[1], lz: CAM_LOOK[2] });
   useFrame(({ clock }, dt) => {
     const t = clock.getElapsedTime(); const s = shakeRef.current; shakeRef.current *= Math.exp(-dt * 7);
     const f = focus.current;
-    const tl = f ? [f[0] * 0.6, 1.0, f[2] * 0.6] : [0.2, 1.0, -1.2];
+    const tl = f ? [CAM_LOOK[0] + f[0] * 0.45, CAM_LOOK[1], CAM_LOOK[2] + (f[2] - CAM_LOOK[2]) * 0.4] : CAM_LOOK;
     const c = cur.current; const a = Math.min(1, dt * 4);
     c.lx += (tl[0] - c.lx) * a; c.ly += (tl[1] - c.ly) * a; c.lz += (tl[2] - c.lz) * a;
-    camera.position.set(-1.05 + Math.sin(t * 0.3) * 0.05 + (Math.random() - 0.5) * s * 0.08, 1.75 + Math.sin(t * 0.45) * 0.03 + (Math.random() - 0.5) * s * 0.05, 3.7);
+    camera.position.set(CAM_POS[0] + Math.sin(t * 0.3) * 0.05 + (Math.random() - 0.5) * s * 0.08, CAM_POS[1] + Math.sin(t * 0.45) * 0.03 + (Math.random() - 0.5) * s * 0.05, CAM_POS[2]);
     camera.lookAt(c.lx, c.ly, c.lz);
   });
   return null;
@@ -150,7 +158,7 @@ export default function DescentStage({ biome, player, enemies, targetId, onPickT
   const ti = enemies.findIndex((e) => e.id === targetId); focus.current = ti >= 0 ? slots[ti] : null;
   return (
     <div style={{ position: "absolute", inset: 0, background: `radial-gradient(ellipse at 50% 30%, ${biome.skyTop} 0%, ${biome.skyBottom} 55%, #000 100%)` }}>
-      <Canvas dpr={[1, 1.5]} shadows gl={{ alpha: true, antialias: true }} camera={{ position: [-1.05, 1.75, 3.7], fov: 42, near: 0.1, far: 40 }} style={{ position: "absolute", inset: 0 }}>
+      <Canvas dpr={[1, 1.5]} shadows gl={{ alpha: true, antialias: true }} camera={{ position: CAM_POS, fov: 42, near: 0.1, far: 40 }} style={{ position: "absolute", inset: 0 }}>
         <Atmosphere biome={biome} />
         <CameraRig shakeRef={shakeRef} focus={focus} />
         <ambientLight color={biome.ambientColor} intensity={1.0} />
