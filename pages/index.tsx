@@ -22,7 +22,7 @@ const GAMES = [
   { id:'raid',   title:'THE RAID',           desc:'DEPLOY YOUR SQUAD. SURVIVE THE COLONY. BRING HOME THE LOOT.',  icon:'🗡️',  path:'/the-raid',     color:'#f97316', glow:'rgba(249,115,22,0.4)',  badge:'SQUAD',    bg:'rgba(249,115,22,0.08)'  },
   { id:'tunnel', title:'ANT TUNNEL',         desc:'NAVIGATE THE UNDERGROUND. COLLECT CRYSTALS. OUTRUN THE SPIDER.', icon:'🐜', path:'/tunnel',       color:'#3b82f6', glow:'rgba(59,130,246,0.4)', badge:'ARCADE',   bg:'rgba(59,130,246,0.08)'  },
   { id:'shuffle',title:"QUEEN'S EGG SHUFFLE",desc:"FIND THE QUEEN'S EGG. BEAT THE ODDS. WIN BIG.",               icon:'🥚',  path:'/shuffle',       color:'#a855f7', glow:'rgba(168,85,247,0.4)', badge:'LUCK',     bg:'rgba(168,85,247,0.08)'  },
-  { id:'descent',title:'HIVE DESCENT',        desc:'DESCEND THROUGH 10 FLOORS. FACE THE QUEEN. WIN OR DIE.', icon:'🐜',  path:'/descent',     color:'#ff3399', glow:'rgba(255,51,153,0.45)',badge:'COMING SOON', bg:'rgba(255,51,153,0.08)', comingSoon:true },
+  { id:'descent',title:'HIVE DESCENT',        desc:'DESCEND THROUGH 10 FLOORS. FACE THE QUEEN. WIN OR DIE.', icon:'🐜',  path:'/descent',     color:'#ff3399', glow:'rgba(255,51,153,0.45)',badge:'ROGUELITE', bg:'rgba(255,51,153,0.08)' },
 ];
 
 const ECONOMY = [
