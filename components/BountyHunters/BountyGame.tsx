@@ -22,6 +22,19 @@ export default function BountyGameView({ board, faction = "samurai", onEnd, onQu
   const [portrait, setPortrait] = useState(false);
   const [fatal, setFatal] = useState<string | null>(null);
   const [dbg, setDbg] = useState<string | null>(null);
+  // iOS Safari: the lobby is scrolled far down when HUNT is tapped; when the tall lobby is replaced by a viewport-sized
+  // view, WebKit keeps positioning fixed elements against the stale scroll offset — the game rendered off-screen (music
+  // played, screen showed the bare page background). So: normal-flow absolute root sized to the visual viewport, scroll to
+  // the top on mount and lock body scrolling while playing.
+  const [vh, setVh] = useState<number | string>("100vh");
+  useEffect(() => {
+    const prevOv = document.body.style.overflow, prevH = document.documentElement.style.height, prevBH = document.body.style.height;
+    document.body.style.overflow = "hidden"; document.body.style.height = "100%"; document.documentElement.style.height = "100%";
+    const up = () => { window.scrollTo(0, 0); setVh(window.visualViewport?.height || window.innerHeight); };
+    up(); const t1 = setTimeout(up, 50), t2 = setTimeout(up, 400);
+    window.addEventListener("resize", up); window.addEventListener("orientationchange", up); window.visualViewport?.addEventListener("resize", up);
+    return () => { clearTimeout(t1); clearTimeout(t2); document.body.style.overflow = prevOv; document.body.style.height = prevBH; document.documentElement.style.height = prevH; window.removeEventListener("resize", up); window.removeEventListener("orientationchange", up); window.visualViewport?.removeEventListener("resize", up); };
+  }, []);
   const rootRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!/[?&]debug/.test(location.search)) return;
@@ -80,7 +93,7 @@ export default function BountyGameView({ board, faction = "samurai", onEnd, onQu
   const bossPct = hud?.bossHp != null ? hud.bossHp / hud.bossMax : null;
   return (<>
     {dbg && createPortal(<div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 2147483647, background: "#ffec3d", color: "#000", fontFamily: "monospace", fontSize: 10, padding: 6, wordBreak: "break-all", whiteSpace: "pre-wrap", pointerEvents: "none" }}>{dbg}</div>, document.body)}
-    <div ref={rootRef} style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%", zIndex: 50, background: "#000", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: isTouch && portrait ? "flex-start" : "center", paddingTop: isTouch && portrait ? "env(safe-area-inset-top)" : 0, fontFamily: FONT, color: "#fff", overflow: "hidden", touchAction: "none", WebkitUserSelect: "none", userSelect: "none" }}>
+    <div ref={rootRef} style={{ position: "absolute", top: 0, left: 0, width: "100%", height: vh, zIndex: 50, background: "#000", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: isTouch && portrait ? "flex-start" : "center", paddingTop: isTouch && portrait ? "env(safe-area-inset-top)" : 0, fontFamily: FONT, color: "#fff", overflow: "hidden", touchAction: "none", WebkitUserSelect: "none", userSelect: "none" }}>
       {fatal && (
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 20, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, textAlign: "center", background: "rgba(0,0,0,0.85)" }}>
           <div style={{ fontSize: 14, color: "#ff5566", letterSpacing: "0.3em", fontWeight: 800 }}>☠ THE HUNT COULDN'T START</div>
@@ -131,7 +144,7 @@ export default function BountyGameView({ board, faction = "samurai", onEnd, onQu
       </div>
       {!isTouch && <div style={{ marginTop: 8, fontSize: 10, opacity: 0.4, letterSpacing: "0.2em" }}>← → MOVE · ↑ AIM UP · ↓ CROUCH / DROP · Z or SPACE JUMP · X or SHIFT FIRE · ESC QUIT</div>}
       {isTouch && (
-        <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, top: portrait ? VH * scale + 8 : "auto", height: portrait ? "auto" : 150, display: "flex", justifyContent: "space-between", alignItems: "flex-end", padding: portrait ? "0 18px max(40px, env(safe-area-inset-bottom))" : "0 max(14px, env(safe-area-inset-left)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-right))", pointerEvents: "none", zIndex: 10 }}>
+        <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, top: portrait ? VH * scale + 8 : "auto", height: portrait ? "auto" : 150, display: "flex", justifyContent: "space-between", alignItems: "flex-end", padding: portrait ? "0 18px max(40px, env(safe-area-inset-bottom))" : "0 max(14px, env(safe-area-inset-left)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-right))", pointerEvents: "none", zIndex: 10 }}>
           <div style={{ display: "grid", gridTemplateColumns: "60px 60px 60px", gridTemplateRows: "60px 60px", gap: 6, pointerEvents: "auto", opacity: portrait ? 1 : 0.75 }}>
             <div />{btn("▲", "up")}<div />
             {btn("◀", "left")}{btn("▼", "down")}{btn("▶", "right")}

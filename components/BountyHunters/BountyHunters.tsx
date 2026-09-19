@@ -52,7 +52,7 @@ const BountyHunters: React.FC = () => {
     if (!canStart) return; setStarting(true); setErr("");
     const s = await spend(cost, "bounty");
     if (!s?.ok) { setStarting(false); setErr("Couldn't charge the entry fee — check your REBEL balance."); return; }
-    setStarting(false); setPhase("playing");
+    setStarting(false); try { window.scrollTo(0, 0); } catch {} setPhase("playing");
   }
 
   const finishedRef = useRef(0);
