@@ -9,7 +9,15 @@ import { BOARDS, BOUNTY_DEATH_KEEP, BOUNTY_DEFAULT_COST, BOUNTY_HP, BOUNTY_LIVES
 import { preloadBoard } from "./game";
 import { DESCENT_FACTIONS } from "../../lib/descentConfig";
 
-const BountyGameView = dynamic(() => import("./BountyGame"), { ssr: false });
+// If the game chunk fails to load (stale HTML referencing an old build, flaky in-app browsers), reload once with a cache-buster instead of crashing to a blank page.
+function retryChunk(e: any): never {
+  try {
+    const key = "ra:bh:chunkRetry"; const last = Number(sessionStorage.getItem(key) || 0);
+    if (Date.now() - last > 30000) { sessionStorage.setItem(key, String(Date.now())); const u = new URL(location.href); u.searchParams.set("r", String(Date.now())); location.replace(u.toString()); }
+  } catch {}
+  throw e;
+}
+const BountyGameView = dynamic(() => import("./BountyGame").catch(retryChunk), { ssr: false, loading: () => <div style={{ position: "fixed", inset: 0, background: "#000", color: "#a78bfa", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Noto Serif JP', serif", letterSpacing: "0.3em", fontSize: 12 }}>LOADING THE HUNT…</div> });
 
 type Phase = "lobby" | "playing" | "result";
 const FONT = "'Noto Serif JP', 'Hiragino Mincho ProN', serif";
