@@ -14,7 +14,7 @@ const SiegePage: NextPage = () => (
       <meta name="description" content="Hold the gate of the Ant Citadel against the spider horde. Physics catapults, toppling siege towers, beetle rams." />
       <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
     </Head>
-    <style>{`@import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&display=swap");`}</style>
+    <style dangerouslySetInnerHTML={{ __html: "@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&display=swap');" }} />
     <div style={{ minHeight: "100vh", background: "radial-gradient(ellipse at 50% 0%, #1a1f30 0%, #0b0e17 60%)", color: "#e9e2d2", padding: "16px 12px 40px" }}>
       <div style={{ maxWidth: 1180, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, fontFamily: "'Cinzel', Georgia, serif" }}>

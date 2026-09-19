@@ -1,13 +1,15 @@
 // components/Siege/SiegeView.tsx — phase 1 solo drill: canvas + DOM HUD. The engine (PixiJS + planck) is loaded on the client only.
 import React, { useEffect, useRef, useState } from "react";
 import type { Hud } from "./engine";
+const FACTIONS = ["ronin", "samurai", "ashigaru", "yamabushi"] as const;
+const KIT: Record<string, { name: string; ammo: string }> = { boulder: { name: "Catapult crew", ammo: "Plain boulder" }, ronin: { name: "Ronin", ammo: "Leaps herself — carves a line through the ranks, blinks back" }, samurai: { name: "Samurai", ammo: "Blade boulder — cuts everything around the impact" }, ashigaru: { name: "Ashigaru", ammo: "Spear rain — pins the ranks where it lands" }, yamabushi: { name: "Yamabushi", ammo: "Storm orb — lightning chains through the horde" } };
 
 const EMPTY: Hud = { gate: 1000, gateMax: 1000, wave: 0, waves: 6, horde: 0, score: 0, kills: 0, reload: 0, state: "ready", msg: null };
 
 export default function SiegeView() {
   const wrapRef = useRef<HTMLDivElement | null>(null); const canvasRef = useRef<HTMLCanvasElement | null>(null); const engRef = useRef<any>(null);
   const [hud, setHud] = useState<Hud>(EMPTY); const [result, setResult] = useState<{ won: boolean; score: number; kills: number; waves: number } | null>(null); const [err, setErr] = useState<string | null>(null); const [gen, setGen] = useState(0);
-  const [fs, setFs] = useState(false);
+  const [fs, setFs] = useState(false); const [faction, setFaction] = useState<string>(() => { try { return localStorage.getItem("ra:siege:faction") || "ronin"; } catch { return "ronin"; } });
 
   useEffect(() => {
     let alive = true; let eng: any = null;
@@ -15,7 +17,7 @@ export default function SiegeView() {
       try {
         const mod = await import("./engine"); if (!alive || !canvasRef.current) return;
         eng = new mod.Siege(canvasRef.current, { onHud: (h) => { if (alive) setHud(h); }, onEnd: (r) => { if (alive) setResult(r); } });
-        engRef.current = eng; await eng.init();
+        eng.faction = faction; engRef.current = eng; await eng.init();
       } catch (e: any) { console.error(e); if (alive) setErr(e?.message || String(e)); }
     })();
     return () => { alive = false; try { eng?.destroy(); } catch {} engRef.current = null; };
@@ -43,6 +45,17 @@ export default function SiegeView() {
         <div style={{ ...pill, minWidth: 110 }}>
           <div style={{ fontSize: 10, opacity: 0.8, marginBottom: 4 }}>{hud.reload > 0 ? "RELOADING" : "READY — DRAG TO AIM"}</div>
           <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,0.08)", overflow: "hidden" }}><div style={{ width: `${(1 - hud.reload) * 100}%`, height: "100%", background: hud.reload > 0 ? "#a29a88" : "#ffd27a" }} /></div>
+        </div>
+      </div>
+      {/* faction picker */}
+      <div style={{ position: "absolute", left: 12, bottom: 10, display: "flex", gap: 6, alignItems: "flex-end" }}>
+        {[...FACTIONS, "boulder"].map((f) => { const on = f === faction; return (
+          <button key={f} type="button" title={KIT[f].name} onClick={() => { setFaction(f); try { localStorage.setItem("ra:siege:faction", f); } catch {} engRef.current?.setFaction?.(f); }}
+            style={{ width: on ? 54 : 44, height: on ? 54 : 44, borderRadius: 10, padding: 0, overflow: "hidden", cursor: "pointer", background: on ? "rgba(240,166,58,0.18)" : "rgba(8,10,20,0.7)", border: on ? "1px solid #f0a63a" : "1px solid rgba(255,255,255,0.15)", boxShadow: on ? "0 0 14px rgba(240,166,58,0.5)" : "none", transition: "all .15s", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+            {f === "boulder" ? <span style={{ fontSize: on ? 26 : 20, lineHeight: 1, paddingBottom: 8 }}>🪨</span> : <img src={`/descent/portraits/${f}.png`} alt={f} style={{ height: "92%", objectFit: "contain", objectPosition: "bottom", filter: on ? "none" : "brightness(0.65) saturate(0.7)" }} />}
+          </button>); })}
+        <div style={{ marginLeft: 8, fontFamily: "'Cinzel', Georgia, serif", fontSize: 11, color: "#e9e2d2", background: "rgba(8,10,20,0.7)", border: "1px solid rgba(240,166,58,0.25)", borderRadius: 8, padding: "6px 10px", maxWidth: 300 }}>
+          <div style={{ color: "#ffd27a", letterSpacing: "0.15em" }}>{KIT[faction].name.toUpperCase()}</div><div style={{ fontFamily: "system-ui, sans-serif", fontSize: 11, opacity: 0.85, marginTop: 2 }}>{KIT[faction].ammo}</div>
         </div>
       </div>
       <button type="button" onClick={toggleFs} style={{ position: "absolute", right: 12, bottom: 10, background: "rgba(8,10,20,0.7)", border: "1px solid rgba(240,166,58,0.3)", borderRadius: 8, color: "#e9e2d2", fontSize: 12, padding: "6px 10px", cursor: "pointer" }}>{fs ? "✕ exit" : "⛶ full screen"}</button>

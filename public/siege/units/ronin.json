@@ -1,0 +1,1 @@
+{"frame": 256, "cols": 10, "clips": {"idle": [0, 8, 6, true], "attack": [8, 10, 14, false], "magic": [18, 10, 12, false], "special": [28, 10, 12, false], "hit": [38, 4, 10, false], "win": [42, 8, 8, false], "defend": [50, 4, 8, false], "lose": [54, 6, 6, false]}, "feet": 222.8, "height": 189.6}
