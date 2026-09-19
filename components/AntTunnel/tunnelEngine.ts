@@ -40,7 +40,7 @@ const SPIDER_BASE = 3.1;        // cells / s at 160 ms config; scales with tunne
 
 type Mover = { x: number; y: number; dir: Dir | null; want: Dir | null; speed: number };
 type Spider = Mover & { kind: SpiderKind; camp: Cell | null; alert: number; tint: string; frozen: number };
-type Pick = { row: number; col: number; kind: 0 | 1 | 2 | 3 | 4 | 5 | 6; taken: boolean; ph: number };  // 0 crumb 1 sugar 2 crystal 3 dig claw 4 decoy 5 web freeze 6 sugar rush
+type Pick = { row: number; col: number; kind: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7; taken: boolean; ph: number };  // 0 crumb 1 sugar 2 crystal 3 dig claw 4 decoy 5 web freeze 6 sugar rush 7 heart (may sit inside a breakable wall — glowing tile)
 export const POWER_NAMES: Record<number, string> = { 3: "DIG CLAW +2", 4: "PHEROMONE DECOY", 5: "WEB FREEZE", 6: "SUGAR RUSH" };
 type Part = { x: number; y: number; vx: number; vy: number; life: number; c: string; s: number };
 
@@ -60,7 +60,7 @@ export class Tunnel {
   // view
   vw = COLS * CELL; vh = ROWS * CELL; follow = false; camX = 0; camY = 0; zoom = 1; floorTex: HTMLCanvasElement | null = null; wallTex: HTMLCanvasElement | null = null;
   seedR = Math.random() * 1000; dustT = 0; digT = 0; runT = 0;
-  mods: ThemeMods; lives = 0; livesMax = 0; breakCd = 0; wallHits = new Map<string, number>();
+  mods: ThemeMods; lives = 0; livesMax = 0; breakCd = 0; wallHits = new Map<string, number>(); dead = false;
 
   constructor(canvas: HTMLCanvasElement, layout: string[], theme: Theme, cfg: Cfg, cb: Callbacks, sprites: Sprites, layouts?: string[][], layoutIdx = 0) {
     this.ctx = canvas.getContext("2d")!; this.layout = new Set(layout); this.theme = theme; this.cfg = cfg; this.cb = cb; this.sp = sprites;
@@ -100,6 +100,15 @@ export class Tunnel {
     const nPow = this.cfg.powerups === false ? 0 : this.floor === 1 ? 1 : 2; const kinds: (3 | 4 | 5 | 6)[] = [3, 4, 5, 6];
     for (let i = 0; i < nPow && open.length; i++) { const c = open.pop()!; this.picks.push({ row: c.row, col: c.col, kind: kinds[(Math.random() * kinds.length) | 0], taken: false, ph: Math.random() * 6 }); }
     this.crystalsTotal = this.picks.filter((p) => p.kind === 2).length;
+    // one heart per floor (when hearts are on). Half the time it is buried in a breakable wall next to a corridor — the wall glows pink.
+    if (this.livesMax > 0) {
+      let placed = false;
+      if (Math.random() < 0.5) {
+        const walls: Cell[] = []; for (let r = 1; r < ROWS - 1; r++) for (let c = 1; c < COLS - 1; c++) if (this.breakable(r, c) && !this.picks.some((q) => q.row === r && q.col === c) && Object.values(DIRV).some(([dx, dy]) => !this.isWall(r + dy, c + dx))) walls.push({ row: r, col: c });
+        if (walls.length) { const w = walls[(Math.random() * walls.length) | 0]; this.picks.push({ row: w.row, col: w.col, kind: 7, taken: false, ph: Math.random() * 6 }); placed = true; }
+      }
+      if (!placed && open.length) { const c = open.pop()!; this.picks.push({ row: c.row, col: c.col, kind: 7, taken: false, ph: Math.random() * 6 }); }
+    }
   }
 
   // ── lifecycle
@@ -146,6 +155,7 @@ export class Tunnel {
     for (const p of this.picks) {
       if (p.taken) continue; if (Math.abs(p.col + 0.5 - this.ant.x) < 0.45 && Math.abs(p.row + 0.5 - this.ant.y) < 0.45) {
         p.taken = true;
+        if (p.kind === 7) { this.cb.onSfx("crystal"); this.burst(p.col + 0.5, p.row + 0.5, "#ff5b8a", 22); if (this.lives < this.livesMax) { this.lives++; this.say(`❤ HEART +1  ${"❤".repeat(this.lives)}`, 1.4); } else { this.score += 15; this.say("❤ Full hearts — +15", 1.2); } this.pushHud(); continue; }
         if (p.kind >= 3) { this.powerUp(p.kind); this.burst(p.col + 0.5, p.row + 0.5, "#ffffff", 14); continue; }
         // combo: keep picking things up within 1.6 s → ×2 after 8, ×3 after 18
         this.combo++; this.comboT = 1.6; this.mult = this.combo >= 18 ? 3 : this.combo >= 8 ? 2 : 1;
@@ -162,7 +172,7 @@ export class Tunnel {
     // spider hit
     if (this.invuln <= 0 && this.spiders.some((sp) => Math.hypot(sp.x - this.ant.x, sp.y - this.ant.y) < 0.62)) {
       this.invuln = 0.9; this.combo = 0; this.mult = 1; this.hitT = 0.35; this.flash = 1; this.shake = 1; this.cb.onSfx("hit"); this.burst(this.ant.x, this.ant.y, "#ff5566", 12);
-      if (this.livesMax > 0) { this.lives--; if (this.lives <= 0) { this.lives = 0; this.say("Spider hit! No hearts left", 1.2); this.pushHud(); this.end(false); return; } this.say(`Spider hit! ${"❤".repeat(this.lives)} left`, 1.2); this.invuln = 1.4; }
+      if (this.livesMax > 0) { this.lives--; if (this.lives <= 0) { this.lives = 0; this.dead = true; this.pushHud(); this.end(false); return; } this.say(`Spider hit! ${"❤".repeat(this.lives)} left`, 1.2); this.invuln = 1.4; }
       else { this.timeLeft = Math.max(0, this.timeLeft - 3); this.say("Spider hit! −3 seconds", 1.2); }
     }
   }
@@ -236,13 +246,13 @@ export class Tunnel {
     if (this.breakCd > 0) { this.say(`🌋 Too hot — pick cools in ${this.breakCd.toFixed(1)} s`, 0.8); this.cb.onSfx("nowall"); return; }
     const k = `${tr}:${tc}`; const need = this.mods.wallHits || 1; const hits = (this.wallHits.get(k) || 0) + 1; this.digT = 0.35; this.breakCd = this.mods.breakCooldown || 0;
     if (hits < need) { this.wallHits.set(k, hits); this.cb.onSfx("wall"); this.burst(tc + 0.5, tr + 0.5, "#c8a97a", 8); this.shake = 0.25; this.say(`Cracked! ${need - hits} more hit${need - hits > 1 ? "s" : ""}`, 0.9); return; }
-    this.broken.add(k); this.wallHits.delete(k); this.breaks--; this.cb.onSfx("wall"); this.burst(tc + 0.5, tr + 0.5, "#c8a97a", 18); this.shake = 0.4; this.say("Wall broken ✅", 0.9);
+    this.broken.add(k); this.wallHits.delete(k); this.breaks--; if (this.picks.some((p) => p.kind === 7 && !p.taken && p.row === tr && p.col === tc)) this.say("❤ A heart was buried here!", 1.4); this.cb.onSfx("wall"); this.burst(tc + 0.5, tr + 0.5, "#c8a97a", 18); this.shake = 0.4; this.say("Wall broken ✅", 0.9);
   }
   burst(x: number, y: number, c: string, n: number) { for (let i = 0; i < n; i++) { const a = Math.random() * Math.PI * 2, sp = 1 + Math.random() * 3; this.parts.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1, life: 0.35 + Math.random() * 0.35, c, s: 2 + Math.random() * 3 }); } }
   end(won: boolean) {
     if (this.state !== "play") return; const swept = this.sweeps > 0; this.state = swept ? "won" : "lost"; this.ant.dir = null; this.ant.want = null; for (const sp of this.spiders) sp.dir = null;
-    this.cb.onSfx(swept ? "win" : "lose"); const out = this.livesMax > 0 && this.lives <= 0; this.say(out ? (swept ? `Caught — ${this.sweeps} floor${this.sweeps > 1 ? "s" : ""} cleared 👑` : "Caught by the spiders 🕷") : swept ? `Time's up — ${this.sweeps} floor${this.sweeps > 1 ? "s" : ""} cleared 👑` : "Time's up", 3); void won;
-    setTimeout(() => { if (!this.over) this.cb.onEnd({ score: this.score, fullClear: swept, crystalsCollected: this.crystalsGot, crystalsTotal: this.crystalsTotal, clearMs: this.firstClearMs, crumbs: this.crumbsGot, sugars: this.sugarsGot, floors: this.sweeps }); }, 900);
+    this.cb.onSfx(swept ? "win" : "lose"); const out = this.dead; this.say(out ? (swept ? `Caught — ${this.sweeps} floor${this.sweeps > 1 ? "s" : ""} cleared 👑` : "Caught by the spiders 🕷") : swept ? `Time's up — ${this.sweeps} floor${this.sweeps > 1 ? "s" : ""} cleared 👑` : "Time's up", 3); void won;
+    setTimeout(() => { this.cb.onEnd({ score: this.score, fullClear: swept, crystalsCollected: this.crystalsGot, crystalsTotal: this.crystalsTotal, clearMs: this.firstClearMs, crumbs: this.crumbsGot, sugars: this.sugarsGot, floors: this.sweeps }); }, 900);
   }
 
   // ── rendering
@@ -280,14 +290,21 @@ export class Tunnel {
     }
     // pickups
     for (const p of this.picks) {
-      if (p.taken) continue; const x = (p.col + 0.5) * CELL, y = (p.row + 0.5) * CELL; const bob = Math.sin(this.t * 3 + p.ph) * 1.5;
+      if (p.taken || p.kind >= 3) continue; const x = (p.col + 0.5) * CELL, y = (p.row + 0.5) * CELL; const bob = Math.sin(this.t * 3 + p.ph) * 1.5;
       if (p.kind === 0) { c.fillStyle = th.crumb; c.beginPath(); c.arc(x, y + bob * 0.3, 3.2, 0, Math.PI * 2); c.fill(); c.fillStyle = "rgba(255,255,255,0.35)"; c.beginPath(); c.arc(x - 1, y - 1 + bob * 0.3, 1.2, 0, Math.PI * 2); c.fill(); }
       else if (p.kind === 1) { c.save(); c.translate(x, y + bob); c.rotate(Math.PI / 4); c.fillStyle = th.sugar; c.shadowColor = th.sugar; c.shadowBlur = 8; c.fillRect(-5, -5, 10, 10); c.shadowBlur = 0; c.fillStyle = "rgba(255,255,255,0.5)"; c.fillRect(-4, -4, 3, 3); c.restore(); }
       else { const pulse = 0.6 + 0.4 * Math.sin(this.t * 4 + p.ph); c.save(); c.translate(x, y + bob * 1.4); const gl = c.createRadialGradient(0, 0, 2, 0, 0, 22 + pulse * 6); gl.addColorStop(0, hexA(th.crystal, 0.55 * pulse + 0.2)); gl.addColorStop(1, hexA(th.crystal, 0)); c.fillStyle = gl; c.beginPath(); c.arc(0, 0, 28, 0, Math.PI * 2); c.fill(); c.fillStyle = th.crystal; c.shadowColor = th.crystal; c.shadowBlur = 18 + pulse * 10; c.beginPath(); c.moveTo(0, -11); c.lineTo(8, -2); c.lineTo(0, 11); c.lineTo(-8, -2); c.closePath(); c.fill(); c.shadowBlur = 0; c.fillStyle = "rgba(255,255,255,0.55)"; c.beginPath(); c.moveTo(0, -11); c.lineTo(4, -3); c.lineTo(-3, -4); c.closePath(); c.fill(); const sk = Math.max(0, Math.sin(this.t * 5 + p.ph * 2)); if (sk > 0.6) { c.fillStyle = `rgba(255,255,255,${(sk - 0.6) * 2.5})`; c.fillRect(-1, -19 + 4 * sk, 2, 8); c.fillRect(-4, -16 + 4 * sk, 8, 2); } c.restore(); }
     }
+    // hearts: buried ones make the wall tile pulse pink (with a glint) until it is broken; free ones float like power-ups
+    for (const p of this.picks) {
+      if (p.taken || p.kind !== 7) continue; const x = (p.col + 0.5) * CELL, y = (p.row + 0.5) * CELL; const pulse = 0.5 + 0.5 * Math.sin(this.t * 4 + p.ph);
+      if (this.isWall(p.row, p.col)) { c.save(); c.fillStyle = `rgba(255,80,140,${0.18 + pulse * 0.22})`; c.fillRect(p.col * CELL, p.row * CELL, CELL, CELL); const g4 = c.createRadialGradient(x, y, 1, x, y, 10 + pulse * 6); g4.addColorStop(0, `rgba(255,150,190,${0.5 + pulse * 0.4})`); g4.addColorStop(1, "rgba(255,80,140,0)"); c.fillStyle = g4; c.fillRect(p.col * CELL, p.row * CELL, CELL, CELL); c.font = "11px system-ui, 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif"; c.textAlign = "center"; c.textBaseline = "middle"; c.globalAlpha = 0.55 + pulse * 0.45; c.fillText("❤", x, y + 1); c.restore(); continue; }
+      c.save(); c.translate(x, y + Math.sin(this.t * 3 + p.ph) * 2); const g5 = c.createRadialGradient(0, 0, 2, 0, 0, 16 + pulse * 8); g5.addColorStop(0, "rgba(255,90,150,0.55)"); g5.addColorStop(1, "rgba(255,90,150,0)"); c.fillStyle = g5; c.beginPath(); c.arc(0, 0, 24, 0, Math.PI * 2); c.fill();
+      c.font = "18px system-ui, 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif"; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText("❤️", 0, 1); c.restore();
+    }
     // power-ups (emoji glyphs with a glow) + decoy marker
     for (const p of this.picks) {
-      if (p.taken || p.kind < 3) continue; const x = (p.col + 0.5) * CELL, y = (p.row + 0.5) * CELL; const pulse = 0.6 + 0.4 * Math.sin(this.t * 5 + p.ph);
+      if (p.taken || p.kind < 3 || p.kind === 7) continue; const x = (p.col + 0.5) * CELL, y = (p.row + 0.5) * CELL; const pulse = 0.6 + 0.4 * Math.sin(this.t * 5 + p.ph);
       c.save(); c.translate(x, y + Math.sin(this.t * 3 + p.ph) * 2); const g2 = c.createRadialGradient(0, 0, 2, 0, 0, 16 + pulse * 6); g2.addColorStop(0, "rgba(255,255,255,0.35)"); g2.addColorStop(1, "rgba(255,255,255,0)"); c.fillStyle = g2; c.beginPath(); c.arc(0, 0, 22, 0, Math.PI * 2); c.fill();
       c.font = "18px system-ui, 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif"; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(p.kind === 3 ? "⛏" : p.kind === 4 ? "🧪" : p.kind === 5 ? "❄️" : "⚡", 0, 1); c.restore();
     }
@@ -303,7 +320,7 @@ export class Tunnel {
     const sh = this.sp.sheet;
     if (sh.complete && sh.naturalWidth) {
       const moving = !!this.ant.dir; let fi = 0; let flip = false;
-      if (this.state === "won") fi = 16; else if (this.state === "lost") fi = 17; else if (this.hitT > 0) fi = 15; else if (this.digT > 0) { fi = 18; flip = this.facing === "left"; }
+      if (this.dead) fi = 17; else if (this.state === "won") fi = 16; else if (this.state === "lost") fi = 17; else if (this.hitT > 0) fi = 15; else if (this.digT > 0) { fi = 18; flip = this.facing === "left"; }
       else if (moving) { const f = this.facing; const k = Math.floor(this.runT * 11); if (f === "up") fi = 7 + (k % 4); else if (f === "down") fi = 11 + (k % 4); else { fi = 1 + (k % 6); flip = f === "left"; } }
       else fi = 0;   // one steady idle frame (alternating frames made the legs flicker)
       if (!moving && this.state === "play") flip = this.facing === "left";

@@ -119,7 +119,7 @@ const DEFAULT_TUNNEL_CONFIG = {
   tunnelCrumbCount: 95,
   tunnelWallBreaks: 5,
   tunnelSpiderSpeedMs: 160,
-  tunnelLives: 3,
+  tunnelLives: 5,
   tunnelPowerups: true,
   tunnelFloorBonus: 25,
   tunnelFloorTimeBonus: 20,
@@ -953,14 +953,10 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
       setupNewRun();
       setCountdown(3);
 
-      if (typeof window !== "undefined" && window.innerWidth <= 900) {
-        requestAnimationFrame(() => {
-          boardScrollRef.current?.scrollIntoView({
-            block: "start",
-            behavior: "auto",
-          });
-        });
-      }
+      // bring the board into view on every screen size (desktop used to leave it below the fold)
+      requestAnimationFrame(() => {
+        boardScrollRef.current?.scrollIntoView({ block: window.innerWidth <= 900 ? "start" : "center", behavior: "smooth" });
+      });
 
       if (typeof window !== "undefined" && window.innerWidth <= 900) {
         requestAnimationFrame(() => {
@@ -1323,7 +1319,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
             {(["colony","neon","mythic","lava","ice","golden","shadow","amber","toxic","void"] as BoardTheme[]).map(key=>{
               const d=DIFFICULTY[key];const th=themeMap[key];const active=boardTheme===key;
               return(
-                <button key={key} onClick={()=>{setBoardTheme(key);setLayoutIndex(0);}}
+                <button key={key} disabled={isPlaying || countdown !== null} onClick={()=>{ if (isPlaying || countdown !== null) return; setBoardTheme(key);setLayoutIndex(0);}}
                   style={{
                     padding:'10px 14px',borderRadius:14,cursor:'pointer',transition:'all 0.2s',
                     border:active?`2px solid ${th.accent}`:'2px solid rgba(255,255,255,0.1)',
@@ -1410,7 +1406,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                     <span>🍞 Crumb = 1</span>
                     <span>🍬 Sugar = 5</span>
                     <span>💎 Crystal = 20</span>
-                    <span>{tunnelCfg.tunnelLives > 0 ? `🕷️ Hit = −1 heart (${tunnelCfg.tunnelLives} hearts, +1 per floor)` : "🕷️ Hit = -3 sec"}</span>
+                    <span>{tunnelCfg.tunnelLives > 0 ? `🕷️ Hit = −1 heart (${tunnelCfg.tunnelLives} hearts · a ❤ is hidden on every floor — glowing walls hide one)` : "🕷️ Hit = -3 sec"}</span>
                     <span>Collect all crystals → next floor</span>
                   </div>
                 </div>

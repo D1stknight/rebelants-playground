@@ -147,7 +147,7 @@ export const pointsConfig: PointsConfig = {
   tunnelCrumbCount: 95,
   tunnelWallBreaks: 5,
   tunnelSpiderSpeedMs: 160,
-  tunnelLives: 3,
+  tunnelLives: 5,
   tunnelPowerups: true,
   tunnelFloorBonus: 25,
   tunnelFloorTimeBonus: 20,

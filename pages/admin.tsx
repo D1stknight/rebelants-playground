@@ -178,7 +178,7 @@ const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
   tunnelCrumbCount: (defaultConfig as any).tunnelCrumbCount ?? 95,
   tunnelWallBreaks: (defaultConfig as any).tunnelWallBreaks ?? 5,
   tunnelSpiderSpeedMs: (defaultConfig as any).tunnelSpiderSpeedMs ?? 160,
-  tunnelLives: (defaultConfig as any).tunnelLives ?? 3,
+  tunnelLives: (defaultConfig as any).tunnelLives ?? 5,
   tunnelPowerups: (defaultConfig as any).tunnelPowerups !== false,
   tunnelFloorBonus: (defaultConfig as any).tunnelFloorBonus ?? 25,
   tunnelFloorTimeBonus: (defaultConfig as any).tunnelFloorTimeBonus ?? 20,
