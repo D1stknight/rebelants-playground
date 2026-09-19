@@ -8,34 +8,20 @@ import * as pl from "planck";
 import { loadSheet, Unit, type Sheet } from "./units";
 
 export const WORLD_W = 52, WORLD_H = 22, PX = 28;               // 1456 × 616 css px at scale 1
-const GROUND: [number, number][] = [[0, 12], [7.2, 12], [12.2, 7.6], [12.8, 7.6], [12.8, 2.2], [WORLD_W + 4, 2.2]];
-const PLAIN_Y = 2.2, GATE = { x0: 12.2, x1: 12.85, y0: 2.2, y1: 7.6 }, CATAPULT = { x: 5.6, y: 12.9 };
+const WALL_X = 15.2, WALK_Y = 11.5;                                // the citadel: wall face toward the horde, and the height of the wall-walk
+const GROUND: [number, number][] = [[0, WALK_Y], [WALL_X, WALK_Y], [WALL_X, 2.2], [WORLD_W + 4, 2.2]];
+const PLAIN_Y = 2.2, GATE = { x0: 14.5, x1: 15.25, y0: 2.2, y1: 7.6 }, CATAPULT = { x: 5.2, y: WALK_Y + 0.1 };
 const G = 22;                                                     // gravity (m/s²) — a little heavy for snappy arcs
 
-export type Hud = { gate: number; gateMax: number; wave: number; waves: number; horde: number; score: number; kills: number; reload: number; state: "ready" | "play" | "won" | "lost"; msg: string | null };
-export type Callbacks = { onHud: (h: Hud) => void; onSfx?: (n: "launch" | "impact" | "crash" | "squish" | "gate" | "horn" | "lose" | "win") => void; onEnd?: (r: { won: boolean; score: number; kills: number; waves: number }) => void };
-
+import { type Hud, type Callbacks, FACTIONS, KIT, WAVES, FX } from "./shared";
+export type { Hud, Callbacks }; export { FACTIONS, KIT };
 type Kind = "boulder" | "crawler" | "block" | "towerBase" | "ram" | "wheel" | "ground" | "gate";
 type Ent = { id: number; kind: Kind; body: pl.Body; g: PIXI.Container; hp: number; hpMax: number; t: number; dead?: boolean; stun?: number; row?: number; ph?: number; size?: number; tower?: Tower; ram?: Ram; sub?: "rock" | "blade" | "spear" | "orb"; hit?: boolean };
 type Missile = { g: PIXI.Container; x: number; y: number; vx: number; vy: number; life: number; kind: "arrow" | "spear"; dmg: number };
 type Archer = { u: Unit; x: number; y: number; cd: number };
-export const FACTIONS = ["ronin", "samurai", "ashigaru", "yamabushi"] as const;
-export const KIT: Record<string, { name: string; ammo: string; clip: "attack" | "magic" | "special"; tint: number }> = {
-  boulder: { name: "Catapult crew", ammo: "Boulder", clip: "attack", tint: 0xffffff },
-  ronin: { name: "Ronin", ammo: "The Ronin leaps herself — carves a line through the ranks and dashes back", clip: "special", tint: 0xff4d5e },
-  samurai: { name: "Samurai", ammo: "Blade boulder — cuts everything around the impact", clip: "attack", tint: 0xff7a7a },
-  ashigaru: { name: "Ashigaru", ammo: "Spear rain — a spread of spears pins the ranks where it lands", clip: "attack", tint: 0x8fe08f },
-  yamabushi: { name: "Yamabushi", ammo: "Storm orb — lightning chains through the horde", clip: "magic", tint: 0x9ec7ff },
-};
 type Tower = { base: Ent; blocks: Ent[]; arrived: boolean; alive: boolean };
 type Ram = { body: Ent; wheels: Ent[]; joints: pl.RevoluteJoint[]; arrived: boolean; alive: boolean };
 type Part = { s: PIXI.Sprite; vx: number; vy: number; life: number; life0: number; grow: number; spin: number; g: number; fade: number; size: number };
-
-const WAVES: { crawlers: number; big: number; tower?: number; ram?: number; gap: number }[] = [
-  { crawlers: 8, big: 0, gap: 0.9 }, { crawlers: 12, big: 2, gap: 0.7 }, { crawlers: 10, big: 2, tower: 1, gap: 0.7 },
-  { crawlers: 16, big: 4, gap: 0.55 }, { crawlers: 14, big: 3, tower: 1, ram: 1, gap: 0.55 }, { crawlers: 22, big: 6, tower: 2, ram: 1, gap: 0.45 },
-];
-const FX = ["spark", "spark2", "ring", "glow", "flare", "smoke", "smoke2", "fire", "flame", "dirt", "bolt", "bolt2", "star", "slash", "magic", "scorch", "twirl", "muzzle"];
 
 export class Siege {
   app!: PIXI.Application; world!: pl.World; cb: Callbacks; canvas: HTMLCanvasElement; ready = false; over = false;
@@ -47,8 +33,8 @@ export class Siege {
   state: Hud["state"] = "ready"; gateHp = 1000; gateMax = 1000; wave = 0; score = 0; kills = 0; msg: string | null = null; msgT = 0;
   spawnQueue: { at: number; fn: () => void }[] = []; waveT = 0; waveDone = false; hordeLeft = 0;
   reload = 0; reloadTime = 1.4; aiming = false; aimStart = { x: 0, y: 0 }; aimNow = { x: 0, y: 0 }; catapultG!: PIXI.Container; armG!: PIXI.Graphics; previewG!: PIXI.Graphics;
-  shock!: ShockwaveFilter; shockT = 99; shake = 0; hudT = 0; torches: PIXI.Sprite[] = [];
-  faction = "boulder"; hero: Unit | null = null; heroSheet: Sheet | null = null; heroPos = { x: 3.4, y: 12 }; archers: Archer[] = []; missiles: Missile[] = []; units: Unit[] = [];
+  shock!: ShockwaveFilter; shockT = 99; shake = 0; hudT = 0; torches: PIXI.Sprite[] = []; flames: PIXI.Sprite[] = []; art: Record<string, PIXI.Texture> = {}; backdrop: PIXI.Sprite | null = null;
+  faction = "boulder"; hero: Unit | null = null; heroSheet: Sheet | null = null; heroPos = { x: 9.6, y: WALK_Y }; archers: Archer[] = []; missiles: Missile[] = []; units: Unit[] = [];
   cam = { zoom: 1, fx: WORLD_W / 2, fy: WORLD_H / 2, tz: 1, tfx: WORLD_W / 2, tfy: WORLD_H / 2 }; follow: Ent | null = null; followT = 0;
   leap: { u: Unit; x: number; y: number; vx: number; vy: number; phase: "fly" | "dash" | "back"; t: number; hitIds: Set<number> } | null = null;
 
@@ -58,6 +44,7 @@ export class Siege {
     this.app = new PIXI.Application();
     await this.app.init({ canvas: this.canvas, resizeTo: this.canvas.parentElement || undefined, antialias: true, backgroundAlpha: 1, background: 0x0b0e17, resolution: Math.min(2, window.devicePixelRatio || 1), autoDensity: true, preference: "webgl" });
     for (const n of FX) this.tex[n] = await PIXI.Assets.load(`/siege/fx/${n}.png`);
+    for (const n of ["backdrop", "citadel", "plain"]) this.art[n] = await PIXI.Assets.load(`/siege/art/${n}.png`);
     for (const k of ["sky", "far", "world", "fx", "front"] as const) { this.L[k] = new PIXI.Container(); this.app.stage.addChild(this.L[k]); } this.L.world.sortableChildren = true;
     const bloom = new AdvancedBloomFilter({ threshold: 0.35, bloomScale: 1.1, brightness: 1.0, blur: 6, quality: 4 }); this.L.fx.filters = [bloom];
     this.shock = new ShockwaveFilter({ center: { x: 0, y: 0 }, amplitude: 22, wavelength: 90, brightness: 1.05, radius: 260, speed: 900, time: 99 }); this.L.world.filters = [this.shock];
@@ -73,7 +60,7 @@ export class Siege {
     this.scale = Math.min(w / (WORLD_W * PX), h / (WORLD_H * PX)); if (h / w > 0.9) this.scale = w / (WORLD_W * PX);   // portrait: fit width
     this.ox = (w - WORLD_W * PX * this.scale) / 2; this.oy = Math.max(0, (h - WORLD_H * PX * this.scale) / 2);
     this.applyCamera();
-    this.L.sky.scale.set(Math.max(w / (WORLD_W * PX), h / (WORLD_H * PX))); this.L.sky.position.set(0, 0);
+    if (this.backdrop) { const bw = this.art.backdrop.width, bh = this.art.backdrop.height; const k = Math.max(w / bw, h / bh); this.backdrop.scale.set(k); this.backdrop.position.set((w - bw * k) / 2, (h - bh * k) / 2); }
   }
   destroy() { this.over = true; window.removeEventListener("resize", this.fitBound); try { this.app?.destroy(false, { children: true }); } catch {} }
 
@@ -252,7 +239,7 @@ export class Siege {
   }
   // ── the garrison: archers on the battlements keep the fight alive between your shots
   async buildGarrison() {
-    const spots: [string, number, number, number][] = [["ashigaru", 2.7, 15.6, 2.2], ["samurai", 4.1, 15.6, 2.2], ["yamabushi", 5.5, 15.6, 2.2], ["ashigaru", 6.9, 15.6, 2.2], ["samurai", 11.9, 8.6, 2.0]];
+    const spots: [string, number, number, number][] = [["ashigaru", 1.5, WALK_Y, 2.5], ["samurai", 3.0, WALK_Y, 2.5], ["yamabushi", 7.4, WALK_Y, 2.5], ["ashigaru", 11.8, WALK_Y, 2.5], ["samurai", 13.9, WALK_Y, 2.5]];
     for (const [fid, x, y, h] of spots) { const sheet = await loadSheet(fid); if (this.over) return; const u = new Unit(sheet, fid, h * PX); u.sp.position.set(this.sx(x), this.sy(y)); u.play("idle"); u.t = Math.random(); this.L.world.addChild(u.sp); this.units.push(u); this.archers.push({ u, x, y, cd: 1.5 + Math.random() * 3 }); }
   }
   stepArchers(dt: number) {
@@ -283,7 +270,7 @@ export class Siege {
   }
   stepCamera(dt: number) {
     const c = this.cam;
-    if (this.aiming) { c.tz = 1.28; c.tfx = CATAPULT.x + 9; c.tfy = 10.5; }
+    if (this.aiming) { c.tz = 1.28; c.tfx = CATAPULT.x + 10; c.tfy = 9.5; }
     else if (this.follow && !this.follow.dead) { const p = this.follow.body.getPosition(); c.tz = 1.15; c.tfx = p.x; c.tfy = Math.max(6, p.y - 1); this.followT = 0; }
     else if (this.leap) { c.tz = 1.25; c.tfx = this.leap.x; c.tfy = this.leap.y + 2; }
     else { this.followT += dt; if (this.followT > 0.9) { c.tz = 1; c.tfx = WORLD_W / 2; c.tfy = WORLD_H / 2; } }
@@ -292,40 +279,20 @@ export class Siege {
     this.applyCamera();
   }
 
-  // ── scenery (placeholder art for phase 1: real painted layers come in phase 2)
+  // ── scenery: painted layers (tools/siege-art) — backdrop covers the screen, the citadel is one big painted sprite, the plain tiles
   buildScenery() {
-    const sky = new PIXI.Graphics(); const H = WORLD_H * PX, W = WORLD_W * PX;
-    sky.rect(0, 0, W * 1.2, H * 1.2).fill({ color: 0x0c1224 }); for (let i = 0; i < 18; i++) { const y = (i / 18) * H * 1.2; sky.rect(0, y, W * 1.2, H * 1.2 / 18 + 2).fill({ color: this.lerpColor(0x0a0f1f, 0x3a2438, i / 18) }); }
-    for (let i = 0; i < 90; i++) { sky.circle(Math.random() * W * 1.2, Math.random() * H * 0.55, Math.random() * 1.6 + 0.3).fill({ color: 0xffffff, alpha: 0.35 + Math.random() * 0.5 }); }
-    this.L.sky.addChild(sky);
-    const moon = new PIXI.Sprite(this.tex.glow); moon.anchor.set(0.5); moon.tint = 0xf4e8c8; moon.width = moon.height = 5.5 * PX; moon.position.set(41 * PX, 3.6 * PX); moon.alpha = 0.9; this.L.far.addChild(moon);
-    const moonCore = new PIXI.Graphics(); moonCore.circle(41 * PX, 3.6 * PX, 1.05 * PX).fill(0xefe3c2); this.L.far.addChild(moonCore);
-    // far hills
-    const hills = new PIXI.Graphics(); hills.moveTo(0, this.sy(6)); for (let x = 0; x <= WORLD_W + 4; x += 1) hills.lineTo(this.sx(x), this.sy(4.2 + Math.sin(x * 0.35) * 0.9 + Math.sin(x * 0.11 + 2) * 1.4)); hills.lineTo(this.sx(WORLD_W + 4), this.sy(-2)).lineTo(0, this.sy(-2)).closePath().fill(0x161a2a); this.L.far.addChild(hills);
-    // ground
-    const gnd = new PIXI.Graphics(); gnd.moveTo(this.sx(GROUND[0][0]), this.sy(GROUND[0][1])); for (const [x, y] of GROUND) gnd.lineTo(this.sx(x), this.sy(y)); gnd.lineTo(this.sx(WORLD_W + 4), this.sy(-3)).lineTo(0, this.sy(-3)).closePath().fill(0x1c1720);
-    gnd.moveTo(this.sx(12.8), this.sy(PLAIN_Y)).lineTo(this.sx(WORLD_W + 4), this.sy(PLAIN_Y)).stroke({ width: 3, color: 0x2e2836 });
-    for (let i = 0; i < 60; i++) { const x = 13.5 + Math.random() * (WORLD_W - 12); gnd.ellipse(this.sx(x), this.sy(PLAIN_Y - 0.1 - Math.random() * 1.2), 6 + Math.random() * 14, 2 + Math.random() * 3).fill({ color: 0x2a2330, alpha: 0.6 }); }
-    // hill face + citadel
-    gnd.moveTo(this.sx(0), this.sy(12)).lineTo(this.sx(7.2), this.sy(12)).lineTo(this.sx(12.2), this.sy(7.6)).lineTo(this.sx(12.8), this.sy(7.6)).lineTo(this.sx(12.8), this.sy(PLAIN_Y)).lineTo(this.sx(0), this.sy(PLAIN_Y)).closePath().fill(0x2a2019);
-    for (let i = 0; i < 40; i++) { const x = Math.random() * 12, y = 2.6 + Math.random() * (11.5 - (x / 12) * 4.5); gnd.ellipse(this.sx(x), this.sy(y), 6 + Math.random() * 10, 3 + Math.random() * 4).fill({ color: 0x3a2c22, alpha: 0.7 }); }
-    this.L.world.addChild(gnd);
-    const stone = 0x2d3548, edge = 0x4a5670, dark = 0x1f2536;
-    const cit = new PIXI.Graphics();
-    // outer wall + gate tower
-    cit.rect(this.sx(11.2), this.sy(8.6), 1.7 * PX, 6.4 * PX).fill(stone).stroke({ width: 2, color: edge }); for (let i = 0; i < 3; i++) cit.rect(this.sx(11.2 + i * 0.6), this.sy(9.1), 0.4 * PX, 0.5 * PX).fill(stone);
-    cit.moveTo(this.sx(12.85), this.sy(2.2)).lineTo(this.sx(12.85), this.sy(5.4)).arc(this.sx(12.85), this.sy(5.4), 0.9 * PX, Math.PI, 1.5 * Math.PI).stroke({ width: 0 });
-    cit.roundRect(this.sx(12.15), this.sy(6.2), 0.75 * PX, 4 * PX, 6).fill(0x120d0b);   // gate door
-    for (let i = 0; i < 6; i++) cit.rect(this.sx(12.15), this.sy(6.0 - i * 0.65), 0.75 * PX, 2).fill(0x3a2a1a);
-    // upper citadel wall on the hilltop
-    cit.rect(this.sx(2.2), this.sy(15.6), 6.2 * PX, 3.7 * PX).fill(stone).stroke({ width: 2, color: edge });
-    for (let i = 0; i < 8; i++) cit.rect(this.sx(2.2 + i * 0.8), this.sy(16.1), 0.5 * PX, 0.5 * PX).fill(stone);
-    for (let r = 0; r < 5; r++) for (let c = 0; c < 8; c++) cit.rect(this.sx(2.3 + c * 0.77 + (r % 2) * 0.38), this.sy(15.4 - r * 0.7), 0.6 * PX, 0.5 * PX).stroke({ width: 1, color: dark, alpha: 0.7 });
-    cit.rect(this.sx(0.6), this.sy(18.2), 1.7 * PX, 6.3 * PX).fill(0x33405a).stroke({ width: 2, color: edge }); cit.rect(this.sx(8.6), this.sy(17.4), 1.7 * PX, 5.5 * PX).fill(0x33405a).stroke({ width: 2, color: edge });
-    cit.moveTo(this.sx(0.6), this.sy(18.2)).lineTo(this.sx(1.45), this.sy(19.6)).lineTo(this.sx(2.3), this.sy(18.2)).closePath().fill(0x7c3aed); cit.moveTo(this.sx(8.6), this.sy(17.4)).lineTo(this.sx(9.45), this.sy(18.8)).lineTo(this.sx(10.3), this.sy(17.4)).closePath().fill(0xe0475b);
-    this.L.world.addChild(cit);
-    // torches
-    for (const [x, y] of [[1.45, 17.9], [9.45, 17.1], [11.6, 8.9], [3.5, 15.9], [7.4, 15.9]]) { const t = new PIXI.Sprite(this.tex.glow); t.anchor.set(0.5); t.tint = 0xffa63a; t.width = t.height = 2.2 * PX; t.position.set(this.sx(x), this.sy(y)); t.alpha = 0.7; t.blendMode = "add"; this.L.fx.addChild(t); this.torches.push(t); const f = new PIXI.Graphics(); f.circle(this.sx(x), this.sy(y), 3).fill(0xffe0a0); this.L.world.addChild(f); }
+    const bd = new PIXI.Sprite(this.art.backdrop); bd.anchor.set(0, 0); this.L.sky.addChild(bd); this.backdrop = bd;
+    // ground plain from the wall to the far right, tiled earth strip
+    const plainH = 5.6; const tile = new PIXI.TilingSprite({ texture: this.art.plain, width: (WORLD_W + 8 - WALL_X) * PX, height: plainH * PX }); tile.position.set(this.sx(WALL_X), this.sy(PLAIN_Y)); tile.tileScale.set((plainH * PX) / this.art.plain.height); this.L.world.addChild(tile); tile.zIndex = -20;
+    const under = new PIXI.Graphics(); under.rect(0, this.sy(PLAIN_Y - plainH + 0.2), (WORLD_W + 8) * PX, 8 * PX).fill(0x0a0808); this.L.world.addChild(under); under.zIndex = -30;
+    const cit = new PIXI.Sprite(this.art.citadel); cit.position.set(0, this.sy(WORLD_H)); cit.width = 15.6 * PX; cit.height = WORLD_H * PX; this.L.world.addChild(cit); cit.zIndex = -10;
+    // torches: sconces along the wall-walk, the gate towers and the keep windows
+    for (const [x, y, k] of [[1.0, 12.7, 1], [4.3, 12.7, 1], [8.3, 12.7, 1], [11.6, 12.7, 1], [13.0, 15.3, 1.2], [14.6, 15.3, 1.2], [2.55, 11.9, 0.5], [4.35, 11.9, 0.5], [2.55, 14.7, 0.5], [4.35, 14.7, 0.5], [2.55, 17.5, 0.5], [4.35, 17.5, 0.5], [9.05, 13.1, 0.4], [9.05, 15.3, 0.4]]) {
+      const t = new PIXI.Sprite(this.tex.glow); t.anchor.set(0.5); t.tint = 0xffa63a; t.width = t.height = 3.2 * k * PX; t.position.set(this.sx(x), this.sy(y)); t.alpha = 0.55; t.blendMode = "add"; this.L.fx.addChild(t); this.torches.push(t);
+      if (k >= 1) { const f = new PIXI.Sprite(this.tex.flame); f.anchor.set(0.5, 0.9); f.tint = 0xffc36a; f.width = 0.45 * PX; f.height = 0.7 * PX; f.blendMode = "add"; f.position.set(this.sx(x), this.sy(y) + 4); this.L.fx.addChild(f); this.flames.push(f); const br = new PIXI.Graphics(); br.rect(-2, 0, 4, 0.35 * PX).fill(0x2a2018); br.position.set(this.sx(x), this.sy(y) + 2); this.L.world.addChild(br); }
+    }
+    // warm light pool on the gate face from the braziers, and a moonlit rim on the plain
+    const pool = new PIXI.Sprite(this.tex.glow); pool.anchor.set(0.5); pool.tint = 0xff9a3a; pool.width = 9 * PX; pool.height = 7 * PX; pool.position.set(this.sx(14.2), this.sy(5.5)); pool.alpha = 0.22; pool.blendMode = "add"; this.L.fx.addChild(pool);
   }
   lerpColor(a: number, b: number, t: number) { const ar = a >> 16, ag = (a >> 8) & 255, ab = a & 255, br = b >> 16, bg = (b >> 8) & 255, bb = b & 255; return ((ar + (br - ar) * t) << 16) | ((ag + (bg - ag) * t) << 8) | (ab + (bb - ab) * t); }
   buildCatapult() {
@@ -388,7 +355,7 @@ export class Siege {
     // crawlers march
     for (const e of this.ents) {
       if (e.dead) continue; e.t += dt;
-      if (e.kind === "crawler") { if ((e.stun || 0) > 0) e.stun! -= dt; else { const v = e.body.getLinearVelocity(); const p = e.body.getPosition(); const target = -(1.7 + (e.row || 0) * 0.9) / Math.sqrt(e.size || 1); if (p.x > GATE.x1 + (e.size || 1) * 0.75) { e.body.setLinearVelocity(new pl.Vec2(v.x + (target - v.x) * 0.15, v.y)); } else { e.body.setLinearVelocity(new pl.Vec2(0, v.y)); } if (p.y < PLAIN_Y - 3 || p.x < 11) { this.hordeLeft--; this.removeEnt(e); } } }
+      if (e.kind === "crawler") { if ((e.stun || 0) > 0) e.stun! -= dt; else { const v = e.body.getLinearVelocity(); const p = e.body.getPosition(); const target = -(1.7 + (e.row || 0) * 0.9) / Math.sqrt(e.size || 1); if (p.x > GATE.x1 + (e.size || 1) * 0.75) { e.body.setLinearVelocity(new pl.Vec2(v.x + (target - v.x) * 0.15, v.y)); } else { e.body.setLinearVelocity(new pl.Vec2(0, v.y)); } if (p.y < PLAIN_Y - 3 || p.x < GATE.x0 - 2.5) { this.hordeLeft--; this.removeEnt(e); } } }
       else if (e.kind === "boulder") { const v = e.body.getLinearVelocity(); const p = e.body.getPosition(); if (e.t > 7 || p.x > WORLD_W + 8 || p.x < 0 || p.y < -2 || (e.t > 1 && Math.hypot(v.x, v.y) < 0.35)) { if (p.y > 0) this.burst(p.x, p.y, "smoke", 4, 1, 0.8, 0x8a8090, 0.6); this.removeEnt(e); } }
       else if (e.kind === "block") { const p = e.body.getPosition(); if (p.y < -2) this.removeEnt(e); }
     }
@@ -398,7 +365,7 @@ export class Siege {
       if (tw.arrived && standing >= 3) this.hurtGate(dt * 14);
       if (standing < 2) { tw.alive = false; this.hordeLeft--; this.score += 120; this.say("Siege tower toppled! +120", 1.4); const p = tw.base.body.getPosition(); this.burst(p.x, p.y + 1, "dirt", 14, 3, 1, 0xcbbde8, 0.35); this.removeEnt(tw.base); }
     }
-    for (const r of this.rams) { if (!r.alive) continue; const p = r.body.body.getPosition(); if (!r.arrived && p.x < GATE.x1 + 1.6) { r.arrived = true; this.say("Beetle ram at the gate!", 1.8); } if (r.arrived) { for (const j of r.joints) j.setMotorSpeed(0); r.body.body.setLinearVelocity(new pl.Vec2(0, 0)); this.hurtGate(dt * 26); if (Math.floor(this.t * 1.5) !== Math.floor((this.t - dt) * 1.5)) { this.shake = 0.5; this.burst(GATE.x1, p.y + 0.3, "dirt", 6, 2.5, 0.7, 0xb8a48a, 0.25); this.cb.onSfx?.("gate"); } } if (p.x < 10) { r.alive = false; this.hordeLeft--; } }
+    for (const r of this.rams) { if (!r.alive) continue; const p = r.body.body.getPosition(); if (!r.arrived && p.x < GATE.x1 + 1.6) { r.arrived = true; this.say("Beetle ram at the gate!", 1.8); } if (r.arrived) { for (const j of r.joints) j.setMotorSpeed(0); r.body.body.setLinearVelocity(new pl.Vec2(0, 0)); this.hurtGate(dt * 26); if (Math.floor(this.t * 1.5) !== Math.floor((this.t - dt) * 1.5)) { this.shake = 0.5; this.burst(GATE.x1, p.y + 0.3, "dirt", 6, 2.5, 0.7, 0xb8a48a, 0.25); this.cb.onSfx?.("gate"); } } if (p.x < GATE.x0 - 3) { r.alive = false; this.hordeLeft--; } }
     this.stepLeap(dt); this.stepArchers(dt); this.stepMissiles(dt);
     this.world.step(dt, 8, 3); this.flushRemovals();
     // wave end
@@ -409,7 +376,8 @@ export class Siege {
     for (const e of this.ents) { if (e.dead) continue; const p = e.body.getPosition(); e.g.position.set(this.sx(p.x), this.sy(p.y)); e.g.rotation = -e.body.getAngle(); if (e.kind === "crawler") { e.g.scale.x = 1; this.drawCrawler(e, this.t); e.g.zIndex = (e.row || 0) * 10; } }
     for (const u of this.units) u.update(dt); this.stepCamera(dt);
     // torches flicker
-    for (const [i, t] of this.torches.entries()) t.alpha = 0.55 + Math.sin(this.t * 9 + i * 1.7) * 0.12 + Math.random() * 0.06;
+    for (const [i, t] of this.torches.entries()) t.alpha = 0.5 + Math.sin(this.t * 9 + i * 1.7) * 0.1 + Math.random() * 0.06;
+    for (const [i, f] of this.flames.entries()) { f.scale.y = (0.7 * PX / f.texture.height) * (0.9 + Math.sin(this.t * 13 + i * 2.1) * 0.12 + Math.random() * 0.08); f.skew.x = Math.sin(this.t * 7 + i) * 0.12; }
     // particles
     for (const p of this.parts) { p.life -= dt; p.s.x += p.vx * dt; p.s.y += p.vy * dt; p.vy += p.g * dt; const k = Math.max(0, p.life / p.life0); p.s.alpha = Math.min(1, k * 1.5) * p.fade; if (p.size > 0) { const sz = p.size * (1 + (1 - k) * (p.grow - 1)); p.s.width = p.s.height = Math.max(1, sz); } p.s.rotation += p.spin * dt; }
     for (const p of this.parts) if (p.life <= 0) p.s.destroy(); this.parts = this.parts.filter((p) => p.life > 0);
