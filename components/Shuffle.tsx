@@ -54,6 +54,14 @@ function useShuffleAudio() {
     rare:   () => { if (!mutedRef.current) play("/audio/prize-rare.mp3",   0.9); },
     ultra:  () => { if (!mutedRef.current) play("/audio/prize-ultra.mp3",  1.0); },
     none:   () => { if (!mutedRef.current) play("/audio/prize-none.mp3",   0.8); },
+    // queen's magic (components/QueenStage)
+    charge: () => { if (!mutedRef.current) play("/audio/shuffle-charge.mp3", 0.6); },
+    bolt:   () => { if (!mutedRef.current) play(Math.random() < 0.5 ? "/audio/shuffle-bolt.mp3" : "/audio/shuffle-bolt2.mp3", 0.9); },
+    crack1: () => { if (!mutedRef.current) play("/audio/shuffle-crack1.mp3", 0.8); },
+    crack2: () => { if (!mutedRef.current) play("/audio/shuffle-crack2.mp3", 0.85); },
+    crack3: () => { if (!mutedRef.current) play("/audio/shuffle-crack3.mp3", 0.9); },
+    hatch:  () => { if (!mutedRef.current) play("/audio/shuffle-hatch.mp3", 0.9); },
+    fizzle: () => {},
   }), [play, stopMusic]);
 
   return { muted, toggleMute, startMusic, stopMusic, sfx };
@@ -834,7 +842,7 @@ const [phase, setPhase] = useState<Phase>("idle");
 const { muted: shuffleMuted, toggleMute: toggleShuffleMute, startMusic, stopMusic, sfx: shuffleSfx } = useShuffleAudio();
 const [showHowPointsWork, setShowHowPointsWork] = useState(false);
 const [order, setOrder] = useState<number[]>(() => Array.from({ length: EGG_COUNT }, (_, i) => i));
-const stageRef = React.useRef<import("./QueenStage").QueenStageHandle | null>(null); const eggRefs = React.useRef<(HTMLButtonElement | null)[]>([]); const [hatched, setHatched] = useState<number | null>(null); const [pickedEgg, setPickedEgg] = useState<number | null>(null);
+const stageRef = React.useRef<import("./QueenStage").QueenStageHandle | null>(null); const eggRefs = React.useRef<(HTMLButtonElement | null)[]>([]); const [hatched, setHatched] = useState<number | null>(null); const [crackHit, setCrackHit] = useState(0); const [pickedEgg, setPickedEgg] = useState<number | null>(null);
 const [progress, setProgress] = useState(0);
 const [busy, setBusy] = useState(false);
 const [rarity, setRarity] = useState<Rarity>("none");
@@ -1358,7 +1366,7 @@ async function submitShipping() {
           }} />
 
           {/* Queen — paper-doll canvas over the whole scene (she stands above the egg rail; her lightning is drawn over the eggs) */}
-          <QueenStage apiRef={stageRef} active={phase === "shuffling"} getEggRect={(i) => eggRefs.current[i]?.getBoundingClientRect() || null} onHatch={(i) => setHatched(i)} />
+          <QueenStage apiRef={stageRef} active={phase === "shuffling"} getEggRect={(i) => eggRefs.current[i]?.getBoundingClientRect() || null} onHatch={(i) => setHatched(i)} onCrack={() => setCrackHit((n) => n + 1)} onSfx={(n) => { const f = (shuffleSfx as any)[n]; if (typeof f === "function") f(); }} />
 
           {/* Rails */}
           <div className="rail rail-top" style={{ zIndex:4 }} />
@@ -1390,10 +1398,8 @@ async function submitShipping() {
               disabled={phase !== "pick" || busy}
               aria-label="Pick egg"
             >
-              <div className={`egg-body ${phase === "pick" ? "wobble-on-pick" : ""}`} style={{
-                background: phase==='pick'
-                  ? undefined
-                  : undefined,
+              <div key={pickedEgg === i ? crackHit : 0} className={`egg-body ${phase === "pick" && !busy ? "wobble-on-pick" : ""}`} style={{
+                animation: pickedEgg === i && crackHit > 0 ? "eggHit 0.32s ease-out" : undefined,
                 boxShadow: phase==='pick'
                   ? 'inset -6px -8px 20px rgba(0,0,0,0.4), inset 4px 4px 12px rgba(255,255,220,0.5), 0 8px 24px rgba(0,0,0,0.5), 0 0 30px rgba(251,191,36,0.5), 0 0 60px rgba(251,191,36,0.2)'
                   : 'inset -6px -8px 20px rgba(0,0,0,0.4), inset 4px 4px 12px rgba(255,255,200,0.3), 0 8px 24px rgba(0,0,0,0.5)',
@@ -1707,6 +1713,7 @@ async function submitShipping() {
           50% { transform: rotate(3deg); }
         }
         .wobble-on-pick { animation: wobble-on-pick 0.7s ease-in-out infinite; }
+        @keyframes eggHit { 0% { transform: translate(0,0) scale(1); } 20% { transform: translate(-4px,2px) scale(1.08,0.94); } 45% { transform: translate(4px,-2px) scale(0.95,1.07); } 70% { transform: translate(-2px,1px) scale(1.03,0.98); } 100% { transform: translate(0,0) scale(1); } }
 
         .ant-progress { position: absolute; bottom: 8px; left: 10px; right: 10px; z-index: 5; }
 

@@ -17,6 +17,11 @@ lx0 = 306 + 0.05 * (yy - FIST[3]); lx1 = 356 + 0.07 * (yy - FIST[3])
 lower = (a > 0) & (xx >= lx0) & (xx < lx1) & (yy >= FIST[3] - 6) & (yy < 925) & (g > 0.5 * r)   # the rod below the fist: everything not dress-red inside a slanted band    # staff over the dress: gold column, dress excluded
 grip = (a > 0) & (xx >= 302) & (xx < 350) & (yy >= FIST[1]) & (yy < FIST[3]) & goldc   # inside the fist: gold pixels only
 mask = upper | lower | grip
+# the arm (fist + forearm up to the shoulder pad) becomes its own layer so it can swing from the shoulder
+SHOULDER = (392, 556)
+armbox = (a > 0) & (((xx >= FIST[0]) & (xx < FIST[2]) & (yy >= FIST[1]) & (yy < FIST[3])) | ((xx >= 326) & (xx < 394) & (yy >= 546) & (yy < 604) & (xx < 326 + (yy - 546) * 1.2 + 40)))
+goldpad = (r > 150) & (g > 115) & (b < 130) & (g > 0.7 * r)
+armmask = armbox & ~goldpad & ~mask
 # staff layer
 staff = np.zeros_like(im); staff[mask] = im[mask]
 ys, xs = np.where(mask); bx0, bx1, by0, by1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
@@ -30,16 +35,30 @@ fill = mask & near_body
 inp = cv2.inpaint(cv2.cvtColor(rgb.astype(np.uint8), cv2.COLOR_RGB2BGR), cv2.dilate(mask.astype(np.uint8), np.ones((3, 3), np.uint8)) * 255, 7, cv2.INPAINT_TELEA)
 inp = cv2.cvtColor(inp, cv2.COLOR_BGR2RGB)
 body = im.copy(); body[mask, :3] = inp[mask]; body[mask, 3] = np.where(fill[mask], 255, 0)
+# remove the arm from the body too (inpaint; transparent where only background was behind it)
+bodyish2 = (body[..., 3] > 0) & ~armmask; near2 = cv2.dilate(bodyish2.astype(np.uint8), np.ones((17, 17), np.uint8)) > 0
+inp2 = cv2.cvtColor(cv2.inpaint(cv2.cvtColor(body[..., :3].astype(np.uint8), cv2.COLOR_RGB2BGR), cv2.dilate(armmask.astype(np.uint8), np.ones((3, 3), np.uint8)) * 255, 7, cv2.INPAINT_TELEA), cv2.COLOR_BGR2RGB)
+body[armmask, :3] = inp2[armmask]; body[armmask, 3] = np.where((armmask & near2 & (xx > 350))[armmask], 255, 0)
+# any masked pixel that sat next to the background (silhouette edge) becomes transparent instead of inpainted
+near_bg = cv2.dilate((a == 0).astype(np.uint8), np.ones((13, 13), np.uint8)) > 0
+edge = (mask | armmask) & near_bg; body[edge, 3] = 0
+clear = armbox & (xx <= 352); body[clear, 3] = 0
+arm = np.zeros_like(im); arm[armmask] = im[armmask]; ays, axs = np.where(armmask); ax0, ax1, ay0, ay1 = axs.min(), axs.max() + 1, ays.min(), ays.max() + 1
+arm_img = Image.fromarray(arm[ay0:ay1, ax0:ax1])
 # hide the fist hole by keeping the fist (skin) pixels: they were never in mask (skin fails the gold test) — fine
+# drop stray specks left of the torso (bits of shadow / outline that belonged to the staff or the hand)
+n_lab, lab = cv2.connectedComponents((body[..., 3] > 0).astype(np.uint8))
+sizes = np.bincount(lab.ravel()); small = np.isin(lab, np.where(sizes < 1500)[0]) & (lab > 0); body[small, 3] = 0
 body_img = Image.fromarray(body)
 fist_img = Image.fromarray(im[FIST[1]:FIST[3], FIST[0]:FIST[2]].copy())
 bb = body_img.getbbox(); body_img = body_img.crop(bb)
 fist = ((FIST[0] + FIST[2]) // 2, (FIST[1] + FIST[3]) // 2)   # pivot = centre of her fist
-meta = { "render": [W, H], "body": { "box": list(bb) }, "staff": { "box": [int(bx0), int(by0), int(bx1), int(by1)] }, "fist": { "box": list(FIST) }, "pivot": list(fist), "gem": [318, 300], "feet_y": int(bb[3]) }
+meta = { "render": [W, H], "body": { "box": list(bb) }, "staff": { "box": [int(bx0), int(by0), int(bx1), int(by1)] }, "fist": { "box": list(FIST) }, "arm": { "box": [int(ax0), int(ay0), int(ax1), int(ay1)] }, "shoulder": list(SHOULDER), "pivot": list(fist), "gem": [318, 300], "feet_y": int(bb[3]) }
 # 2x web size: 640 px tall body
 k = 640 / body_img.height
 body_img.resize((round(body_img.width * k), 640), Image.LANCZOS).save(f"{out}/body.png", optimize=True)
 staff_img.resize((max(1, round(staff_img.width * k)), max(1, round(staff_img.height * k))), Image.LANCZOS).save(f"{out}/staff.png", optimize=True)
 fist_img.resize((round(fist_img.width * k), round(fist_img.height * k)), Image.LANCZOS).save(f"{out}/fist.png", optimize=True)
+arm_img.resize((round(arm_img.width * k), round(arm_img.height * k)), Image.LANCZOS).save(f"{out}/arm.png", optimize=True)
 meta["scale"] = k; json.dump(meta, open(f"{out}/layers.json", "w"))
 print(meta, os.path.getsize(f"{out}/body.png") // 1024, "KB", os.path.getsize(f"{out}/staff.png") // 1024, "KB")
