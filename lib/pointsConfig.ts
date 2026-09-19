@@ -61,6 +61,13 @@ export type PointsConfig = {
   tunnelCrumbCount: number;
   tunnelWallBreaks: number;
   tunnelSpiderSpeedMs: number;
+  tunnelLives: number;          // hearts per run (0 = time penalty instead)
+  tunnelPowerups: boolean;      // floor power-ups on/off
+  tunnelFloorBonus: number;     // points banked per floor cleared (× floor)
+  tunnelFloorTimeBonus: number; // seconds added back per floor cleared
+  descentCost: number;          // Hive Descent entry
+  bountyCost: number;           // Bounty Hunters entry
+  gpCost: number;               // Rebel Grand Prix entry
 };
 
 export const pointsConfig: PointsConfig = {
@@ -140,4 +147,11 @@ export const pointsConfig: PointsConfig = {
   tunnelCrumbCount: 95,
   tunnelWallBreaks: 5,
   tunnelSpiderSpeedMs: 160,
+  tunnelLives: 3,
+  tunnelPowerups: true,
+  tunnelFloorBonus: 25,
+  tunnelFloorTimeBonus: 20,
+  descentCost: 300,
+  bountyCost: 100,
+  gpCost: 100,
 };

@@ -20,7 +20,7 @@ export default function TunnelRun({ layout, layouts, layoutIdx = 0, theme, cfg, 
   const fullscreen = isTouch && playing;
 
   // (re)create the game whenever a run starts or the layout changes
-  const runKey = `${layout.join("|")}|${playing ? "p" : "i"}|${faction}`;
+  const runKey = `${layout.join("|")}|${playing ? "p" : "i"}|${faction}|${cfg.themeId || ""}|${theme.wall}|${theme.floor}`;
   useEffect(() => {
     const cv = canvasRef.current; if (!cv) return;
     const g = new Tunnel(cv, layout, theme, cfg, { onHud: (h) => cbRef.current.onHud(h), onEnd: (r) => cbRef.current.onEnd(r), onSfx: (n) => cbRef.current.onSfx(n) }, spritesRef.current, layouts, layoutIdx);

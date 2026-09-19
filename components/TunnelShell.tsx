@@ -119,6 +119,10 @@ const DEFAULT_TUNNEL_CONFIG = {
   tunnelCrumbCount: 95,
   tunnelWallBreaks: 5,
   tunnelSpiderSpeedMs: 160,
+  tunnelLives: 3,
+  tunnelPowerups: true,
+  tunnelFloorBonus: 25,
+  tunnelFloorTimeBonus: 20,
 };
 
 const START_CELL: Cell = { row: 2, col: 2 };
@@ -396,16 +400,16 @@ function formatMs(ms: number) {
 
 // ── Difficulty levels ──────────────────────────────────────────────────────
 const DIFFICULTY: Record<string, {label:string;emoji:string;desc:string}> = {
-  colony:  {label:"The Colony",  emoji:"🐜", desc:"Classic colony. Learn the ropes."},
-  neon:    {label:"Neon Grid",  emoji:"⚡", desc:"Electric. Spider moves faster."},
-  mythic:  {label:"Mythic Dark",  emoji:"🔮", desc:"Dark magic. Tighter paths."},
-  lava:    {label:"Lava Caves",  emoji:"🌋", desc:"Volcanic. Heat slows your breaks."},
-  ice:     {label:"Ice Caverns",  emoji:"🧊", desc:"Frozen. Spider is relentless."},
-  golden:  {label:"Golden Vault",  emoji:"🏆", desc:"Guarded vault. Charges dwindling."},
-  shadow:  {label:"Shadow Realm",  emoji:"👁️", desc:"You barely see the walls."},
-  amber:   {label:"Amber Ruins",  emoji:"🏺", desc:"Ancient stone. Walls resist breaking."},
-  toxic:   {label:"Toxic Depths",  emoji:"☢️", desc:"Poison mist. Near impossible odds."},
-  void:    {label:"Void Core", emoji:"💀", desc:"Pure darkness. Maximum intensity."},
+  colony:  {label:"The Colony",  emoji:"🐜", desc:"Classic colony. No modifiers — learn the ropes."},
+  neon:    {label:"Neon Grid",  emoji:"⚡", desc:"Electric. Spiders move 15% faster."},
+  mythic:  {label:"Mythic Dark",  emoji:"🔮", desc:"Dark magic. Lantern-only sight, one fewer wall break."},
+  lava:    {label:"Lava Caves",  emoji:"🌋", desc:"Volcanic. Your pick needs 2.5 s to cool between breaks."},
+  ice:     {label:"Ice Caverns",  emoji:"🧊", desc:"Frozen. Spiders 25% faster and never lose your trail."},
+  golden:  {label:"Golden Vault",  emoji:"🏆", desc:"Guarded vault. Two fewer wall breaks."},
+  shadow:  {label:"Shadow Realm",  emoji:"👁️", desc:"Lantern-only sight. You barely see the walls."},
+  amber:   {label:"Amber Ruins",  emoji:"🏺", desc:"Ancient stone. Every wall takes two hits."},
+  toxic:   {label:"Toxic Depths",  emoji:"☢️", desc:"Poison mist. Dark, spiders 20% faster, clock runs 25% faster."},
+  void:    {label:"Void Core", emoji:"💀", desc:"Pure darkness. Spiders 35% faster, three fewer breaks, one fewer heart."},
 };
 
 export default function TunnelShell() {
@@ -804,6 +808,10 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           tunnelCrumbCount: Number(cfg?.tunnelCrumbCount || DEFAULT_TUNNEL_CONFIG.tunnelCrumbCount),
           tunnelWallBreaks: Number(cfg?.tunnelWallBreaks || DEFAULT_TUNNEL_CONFIG.tunnelWallBreaks),
           tunnelSpiderSpeedMs: Number(cfg?.tunnelSpiderSpeedMs || DEFAULT_TUNNEL_CONFIG.tunnelSpiderSpeedMs),
+          tunnelLives: Number(cfg?.tunnelLives ?? DEFAULT_TUNNEL_CONFIG.tunnelLives),
+          tunnelPowerups: cfg?.tunnelPowerups !== false,
+          tunnelFloorBonus: Number(cfg?.tunnelFloorBonus ?? DEFAULT_TUNNEL_CONFIG.tunnelFloorBonus),
+          tunnelFloorTimeBonus: Number(cfg?.tunnelFloorTimeBonus ?? DEFAULT_TUNNEL_CONFIG.tunnelFloorTimeBonus),
         };
 
         setTunnelCfg(nextCfg);
@@ -984,9 +992,9 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layoutIndex, earn, refresh, effectivePlayerId, playerName, runStartedAt]);
   const forceEnd = () => { const g = (window as any).__tun; if (g && g.state === "play") g.end(false); };
-  const [crystalsLeft, setCrystalsLeft] = useState(0); const [tunnelFloor, setTunnelFloor] = useState(1); const [tunnelMult, setTunnelMult] = useState(1);
-  const onTunnelHud = React.useCallback((h: { score: number; timeLeft: number; breaks: number; crystalsLeft: number; msg: string | null; hit: boolean; floor: number; mult: number }) => {
-    setScore(h.score); setTimeLeft(h.timeLeft); setWallBreaksLeft(h.breaks); setCrystalsLeft(h.crystalsLeft); setTunnelFloor(h.floor); setTunnelMult(h.mult); if (h.msg) setRunMessage(h.msg); setHitFlash(h.hit);
+  const [crystalsLeft, setCrystalsLeft] = useState(0); const [tunnelLives, setTunnelLives] = useState<[number, number]>([0, 0]); const [tunnelFloor, setTunnelFloor] = useState(1); const [tunnelMult, setTunnelMult] = useState(1);
+  const onTunnelHud = React.useCallback((h: { score: number; timeLeft: number; breaks: number; lives: number; livesMax: number; crystalsLeft: number; msg: string | null; hit: boolean; floor: number; mult: number }) => {
+    setTunnelLives([h.lives, h.livesMax]); setScore(h.score); setTimeLeft(h.timeLeft); setWallBreaksLeft(h.breaks); setCrystalsLeft(h.crystalsLeft); setTunnelFloor(h.floor); setTunnelMult(h.mult); if (h.msg) setRunMessage(h.msg); setHitFlash(h.hit);
   }, []);
   const isPlayingRef = useRef(false); useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
   function formatCountdown(ms: number): string {
@@ -1381,6 +1389,12 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                     <div style={statusPillStyle}>
                       🧱 Wall Break Charges: <b>{wallBreaksLeft}</b> / {tunnelCfg.tunnelWallBreaks}
                     </div>
+
+                    {tunnelLives[1] > 0 && (
+                      <div style={{ ...statusPillStyle, color: tunnelLives[0] <= 1 ? "#ff4444" : undefined }} title="Hearts">
+                        {Array.from({ length: tunnelLives[1] }, (_, i) => (i < tunnelLives[0] ? "❤️" : "🖤")).join(" ")}
+                      </div>
+                    )}
                   </div>
 
                   <div
@@ -1396,7 +1410,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                     <span>🍞 Crumb = 1</span>
                     <span>🍬 Sugar = 5</span>
                     <span>💎 Crystal = 20</span>
-                    <span>🕷️ Hit = -3 sec</span>
+                    <span>{tunnelCfg.tunnelLives > 0 ? `🕷️ Hit = −1 heart (${tunnelCfg.tunnelLives} hearts, +1 per floor)` : "🕷️ Hit = -3 sec"}</span>
                     <span>Collect all crystals → next floor</span>
                   </div>
                 </div>
@@ -1431,14 +1445,14 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                     layouts={TUNNEL_LAYOUTS as string[][]}
                     layoutIdx={layoutIndex}
                     theme={{ ...theme, dark: boardTheme === "shadow" || boardTheme === "void" || boardTheme === "mythic" }}
-                    cfg={{ runSeconds: tunnelCfg.tunnelRunSeconds, crystals: tunnelCfg.tunnelCrystalCount, sugars: tunnelCfg.tunnelSugarCount, crumbs: tunnelCfg.tunnelCrumbCount, wallBreaks: tunnelCfg.tunnelWallBreaks, spiderSpeedMs: tunnelCfg.tunnelSpiderSpeedMs }}
+                    cfg={{ runSeconds: tunnelCfg.tunnelRunSeconds, crystals: tunnelCfg.tunnelCrystalCount, sugars: tunnelCfg.tunnelSugarCount, crumbs: tunnelCfg.tunnelCrumbCount, wallBreaks: tunnelCfg.tunnelWallBreaks, spiderSpeedMs: tunnelCfg.tunnelSpiderSpeedMs, lives: tunnelCfg.tunnelLives, powerups: tunnelCfg.tunnelPowerups, floorBonus: tunnelCfg.tunnelFloorBonus, floorTimeBonus: tunnelCfg.tunnelFloorTimeBonus, themeId: boardTheme }}
                     playing={isPlaying}
                     faction={tunnelFaction}
                     onHud={onTunnelHud}
                     onEnd={finishRun}
                     onSfx={(n) => { const f = (sfx as any)[n === "hit" ? "spiderHit" : n]; if (typeof f === "function") f(); }}
                     onQuit={() => { if (window.confirm("Quit this run? The entry fee is spent and you keep your score so far.")) forceEnd(); }}
-                    hudLine={<div style={{ display: "flex", gap: 14, padding: "6px 14px", borderRadius: 999, background: "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.15)", fontSize: 13, fontWeight: 800 }}><span>⏱ {timeLeft}s</span><span style={{ color: "#93c5fd" }}>🎯 {score}</span><span style={{ color: "#fbbf24" }}>🧱 {wallBreaksLeft}</span><span style={{ color: "#c4b5fd" }}>🕳 F{tunnelFloor}</span>{tunnelMult > 1 && <span style={{ color: "#fb7185" }}>×{tunnelMult}</span>}</div>}
+                    hudLine={<div style={{ display: "flex", gap: 14, padding: "6px 14px", borderRadius: 999, background: "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.15)", fontSize: 13, fontWeight: 800 }}><span>⏱ {timeLeft}s</span><span style={{ color: "#93c5fd" }}>🎯 {score}</span><span style={{ color: "#fbbf24" }}>🧱 {wallBreaksLeft}</span><span style={{ color: "#c4b5fd" }}>🕳 F{tunnelFloor}</span>{tunnelLives[1] > 0 && <span>{Array.from({ length: tunnelLives[1] }, (_, i) => (i < tunnelLives[0] ? "❤️" : "🖤")).join("")}</span>}{tunnelMult > 1 && <span style={{ color: "#fb7185" }}>×{tunnelMult}</span>}</div>}
                   />
                   {countdown !== null && (
                     <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none", zIndex: 70 }}>
