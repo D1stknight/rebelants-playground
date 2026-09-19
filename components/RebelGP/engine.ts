@@ -57,7 +57,7 @@ export class Race {
   input: Input = { left: false, right: false, accel: false, brake: false, drift: false, item: false };
   camX = 0; camY = 0; camH = 0; hudT = 0; msg: string | null = null; msgT = 0; shake = 0;
   props: HTMLImageElement; sky: HTMLImageElement; skyMid: HTMLImageElement; kartImg: Record<string, HTMLImageElement> = {};
-  N: number; cpStep: number; finishedCount = 0; errCount = 0; autopilot = false;
+  N: number; cpStep: number; finishedCount = 0; errCount = 0; autopilot = false; itemHintShown = false; touch = false;
 
   constructor(canvas: HTMLCanvasElement, loaded: { data: TrackData; map: Uint32Array; surf: Uint8Array }, cb: Callbacks, faction: string, chassis: ChassisId, rivals?: { faction: string; chassis: ChassisId }[]) {
     this.ctx = canvas.getContext("2d")!; this.ctx.imageSmoothingEnabled = false;
@@ -70,8 +70,8 @@ export class Race {
     // racers: player + 7 rivals from the other factions
     const allF = ["ashigaru", "ronin", "samurai", "bushi", "warrior", "shogun", "buke", "kenshi", "wokou", "sohei", "yamabushi"].filter((f) => f !== faction);
     const seed = this.track.diff * 31 + 7; const rng = mulberry(seed); allF.sort(() => rng() - 0.5);
-    const chas: ChassisId[] = ["scout", "soldier", "tank"];
-    const list = [{ faction, chassis, ai: false }, ...Array.from({ length: GP_RACERS - 1 }, (_, i) => rivals?.[i] ? { ...rivals[i], ai: true } : { faction: allF[i], chassis: chas[Math.floor(rng() * 3)], ai: true })];
+    const chas: ChassisId[] = ["scout", "soldier", "tank", "drone", "royal"];
+    const list = [{ faction, chassis, ai: false }, ...Array.from({ length: GP_RACERS - 1 }, (_, i) => rivals?.[i] ? { ...rivals[i], ai: true } : { faction: allF[i], chassis: chas[Math.floor(rng() * 5)], ai: true })];
     // player starts last on the grid (Mario Kart style for race 1); rivals ahead
     const order = [...list.slice(1), list[0]];
     order.forEach((r, i) => {
@@ -102,7 +102,7 @@ export class Race {
     const loop = (now: number) => {
       if (this.over) return;
       const dt = Math.min(0.05, (now - this.last) / 1000); this.last = now; this.acc += dt;
-      try { let n = 0; while (this.acc >= 1 / 60 && n++ < 4) { this.step(1 / 60); this.acc -= 1 / 60; } if (n >= 4) this.acc = 0; this.render(); this.errCount = 0; }
+      try { let n = 0; while (this.acc >= 1 / 60 && n++ < 4) { this.step(1 / 60); this.acc -= 1 / 60; } if (n >= 4) this.acc = 0; this.camera(dt); this.render(); this.errCount = 0; }
       catch (e) { console.error("RGP frame error", e); this.acc = 0; if (++this.errCount > 90) { this.over = true; return; } }
       this.raf = requestAnimationFrame(loop);
     };
@@ -133,11 +133,6 @@ export class Race {
     if (racing) { this.stepProjs(dt); this.stepDrops(dt); this.stepHazards(dt); this.stepBoxes(dt); }
     for (const f of this.fx) f.life -= dt; this.fx = this.fx.filter((f) => f.life > 0);
     this.rank();
-    // camera follows the player
-    const me = this.me; const th = me.h; let dh = th - this.camH; while (dh > Math.PI) dh -= Math.PI * 2; while (dh < -Math.PI) dh += Math.PI * 2;
-    this.camH += dh * Math.min(1, dt * 7);
-    const tx = me.x - Math.cos(this.camH) * CAM_BACK, ty = me.y - Math.sin(this.camH) * CAM_BACK;
-    this.camX += (tx - this.camX) * Math.min(1, dt * 12); this.camY += (ty - this.camY) * Math.min(1, dt * 12);
     this.hudT += dt; if (this.hudT > 0.1) { this.hudT = 0; this.pushHud(); }
   }
 
@@ -166,9 +161,10 @@ export class Race {
       k.h += steerIn * turn * dt;
       // throttle
       const accel = 80 * ch.accel;
-      if (inp.accel) k.speed += accel * dt; else if (inp.brake) k.speed -= 160 * dt; else k.speed -= 40 * dt;
+      if (inp.accel) k.speed += accel * dt;
+      else if (inp.brake) k.speed = k.speed > 0 ? Math.max(0, k.speed - 200 * dt) : Math.max(-45, k.speed - 60 * dt);
+      else k.speed = k.speed > 0 ? Math.max(0, k.speed - 40 * dt) : Math.min(0, k.speed + 60 * dt);   // coast to a stop, never roll backwards
       if (k.speed > top) k.speed -= Math.min(k.speed - top, (k.boost > 0 ? 80 : 240) * dt);
-      k.speed = Math.max(k.ai ? 0 : -50, k.speed);
     }
     if (k.boost > 0) { k.boost -= dt; k.speed = Math.max(k.speed, top * 1.45); }
     if (s === SURF.boost && k.boost < 0.6) { k.boost = 0.9; this.sfx("boost"); }
@@ -193,7 +189,7 @@ export class Race {
     // item use
     if (inp.item && !k.prevInputItem && k.item && k.roulette <= 0 && racing && !k.finished) this.useItem(k);
     k.prevInputItem = inp.item;
-    if (k.roulette > 0) { k.roulette -= dt; if (k.roulette <= 0) { k.item = this.rollItem(k.rank); if (k === this.me) this.sfx("item"); } }
+    if (k.roulette > 0) { k.roulette -= dt; if (k.roulette <= 0) { k.item = this.rollItem(k.rank); if (k === this.me) { this.sfx("item"); if (!this.itemHintShown) { this.itemHintShown = true; this.msg = this.touch ? "★ TO FIRE" : "X TO FIRE"; this.msgT = 2; } } } }
   }
   rubber(k: Kart) {
     // rubber band: rivals behind the player get faster, rivals far ahead ease off
@@ -225,7 +221,7 @@ export class Race {
     }
   }
   stepBoxes(dt: number) {
-    for (const b of this.boxes) { if (b.t > 0) { b.t -= dt; continue; } for (const k of this.karts) if (!k.item && k.roulette <= 0 && Math.hypot(b.x - k.x, b.y - k.y) < 14) { b.t = 4; k.roulette = 1.1; if (k === this.me) this.sfx("box"); this.fx.push({ kind: "star", x: b.x, y: b.y, life: 0.4 }); break; } }
+    for (const b of this.boxes) { if (b.t > 0) { b.t -= dt; continue; } for (const k of this.karts) if (!k.item && k.roulette <= 0 && Math.hypot(b.x - k.x, b.y - k.y) < 17) { b.t = 4; k.roulette = 1.1; if (k === this.me) this.sfx("box"); this.fx.push({ kind: "star", x: b.x, y: b.y, life: 0.4 }); break; } }
   }
   stepDrops(dt: number) { for (const d of this.drops) d.life -= dt; this.drops = this.drops.filter((d) => d.life > 0); }
   stepHazards(dt: number) {
@@ -297,6 +293,13 @@ export class Race {
   }
 
   // ── rendering
+  camera(dt: number) {
+    // camera follows the player; runs once per rendered frame with the real frame time so motion stays smooth
+    const me = this.me; let dh = me.h - this.camH; while (dh > Math.PI) dh -= Math.PI * 2; while (dh < -Math.PI) dh += Math.PI * 2;
+    // SMK-style: the camera is rigidly behind the kart (a tiny lag only so spins read as spins)
+    this.camH += dh * Math.min(1, dt * (me.spin > 0 ? 6 : 30));
+    this.camX = me.x - Math.cos(this.camH) * CAM_BACK; this.camY = me.y - Math.sin(this.camH) * CAM_BACK;
+  }
   render() {
     const c = this.ctx; const b = this.buf32; const cosH = Math.cos(this.camH), sinH = Math.sin(this.camH);
     const sx = this.shake > 0 ? (Math.random() - 0.5) * this.shake * 5 : 0, sy = this.shake > 0 ? (Math.random() - 0.5) * this.shake * 3 : 0;
@@ -311,10 +314,10 @@ export class Race {
       const wx = this.camX + cosH * z, wy = this.camY + sinH * z;  // world point at screen centre
       const step = z / FOCAL;                                     // world units per screen pixel
       const dxs = -sinH * step, dys = cosH * step;               // "right" vector on screen → world
-      let fx = wx - dxs * (this.vw / 2) + sx * step, fy = wy - dys * (this.vw / 2) + sy * step; let o = y * this.vw;
+      let fx = wx - dxs * (this.vw / 2), fy = wy - dys * (this.vw / 2); let o = y * this.vw;
       for (let x = 0; x < this.vw; x++) { b[o++] = map[(((fy | 0) & MASKB) << 10) | ((fx | 0) & MASKB)]; fx += dxs; fy += dys; }
     }
-    c.putImageData(this.buf, 0, 0, 0, HORIZON, this.vw, VH - HORIZON);
+    c.putImageData(this.buf, Math.round(sx), Math.round(sy), 0, HORIZON, this.vw, VH - HORIZON);
     // horizon haze
     const g = c.createLinearGradient(0, HORIZON, 0, HORIZON + 26); g.addColorStop(0, "rgba(10,15,28,0.85)"); g.addColorStop(1, "rgba(10,15,28,0)"); c.fillStyle = g; c.fillRect(0, HORIZON, this.vw, 26);
     // sprites, far → near
@@ -331,7 +334,7 @@ export class Race {
     const prop = (x: number, y: number, id: number, worldH: number, lift = 0, alpha = 1) => { if (ok) put(x, y, P, (id % 8) * 64, Math.floor(id / 8) * 64, 64, 64, worldH, lift, alpha); };
     const DEC: Record<string, number> = { tree: this.track.biome === "garden" ? PROP.tree2 : PROP.tree, rock: this.track.biome === "fortress" ? PROP.rock2 : PROP.rock, mushroom: PROP.mushroom, pipe: PROP.pipe, barrel: PROP.barrel, torch: PROP.torch, pillar: PROP.pillar, crystal: this.track.biome === "throne" ? PROP.crystal : PROP.crystal2, egg: PROP.egg, flower: PROP.flower, fence: PROP.fence };
     for (const [x, y, kind] of this.track.decor) prop(x, y, DEC[kind] ?? PROP.rock, kind === "tree" ? 46 : kind === "pillar" || kind === "pipe" ? 40 : kind === "flower" || kind === "mushroom" ? 18 : 24);
-    for (const bx of this.boxes) if (bx.t <= 0) prop(bx.x, bx.y, PROP.itembox, 14, 5 + Math.sin(this.t * 3) * 2);
+    for (const bx of this.boxes) if (bx.t <= 0) prop(bx.x, bx.y, PROP.itembox, 16, 6 + Math.sin(this.t * 3) * 2);
     for (const d of this.drops) prop(d.x, d.y, PROP.slick, 7);
     for (const h of this.hazards) {
       if (h.kind === "spider") prop(h.x, h.y, PROP.spider, 20);
@@ -346,7 +349,9 @@ export class Race {
       const sh = this.kartImg[k.faction + k.chassis]; if (!sh || !sh.complete || !sh.naturalWidth) continue;
       let rel = k.h - this.camH; if (k.spin > 0) rel += k.spin * 6; let fi = Math.round((rel / (Math.PI * 2)) * 16); fi = ((fi % 16) + 16) % 16;
       const flicker = k.invuln > 0 && k.spin <= 0 && Math.floor(this.t * 16) % 2 === 0;
-      if (!flicker) put(k.x, k.y, sh, fi * 96, 0, 96, 96, 20, k.hop > 0 ? Math.sin(k.hop * Math.PI) * 6 : 0);
+      // ground shadow, then the kart
+      { const { z, lat } = proj(k.x, k.y); if (z > 6 && z < 900) { const sc = FOCAL / z; const px = this.vw / 2 + lat * sc + sx, base = HORIZON + CAM_H * sc + sy; S.push({ z: z + 0.01, draw: () => { c.fillStyle = "rgba(0,0,0,0.35)"; c.beginPath(); c.ellipse(px, base - 1 * sc, 11 * sc, 3.5 * sc, 0, 0, Math.PI * 2); c.fill(); } }); } }
+      if (!flicker) put(k.x, k.y, sh, fi * 128, 0, 128, 128, 40, k.hop > 0 ? Math.sin(k.hop * Math.PI) * 6 : 0);
       if (k.shield > 0) prop(k.x, k.y, PROP.shield, 26, -1, 0.55);
       if (k.drift !== 0 && k.driftT > 0.9) prop(k.x - Math.cos(k.h) * 10, k.y - Math.sin(k.h) * 10, PROP.star, 7 + Math.sin(this.t * 30) * 2, 1, 0.9);
     }

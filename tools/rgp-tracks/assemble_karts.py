@@ -2,7 +2,7 @@ import sys, glob
 sys.path.insert(0,'/home/claude/repo/tools/bounty-sprites')
 from pixelize import pixelize
 from PIL import Image
-def sheet(indir, out, fw=96, fh=96, target_h=None, factor=None, colors=40):
+def sheet(indir, out, fw=128, fh=128, target_h=None, factor=None, colors=48):
     files=sorted(glob.glob(f'{indir}/a*.png')); frames=[]
     for f in files:
         im=Image.open(f)

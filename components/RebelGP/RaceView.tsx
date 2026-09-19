@@ -53,7 +53,7 @@ export default function RaceView({ trackId, faction, chassis, onEnd, onQuit }: P
         onSfx: (n) => { const s = (SFX as any)[n]; if (s) s(audioRef.current); },
         onEnd: (res) => { audioRef.current.music(null); onEnd(res); },
       }, faction, chassis);
-      r.setView(vwRef.current); raceRef.current = r; (window as any).__gp = r; r.start(); setReady(true);
+      r.setView(vwRef.current); r.touch = "ontouchstart" in window || navigator.maxTouchPoints > 0; raceRef.current = r; (window as any).__gp = r; r.start(); setReady(true);
       audioRef.current.music(track.cup >= 3 ? "fw-battle-epic" : "hd-war", 0.3);
     }).catch((e) => { console.error(e); setLoadErr(String(e?.message || e)); });
     const kd = (e: KeyboardEvent) => { const k = KEYS[e.key]; const g = raceRef.current; if (k && g) { g.input[k] = true; e.preventDefault(); } if (e.key === "Escape") onQuit(); };

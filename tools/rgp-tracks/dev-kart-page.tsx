@@ -6,44 +6,63 @@ import { useGLTF, useFBX } from "@react-three/drei";
 import { AnimationMixer, Box3, BoxGeometry, CylinderGeometry, DoubleSide, Group, Mesh, MeshStandardMaterial, SphereGeometry, TorusGeometry, Vector3, type Object3D } from "three";
 import { clone } from "three/examples/jsm/utils/SkeletonUtils.js";
 
-export const CHASSIS: Record<string, { len: number; wid: number; hgt: number; wheel: number; bar: boolean; spoiler: boolean; nose: number }> = {
-  scout:   { len: 1.15, wid: 0.72, hgt: 0.30, wheel: 0.19, bar: false, spoiler: false, nose: 0.55 },
-  soldier: { len: 1.30, wid: 0.85, hgt: 0.36, wheel: 0.23, bar: false, spoiler: true,  nose: 0.45 },
-  tank:    { len: 1.45, wid: 1.00, hgt: 0.46, wheel: 0.30, bar: true,  spoiler: false, nose: 0.35 },
+export const CHASSIS: Record<string, { len: number; wid: number; noseL: number; wingF: number; wingR: number; wheelF: number; wheelR: number; pod: number; airbox: number; halo: boolean; trim: number }> = {
+  //           body len  body wid  nose   front wing  rear wing  wheelF  wheelR  side pod  airbox  halo   gold trim
+  scout:   { len: 1.55, wid: 0.26, noseL: 0.65, wingF: 0.80, wingR: 0.70, wheelF: 0.14, wheelR: 0.17, pod: 0.10, airbox: 0.14, halo: false, trim: 0 },
+  soldier: { len: 1.75, wid: 0.30, noseL: 0.60, wingF: 0.95, wingR: 0.85, wheelF: 0.16, wheelR: 0.20, pod: 0.16, airbox: 0.18, halo: true,  trim: 0 },
+  tank:    { len: 1.85, wid: 0.36, noseL: 0.45, wingF: 1.05, wingR: 1.00, wheelF: 0.19, wheelR: 0.26, pod: 0.24, airbox: 0.22, halo: true,  trim: 0 },
+  drone:   { len: 1.95, wid: 0.26, noseL: 0.80, wingF: 0.90, wingR: 0.75, wheelF: 0.15, wheelR: 0.19, pod: 0.12, airbox: 0.12, halo: false, trim: 0 },
+  royal:   { len: 1.80, wid: 0.32, noseL: 0.60, wingF: 1.00, wingR: 0.95, wheelF: 0.17, wheelR: 0.22, pod: 0.18, airbox: 0.26, halo: true,  trim: 1 },
 };
 
 function buildKart(H: number, k: string, paint: string, accent: string) {
-  const c = CHASSIS[k] || CHASSIS.soldier; const L = c.len * H * 0.92, W = c.wid * H * 0.95, HG = c.hgt * H * 0.72, R = c.wheel * H * 0.95;
+  const c = CHASSIS[k] || CHASSIS.soldier; const L = c.len * H * 0.85, W = c.wid * H * 0.9;
   const g = new Group();
-  const mPaint = new MeshStandardMaterial({ color: paint, metalness: 0.35, roughness: 0.45 });
-  const mDark = new MeshStandardMaterial({ color: "#2a2a30", metalness: 0.2, roughness: 0.8 });
-  const mTire = new MeshStandardMaterial({ color: "#1a1a1e", roughness: 0.95 });
-  const mRim = new MeshStandardMaterial({ color: "#c9c9d2", metalness: 0.8, roughness: 0.3 });
-  const mAcc = new MeshStandardMaterial({ color: accent, emissive: accent, emissiveIntensity: 0.35 });
+  const mPaint = new MeshStandardMaterial({ color: paint, metalness: 0.4, roughness: 0.4 });
+  const mDark = new MeshStandardMaterial({ color: "#22222a", metalness: 0.3, roughness: 0.7 });
+  const mCarbon = new MeshStandardMaterial({ color: "#3a3a44", metalness: 0.5, roughness: 0.5 });
+  const mTire = new MeshStandardMaterial({ color: "#16161a", roughness: 0.95 });
+  const mRim = new MeshStandardMaterial({ color: c.trim ? "#e6c15a" : "#c9c9d2", metalness: 0.85, roughness: 0.3 });
+  const mAcc = new MeshStandardMaterial({ color: accent, emissive: accent, emissiveIntensity: 0.3, metalness: 0.3, roughness: 0.4 });
+  const mGold = new MeshStandardMaterial({ color: "#e6c15a", metalness: 0.9, roughness: 0.25 });
   const mGlow = new MeshStandardMaterial({ color: "#ffb347", emissive: "#ff7a1a", emissiveIntensity: 1.2 });
-  // floor pan + body
-  const pan = new Mesh(new BoxGeometry(L, HG * 0.35, W * 0.9), mDark); pan.position.set(0, R * 0.9, 0); g.add(pan);
-  const body = new Mesh(new BoxGeometry(L * 0.78, HG, W * 0.78), mPaint); body.position.set(L * 0.04, R * 0.9 + HG * 0.55, 0); g.add(body);
-  // nose (front is +x)
-  const nose = new Mesh(new BoxGeometry(L * c.nose, HG * 0.75, W * 0.5), mPaint); nose.position.set(L * 0.42, R * 0.9 + HG * 0.42, 0); g.add(nose);
-  const noseTip = new Mesh(new BoxGeometry(L * 0.08, HG * 0.5, W * 0.62), mAcc); noseTip.position.set(L * 0.66, R * 0.9 + HG * 0.4, 0); g.add(noseTip);
-  // seat back + cockpit cutout
-  const seat = new Mesh(new BoxGeometry(L * 0.12, HG * 0.8, W * 0.5), mDark); seat.position.set(-L * 0.3, R * 0.9 + HG * 1.2, 0); g.add(seat);
-  // steering column + wheel
-  const col = new Mesh(new CylinderGeometry(H * 0.012, H * 0.012, H * 0.22, 6), mDark); col.position.set(L * 0.2, R * 0.9 + HG * 1.15, 0); col.rotation.z = 0.7; g.add(col);
-  const wheel = new Mesh(new TorusGeometry(H * 0.075, H * 0.012, 6, 14), mDark); wheel.position.set(L * 0.13, R * 0.9 + HG * 1.35, 0); wheel.rotation.y = Math.PI / 2; wheel.rotation.x = 0; wheel.rotateOnAxis(new Vector3(0, 0, 1), 0.7); g.add(wheel);
-  // wheels
-  for (const sx of [1, -1]) for (const sz of [1, -1]) {
-    const t = new Mesh(new CylinderGeometry(R, R, W * 0.16, 12), mTire); t.rotation.x = Math.PI / 2; t.position.set(sx * L * 0.36, R, sz * (W * 0.5 + W * 0.08)); g.add(t);
-    const rim = new Mesh(new CylinderGeometry(R * 0.55, R * 0.55, W * 0.17, 8), mRim); rim.rotation.x = Math.PI / 2; rim.position.copy(t.position); g.add(rim);
-  }
-  // exhausts (rear, -x)
-  for (const sz of [1, -1]) { const ex = new Mesh(new CylinderGeometry(H * 0.03, H * 0.035, L * 0.18, 8), mDark); ex.rotation.z = Math.PI / 2; ex.position.set(-L * 0.48, R * 1.1, sz * W * 0.22); g.add(ex); const fl = new Mesh(new SphereGeometry(H * 0.03, 8, 6), mGlow); fl.position.set(-L * 0.58, R * 1.1, sz * W * 0.22); g.add(fl); }
-  if (c.spoiler) { const sp = new Mesh(new BoxGeometry(L * 0.1, HG * 0.14, W * 0.95), mAcc); sp.position.set(-L * 0.48, R * 0.9 + HG * 1.75, 0); g.add(sp); for (const sz of [1, -1]) { const st = new Mesh(new BoxGeometry(L * 0.06, HG * 0.8, W * 0.05), mDark); st.position.set(-L * 0.48, R * 0.9 + HG * 1.35, sz * W * 0.4); g.add(st); } }
-  if (c.bar) { const bar = new Mesh(new TorusGeometry(W * 0.32, H * 0.02, 6, 12, Math.PI), mRim); bar.position.set(-L * 0.24, R * 0.9 + HG * 1.15, 0); bar.rotation.y = Math.PI / 2; g.add(bar); }
-  // faction stripe
-  const stripe = new Mesh(new BoxGeometry(L * 0.8, HG * 0.06, W * 0.12), mAcc); stripe.position.set(L * 0.04, R * 0.9 + HG * 1.06, 0); g.add(stripe);
-  return { g, seatY: R * 0.9 + HG * 1.05, seatX: -L * 0.14 };
+  const RF = c.wheelF * H, RR = c.wheelR * H; const floor = RR * 0.55;   // ride height
+  const add = (m: Mesh) => { g.add(m); return m; };
+  // monocoque: floor + tub + raised cockpit
+  add(new Mesh(new BoxGeometry(L * 0.75, H * 0.03, W * 2.2), mCarbon)).position.set(-L * 0.05, floor, 0);
+  add(new Mesh(new BoxGeometry(L * 0.62, H * 0.16, W), mPaint)).position.set(-L * 0.02, floor + H * 0.09, 0);
+  add(new Mesh(new BoxGeometry(L * 0.3, H * 0.1, W * 0.9), mPaint)).position.set(-L * 0.12, floor + H * 0.22, 0);   // cockpit rim
+  // nose: tapered from body front to the tip (+x)
+  const ng = new CylinderGeometry(H * 0.05, W * 0.5, L * c.noseL, 4); ng.rotateY(Math.PI / 4); ng.rotateZ(-Math.PI / 2);
+  const nose = new Mesh(ng, mPaint); nose.position.set(L * 0.29 + L * c.noseL * 0.5, floor + H * 0.1, 0); g.add(nose);
+  // front wing + end plates
+  const fw = add(new Mesh(new BoxGeometry(L * 0.14, H * 0.025, c.wingF * H), c.trim ? mGold : mAcc)); fw.position.set(L * 0.29 + L * c.noseL - L * 0.04, floor - H * 0.01, 0);
+  for (const sz of [1, -1]) add(new Mesh(new BoxGeometry(L * 0.16, H * 0.08, H * 0.02), mPaint)).position.set(fw.position.x, floor + H * 0.03, sz * c.wingF * H * 0.5);
+  // side pods
+  for (const sz of [1, -1]) { const pod = add(new Mesh(new BoxGeometry(L * 0.34, H * 0.13, c.pod * H), mPaint)); pod.position.set(-L * 0.12, floor + H * 0.08, sz * (W * 0.5 + c.pod * H * 0.5)); const inlet = add(new Mesh(new BoxGeometry(L * 0.04, H * 0.09, c.pod * H * 0.8), mDark)); inlet.position.set(L * 0.05, floor + H * 0.08, sz * (W * 0.5 + c.pod * H * 0.5)); }
+  // engine cover + airbox behind the driver
+  add(new Mesh(new BoxGeometry(L * 0.3, H * 0.16, W * 0.7), mPaint)).position.set(-L * 0.33, floor + H * 0.22, 0);
+  const ab = add(new Mesh(new BoxGeometry(L * 0.12, c.airbox * H, W * 0.5), mPaint)); ab.position.set(-L * 0.2, floor + H * 0.3 + c.airbox * H * 0.5, 0);
+  add(new Mesh(new BoxGeometry(L * 0.04, c.airbox * H * 0.6, W * 0.35), mDark)).position.set(-L * 0.14, floor + H * 0.32 + c.airbox * H * 0.5, 0);
+  // halo
+  if (c.halo) { const halo = new Mesh(new TorusGeometry(W * 0.75, H * 0.012, 6, 16, Math.PI), c.trim ? mGold : mCarbon); halo.position.set(-L * 0.1, floor + H * 0.34, 0); halo.rotation.x = Math.PI; halo.rotation.z = Math.PI; halo.rotation.set(-Math.PI / 2, 0, 0); g.add(halo); add(new Mesh(new BoxGeometry(L * 0.14, H * 0.012, H * 0.012), mCarbon)).position.set(L * 0.0, floor + H * 0.34, 0); }
+  // rear wing on pylons
+  const rw = add(new Mesh(new BoxGeometry(L * 0.1, H * 0.03, c.wingR * H), c.trim ? mGold : mAcc)); rw.position.set(-L * 0.46, floor + H * 0.42, 0);
+  add(new Mesh(new BoxGeometry(L * 0.1, H * 0.02, c.wingR * H * 0.9), mPaint)).position.set(-L * 0.44, floor + H * 0.36, 0);
+  for (const sz of [1, -1]) add(new Mesh(new BoxGeometry(L * 0.12, H * 0.14, H * 0.02), mPaint)).position.set(-L * 0.46, floor + H * 0.38, sz * c.wingR * H * 0.5);
+  add(new Mesh(new BoxGeometry(L * 0.06, H * 0.2, W * 0.3), mCarbon)).position.set(-L * 0.42, floor + H * 0.25, 0);
+  // exhaust
+  for (const sz of [1, -1]) { add(new Mesh(new CylinderGeometry(H * 0.02, H * 0.025, L * 0.08, 8), mDark)).rotation.z = Math.PI / 2; g.children[g.children.length - 1].position.set(-L * 0.5, floor + H * 0.12, sz * W * 0.3); add(new Mesh(new SphereGeometry(H * 0.022, 8, 6), mGlow)).position.set(-L * 0.55, floor + H * 0.12, sz * W * 0.3); }
+  // wheels: exposed, on suspension arms
+  const wheel = (x: number, sz: number, R: number, wd: number) => {
+    const t = add(new Mesh(new CylinderGeometry(R, R, wd, 14), mTire)); t.rotation.x = Math.PI / 2; t.position.set(x, R, sz * (W * 0.5 + c.pod * H + R * 0.55 + wd * 0.5));
+    const rim = add(new Mesh(new CylinderGeometry(R * 0.6, R * 0.6, wd * 1.05, 8), mRim)); rim.rotation.x = Math.PI / 2; rim.position.copy(t.position);
+    for (const dz of [0.25, -0.25]) { const arm = add(new Mesh(new BoxGeometry(H * 0.02, H * 0.02, t.position.z - sz * W * 0.5), mCarbon)); arm.position.set(x + dz * L * 0.06, R * 1.05, sz * (W * 0.5) + (t.position.z - sz * W * 0.5) / 2); }
+  };
+  for (const sz of [1, -1]) { wheel(L * 0.3, sz, RF, H * 0.09); wheel(-L * 0.36, sz, RR, H * 0.12); }
+  // livery stripe + number plate on the nose
+  add(new Mesh(new BoxGeometry(L * 0.5, H * 0.004, W * 0.25), mAcc)).position.set(L * 0.02, floor + H * 0.171, 0);
+  return { g, seatY: floor + H * 0.05, seatX: -L * 0.11 };
 }
 
 function Rig({ fid, kid, paint, accent }: { fid: string; kid: string; paint: string; accent: string }) {
@@ -67,10 +86,10 @@ function Rig({ fid, kid, paint, accent }: { fid: string; kid: string; paint: str
       // seated: thighs forward, shins down, arms to the wheel, slight forward lean
       const rot = (b: string, x: number, y: number, z: number) => { const bb = bones[b]; if (bb) bb.rotation.set(bb.rotation.x + x, bb.rotation.y + y, bb.rotation.z + z); };
       action.stop(); action.play(); action.time = 0.2; mixer.update(0);
-      const P = { thigh: -1.45, shin: 1.35, arm: -0.8, fore: -0.55, lean: 0.05, ...o };
+      const P = { thigh: -1.5, shin: 1.45, arm: -0.75, fore: -0.7, lean: 0.02, ...o };
       rot("LeftUpLeg", P.thigh, 0, 0.12); rot("RightUpLeg", P.thigh, 0, -0.12); rot("LeftLeg", P.shin, 0, 0); rot("RightLeg", P.shin, 0, 0);
       rot("LeftArm", P.arm, 0, 0.35); rot("RightArm", P.arm, 0, -0.35); rot("LeftForeArm", P.fore, 0, 0); rot("RightForeArm", P.fore, 0, 0);
-      rot("Spine", P.lean, 0, 0); rot("Head", -0.25, 0, 0); if (o.head) rot("Head", o.head[0], o.head[1], o.head[2]);
+      rot("Spine", P.lean, 0, 0); rot("Head", -0.15, 0, 0); if (o.head) rot("Head", o.head[0], o.head[1], o.head[2]);
       s.rotation.set(0, Math.PI / 2, 0); // face +x (kart front)
       s.updateMatrixWorld(true);
       const hips = bones.Hips; const hp = new Vector3(); hips.getWorldPosition(hp);

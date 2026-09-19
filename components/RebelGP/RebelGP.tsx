@@ -124,12 +124,12 @@ const RebelGP: React.FC = () => {
       </div>
 
       {/* kart */}
-      <div style={{ maxWidth: 760, margin: "24px auto 0", padding: "0 16px" }}>
-        <div style={{ fontSize: 11, color: "#a78bfa", letterSpacing: "0.4em", textAlign: "center", marginBottom: 10 }}>◆ YOUR KART ◆</div>
-        <div style={{ display: "grid", gridTemplateColumns: narrow ? "1fr" : "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+      <div style={{ maxWidth: 1000, margin: "24px auto 0", padding: "0 16px" }}>
+        <div style={{ fontSize: 11, color: "#a78bfa", letterSpacing: "0.4em", textAlign: "center", marginBottom: 10 }}>◆ YOUR KART · 5 CHASSIS ◆</div>
+        <div style={{ display: "grid", gridTemplateColumns: narrow ? "1fr" : "repeat(auto-fit, minmax(230px, 1fr))", gap: 8 }}>
           {CHASSIS.map((k) => { const on = k.id === chassis; return (
             <button key={k.id} type="button" onClick={() => setChassis(k.id)} style={{ fontFamily: FONT, textAlign: "left", padding: "10px 12px", borderRadius: 12, border: on ? "2px solid #ffd166" : "1px solid rgba(255,255,255,0.12)", background: on ? "linear-gradient(180deg, rgba(255,209,102,0.15), rgba(10,8,16,0.9))" : "rgba(10,8,16,0.8)", color: "#fff", cursor: "pointer", boxShadow: on ? "0 0 22px rgba(255,209,102,0.3)" : "none", display: "flex", gap: 12, alignItems: "center" }}>
-              <div style={{ width: 96, height: 72, flex: "0 0 auto", backgroundImage: `url(/rgp/karts/kart_${faction}_${k.id}.png)`, backgroundPosition: `-${4 * 96}px -12px`, backgroundRepeat: "no-repeat", imageRendering: "pixelated", filter: on ? "none" : "brightness(0.7)" }} />
+              <div style={{ width: 128, height: 64, flex: "0 0 auto", backgroundImage: `url(/rgp/karts/kart_${faction}_${k.id}.png)`, backgroundPosition: `-${4 * 128}px -58px`, backgroundRepeat: "no-repeat", imageRendering: "pixelated", filter: on ? "none" : "brightness(0.7)" }} />
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: "0.08em", color: on ? "#ffd166" : "#fff" }}>{k.name.toUpperCase()}</div>
                 <div style={{ fontSize: 9, opacity: 0.6, fontStyle: "italic", marginTop: 2 }}>{k.blurb}</div>

@@ -9,12 +9,14 @@ export const GP_PAYOUT = [3.0, 2.0, 1.4, 1.0, 0.6, 0.3, 0.15, 0];
 /** cup bonus: sum of place points (1st 10 … 8th 1) over the 3 tracks; ≥ 24 pays the cup bounty */
 export const GP_PLACE_POINTS = [10, 8, 6, 5, 4, 3, 2, 1];
 
-export type ChassisId = "scout" | "soldier" | "tank";
+export type ChassisId = "scout" | "soldier" | "tank" | "drone" | "royal";
 export type Chassis = { id: ChassisId; name: string; blurb: string; top: number; accel: number; handling: number; weight: number };
 export const CHASSIS: Chassis[] = [
-  { id: "scout",   name: "Scout",   blurb: "Light and twitchy. Fast off the line, turns on a dime, gets bullied.", top: 0.94, accel: 1.25, handling: 1.25, weight: 0.7 },
-  { id: "soldier", name: "Soldier", blurb: "The all-rounder. Nothing special, nothing wrong.",                       top: 1.0,  accel: 1.0,  handling: 1.0,  weight: 1.0 },
-  { id: "tank",    name: "Tank",    blurb: "Heavy. Slow to wind up, highest top speed, shoves everyone off the line.", top: 1.08, accel: 0.78, handling: 0.82, weight: 1.45 },
+  { id: "scout",   name: "Scout",   blurb: "Needle nose, tiny wings. Fast off the line, turns on a dime, gets bullied.",      top: 0.94, accel: 1.25, handling: 1.25, weight: 0.7 },
+  { id: "soldier", name: "Soldier", blurb: "The classic open-wheeler. Nothing special, nothing wrong.",                       top: 1.0,  accel: 1.0,  handling: 1.0,  weight: 1.0 },
+  { id: "tank",    name: "Tank",    blurb: "Fat rear tyres, huge wing. Slow to wind up, top speed king, shoves everyone.",     top: 1.08, accel: 0.78, handling: 0.82, weight: 1.45 },
+  { id: "drone",   name: "Drone",   blurb: "Long, low and slippery. Best drifts on the grid, weak in a shoving match.",        top: 1.03, accel: 0.95, handling: 1.15, weight: 0.85 },
+  { id: "royal",   name: "Royal",   blurb: "Gold trim, tall airbox. Strong everywhere, brakes like a queen — slowly.",          top: 1.05, accel: 1.05, handling: 0.9,  weight: 1.2 },
 ];
 
 export type CupId = 1 | 2 | 3 | 4 | 5;
