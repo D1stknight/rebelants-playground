@@ -1,6 +1,7 @@
 // components/BountyHunters/BountyGame.tsx
 // Mounts the canvas engine, forwards keyboard/touch input, draws the HUD in DOM on top.
 import React, { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { BountyGame, VW, VH, type Hud, type Input } from "./game";
 import type { Board } from "../../lib/bountyConfig";
 import { useBountyAudio } from "../../lib/useBountyAudio";
@@ -20,6 +21,20 @@ export default function BountyGameView({ board, faction = "samurai", onEnd, onQu
   const [isTouch, setIsTouch] = useState(false);
   const [portrait, setPortrait] = useState(false);
   const [fatal, setFatal] = useState<string | null>(null);
+  const [dbg, setDbg] = useState<string | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!/[?&]debug/.test(location.search)) return;
+    const errs: string[] = [];
+    const oe = (e: ErrorEvent) => errs.push("ERR " + e.message); const ur = (e: PromiseRejectionEvent) => errs.push("REJ " + String(e.reason?.message || e.reason));
+    window.addEventListener("error", oe); window.addEventListener("unhandledrejection", ur);
+    const id = setInterval(() => {
+      const r = rootRef.current?.getBoundingClientRect(); const c = canvasRef.current?.getBoundingClientRect(); const g = gameRef.current;
+      const cs = rootRef.current ? getComputedStyle(rootRef.current) : null;
+      setDbg(JSON.stringify({ win: [innerWidth, innerHeight], vv: window.visualViewport ? [Math.round(window.visualViewport.width), Math.round(window.visualViewport.height), window.visualViewport.scale] : null, dpr: devicePixelRatio, isTouch, portrait, scale, root: r ? [Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)] : null, rootCss: cs ? [cs.position, cs.display, cs.backgroundColor, cs.zIndex, cs.visibility, cs.opacity] : null, canvas: c ? [Math.round(c.x), Math.round(c.y), Math.round(c.width), Math.round(c.height)] : null, game: g ? { t: Math.round(g.t * 10) / 10, state: g.state, px: Math.round(g.player.x), over: g.over } : null, doc: [document.documentElement.scrollWidth, document.documentElement.scrollHeight, scrollX, scrollY], errs: errs.slice(-5), ua: navigator.userAgent }));
+    }, 700);
+    return () => { clearInterval(id); window.removeEventListener("error", oe); window.removeEventListener("unhandledrejection", ur); };
+  }, [isTouch, portrait, scale]);
   useEffect(() => { setIsTouch("ontouchstart" in window || navigator.maxTouchPoints > 0); }, []);
 
   useEffect(() => {
@@ -63,10 +78,11 @@ export default function BountyGameView({ board, faction = "samurai", onEnd, onQu
   );
 
   const bossPct = hud?.bossHp != null ? hud.bossHp / hud.bossMax : null;
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "#000", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: isTouch && portrait ? "flex-start" : "center", paddingTop: isTouch && portrait ? "env(safe-area-inset-top)" : 0, fontFamily: FONT, color: "#fff", overflow: "hidden", touchAction: "none", WebkitUserSelect: "none", userSelect: "none" }}>
+  return (<>
+    {dbg && createPortal(<div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 2147483647, background: "#ffec3d", color: "#000", fontFamily: "monospace", fontSize: 10, padding: 6, wordBreak: "break-all", whiteSpace: "pre-wrap", pointerEvents: "none" }}>{dbg}</div>, document.body)}
+    <div ref={rootRef} style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%", zIndex: 50, background: "#000", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: isTouch && portrait ? "flex-start" : "center", paddingTop: isTouch && portrait ? "env(safe-area-inset-top)" : 0, fontFamily: FONT, color: "#fff", overflow: "hidden", touchAction: "none", WebkitUserSelect: "none", userSelect: "none" }}>
       {fatal && (
-        <div style={{ position: "absolute", inset: 0, zIndex: 20, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, textAlign: "center", background: "rgba(0,0,0,0.85)" }}>
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 20, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, textAlign: "center", background: "rgba(0,0,0,0.85)" }}>
           <div style={{ fontSize: 14, color: "#ff5566", letterSpacing: "0.3em", fontWeight: 800 }}>☠ THE HUNT COULDN'T START</div>
           <div style={{ fontSize: 11, opacity: 0.6, marginTop: 10, maxWidth: 420, wordBreak: "break-word" }}>{fatal}</div>
           <button type="button" onClick={onQuit} style={{ marginTop: 18, fontFamily: FONT, padding: "12px 22px", border: "1px solid rgba(255,255,255,0.25)", borderRadius: 12, background: "rgba(255,255,255,0.08)", color: "#fff", fontWeight: 800, letterSpacing: "0.15em" }}>BACK TO LOBBY</button>
@@ -76,7 +92,7 @@ export default function BountyGameView({ board, faction = "samurai", onEnd, onQu
         <canvas ref={canvasRef} width={VW} height={VH} style={{ width: VW * scale, height: VH * scale, imageRendering: "pixelated", display: "block" }} />
         {/* HUD */}
         {hud && (
-          <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, pointerEvents: "none" }}>
             <div style={{ position: "absolute", top: 8, left: 10, display: "flex", gap: 10, alignItems: "center" }}>
               <div>
                 <div style={{ display: "flex", gap: 3 }}>{Array.from({ length: Math.max(0, hud.lives) }, (_, i) => <span key={i} style={{ fontSize: 11 * Math.max(1, scale / 2) }}>❤️</span>)}</div>
@@ -128,5 +144,5 @@ export default function BountyGameView({ board, faction = "samurai", onEnd, onQu
       )}
       <style>{`@keyframes bhMsg{0%{opacity:0;transform:scale(1.15)}12%{opacity:1;transform:scale(1)}80%{opacity:1}100%{opacity:0}}`}</style>
     </div>
-  );
+  </>);
 }
