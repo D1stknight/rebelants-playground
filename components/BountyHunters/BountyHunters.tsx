@@ -43,6 +43,16 @@ const BountyHunters: React.FC = () => {
   const [result, setResult] = useState<{ cleared: boolean; bounty: number; kills: number; boardN: number; paid: number } | null>(null);
   useEffect(() => { setBest(loadBest()); }, []);
   const [narrow, setNarrow] = useState(false);
+  // iPhone Safari has no Fullscreen API for pages — the only way to lose the browser bars is "Add to Home Screen" (the site runs standalone). Show the tip once.
+  const [fsTip, setFsTip] = useState(false);
+  useEffect(() => {
+    try {
+      const ua = navigator.userAgent; const iOS = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      const standalone = (navigator as any).standalone === true || window.matchMedia("(display-mode: standalone)").matches;
+      const noFsApi = !((document.documentElement as any).requestFullscreen || (document.documentElement as any).webkitRequestFullscreen);
+      setFsTip(iOS && !standalone && noFsApi && localStorage.getItem("ra:bh:fstip") !== "1");
+    } catch {}
+  }, []);
   useEffect(() => { const f = () => setNarrow(window.innerWidth < 720); f(); window.addEventListener("resize", f); return () => window.removeEventListener("resize", f); }, []);
   useEffect(() => { preloadBoard(board, faction); }, [board, faction]);
   const unlockedN = useMemo(() => { let n = 1; for (const b of BOARDS) if (best[b.n]?.cleared) n = Math.max(n, b.n + 1); return Math.min(n, BOARDS.length); }, [best]);
@@ -159,6 +169,16 @@ const BountyHunters: React.FC = () => {
           );
         })}
       </div>
+
+      {fsTip && (
+        <div style={{ maxWidth: 640, margin: "18px auto 0", padding: "0 16px" }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.35)", borderRadius: 12, padding: "10px 12px", fontSize: 12, lineHeight: 1.45 }}>
+            <div style={{ fontSize: 20 }}>⛶</div>
+            <div style={{ flex: 1 }}><b>Want full screen?</b> Safari on iPhone can't hide its bars for games. Tap <b>Share</b> (the box with the arrow) → <b>Add to Home Screen</b>, then launch Rebel Ants from there — no address bar, no tabs. Landscape gives the widest view.</div>
+            <button type="button" onClick={() => { setFsTip(false); try { localStorage.setItem("ra:bh:fstip", "1"); } catch {} }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.6)", fontSize: 16, cursor: "pointer", padding: 4 }}>✕</button>
+          </div>
+        </div>
+      )}
 
       {/* start */}
       <div style={{ maxWidth: 640, margin: "26px auto 0", padding: "0 16px", textAlign: "center", ...(narrow ? { position: "sticky", bottom: 0, zIndex: 5, background: "linear-gradient(180deg, rgba(5,2,12,0) 0%, rgba(5,2,12,0.96) 30%)", paddingTop: 14, paddingBottom: "max(12px, env(safe-area-inset-bottom))" } : {}) }}>
