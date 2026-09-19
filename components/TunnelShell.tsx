@@ -1,5 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import TunnelRun from "./AntTunnel/TunnelRun";
 import { usePoints } from "../lib/usePoints";
 import { loadProfile, getEffectivePlayerId, saveProfile } from "../lib/profile";
 
@@ -960,242 +961,31 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     }
   }
 
-  useEffect(() => {
-    if (!isPlaying) return;
-
-    const interval = setInterval(() => {
-      setTimeLeft((t) => Math.max(0, t - 1));
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [isPlaying]);
-
-      useEffect(() => {
-    if (!isPlaying) return;
-    if (timeLeft > 0) return;
-
-    let cancelled = false;
-
-        const finishRun = async () => {
-      setIsPlaying(false);
-      sfx.lose();
-    setLastRunResult({ layoutName: LAYOUT_NAMES[layoutIndex]||("#"+(layoutIndex+1)), layoutNum: layoutIndex+1, score, clearTimeMs: null, wasFullClear: false });
-
-            const crystalsCollected = Math.max(0, runCrystalTarget - crystals.length);
-      await recordTunnelRun({
-        score,
-        fullClear: false,
-        crystalsCollected,
-      });
-      await loadTunnelLeaderboard();
-
-                 if (score <= 0) {
-        setRunMessage("Run complete. No points earned this time.");
-        scrollBackToBoardHeader();
-        return;
-      }
-
-      setRunMessage(`Run complete. Claiming ${score} REBEL Points...`);
-
-      try {
-        const earnRes: any = await earn(score);
-        if (cancelled) return;
-
-        if (!earnRes?.ok) {
-          setRunMessage(earnRes?.error || "Run complete, but reward claim failed.");
-          return;
-        }
-
-                       setRunMessage(`Run complete. +${earnRes?.added ?? score} REBEL Points credited ✅`);
-        await refresh();
-        scrollBackToBoardHeader();
-      } catch (e: any) {
-        if (cancelled) return;
-        setRunMessage(e?.message || "Run complete, but reward claim failed.");
-      }
-    };
-
-    void finishRun();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [timeLeft, isPlaying, score, earn, refresh, runCrystalTarget, crystals.length, runStartedAt, effectivePlayerId, playerName]);
-
-   useEffect(() => {
-    if (!isPlaying) return;
-    if (crystals.length > 0) return;
-
-    let cancelled = false;
-
-       const finishCrystalRun = async () => {
-      setIsPlaying(false);
-      setDidWinRun(true);
-      sfx.win();
-    const _clearMs = runStartedAt ? Math.max(0, Date.now() - runStartedAt) : null;
-    setLastRunResult({ layoutName: LAYOUT_NAMES[layoutIndex]||("#"+(layoutIndex+1)), layoutNum: layoutIndex+1, score, clearTimeMs: _clearMs, wasFullClear: true });
-
-            await recordTunnelRun({
-        score,
-        fullClear: true,
-        crystalsCollected: runCrystalTarget,
-      });
-      await loadTunnelLeaderboard();
-
-               if (score <= 0) {
-        setRunMessage("Crystal sweep complete! No points earned this time.");
-        scrollBackToBoardHeader();
-        return;
-      }
-
-      setRunMessage(`Crystal sweep complete! Claiming ${score} REBEL Points... 👑`);
-
-      try {
-        const earnRes: any = await earn(score);
-
-        if (cancelled) return;
-
-        if (!earnRes?.ok) {
-          setRunMessage(earnRes?.error || "Crystal sweep complete, but reward claim failed.");
-          return;
-        }
-
-                       setRunMessage(`Crystal sweep complete! +${earnRes?.added ?? score} REBEL Points credited 👑`);
-        await refresh();
-        scrollBackToBoardHeader();
-      } catch (e: any) {
-        if (cancelled) return;
-        setRunMessage(e?.message || "Crystal sweep complete, but reward claim failed.");
-      }
-    };
-
-    void finishCrystalRun();
-
-    return () => {
-      cancelled = true;
-    };
-   }, [crystals.length, isPlaying, score, earn, refresh, runCrystalTarget, runStartedAt, effectivePlayerId, playerName]);
-
-    useEffect(() => {
-    if (!isPlaying) return;
-
-    const nextSpiderStep = (current: Cell) => {
-      const directions = [
-        { row: -1, col: 0 },
-        { row: 1, col: 0 },
-        { row: 0, col: -1 },
-        { row: 0, col: 1 },
-      ];
-
-      const candidates = directions
-        .map((move) => ({
-          row: current.row + move.row,
-          col: current.col + move.col,
-        }))
-        .filter(
-          (next) =>
-            next.row >= 0 &&
-            next.row < GRID_ROWS &&
-            next.col >= 0 &&
-            next.col < GRID_COLS &&
-                      !isWall(next.row, next.col, brokenWallSet, layoutIndex)
-        );
-
-      if (!candidates.length) return current;
-
-      const ranked = [...candidates].sort((a, b) => {
-        const da = manhattanDistance(a, playerPos);
-        const db = manhattanDistance(b, playerPos);
-        return da - db;
-      });
-
-      const roll = Math.random();
-
-      // almost always choose the best chase move
-      if (roll < 0.88) return ranked[0];
-      if (roll < 0.97 && ranked[1]) return ranked[1];
-
-      return ranked[(Math.random() * ranked.length) | 0];
-    };
-
-       const interval = setInterval(() => {
-      setSpiderPos((current) => {
-        const firstStep = nextSpiderStep(current);
-        const distAfterFirst = manhattanDistance(firstStep, playerPos);
-
-        if (distAfterFirst <= 6) {
-          return nextSpiderStep(firstStep);
-        }
-
-        return firstStep;
-      });
-    }, tunnelCfg.tunnelSpiderSpeedMs);
-
-    return () => clearInterval(interval);
-   }, [isPlaying, playerPos, brokenWallSet, tunnelCfg.tunnelSpiderSpeedMs, layoutIndex]);
-    useEffect(() => {
-    if (!isPlaying) return;
-
-    const now = Date.now();
-    if (playerPos.row !== spiderPos.row || playerPos.col !== spiderPos.col) return;
-    if (now - lastHitRef.current < 900) return;
-
-    lastHitRef.current = now;
-    setTimeLeft((t) => Math.max(0, t - 3));
-    setRunMessage("Spider hit! -3 seconds");
-    setHitFlash(true);
-    setHitShake(true);
-    sfx.spiderHit();
-
-    window.setTimeout(() => {
-      setHitFlash(false);
-    }, 220);
-
-    window.setTimeout(() => {
-      setHitShake(false);
-    }, 180);
-  }, [playerPos, spiderPos, isPlaying]);
-
-                  useLayoutEffect(() => {
-    const playerEl = playerTileRef.current;
-    if (!playerEl || !isPlaying) return;
-
-    const raf = requestAnimationFrame(() => {
-      playerEl.scrollIntoView({
-        block: "center",
-        inline: "center",
-        behavior: "auto",
-      });
-    });
-
-    return () => cancelAnimationFrame(raf);
-  }, [playerPos, isPlaying]);
-  
-    useEffect(() => {
-    if (!isPlaying) return;
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      const validMove = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"];
-      const isBreak = e.code === "Space";
-
-      if (!validMove.includes(e.key) && !isBreak) return;
-
-      e.preventDefault();
-
-      if (isBreak) {
-        handleTunnelAction("break");
-        return;
-      }
-
-      if (e.key === "ArrowUp") handleTunnelAction("up");
-      if (e.key === "ArrowDown") handleTunnelAction("down");
-      if (e.key === "ArrowLeft") handleTunnelAction("left");
-      if (e.key === "ArrowRight") handleTunnelAction("right");
-    };
-
-    window.addEventListener("keydown", onKeyDown, { passive: false });
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isPlaying, facing, playerPos, wallBreaksLeft, brokenWallSet, layoutIndex]);
+  // ── run end (the canvas engine reports the result; one path for time-out and crystal sweep)
+  const finishRun = React.useCallback(async (r: { score: number; fullClear: boolean; crystalsCollected: number; crystalsTotal: number; clearMs: number | null }) => {
+    if (!isPlayingRef.current) return;
+    isPlayingRef.current = false; setIsPlaying(false); setDidWinRun(r.fullClear); setScore(r.score);
+    if (r.fullClear) sfx.win(); else sfx.lose();
+    setLastRunResult({ layoutName: LAYOUT_NAMES[layoutIndex] || ("#" + (layoutIndex + 1)), layoutNum: layoutIndex + 1, score: r.score, clearTimeMs: r.clearMs, wasFullClear: r.fullClear });
+    await recordTunnelRun({ score: r.score, fullClear: r.fullClear, crystalsCollected: r.crystalsCollected });
+    await loadTunnelLeaderboard();
+    const label = r.fullClear ? "Crystal sweep complete!" : "Run complete.";
+    if (r.score <= 0) { setRunMessage(`${label} No points earned this time.`); scrollBackToBoardHeader(); return; }
+    setRunMessage(`${label} Claiming ${r.score} REBEL Points...${r.fullClear ? " 👑" : ""}`);
+    try {
+      const earnRes: any = await earn(r.score);
+      if (!earnRes?.ok) { setRunMessage(earnRes?.error || `${label} Reward claim failed.`); return; }
+      setRunMessage(`${label} +${earnRes?.added ?? r.score} REBEL Points credited ${r.fullClear ? "👑" : "✅"}`);
+      await refresh(); scrollBackToBoardHeader();
+    } catch (e: any) { setRunMessage(e?.message || `${label} Reward claim failed.`); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layoutIndex, earn, refresh, effectivePlayerId, playerName, runStartedAt]);
+  const forceEnd = () => { const g = (window as any).__tun; if (g && g.state === "play") g.end(false); };
+  const [crystalsLeft, setCrystalsLeft] = useState(0);
+  const onTunnelHud = React.useCallback((h: { score: number; timeLeft: number; breaks: number; crystalsLeft: number; msg: string | null; hit: boolean }) => {
+    setScore(h.score); setTimeLeft(h.timeLeft); setWallBreaksLeft(h.breaks); setCrystalsLeft(h.crystalsLeft); if (h.msg) setRunMessage(h.msg); setHitFlash(h.hit);
+  }, []);
+  const isPlayingRef = useRef(false); useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
   function formatCountdown(ms: number): string {
     if (ms <= 0) return "00:00:00";
     const s = Math.floor(ms / 1000);
@@ -1357,7 +1147,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           <span style={{color:timeLeft<=10?"#ff4444":themeMap[boardTheme].accent,fontWeight:900,fontSize:18,letterSpacing:1}}>⏱ {timeLeft}s</span>
               <span style={{color:themeMap[boardTheme].crystal,fontWeight:700,fontSize:16}}>💎 {score}</span>
               <span style={{color:"#ff8c00",fontWeight:700,fontSize:16}}>💥 {wallBreaksLeft}</span>
-              <span style={{color:"rgba(255,255,255,0.6)",fontWeight:700,fontSize:14}}>💎 {crystals.length} left</span>
+              <span style={{color:"rgba(255,255,255,0.6)",fontWeight:700,fontSize:14}}>💎 {crystalsLeft} left</span>
             </div>
           )}
             <main
@@ -1539,14 +1329,6 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
       </>
           )}
 
-          {isPlaying && isMobileView && (
-            <div style={mobileRunTopBarStyle}>
-              <div style={mobileRunStatPillStyle}>⏱ {timeLeft}s</div>
-              <div style={mobileRunStatPillStyle}>🎯 {score}</div>
-              <div style={mobileRunStatPillStyle}>🧱 {wallBreaksLeft}</div>
-              <div style={mobileRunStatPillStyle}>💎 {crystals.length}</div>
-            </div>
-          )}
 
                    <div ref={gameBoardTopRef} style={gameBoardWrapStyle}>
             <div style={gameBoardStyle}>
@@ -1561,7 +1343,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               <span style={{fontSize:11,opacity:0.6,fontStyle:"italic"}}>{DIFFICULTY[boardTheme].desc}</span>
             </div>
                   <div style={{ fontSize: 13, opacity: 0.82 }}>
-                                       Desktop: arrow keys move, Space breaks. Mobile: swipe to move, tap Break to smash walls.
+                                       Desktop: arrow keys / WASD move, Space breaks a wall. Phone: d-pad or swipe to move, ⛏ breaks. Your ant keeps running until it hits a wall — steer at the corners.
                   </div>
 
                                   <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
@@ -1628,295 +1410,27 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     {runMessage}
   </div>
 ) : null}
-                                                                            <div
-                  ref={boardScrollRef}
-                  className={hitShake ? "hitShake" : ""}
-                  onTouchStart={handleSwipeStart}
-                  onTouchMove={handleSwipeMove}
-                  onTouchEnd={handleSwipeEnd}
-                  style={{
-                    ...boardPreviewStyle,
-                    ...(isMobileView ? boardPreviewMobileStyle : null),
-                    ...(isPlaying && isMobileView ? boardPreviewMobileRunStyle : null),
-          ...(isPlaying && isMobileView && isLandscape ? { height: "calc(100svh - 80px)", minHeight: "calc(100svh - 80px)", maxHeight: "calc(100svh - 80px)" } : null),
-                    background: theme.bg,
-                    overflow: isPlaying && isMobileView ? "hidden" : undefined,
-                    touchAction: isPlaying && isMobileView ? "none" : undefined,
-                  }}
-                >
-                                   <div style={previewGlowStyle(theme.accent)} />
-
-        {/* portrait supported via D-pad */}
-
-                 {hitFlash && (
-  <div
-    className="hitFlash"
-    style={{
-      position: "absolute",
-      inset: 0,
-      pointerEvents: "none",
-      zIndex: 4,
-      background:
-        "radial-gradient(circle at center, rgba(255,70,70,0.62), rgba(180,20,20,0.38) 42%, rgba(80,0,0,0.16) 68%, transparent 78%)",
-      mixBlendMode: "screen",
-    }}
-  />
-)}
-
-                                                                    <div
-                    style={{
-                      ...previewInnerStyle,
-                      ...(isMobileView ? previewInnerMobileStyle : null),
-                      ...(isPlaying && isMobileView ? previewInnerMobileRunStyle : null),
-                    }}
-                  >
-                    <div
-                      style={{
-                        ...previewGridStyle,
-                        ...(isMobileView ? previewGridMobileStyle : null),
-                        ...(isPlaying && isMobileView ? previewGridMobileRunStyle : null),
-                      }}
-                    >
-                    {Array.from({ length: GRID_ROWS * GRID_COLS }, (_, i) => {
-                      const row = Math.floor(i / GRID_COLS);
-                      const col = i % GRID_COLS;
-
-                                           const wall = isWall(row, col, brokenWallSet, layoutIndex);
-                      const hasCrumb = crumbs.some((c) => c.row === row && c.col === col);
-                      const hasSugar = sugars.some((c) => c.row === row && c.col === col);
-                      const hasCrystal = crystals.some((c) => c.row === row && c.col === col);
-                                                                  const isPlayer = playerPos.row === row && playerPos.col === col;
-                      const isSpider = spiderPos?.row === row && spiderPos?.col === col;
-                      const burst = pickupBursts.find((b) => b.row === row && b.col === col);
-                      const wallBurst = wallBursts.find((b) => b.row === row && b.col === col);
-
-                      return (
-                                               <div
-                          key={i}
-                          ref={isPlayer ? playerTileRef : null}
-                          style={{
-                            ...tileStyle,
-                            background: wall ? theme.wall : theme.floor,
-                            border: wall
-                              ? "1px solid rgba(255,255,255,0.05)"
-                              : "1px solid rgba(255,255,255,0.03)",
-                            boxShadow: wall
-                              ? "inset 0 0 14px rgba(0,0,0,0.28)"
-                              : "inset 0 0 8px rgba(255,255,255,0.02)",
-                          }}
-                        >
-                   {!wall && hasCrumb && (
-  <div
-    className="crumbPulse"
-    style={{
-      width: isMobileView ? 12 : 16,
-      height: isMobileView ? 12 : 16,
-      display: "grid",
-      placeItems: "center",
-      borderRadius: "40% 60% 55% 45%",
-      background: "#22c55e",
-      boxShadow: isMobileView
-        ? "0 0 6px #22c55e, 0 0 12px rgba(34,197,94,0.45)"
-        : "0 0 10px #22c55e, 0 0 20px rgba(34,197,94,0.6)",
-      transform: "rotate(15deg)",
-      fontSize: isMobileView ? 8 : 10,
-      filter: isMobileView
-        ? "drop-shadow(0 0 4px rgba(34,197,94,0.6))"
-        : "drop-shadow(0 0 6px rgba(34,197,94,0.8))",
-    }}
-  >
-    🍞
-  </div>
-)}
-
-                                               {!wall && hasSugar && (
-  <div
-    className="sugarPulse"
-    style={{
-      width: isMobileView ? 16 : 20,
-      height: isMobileView ? 16 : 20,
-      display: "grid",
-      placeItems: "center",
-      borderRadius: "50%",
-      background: "radial-gradient(circle at 30% 30%, #fff7cc, #facc15)",
-      boxShadow: isMobileView
-        ? "0 0 10px #facc15, 0 0 18px rgba(250,204,21,0.45)"
-        : "0 0 16px #facc15, 0 0 30px rgba(250,204,21,0.6)",
-      border: "1px solid rgba(255,255,255,0.4)",
-      fontSize: isMobileView ? 10 : 12,
-      filter: isMobileView
-        ? "drop-shadow(0 0 6px rgba(250,204,21,0.7))"
-        : "drop-shadow(0 0 10px rgba(250,204,21,0.9))",
-    }}
-  >
-    🍬
-  </div>
-)}
-
-{!wall && hasCrystal && (
-  <div
-    className="crystalPulse"
-    style={{
-      width: isMobileView ? 20 : 26,
-      height: isMobileView ? 20 : 26,
-      display: "grid",
-      placeItems: "center",
-      fontSize: isMobileView ? 13 : 16,
-      filter: isMobileView
-        ? `
-          drop-shadow(0 0 4px #3b82f6)
-          drop-shadow(0 0 8px #3b82f6)
-          drop-shadow(0 0 16px rgba(59,130,246,0.8))
-        `
-        : `
-          drop-shadow(0 0 6px #3b82f6)
-          drop-shadow(0 0 14px #3b82f6)
-          drop-shadow(0 0 28px rgba(59,130,246,1))
-        `,
-    }}
-  >
-    💎
-  </div>
-)}
-
-                                                                         {!wall && burst && (
-                            <div
-                              className="pickupBurst"
-                              style={{
-                                position: "absolute",
-                                inset: 0,
-                                display: "grid",
-                                placeItems: "center",
-                                pointerEvents: "none",
-                                zIndex: 1,
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: 34,
-                                  height: 34,
-                                  borderRadius: 999,
-                                  background: `${burstColor(burst.kind)}22`,
-                                  boxShadow: `0 0 10px ${burstColor(burst.kind)}, 0 0 24px ${burstColor(burst.kind)}`,
-                                  border: `1px solid ${burstColor(burst.kind)}66`,
-                                }}
-                              />
-                            </div>
-                          )}
-
-                          {wallBurst && (
-                            <div
-                              className="wallBurst"
-                              style={{
-                                position: "absolute",
-                                inset: 0,
-                                display: "grid",
-                                placeItems: "center",
-                                pointerEvents: "none",
-                                zIndex: 1,
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: 38,
-                                  height: 38,
-                                  borderRadius: 999,
-                                  background: "rgba(180, 120, 60, 0.18)",
-                                  boxShadow:
-                                    "0 0 10px rgba(180,120,60,0.45), 0 0 24px rgba(120,70,30,0.55)",
-                                  border: "1px solid rgba(210,160,90,0.45)",
-                                }}
-                              />
-                            </div>
-                          )}
-
-                                                                            {!wall && isSpider && (
-                            <div
-                              className="spiderBob"
-                              style={{
-                                ...tokenStyle,
-                                width: isMobileView ? 34 : 44,
-                                height: isMobileView ? 34 : 44,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                pointerEvents: "none",
-                                overflow: "visible",
-                              }}
-                            >
-                              <img
-                                src="/spiders/spider.png"
-                                alt="Spider"
-                                style={{
-                                  width: isMobileView ? "125%" : "145%",
-                                  height: isMobileView ? "125%" : "145%",
-                                  objectFit: "contain",
-                                  transform: "translateY(2px)",
-                                  filter: isMobileView
-                                    ? "drop-shadow(0 0 4px rgba(0,0,0,0.45)) drop-shadow(0 0 6px rgba(255,40,40,0.45))"
-                                    : "drop-shadow(0 0 6px rgba(0,0,0,0.5)) drop-shadow(0 0 10px rgba(255,40,40,0.65)) drop-shadow(0 0 18px rgba(255,0,0,0.55))",
-                                }}
-                              />
-                            </div>
-                          )}
-
-                                                                                                    {!wall && isPlayer && (
-                            <div
-                              className="antFloat"
-                              style={{
-                                ...tokenStyle,
-                                width: isMobileView ? 34 : 42,
-                                height: isMobileView ? 34 : 42,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                pointerEvents: "none",
-                                overflow: "visible",
-                              }}
-                            >
-                              <img
-                                                             src={getTunnelPlayerSprite()}
-                                alt="Samurai Ant"
-                                                                                               style={{
-                                  width: isMobileView ? "135%" : "155%",
-                                  height: isMobileView ? "135%" : "155%",
-                                  objectFit: "contain",
-                                  transform: "translateY(3px) scale(1.65)",
-                                  transformOrigin: "center center",
-                                  filter: isMobileView
-                                    ? "drop-shadow(0 0 4px rgba(0,0,0,0.35))"
-                                    : "drop-shadow(0 0 6px rgba(0,0,0,0.45)) drop-shadow(0 0 10px rgba(255,255,255,0.12))",
-                                }}
-                              />
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                <div ref={boardScrollRef} style={{ position: "relative" }}>
+                  <TunnelRun
+                    layout={(TUNNEL_LAYOUTS[layoutIndex] || TUNNEL_LAYOUTS[0]) as string[]}
+                    theme={{ ...theme, dark: boardTheme === "shadow" || boardTheme === "void" || boardTheme === "mythic" }}
+                    cfg={{ runSeconds: tunnelCfg.tunnelRunSeconds, crystals: tunnelCfg.tunnelCrystalCount, sugars: tunnelCfg.tunnelSugarCount, crumbs: tunnelCfg.tunnelCrumbCount, wallBreaks: tunnelCfg.tunnelWallBreaks, spiderSpeedMs: tunnelCfg.tunnelSpiderSpeedMs }}
+                    playing={isPlaying}
+                    onHud={onTunnelHud}
+                    onEnd={finishRun}
+                    onSfx={(n) => { const f = (sfx as any)[n === "hit" ? "spiderHit" : n]; if (typeof f === "function") f(); }}
+                    onQuit={() => { if (window.confirm("Quit this run? The entry fee is spent and you keep your score so far.")) forceEnd(); }}
+                    hudLine={<div style={{ display: "flex", gap: 14, padding: "6px 14px", borderRadius: 999, background: "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.15)", fontSize: 13, fontWeight: 800 }}><span>⏱ {timeLeft}s</span><span style={{ color: "#93c5fd" }}>🎯 {score}</span><span style={{ color: "#fbbf24" }}>🧱 {wallBreaksLeft}</span></div>}
+                  />
+                  {countdown !== null && (
+                    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none", zIndex: 70 }}>
+                      <div style={{ fontSize: 120, fontWeight: 900, color: "#fff", textShadow: "0 0 60px rgba(96,165,250,0.9)", lineHeight: 1 }}>{countdown}</div>
+                    </div>
+                  )}
                 </div>
-                            </div>
               </div>
             </div>
 
-        {isPlaying && isMobileView && (
-          <div style={{ position:"fixed", ...(isLandscape ? { right:"max(12px,env(safe-area-inset-right))", top:"50%", transform:"translateY(-50%)" } : { bottom:"max(16px,env(safe-area-inset-bottom))", left:"50%", transform:"translateX(-50%)" }), zIndex:500, display:"flex", flexDirection:"column", alignItems:"center", gap:8, userSelect:"none", WebkitUserSelect:"none", touchAction:"none" }}>
-            {/* D-pad */}
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:6, width:168, height:168 }}>
-              <div />
-              <button type="button" onTouchStart={e=>{e.preventDefault();startDpadRepeat("up");}} onTouchEnd={e=>{e.preventDefault();stopDpadRepeat();}} onTouchCancel={stopDpadRepeat} onMouseDown={e=>{e.preventDefault();startDpadRepeat("up");}} onMouseUp={stopDpadRepeat} onMouseLeave={stopDpadRepeat} style={{ display:"flex",alignItems:"center",justifyContent:"center",borderRadius:12,border:"2px solid rgba(255,255,255,0.3)",background:"rgba(255,255,255,0.12)",fontSize:28,cursor:"pointer",color:"white",WebkitTapHighlightColor:"transparent",touchAction:"none",outline:"none" }}>▲</button>
-              <div />
-              <button type="button" onTouchStart={e=>{e.preventDefault();startDpadRepeat("left");}} onTouchEnd={e=>{e.preventDefault();stopDpadRepeat();}} onTouchCancel={stopDpadRepeat} onMouseDown={e=>{e.preventDefault();startDpadRepeat("left");}} onMouseUp={stopDpadRepeat} onMouseLeave={stopDpadRepeat} style={{ display:"flex",alignItems:"center",justifyContent:"center",borderRadius:12,border:"2px solid rgba(255,255,255,0.3)",background:"rgba(255,255,255,0.12)",fontSize:28,cursor:"pointer",color:"white",WebkitTapHighlightColor:"transparent",touchAction:"none",outline:"none" }}>◀</button>
-              <div style={{ borderRadius:12, background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.1)" }} />
-              <button type="button" onTouchStart={e=>{e.preventDefault();startDpadRepeat("right");}} onTouchEnd={e=>{e.preventDefault();stopDpadRepeat();}} onTouchCancel={stopDpadRepeat} onMouseDown={e=>{e.preventDefault();startDpadRepeat("right");}} onMouseUp={stopDpadRepeat} onMouseLeave={stopDpadRepeat} style={{ display:"flex",alignItems:"center",justifyContent:"center",borderRadius:12,border:"2px solid rgba(255,255,255,0.3)",background:"rgba(255,255,255,0.12)",fontSize:28,cursor:"pointer",color:"white",WebkitTapHighlightColor:"transparent",touchAction:"none",outline:"none" }}>▶</button>
-              <div />
-              <button type="button" onTouchStart={e=>{e.preventDefault();startDpadRepeat("down");}} onTouchEnd={e=>{e.preventDefault();stopDpadRepeat();}} onTouchCancel={stopDpadRepeat} onMouseDown={e=>{e.preventDefault();startDpadRepeat("down");}} onMouseUp={stopDpadRepeat} onMouseLeave={stopDpadRepeat} style={{ display:"flex",alignItems:"center",justifyContent:"center",borderRadius:12,border:"2px solid rgba(255,255,255,0.3)",background:"rgba(255,255,255,0.12)",fontSize:28,cursor:"pointer",color:"white",WebkitTapHighlightColor:"transparent",touchAction:"none",outline:"none" }}>▼</button>
-              <div />
-            </div>
-            {/* Break */}
-            <button type="button" onTouchStart={pressMobileBreak} onMouseDown={pressMobileBreak} style={mobileBreakButtonStyle}>Break</button>
-          </div>
-        )}
           </div>
 
     {!isPlaying && lastRunResult && (
@@ -2004,20 +1518,6 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
             </div>
           </div>
           </div>
-        {/* Mobile users are blocked — Ant Tunnel needs a keyboard. */}
-        {isMobileView && (
-          <div style={{ position:"fixed", inset:0, zIndex:9000, background:"rgba(9,12,22,0.97)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:18, padding:32 }}>
-            <div style={{ fontSize:64 }}>💻</div>
-            <div style={{ fontSize:22, fontWeight:900, color:"white", textAlign:"center", letterSpacing:"0.02em" }}>Desktop only</div>
-            <div style={{ fontSize:14, color:"rgba(255,255,255,0.65)", textAlign:"center", maxWidth:280, lineHeight:1.5 }}>
-              Ant Tunnel is built for keyboard controls and only plays on a computer. Open this page on your laptop or desktop to dig in.
-            </div>
-            <Link href="/" style={{ marginTop:8, padding:"10px 20px", borderRadius:999, background:"linear-gradient(135deg, rgba(251,191,36,0.25), rgba(248,113,113,0.2))", border:"1px solid rgba(251,191,36,0.4)", color:"white", fontSize:13, fontWeight:800, letterSpacing:"0.05em", textDecoration:"none" }}>
-              ← Back to playground
-            </Link>
-            <div style={{ fontSize:32, opacity:0.3, marginTop:4 }}>🐜</div>
-          </div>
-        )}
       </main>
       {showRules && (
         <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.8)", zIndex:3000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }} onClick={()=>setShowRules(false)}>
