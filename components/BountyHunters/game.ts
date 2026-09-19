@@ -4,7 +4,8 @@
 import { BOARDS, BOUNTY_HP, BOUNTY_LIVES, KILL_BOUNTY, type Board } from "../../lib/bountyConfig";
 import { buildLevel, ROWS, TILE, type Level, type Spawn } from "./levels";
 
-export const VW = 400, VH = 225;
+export const VW = 400, VH = 225;           // default view; phones in landscape widen it up to VW_MAX to match the screen
+export const VW_MAX = 480;
 const GRAV = 640, PSPEED = 92, JUMP = 262, BULLET = 280;
 
 export type Weapon = "rifle" | "spread" | "laser" | "flame";
@@ -33,7 +34,7 @@ export function preloadBoard(board: Board, faction = "samurai") {
 }
 
 export class BountyGame {
-  ctx: CanvasRenderingContext2D;
+  ctx: CanvasRenderingContext2D; vw = VW;
   board: Board; level: Level;
   ents: Ent[] = []; player: Ent;
   cam = 0; camLock: number | null = null;
@@ -46,8 +47,8 @@ export class BountyGame {
   parts: { x: number; y: number; vx: number; vy: number; life: number; c: string; s: number }[] = [];
   hud: Sheet; hunter: Sheet; items: Sheet; tiles: Sheet; bg: Sheet[]; bossSheet: Sheet;
 
-  constructor(canvas: HTMLCanvasElement, board: Board, cb: Callbacks, faction = "samurai") {
-    this.ctx = canvas.getContext("2d")!; this.ctx.imageSmoothingEnabled = false;
+  constructor(canvas: HTMLCanvasElement, board: Board, cb: Callbacks, faction = "samurai", viewW = VW) {
+    this.ctx = canvas.getContext("2d")!; this.setView(viewW);
     this.board = board; this.cb = cb; this.level = buildLevel(board);
     this.hunter = load(`hunter_${faction}`, 64, 64, 10); this.items = load("items", 16, 16, 16); this.hud = this.items;
     this.tiles = load(`tiles_${board.biome}`, 16, 16, 16);
@@ -57,6 +58,14 @@ export class BountyGame {
     this.player = this.mk("player", this.level.startX, 9 * TILE, 12, 30); this.player.hp = 1; this.checkpoint = this.level.startX; this.invuln = 2.5;
     for (const s of this.level.spawns) this.spawn(s);
     this.pushHud();
+  }
+
+  /** Widen the view (400–480 px) — the canvas backing store follows; used for phone landscape. */
+  setView(w: number) {
+    this.vw = Math.max(VW, Math.min(VW_MAX, Math.round(w)));
+    const cv = this.ctx.canvas; if (cv.width !== this.vw) { cv.width = this.vw; cv.height = VH; }
+    this.ctx.imageSmoothingEnabled = false;
+    if (this.camLock != null) this.camLock = Math.min(this.level.bossX - 40, this.level.endX - this.vw);
   }
 
   mk(kind: Ent["kind"], x: number, y: number, w: number, h: number): Ent {
@@ -181,15 +190,15 @@ export class BountyGame {
       if (p.y > ROWS * TILE + 20 || this.liquidAt(p.x + p.w / 2, p.y + p.h - 2)) this.kill();
       else if (this.spikeAt(p.x + p.w / 2, p.y + p.h - 2)) this.damage(2);
       // camera / boss trigger
-      if (this.state === "play" && p.x >= this.level.bossX) { this.camLock = this.level.bossX - 40; this.setState("boss", `WANTED · ${this.board.boss.name}`); if (this.boss) this.boss.state = "enter"; this.sfx("ambush"); }
+      if (this.state === "play" && p.x >= this.level.bossX) { this.camLock = Math.min(this.level.bossX - 40, this.level.endX - this.vw); this.setState("boss", `WANTED · ${this.board.boss.name}`); if (this.boss) this.boss.state = "enter"; this.sfx("ambush"); }
       if (p.ground && this.state === "play" && !this.spikeAt(p.x + p.w / 2, p.y + p.h + 2)) { if (Math.floor(p.x / 64) !== Math.floor(this.checkpoint / 64)) this.checkpoint = p.x; }
-      if (this.camLock != null) { p.x = Math.max(this.camLock + 2, Math.min(this.camLock + VW - p.w - 2, p.x)); }
+      if (this.camLock != null) { p.x = Math.max(this.camLock + 2, Math.min(this.camLock + this.vw - p.w - 2, p.x)); }
     }
     // ── entities
     for (const e of this.ents) {
       if (e.dead || e === p) continue;
       e.t += dt;
-      const dx = p.x - e.x; const onScreen = e.x + e.w > this.cam - 24 && e.x < this.cam + VW + 24;
+      const dx = p.x - e.x; const onScreen = e.x + e.w > this.cam - 24 && e.x < this.cam + this.vw + 24;
       if (onScreen && e.data.awake == null) e.data.awake = 0; if (e.data.awake != null) e.data.awake += dt;
       const near = onScreen && e.data.awake > 0.5 && this.state !== "intro" && (this.t > 4 || p.x > this.level.startX + 100);
       switch (e.kind) {
@@ -283,7 +292,7 @@ export class BountyGame {
         case "brick": { if (e.hp <= 0) { e.dead = true; this.level.tiles[Math.floor(e.y / TILE) * this.level.cols + Math.floor(e.x / TILE)] = 0; this.burst(e.x + 8, e.y + 8, 8, "#b08a60", 80, 2); if (Math.random() < 0.5) { const it = this.mk("item", e.x + 2, e.y, 12, 12); it.vy = -100; it.data.item = 0; } } break; }
         case "bullet": {
           e.x += e.vx * dt; e.y += e.vy * dt; if (e.data.gravity) e.vy += e.data.gravity * dt; e.data.life -= dt;
-          if (e.data.life <= 0 || e.x < this.cam - 20 || e.x > this.cam + VW + 20 || e.y < -20 || e.y > VH + 20 || this.solidAt(e.x + e.w / 2, e.y + e.h / 2)) { if (!e.data.pierce || e.data.life <= 0 || this.solidAt(e.x + e.w / 2, e.y + e.h / 2)) { e.dead = true; if (this.solidAt(e.x + e.w / 2, e.y + e.h / 2)) this.burst(e.x, e.y, 3, "#ffe9a0", 40, 1); } }
+          if (e.data.life <= 0 || e.x < this.cam - 20 || e.x > this.cam + this.vw + 20 || e.y < -20 || e.y > VH + 20 || this.solidAt(e.x + e.w / 2, e.y + e.h / 2)) { if (!e.data.pierce || e.data.life <= 0 || this.solidAt(e.x + e.w / 2, e.y + e.h / 2)) { e.dead = true; if (this.solidAt(e.x + e.w / 2, e.y + e.h / 2)) this.burst(e.x, e.y, 3, "#ffe9a0", 40, 1); } }
           for (const o of this.ents) { if (o.kind === "crusher" && this.overlap(e, o)) { e.dead = true; this.burst(e.x, e.y, 3, "#ffe9a0", 40, 1); break; } }
           for (const o of this.ents) {
             if (o.dead || o.hp <= 0 || !(o.kind === "grunt" || o.kind === "elite" || o.kind === "wasp" || o.kind === "turret" || o.kind === "boss" || o.kind === "crate" || o.kind === "brick" || o.kind === "hopper")) continue;
@@ -322,7 +331,7 @@ export class BountyGame {
     this.ents = this.ents.filter((e) => !e.dead);
     this.updateParts(dt);
     // camera
-    const target = this.camLock != null ? this.camLock : Math.max(0, Math.min(this.level.endX - VW, p.x - VW * 0.38));
+    const target = this.camLock != null ? this.camLock : Math.max(0, Math.min(this.level.endX - this.vw, p.x - this.vw * 0.38));
     this.cam += (target - this.cam) * Math.min(1, dt * 8);
     if (this.camLock != null) this.cam = target;
   }
@@ -448,13 +457,13 @@ export class BountyGame {
     const cam = Math.floor(this.cam);
     // parallax
     for (let i = 0; i < 3; i++) {
-      const s = this.bg[i]; if (!s.img.complete || !s.img.naturalWidth) { if (i === 0) { c.fillStyle = "#0a0810"; c.fillRect(0, 0, VW, VH); } continue; }
+      const s = this.bg[i]; if (!s.img.complete || !s.img.naturalWidth) { if (i === 0) { c.fillStyle = "#0a0810"; c.fillRect(0, 0, this.vw, VH); } continue; }
       const f = [0.15, 0.45, 0.8][i]; const off = -Math.floor((cam * f) % 480); const y = i === 2 ? VH - 64 - 32 + 8 : 0;
       c.drawImage(s.img, off, y); c.drawImage(s.img, off + 480, y);
     }
     c.save(); c.translate(Math.floor(-cam + sx), Math.floor(sy));
     // tiles
-    const ts = this.tiles; const x0 = Math.floor(cam / TILE), x1 = Math.min(this.level.cols - 1, x0 + Math.ceil(VW / TILE) + 1);
+    const ts = this.tiles; const x0 = Math.floor(cam / TILE), x1 = Math.min(this.level.cols - 1, x0 + Math.ceil(this.vw / TILE) + 1);
     if (ts.img.complete && ts.img.naturalWidth) {
       for (let ty = 0; ty < ROWS; ty++) for (let tx = x0; tx <= x1; tx++) {
         const v = this.tile(tx, ty); if (!v) continue;
@@ -473,8 +482,8 @@ export class BountyGame {
     c.globalAlpha = 1;
     c.restore();
     // vignette / flash
-    if (this.flash > 0) { c.fillStyle = `rgba(255,60,60,${this.flash * 0.35})`; c.fillRect(0, 0, VW, VH); }
-    if (this.state === "intro") { c.fillStyle = `rgba(0,0,0,${Math.max(0, 1 - this.stateT / 0.8)})`; c.fillRect(0, 0, VW, VH); }
+    if (this.flash > 0) { c.fillStyle = `rgba(255,60,60,${this.flash * 0.35})`; c.fillRect(0, 0, this.vw, VH); }
+    if (this.state === "intro") { c.fillStyle = `rgba(0,0,0,${Math.max(0, 1 - this.stateT / 0.8)})`; c.fillRect(0, 0, this.vw, VH); }
   }
 
   frame(s: Sheet, i: number, x: number, y: number, flip: boolean, w = s.fw, h = s.fh) {

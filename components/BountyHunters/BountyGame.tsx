@@ -2,7 +2,7 @@
 // Mounts the canvas engine, forwards keyboard/touch input, draws the HUD in DOM on top.
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { BountyGame, VW, VH, type Hud, type Input } from "./game";
+import { BountyGame, VW, VW_MAX, VH, type Hud, type Input } from "./game";
 import type { Board } from "../../lib/bountyConfig";
 import { useBountyAudio } from "../../lib/useBountyAudio";
 
@@ -16,8 +16,11 @@ export default function BountyGameView({ board, faction = "samurai", onEnd, onQu
   const gameRef = useRef<BountyGame | null>(null);
   const [hud, setHud] = useState<Hud | null>(null);
   const [scale, setScale] = useState(2);
+  const [vw, setVw] = useState(VW);          // view width: 400 on desktop/portrait, up to 480 in phone landscape to fill the screen
   const audio = useBountyAudio();
   const audioRef = useRef(audio); audioRef.current = audio;
+  const vwRef = useRef(VW); vwRef.current = vw;
+  useEffect(() => { gameRef.current?.setView(vw); }, [vw]);
   const [isTouch, setIsTouch] = useState(false);
   const [portrait, setPortrait] = useState(false);
   const [fatal, setFatal] = useState<string | null>(null);
@@ -55,10 +58,12 @@ export default function BountyGameView({ board, faction = "samurai", onEnd, onQu
       const vv = window.visualViewport; const w = vv?.width || window.innerWidth, h = vv?.height || window.innerHeight;
       const port = h > w; setPortrait(port);
       if (isTouch) {
-        // phones: fill the width; in portrait leave the lower part of the screen for the pads
-        const availH = port ? h * 0.5 : h;
-        setScale(Math.max(0.5, Math.min(w / VW, availH / VH)));
-      } else setScale(Math.max(1, Math.floor(Math.min(w / VW, h / VH) * 4) / 4));
+        if (port) { setVw(VW); setScale(Math.max(0.5, Math.min(w / VW, (h * 0.5) / VH))); }   // portrait: full width, lower half for the pads
+        else {                                                                              // landscape: fill the height and widen the view to the screen's aspect
+          const nvw = Math.max(VW, Math.min(VW_MAX, Math.round((w / h) * VH)));
+          setVw(nvw); setScale(Math.max(0.5, Math.min(w / nvw, h / VH)));
+        }
+      } else { setVw(VW); setScale(Math.max(1, Math.floor(Math.min(w / VW, h / VH) * 4) / 4)); }
     };
     fit(); window.addEventListener("resize", fit); window.addEventListener("orientationchange", fit); window.visualViewport?.addEventListener("resize", fit);
     return () => { window.removeEventListener("resize", fit); window.removeEventListener("orientationchange", fit); window.visualViewport?.removeEventListener("resize", fit); };
@@ -72,7 +77,7 @@ export default function BountyGameView({ board, faction = "samurai", onEnd, onQu
         onHud: (h) => setHud({ ...h }),
         onSfx: (n) => { const s = (audioRef.current.sfx as any)[n]; if (s) s(); },
         onEnd: (r) => { audioRef.current.music(null); onEnd(r); },
-      }, faction);
+      }, faction, vwRef.current);
       gameRef.current = g; (window as any).__bg = g; g.start();
     } catch (e: any) { console.error("BountyGame failed to start", e); setFatal(String(e?.message || e)); return; }
     const onErr = (ev: ErrorEvent) => { if (!gameRef.current || gameRef.current.over) return; setFatal(String(ev.message || "error")); };
@@ -87,7 +92,7 @@ export default function BountyGameView({ board, faction = "samurai", onEnd, onQu
 
   const press = (k: keyof Input, v: boolean) => (e: React.PointerEvent) => { e.preventDefault(); const g = gameRef.current; if (g) g.input[k] = v; };
   const btn = (label: string, k: keyof Input, style: React.CSSProperties = {}) => (
-    <div onPointerDown={press(k, true)} onPointerUp={press(k, false)} onPointerLeave={press(k, false)} onPointerCancel={press(k, false)} style={{ width: 60, height: 60, borderRadius: 16, background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 900, color: "#fff", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", touchAction: "none", ...style }}>{label}</div>
+    <div onPointerDown={press(k, true)} onPointerUp={press(k, false)} onPointerLeave={press(k, false)} onPointerCancel={press(k, false)} style={{ width: 60, height: 60, borderRadius: 16, background: portrait ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.35)", boxShadow: portrait ? "none" : "0 0 0 1px rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 900, color: "#fff", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", touchAction: "none", ...style }}>{label}</div>
   );
 
   const bossPct = hud?.bossHp != null ? hud.bossHp / hud.bossMax : null;
@@ -101,8 +106,8 @@ export default function BountyGameView({ board, faction = "samurai", onEnd, onQu
           <button type="button" onClick={onQuit} style={{ marginTop: 18, fontFamily: FONT, padding: "12px 22px", border: "1px solid rgba(255,255,255,0.25)", borderRadius: 12, background: "rgba(255,255,255,0.08)", color: "#fff", fontWeight: 800, letterSpacing: "0.15em" }}>BACK TO LOBBY</button>
         </div>
       )}
-      <div style={{ position: "relative", width: VW * scale, height: VH * scale, flex: "0 0 auto" }}>
-        <canvas ref={canvasRef} width={VW} height={VH} style={{ width: VW * scale, height: VH * scale, imageRendering: "pixelated", display: "block" }} />
+      <div style={{ position: "relative", width: vw * scale, height: VH * scale, flex: "0 0 auto" }}>
+        <canvas ref={canvasRef} width={vw} height={VH} style={{ width: vw * scale, height: VH * scale, imageRendering: "pixelated", display: "block" }} />
         {/* HUD */}
         {hud && (
           <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, pointerEvents: "none" }}>
@@ -145,11 +150,11 @@ export default function BountyGameView({ board, faction = "samurai", onEnd, onQu
       {!isTouch && <div style={{ marginTop: 8, fontSize: 10, opacity: 0.4, letterSpacing: "0.2em" }}>← → MOVE · ↑ AIM UP · ↓ CROUCH / DROP · Z or SPACE JUMP · X or SHIFT FIRE · ESC QUIT</div>}
       {isTouch && (
         <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, top: portrait ? VH * scale + 8 : "auto", height: portrait ? "auto" : 150, display: "flex", justifyContent: "space-between", alignItems: "flex-end", padding: portrait ? "0 18px max(40px, env(safe-area-inset-bottom))" : "0 max(14px, env(safe-area-inset-left)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-right))", pointerEvents: "none", zIndex: 10 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "60px 60px 60px", gridTemplateRows: "60px 60px", gap: 6, pointerEvents: "auto", opacity: portrait ? 1 : 0.75 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "60px 60px 60px", gridTemplateRows: "60px 60px", gap: 6, pointerEvents: "auto", opacity: portrait ? 1 : 0.8 }}>
             <div />{btn("▲", "up")}<div />
             {btn("◀", "left")}{btn("▼", "down")}{btn("▶", "right")}
           </div>
-          <div style={{ display: "flex", gap: 14, alignItems: "flex-end", pointerEvents: "auto", opacity: portrait ? 1 : 0.75 }}>{btn("●", "fire", { background: "rgba(248,113,113,0.3)", width: 74, height: 74, borderRadius: 37 })}{btn("▲", "jump", { background: "rgba(96,165,250,0.3)", width: 74, height: 74, borderRadius: 37, marginBottom: 26 })}</div>
+          <div style={{ display: "flex", gap: 14, alignItems: "flex-end", pointerEvents: "auto", opacity: portrait ? 1 : 0.8 }}>{btn("●", "fire", { background: portrait ? "rgba(248,113,113,0.3)" : "rgba(180,40,40,0.45)", width: 74, height: 74, borderRadius: 37 })}{btn("▲", "jump", { background: portrait ? "rgba(96,165,250,0.3)" : "rgba(40,80,180,0.45)", width: 74, height: 74, borderRadius: 37, marginBottom: 26 })}</div>
         </div>
       )}
       {isTouch && portrait && hud && hud.state === "intro" && (
