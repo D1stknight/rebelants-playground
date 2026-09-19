@@ -123,6 +123,8 @@ const DEFAULT_TUNNEL_CONFIG = {
   tunnelPowerups: true,
   tunnelFloorBonus: 25,
   tunnelFloorTimeBonus: 20,
+  tunnelRocks: 3,
+  tunnelLivesCap: 10,
 };
 
 const START_CELL: Cell = { row: 2, col: 2 };
@@ -812,6 +814,8 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           tunnelPowerups: cfg?.tunnelPowerups !== false,
           tunnelFloorBonus: Number(cfg?.tunnelFloorBonus ?? DEFAULT_TUNNEL_CONFIG.tunnelFloorBonus),
           tunnelFloorTimeBonus: Number(cfg?.tunnelFloorTimeBonus ?? DEFAULT_TUNNEL_CONFIG.tunnelFloorTimeBonus),
+          tunnelRocks: Number(cfg?.tunnelRocks ?? DEFAULT_TUNNEL_CONFIG.tunnelRocks),
+          tunnelLivesCap: Number(cfg?.tunnelLivesCap ?? DEFAULT_TUNNEL_CONFIG.tunnelLivesCap),
         };
 
         setTunnelCfg(nextCfg);
@@ -988,9 +992,9 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layoutIndex, earn, refresh, effectivePlayerId, playerName, runStartedAt]);
   const forceEnd = () => { const g = (window as any).__tun; if (g && g.state === "play") g.end(false); };
-  const [crystalsLeft, setCrystalsLeft] = useState(0); const [tunnelLives, setTunnelLives] = useState<[number, number]>([0, 0]); const [tunnelFloor, setTunnelFloor] = useState(1); const [tunnelMult, setTunnelMult] = useState(1);
-  const onTunnelHud = React.useCallback((h: { score: number; timeLeft: number; breaks: number; lives: number; livesMax: number; crystalsLeft: number; msg: string | null; hit: boolean; floor: number; mult: number }) => {
-    setTunnelLives([h.lives, h.livesMax]); setScore(h.score); setTimeLeft(h.timeLeft); setWallBreaksLeft(h.breaks); setCrystalsLeft(h.crystalsLeft); setTunnelFloor(h.floor); setTunnelMult(h.mult); if (h.msg) setRunMessage(h.msg); setHitFlash(h.hit);
+  const [crystalsLeft, setCrystalsLeft] = useState(0); const [tunnelLives, setTunnelLives] = useState<[number, number]>([0, 0]); const [tunnelRocks, setTunnelRocks] = useState<[number, boolean]>([0, false]); const [tunnelFloor, setTunnelFloor] = useState(1); const [tunnelMult, setTunnelMult] = useState(1);
+  const onTunnelHud = React.useCallback((h: { score: number; timeLeft: number; breaks: number; lives: number; livesMax: number; rocks: number; rocksOn: boolean; crystalsLeft: number; msg: string | null; hit: boolean; floor: number; mult: number }) => {
+    setTunnelLives([h.lives, h.livesMax]); setTunnelRocks([h.rocks, h.rocksOn]); setScore(h.score); setTimeLeft(h.timeLeft); setWallBreaksLeft(h.breaks); setCrystalsLeft(h.crystalsLeft); setTunnelFloor(h.floor); setTunnelMult(h.mult); if (h.msg) setRunMessage(h.msg); setHitFlash(h.hit);
   }, []);
   const isPlayingRef = useRef(false); useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
   function formatCountdown(ms: number): string {
@@ -1391,6 +1395,12 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                         {Array.from({ length: tunnelLives[1] }, (_, i) => (i < tunnelLives[0] ? "❤️" : "🖤")).join(" ")}
                       </div>
                     )}
+
+                    {isPlaying && (
+                      <div style={{ ...statusPillStyle, opacity: tunnelRocks[1] ? 1 : 0.45 }} title={tunnelRocks[1] ? "X / E throws a rock in the direction you face" : "Rocks unlock with 3 spiders on the floor"}>
+                        🪨 Rocks: <b>{tunnelRocks[0]}</b>{tunnelRocks[1] ? " (X to throw)" : " (3+ spiders)"}
+                      </div>
+                    )}
                   </div>
 
                   <div
@@ -1406,7 +1416,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                     <span>🍞 Crumb = 1</span>
                     <span>🍬 Sugar = 5</span>
                     <span>💎 Crystal = 20</span>
-                    <span>{tunnelCfg.tunnelLives > 0 ? `🕷️ Hit = −1 heart (${tunnelCfg.tunnelLives} hearts · a ❤ is hidden on every floor — glowing walls hide one)` : "🕷️ Hit = -3 sec"}</span>
+                    <span>{tunnelCfg.tunnelLives > 0 ? `🕷️ Hit = −1 heart · ${tunnelCfg.tunnelLives} hearts to start, +1 max & +2 back per floor (cap ${tunnelCfg.tunnelLivesCap}) · a ❤ hides on every floor (pink walls) · 🪨 ${tunnelCfg.tunnelRocks} rocks (X) once 3 spiders are out` : "🕷️ Hit = -3 sec"}</span>
                     <span>Collect all crystals → next floor</span>
                   </div>
                 </div>
@@ -1441,14 +1451,14 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                     layouts={TUNNEL_LAYOUTS as string[][]}
                     layoutIdx={layoutIndex}
                     theme={{ ...theme, dark: boardTheme === "shadow" || boardTheme === "void" || boardTheme === "mythic" }}
-                    cfg={{ runSeconds: tunnelCfg.tunnelRunSeconds, crystals: tunnelCfg.tunnelCrystalCount, sugars: tunnelCfg.tunnelSugarCount, crumbs: tunnelCfg.tunnelCrumbCount, wallBreaks: tunnelCfg.tunnelWallBreaks, spiderSpeedMs: tunnelCfg.tunnelSpiderSpeedMs, lives: tunnelCfg.tunnelLives, powerups: tunnelCfg.tunnelPowerups, floorBonus: tunnelCfg.tunnelFloorBonus, floorTimeBonus: tunnelCfg.tunnelFloorTimeBonus, themeId: boardTheme }}
+                    cfg={{ runSeconds: tunnelCfg.tunnelRunSeconds, crystals: tunnelCfg.tunnelCrystalCount, sugars: tunnelCfg.tunnelSugarCount, crumbs: tunnelCfg.tunnelCrumbCount, wallBreaks: tunnelCfg.tunnelWallBreaks, spiderSpeedMs: tunnelCfg.tunnelSpiderSpeedMs, lives: tunnelCfg.tunnelLives, powerups: tunnelCfg.tunnelPowerups, floorBonus: tunnelCfg.tunnelFloorBonus, floorTimeBonus: tunnelCfg.tunnelFloorTimeBonus, rocks: tunnelCfg.tunnelRocks, livesCap: tunnelCfg.tunnelLivesCap, themeId: boardTheme }}
                     playing={isPlaying}
                     faction={tunnelFaction}
                     onHud={onTunnelHud}
                     onEnd={finishRun}
                     onSfx={(n) => { const f = (sfx as any)[n === "hit" ? "spiderHit" : n]; if (typeof f === "function") f(); }}
                     onQuit={() => { if (window.confirm("Quit this run? The entry fee is spent and you keep your score so far.")) forceEnd(); }}
-                    hudLine={<div style={{ display: "flex", gap: 14, padding: "6px 14px", borderRadius: 999, background: "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.15)", fontSize: 13, fontWeight: 800 }}><span>⏱ {timeLeft}s</span><span style={{ color: "#93c5fd" }}>🎯 {score}</span><span style={{ color: "#fbbf24" }}>🧱 {wallBreaksLeft}</span><span style={{ color: "#c4b5fd" }}>🕳 F{tunnelFloor}</span>{tunnelLives[1] > 0 && <span>{Array.from({ length: tunnelLives[1] }, (_, i) => (i < tunnelLives[0] ? "❤️" : "🖤")).join("")}</span>}{tunnelMult > 1 && <span style={{ color: "#fb7185" }}>×{tunnelMult}</span>}</div>}
+                    hudLine={<div style={{ display: "flex", gap: 14, padding: "6px 14px", borderRadius: 999, background: "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.15)", fontSize: 13, fontWeight: 800 }}><span>⏱ {timeLeft}s</span><span style={{ color: "#93c5fd" }}>🎯 {score}</span><span style={{ color: "#fbbf24" }}>🧱 {wallBreaksLeft}</span><span style={{ color: "#c4b5fd" }}>🕳 F{tunnelFloor}</span>{tunnelLives[1] > 0 && <span>{Array.from({ length: tunnelLives[1] }, (_, i) => (i < tunnelLives[0] ? "❤️" : "🖤")).join("")}</span>}{tunnelRocks[1] && <span>🪨{tunnelRocks[0]}</span>}{tunnelMult > 1 && <span style={{ color: "#fb7185" }}>×{tunnelMult}</span>}</div>}
                   />
                   {countdown !== null && (
                     <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none", zIndex: 70 }}>

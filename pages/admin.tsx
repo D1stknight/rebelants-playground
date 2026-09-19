@@ -21,6 +21,8 @@ type PointsConfigShape = {
   tunnelPowerups: boolean;
   tunnelFloorBonus: number;
   tunnelFloorTimeBonus: number;
+  tunnelRocks: number;
+  tunnelLivesCap: number;
   descentCost: number;
   bountyCost: number;
   gpCost: number;
@@ -182,6 +184,8 @@ const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
   tunnelPowerups: (defaultConfig as any).tunnelPowerups !== false,
   tunnelFloorBonus: (defaultConfig as any).tunnelFloorBonus ?? 25,
   tunnelFloorTimeBonus: (defaultConfig as any).tunnelFloorTimeBonus ?? 20,
+  tunnelRocks: (defaultConfig as any).tunnelRocks ?? 3,
+  tunnelLivesCap: (defaultConfig as any).tunnelLivesCap ?? 10,
   descentCost: (defaultConfig as any).descentCost ?? 300,
   bountyCost: (defaultConfig as any).bountyCost ?? 100,
   gpCost: (defaultConfig as any).gpCost ?? 100,
@@ -1280,9 +1284,11 @@ String(c.status).toUpperCase()==="PENDING"
           <label style={{ fontSize: 12, opacity: 0.9 }}>Crumbs<input value={cfg.tunnelCrumbCount} onChange={(e) => setCfg((c) => ({ ...c, tunnelCrumbCount: safeNum(e.target.value, c.tunnelCrumbCount) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
           <label style={{ fontSize: 12, opacity: 0.9 }}>Wall Breaks<input value={cfg.tunnelWallBreaks} onChange={(e) => setCfg((c) => ({ ...c, tunnelWallBreaks: safeNum(e.target.value, c.tunnelWallBreaks) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
           <label style={{ fontSize: 12, opacity: 0.9 }}>Spider Speed (ms)<input value={cfg.tunnelSpiderSpeedMs} onChange={(e) => setCfg((c) => ({ ...c, tunnelSpiderSpeedMs: safeNum(e.target.value, c.tunnelSpiderSpeedMs) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
-          <label style={{ fontSize: 12, opacity: 0.9 }}>Hearts (0 = −3 s per hit)<input value={cfg.tunnelLives} onChange={(e) => setCfg((c) => ({ ...c, tunnelLives: safeNum(e.target.value, c.tunnelLives) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>Starting Hearts (0 = −3 s per hit)<input value={cfg.tunnelLives} onChange={(e) => setCfg((c) => ({ ...c, tunnelLives: safeNum(e.target.value, c.tunnelLives) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
           <label style={{ fontSize: 12, opacity: 0.9 }}>Floor Bonus (× floor)<input value={cfg.tunnelFloorBonus} onChange={(e) => setCfg((c) => ({ ...c, tunnelFloorBonus: safeNum(e.target.value, c.tunnelFloorBonus) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
           <label style={{ fontSize: 12, opacity: 0.9 }}>Floor Time Bonus (s)<input value={cfg.tunnelFloorTimeBonus} onChange={(e) => setCfg((c) => ({ ...c, tunnelFloorTimeBonus: safeNum(e.target.value, c.tunnelFloorTimeBonus) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>Hearts Cap (max grows per floor)<input value={cfg.tunnelLivesCap} onChange={(e) => setCfg((c) => ({ ...c, tunnelLivesCap: safeNum(e.target.value, c.tunnelLivesCap) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>Rocks per run (3+ spiders)<input value={cfg.tunnelRocks} onChange={(e) => setCfg((c) => ({ ...c, tunnelRocks: safeNum(e.target.value, c.tunnelRocks) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
           <label style={{ fontSize: 12, opacity: 0.9, gridColumn:"1/-1", display:"flex", alignItems:"center", gap:10, marginTop:4 }}><input type="checkbox" checked={cfg.tunnelPowerups !== false} onChange={(e) => setCfg((c) => ({ ...c, tunnelPowerups: e.target.checked }))} /> Floor power-ups (Dig Claw · Decoy · Web Freeze · Sugar Rush)</label>
         </div>
         <div style={{ fontWeight: 900, fontSize: 12, margin: "12px 0 10px", color: "#60a5fa", paddingTop: 10, borderTop: "1px solid rgba(96,165,250,.2)" }}>🎮 ENTRY COSTS</div>

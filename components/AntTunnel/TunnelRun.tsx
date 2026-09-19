@@ -52,9 +52,9 @@ export default function TunnelRun({ layout, layouts, layoutIdx = 0, theme, cfg, 
 
   // keyboard
   useEffect(() => {
-    const map: Record<string, Dir | "break"> = { ArrowUp: "up", w: "up", W: "up", ArrowDown: "down", s: "down", S: "down", ArrowLeft: "left", a: "left", A: "left", ArrowRight: "right", d: "right", D: "right", " ": "break" };
-    const kd = (e: KeyboardEvent) => { const k = map[e.key]; const g = gameRef.current; if (!k || !g) return; e.preventDefault(); if (k === "break") g.input.break = true; else { (["up", "down", "left", "right"] as Dir[]).forEach((d) => (g.input[d] = false)); g.input[k] = true; } };
-    const ku = (e: KeyboardEvent) => { const k = map[e.key]; const g = gameRef.current; if (!k || !g) return; if (k === "break") g.input.break = false; else g.input[k] = false; };
+    const map: Record<string, Dir | "break" | "rock"> = { ArrowUp: "up", w: "up", W: "up", ArrowDown: "down", s: "down", S: "down", ArrowLeft: "left", a: "left", A: "left", ArrowRight: "right", d: "right", D: "right", " ": "break", x: "rock", X: "rock", e: "rock", E: "rock", Shift: "rock" };
+    const kd = (e: KeyboardEvent) => { const k = map[e.key]; const g = gameRef.current; if (!k || !g) return; e.preventDefault(); if (k === "break") g.input.break = true; else if (k === "rock") g.input.rock = true; else { (["up", "down", "left", "right"] as Dir[]).forEach((d) => (g.input[d] = false)); g.input[k] = true; } };
+    const ku = (e: KeyboardEvent) => { const k = map[e.key]; const g = gameRef.current; if (!k || !g) return; if (k === "break") g.input.break = false; else if (k === "rock") g.input.rock = false; else g.input[k] = false; };
     window.addEventListener("keydown", kd, { passive: false }); window.addEventListener("keyup", ku);
     return () => { window.removeEventListener("keydown", kd); window.removeEventListener("keyup", ku); };
   }, []);
@@ -63,9 +63,9 @@ export default function TunnelRun({ layout, layouts, layoutIdx = 0, theme, cfg, 
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const onTS = (e: React.TouchEvent) => { const t = e.touches[0]; if (t) touchStart.current = { x: t.clientX, y: t.clientY }; };
   const onTM = (e: React.TouchEvent) => { const s = touchStart.current; const t = e.touches[0]; const g = gameRef.current; if (!s || !t || !g) return; const dx = t.clientX - s.x, dy = t.clientY - s.y; if (Math.hypot(dx, dy) < 24) return; const d: Dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : dy > 0 ? "down" : "up"; g.ant.want = d; g.facing = d; touchStart.current = { x: t.clientX, y: t.clientY }; };
-  const press = (k: Dir | "break", v: boolean) => (e: React.PointerEvent) => { e.preventDefault(); const g = gameRef.current; if (!g) return; if (k === "break") g.input.break = v; else { if (v) (["up", "down", "left", "right"] as Dir[]).forEach((d) => (g.input[d] = false)); g.input[k] = v; } };
+  const press = (k: Dir | "break" | "rock", v: boolean) => (e: React.PointerEvent) => { e.preventDefault(); const g = gameRef.current; if (!g) return; if (k === "break") g.input.break = v; else if (k === "rock") g.input.rock = v; else { if (v) (["up", "down", "left", "right"] as Dir[]).forEach((d) => (g.input[d] = false)); g.input[k] = v; } };
   const ps = 58;
-  const btn = (label: string, k: Dir | "break", style: React.CSSProperties = {}) => (
+  const btn = (label: string, k: Dir | "break" | "rock", style: React.CSSProperties = {}) => (
     <div onPointerDown={press(k, true)} onPointerUp={press(k, false)} onPointerLeave={press(k, false)} onPointerCancel={press(k, false)} style={{ width: ps, height: ps, borderRadius: 14, background: "rgba(0,0,0,0.45)", border: "1px solid rgba(255,255,255,0.35)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 900, color: "#fff", userSelect: "none", WebkitUserSelect: "none", touchAction: "none", ...style }}>{label}</div>
   );
 
@@ -85,7 +85,7 @@ export default function TunnelRun({ layout, layouts, layoutIdx = 0, theme, cfg, 
           {btn("◀", "left")}<div />{btn("▶", "right")}
           <div />{btn("▼", "down")}<div />
         </div>
-        <div style={{ pointerEvents: "auto", opacity: 0.9 }}>{btn("⛏", "break", { width: 78, height: 78, borderRadius: 39, background: "rgba(251,191,36,0.3)", fontSize: 28 })}</div>
+        <div style={{ pointerEvents: "auto", opacity: 0.9, display: "flex", gap: 10, alignItems: "flex-end" }}>{btn("🪨", "rock", { width: 58, height: 58, borderRadius: 29, background: "rgba(156,138,110,0.35)", fontSize: 24 })}{btn("⛏", "break", { width: 78, height: 78, borderRadius: 39, background: "rgba(251,191,36,0.3)", fontSize: 28 })}</div>
       </div>
     </div>,
     document.body

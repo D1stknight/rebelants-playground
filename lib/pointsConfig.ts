@@ -65,6 +65,8 @@ export type PointsConfig = {
   tunnelPowerups: boolean;      // floor power-ups on/off
   tunnelFloorBonus: number;     // points banked per floor cleared (× floor)
   tunnelFloorTimeBonus: number; // seconds added back per floor cleared
+  tunnelRocks: number;          // rocks per run (usable with 3+ spiders)
+  tunnelLivesCap: number;       // hearts cap (max grows +1 per floor)
   descentCost: number;          // Hive Descent entry
   bountyCost: number;           // Bounty Hunters entry
   gpCost: number;               // Rebel Grand Prix entry
@@ -151,6 +153,8 @@ export const pointsConfig: PointsConfig = {
   tunnelPowerups: true,
   tunnelFloorBonus: 25,
   tunnelFloorTimeBonus: 20,
+  tunnelRocks: 3,
+  tunnelLivesCap: 10,
   descentCost: 300,
   bountyCost: 100,
   gpCost: 100,
