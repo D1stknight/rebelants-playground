@@ -34,6 +34,8 @@ const BountyHunters: React.FC = () => {
   const [err, setErr] = useState("");
   const [result, setResult] = useState<{ cleared: boolean; bounty: number; kills: number; boardN: number; paid: number } | null>(null);
   useEffect(() => { setBest(loadBest()); }, []);
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => { const f = () => setNarrow(window.innerWidth < 720); f(); window.addEventListener("resize", f); return () => window.removeEventListener("resize", f); }, []);
   useEffect(() => { preloadBoard(board, faction); }, [board, faction]);
   const unlockedN = useMemo(() => { let n = 1; for (const b of BOARDS) if (best[b.n]?.cleared) n = Math.max(n, b.n + 1); return Math.min(n, BOARDS.length); }, [best]);
   const canStart = balance >= cost && !starting && board.n <= unlockedN;
@@ -99,11 +101,11 @@ const BountyHunters: React.FC = () => {
       {/* hunter select */}
       <div style={{ maxWidth: 1000, margin: "22px auto 0", padding: "0 16px" }}>
         <div style={{ fontSize: 11, color: "#a78bfa", letterSpacing: "0.4em", textAlign: "center", marginBottom: 10 }}>◆ YOUR HUNTER ◆</div>
-        <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap" }}>
+        <div style={narrow ? { display: "flex", gap: 6, overflowX: "auto", padding: "6px 2px 4px", WebkitOverflowScrolling: "touch", scrollbarWidth: "none" } as React.CSSProperties : { display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap" }}>
           {DESCENT_FACTIONS.map((f) => {
             const on = f.id === faction;
             return (
-              <button key={f.id} type="button" onClick={() => setFaction(f.id)} title={f.name} style={{ fontFamily: FONT, width: 68, padding: 0, background: on ? "rgba(167,139,250,0.2)" : "rgba(0,0,0,0.5)", border: on ? "1px solid #a78bfa" : "1px solid rgba(255,255,255,0.12)", borderRadius: 10, color: "#fff", cursor: "pointer", overflow: "hidden", boxShadow: on ? "0 0 16px rgba(167,139,250,0.5)" : "none", transform: on ? "translateY(-4px)" : "none", transition: "all .15s" }}>
+              <button key={f.id} type="button" onClick={() => setFaction(f.id)} title={f.name} style={{ fontFamily: FONT, width: 68, flex: "0 0 auto", padding: 0, background: on ? "rgba(167,139,250,0.2)" : "rgba(0,0,0,0.5)", border: on ? "1px solid #a78bfa" : "1px solid rgba(255,255,255,0.12)", borderRadius: 10, color: "#fff", cursor: "pointer", overflow: "hidden", boxShadow: on ? "0 0 16px rgba(167,139,250,0.5)" : "none", transform: on ? "translateY(-4px)" : "none", transition: "all .15s" }}>
                 <div style={{ height: 60, display: "flex", alignItems: "flex-end", justifyContent: "center", paddingTop: 4 }}><img src={`/descent/portraits/${f.id}.png`} alt={f.name} style={{ height: "94%", objectFit: "contain", filter: on ? "none" : "brightness(0.6) saturate(0.6)" }} /></div>
                 <div style={{ fontSize: 7, fontWeight: 800, letterSpacing: "0.08em", padding: "4px 2px 6px", color: on ? "#c4b5fd" : "rgba(255,255,255,0.7)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{f.name.toUpperCase()}</div>
               </button>
@@ -118,22 +120,25 @@ const BountyHunters: React.FC = () => {
         {[1, 2, 3, 4].map((w) => {
           const stages = BOARDS.filter((b) => b.world === w); const first = stages[0];
           return (
-            <div key={w} style={{ display: "grid", gridTemplateColumns: "150px 1fr", gap: 10, alignItems: "stretch", marginBottom: 10 }}>
-              <div style={{ borderRadius: 14, overflow: "hidden", position: "relative", minHeight: 96, backgroundImage: `url(/bounty/bg_${first.biome}_far.png)`, backgroundSize: "cover", backgroundPosition: "center 60%" }}>
+            <div key={w} style={{ display: "grid", gridTemplateColumns: narrow ? "1fr" : "150px 1fr", gap: narrow ? 6 : 10, alignItems: "stretch", marginBottom: narrow ? 16 : 10 }}>
+              <div style={{ borderRadius: 14, overflow: "hidden", position: "relative", minHeight: narrow ? 64 : 96, backgroundImage: `url(/bounty/bg_${first.biome}_far.png)`, backgroundSize: "cover", backgroundPosition: "center 60%" }}>
                 <div style={{ position: "absolute", inset: 0, backgroundImage: `url(/bounty/bg_${first.biome}_mid.png)`, backgroundSize: "cover", backgroundPosition: "center 100%" }} />
                 <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(0,0,0,0.1), rgba(0,0,0,0.75))" }} />
                 <div style={{ position: "absolute", left: 10, bottom: 8 }}><div style={{ fontSize: 9, letterSpacing: "0.3em", color: first.accent, fontWeight: 800 }}>WORLD {w}</div><div style={{ fontSize: 15, fontWeight: 900, letterSpacing: "0.06em", textShadow: "0 1px 4px #000" }}>{first.name.split(" ")[0].toUpperCase()}</div></div>
                 <img src={`/bounty/boss_${stages[2].boss.id}.png`} alt="" style={{ position: "absolute", right: 2, top: 6, width: 64, height: 64, objectFit: "none", objectPosition: "0 0", imageRendering: "pixelated", filter: stages[2].n > unlockedN ? "brightness(0.25)" : "drop-shadow(0 2px 4px #000)" }} />
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+              <div style={{ display: "grid", gridTemplateColumns: narrow ? "1fr" : "repeat(3, minmax(0, 1fr))", gap: narrow ? 6 : 8 }}>
                 {stages.map((b) => {
                   const locked = b.n > unlockedN; const on = board.n === b.n; const bb = best[b.n];
                   return (
                     <button key={b.id} type="button" disabled={locked} onClick={() => setBoard(b)} style={{ fontFamily: FONT, textAlign: "left", padding: "10px 12px", borderRadius: 12, border: on ? `2px solid ${b.accent}` : "1px solid rgba(255,255,255,0.12)", background: on ? `linear-gradient(180deg, ${b.accent}22, rgba(10,8,16,0.9))` : "rgba(10,8,16,0.8)", color: "#fff", cursor: locked ? "not-allowed" : "pointer", opacity: locked ? 0.4 : 1, boxShadow: on ? `0 0 22px ${b.accent}55` : "none", transition: "all .15s" }}>
-                      <div style={{ fontSize: 9, letterSpacing: "0.25em", fontWeight: 800, color: b.accent }}>{w}-{b.stage}{locked ? " · LOCKED" : bb?.cleared ? " · CLEARED" : ""}</div>
-                      <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: "0.04em", marginTop: 4 }}>{b.name.split(": ")[1].toUpperCase()}</div>
-                      <div style={{ fontSize: 9, opacity: 0.6, fontStyle: "italic", marginTop: 2, minHeight: 12 }}>{b.subtitle}</div>
-                      <div style={{ fontSize: 9, marginTop: 6, color: "#fbbf24", fontWeight: 800 }}>{b.boss.captain ? "CAPTAIN" : "☠ BOSS"} · {b.boss.name} · {b.boss.bounty}</div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+                        <div style={{ fontSize: 9, letterSpacing: "0.25em", fontWeight: 800, color: b.accent }}>{w}-{b.stage}{locked ? " · LOCKED" : bb?.cleared ? " · CLEARED" : ""}</div>
+                        {narrow && <div style={{ fontSize: 9, color: "#fbbf24", fontWeight: 800, whiteSpace: "nowrap" }}>{b.boss.captain ? "CAPTAIN" : "☠ BOSS"} · {b.boss.bounty}</div>}
+                      </div>
+                      <div style={{ fontSize: narrow ? 13 : 12, fontWeight: 900, letterSpacing: "0.04em", marginTop: 4 }}>{b.name.split(": ")[1].toUpperCase()}</div>
+                      <div style={{ fontSize: 9, opacity: 0.6, fontStyle: "italic", marginTop: 2, minHeight: narrow ? 0 : 12 }}>{b.subtitle}{narrow && !b.boss.captain ? ` · ${b.boss.name}` : ""}</div>
+                      {!narrow && <div style={{ fontSize: 9, marginTop: 6, color: "#fbbf24", fontWeight: 800 }}>{b.boss.captain ? "CAPTAIN" : "☠ BOSS"} · {b.boss.name} · {b.boss.bounty}</div>}
                       {bb && <div style={{ fontSize: 8, opacity: 0.5, marginTop: 3 }}>best +{bb.bounty}</div>}
                     </button>
                   );
@@ -145,16 +150,16 @@ const BountyHunters: React.FC = () => {
       </div>
 
       {/* start */}
-      <div style={{ maxWidth: 640, margin: "26px auto 0", padding: "0 16px", textAlign: "center" }}>
-        <button type="button" onClick={start} disabled={!canStart} style={{ fontFamily: FONT, width: "100%", padding: "20px 24px", fontSize: "clamp(15px, 3.5vw, 21px)", fontWeight: 900, letterSpacing: "0.15em", color: "#fff", border: "none", borderRadius: 14, background: canStart ? "linear-gradient(180deg, #a78bfa 0%, #6d4ec9 55%, #3b2a70 100%)" : "linear-gradient(180deg, rgba(60,50,90,0.5) 0%, rgba(30,20,50,0.7) 100%)", cursor: canStart ? "pointer" : "not-allowed", boxShadow: canStart ? "0 0 40px rgba(167,139,250,0.45), inset 0 1px 0 rgba(255,255,255,0.2)" : "none", opacity: canStart ? 1 : 0.6 }}>
+      <div style={{ maxWidth: 640, margin: "26px auto 0", padding: "0 16px", textAlign: "center", ...(narrow ? { position: "sticky", bottom: 0, zIndex: 5, background: "linear-gradient(180deg, rgba(5,2,12,0) 0%, rgba(5,2,12,0.96) 30%)", paddingTop: 14, paddingBottom: "max(12px, env(safe-area-inset-bottom))" } : {}) }}>
+        <button type="button" onClick={start} disabled={!canStart} style={{ fontFamily: FONT, width: "100%", padding: narrow ? "16px 18px" : "20px 24px", fontSize: "clamp(15px, 3.5vw, 21px)", fontWeight: 900, letterSpacing: "0.15em", color: "#fff", border: "none", borderRadius: 14, background: canStart ? "linear-gradient(180deg, #a78bfa 0%, #6d4ec9 55%, #3b2a70 100%)" : "linear-gradient(180deg, rgba(60,50,90,0.5) 0%, rgba(30,20,50,0.7) 100%)", cursor: canStart ? "pointer" : "not-allowed", boxShadow: canStart ? "0 0 40px rgba(167,139,250,0.45), inset 0 1px 0 rgba(255,255,255,0.2)" : "none", opacity: canStart ? 1 : 0.6 }}>
           🏹 HUNT {board.world}-{board.stage} · {board.name.split(": ")[1].toUpperCase()} · {cost} REBEL
         </button>
         {!canStart && !starting && balance < cost && <div style={{ marginTop: 10, fontSize: 12, color: "#ff99aa" }}>⚠ Need {cost} REBEL to hunt. You have {balance}.</div>}
         {err && <div style={{ marginTop: 10, fontSize: 12, color: "#ff99aa" }}>{err}</div>}
-        <div style={{ marginTop: 14, fontSize: 11, color: "rgba(255,255,255,0.5)", lineHeight: 1.7 }}>
+        {!narrow && <div style={{ marginTop: 14, fontSize: 11, color: "rgba(255,255,255,0.5)", lineHeight: 1.7 }}>
           Tags: grunt {KILL_BOUNTY.grunt} · elite {KILL_BOUNTY.elite} · wasp {KILL_BOUNTY.wasp} · turret {KILL_BOUNTY.turret} · crates drop guns and tags<br />
           Clear the board and bank everything · die {BOUNTY_LIVES} times and you keep {Math.round(BOUNTY_DEATH_KEEP * 100)}% · clearing a board unlocks the next
-        </div>
+        </div>}
       </div>
 
       {/* how to */}

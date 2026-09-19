@@ -17,38 +17,62 @@ export default function BountyGameView({ board, faction = "samurai", onEnd, onQu
   const [scale, setScale] = useState(2);
   const audio = useBountyAudio();
   const audioRef = useRef(audio); audioRef.current = audio;
-  const isTouch = typeof window !== "undefined" && ("ontouchstart" in window || navigator.maxTouchPoints > 0);
+  const [isTouch, setIsTouch] = useState(false);
+  const [portrait, setPortrait] = useState(false);
+  const [fatal, setFatal] = useState<string | null>(null);
+  useEffect(() => { setIsTouch("ontouchstart" in window || navigator.maxTouchPoints > 0); }, []);
 
   useEffect(() => {
-    const fit = () => { const w = window.innerWidth, h = window.innerHeight - (isTouch ? 120 : 0); setScale(Math.max(1, Math.floor(Math.min(w / VW, h / VH) * 4) / 4)); };
-    fit(); window.addEventListener("resize", fit); return () => window.removeEventListener("resize", fit);
+    const fit = () => {
+      const vv = window.visualViewport; const w = vv?.width || window.innerWidth, h = vv?.height || window.innerHeight;
+      const port = h > w; setPortrait(port);
+      if (isTouch) {
+        // phones: fill the width; in portrait leave the lower part of the screen for the pads
+        const availH = port ? h * 0.5 : h;
+        setScale(Math.max(0.5, Math.min(w / VW, availH / VH)));
+      } else setScale(Math.max(1, Math.floor(Math.min(w / VW, h / VH) * 4) / 4));
+    };
+    fit(); window.addEventListener("resize", fit); window.addEventListener("orientationchange", fit); window.visualViewport?.addEventListener("resize", fit);
+    return () => { window.removeEventListener("resize", fit); window.removeEventListener("orientationchange", fit); window.visualViewport?.removeEventListener("resize", fit); };
   }, [isTouch]);
 
   useEffect(() => {
     const cv = canvasRef.current; if (!cv) return;
-    const g = new BountyGame(cv, board, {
-      onHud: (h) => setHud({ ...h }),
-      onSfx: (n) => { const s = (audioRef.current.sfx as any)[n]; if (s) s(); },
-      onEnd: (r) => { audioRef.current.music(null); onEnd(r); },
-    }, faction);
-    gameRef.current = g; (window as any).__bg = g; g.start();
+    let g: BountyGame;
+    try {
+      g = new BountyGame(cv, board, {
+        onHud: (h) => setHud({ ...h }),
+        onSfx: (n) => { const s = (audioRef.current.sfx as any)[n]; if (s) s(); },
+        onEnd: (r) => { audioRef.current.music(null); onEnd(r); },
+      }, faction);
+      gameRef.current = g; (window as any).__bg = g; g.start();
+    } catch (e: any) { console.error("BountyGame failed to start", e); setFatal(String(e?.message || e)); return; }
+    const onErr = (ev: ErrorEvent) => { if (!gameRef.current || gameRef.current.over) return; setFatal(String(ev.message || "error")); };
+    window.addEventListener("error", onErr);
     audioRef.current.music(board.music, 0.35);
     const kd = (e: KeyboardEvent) => { const k = KEYS[e.key]; if (k) { g.input[k] = true; e.preventDefault(); } if (e.key === "Escape") onQuit(); };
     const ku = (e: KeyboardEvent) => { const k = KEYS[e.key]; if (k) { g.input[k] = false; e.preventDefault(); } };
     window.addEventListener("keydown", kd); window.addEventListener("keyup", ku);
-    return () => { g.stop(); window.removeEventListener("keydown", kd); window.removeEventListener("keyup", ku); audioRef.current.music(null); };
+    return () => { g.stop(); window.removeEventListener("keydown", kd); window.removeEventListener("keyup", ku); window.removeEventListener("error", onErr); audioRef.current.music(null); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [board]);
 
   const press = (k: keyof Input, v: boolean) => (e: React.PointerEvent) => { e.preventDefault(); const g = gameRef.current; if (g) g.input[k] = v; };
   const btn = (label: string, k: keyof Input, style: React.CSSProperties = {}) => (
-    <div onPointerDown={press(k, true)} onPointerUp={press(k, false)} onPointerLeave={press(k, false)} onPointerCancel={press(k, false)} style={{ width: 58, height: 58, borderRadius: 14, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.25)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 900, color: "#fff", userSelect: "none", touchAction: "none", ...style }}>{label}</div>
+    <div onPointerDown={press(k, true)} onPointerUp={press(k, false)} onPointerLeave={press(k, false)} onPointerCancel={press(k, false)} style={{ width: 60, height: 60, borderRadius: 16, background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 900, color: "#fff", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", touchAction: "none", ...style }}>{label}</div>
   );
 
   const bossPct = hud?.bossHp != null ? hud.bossHp / hud.bossMax : null;
   return (
-    <div style={{ position: "fixed", inset: 0, background: "#000", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: FONT, color: "#fff", overflow: "hidden" }}>
-      <div style={{ position: "relative", width: VW * scale, height: VH * scale }}>
+    <div style={{ position: "fixed", inset: 0, background: "#000", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: isTouch && portrait ? "flex-start" : "center", paddingTop: isTouch && portrait ? "env(safe-area-inset-top)" : 0, fontFamily: FONT, color: "#fff", overflow: "hidden", touchAction: "none", WebkitUserSelect: "none", userSelect: "none" }}>
+      {fatal && (
+        <div style={{ position: "absolute", inset: 0, zIndex: 20, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, textAlign: "center", background: "rgba(0,0,0,0.85)" }}>
+          <div style={{ fontSize: 14, color: "#ff5566", letterSpacing: "0.3em", fontWeight: 800 }}>☠ THE HUNT COULDN'T START</div>
+          <div style={{ fontSize: 11, opacity: 0.6, marginTop: 10, maxWidth: 420, wordBreak: "break-word" }}>{fatal}</div>
+          <button type="button" onClick={onQuit} style={{ marginTop: 18, fontFamily: FONT, padding: "12px 22px", border: "1px solid rgba(255,255,255,0.25)", borderRadius: 12, background: "rgba(255,255,255,0.08)", color: "#fff", fontWeight: 800, letterSpacing: "0.15em" }}>BACK TO LOBBY</button>
+        </div>
+      )}
+      <div style={{ position: "relative", width: VW * scale, height: VH * scale, flex: "0 0 auto" }}>
         <canvas ref={canvasRef} width={VW} height={VH} style={{ width: VW * scale, height: VH * scale, imageRendering: "pixelated", display: "block" }} />
         {/* HUD */}
         {hud && (
@@ -86,18 +110,21 @@ export default function BountyGameView({ board, faction = "samurai", onEnd, onQu
             )}
           </div>
         )}
-        <button type="button" onClick={audio.toggleMute} style={{ position: "absolute", left: 8, bottom: 8, background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 999, width: 26, height: 26, color: "#fff", fontSize: 12, cursor: "pointer" }}>{audio.muted ? "🔇" : "🔊"}</button>
-        <button type="button" onClick={onQuit} style={{ position: "absolute", right: 8, bottom: 8, background: "rgba(0,0,0,0.5)", border: "1px solid rgba(248,113,113,0.4)", borderRadius: 999, padding: "4px 10px", color: "#f87171", fontSize: 9, fontWeight: 800, letterSpacing: "0.12em", cursor: "pointer", fontFamily: FONT }}>✕ QUIT</button>
+        <button type="button" onClick={audio.toggleMute} style={{ position: "absolute", left: 8, ...(isTouch ? { top: 44 } : { bottom: 8 }), background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 999, width: 26, height: 26, color: "#fff", fontSize: 12, cursor: "pointer" }}>{audio.muted ? "🔇" : "🔊"}</button>
+        <button type="button" onClick={onQuit} style={{ position: "absolute", right: 8, ...(isTouch ? { top: 44 } : { bottom: 8 }), background: "rgba(0,0,0,0.5)", border: "1px solid rgba(248,113,113,0.4)", borderRadius: 999, padding: "4px 10px", color: "#f87171", fontSize: 9, fontWeight: 800, letterSpacing: "0.12em", cursor: "pointer", fontFamily: FONT }}>✕ QUIT</button>
       </div>
       {!isTouch && <div style={{ marginTop: 8, fontSize: 10, opacity: 0.4, letterSpacing: "0.2em" }}>← → MOVE · ↑ AIM UP · ↓ CROUCH / DROP · Z or SPACE JUMP · X or SHIFT FIRE · ESC QUIT</div>}
       {isTouch && (
-        <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, height: 120, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 16px", pointerEvents: "auto" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "58px 58px 58px", gridTemplateRows: "58px 58px", gap: 4 }}>
+        <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, top: portrait ? VH * scale + 8 : "auto", height: portrait ? "auto" : 150, display: "flex", justifyContent: "space-between", alignItems: "flex-end", padding: portrait ? "0 18px max(40px, env(safe-area-inset-bottom))" : "0 max(14px, env(safe-area-inset-left)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-right))", pointerEvents: "none", zIndex: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "60px 60px 60px", gridTemplateRows: "60px 60px", gap: 6, pointerEvents: "auto", opacity: portrait ? 1 : 0.75 }}>
             <div />{btn("▲", "up")}<div />
             {btn("◀", "left")}{btn("▼", "down")}{btn("▶", "right")}
           </div>
-          <div style={{ display: "flex", gap: 10 }}>{btn("●", "fire", { background: "rgba(248,113,113,0.25)", width: 66, height: 66, borderRadius: 33 })}{btn("▲", "jump", { background: "rgba(96,165,250,0.25)", width: 66, height: 66, borderRadius: 33 })}</div>
+          <div style={{ display: "flex", gap: 14, alignItems: "flex-end", pointerEvents: "auto", opacity: portrait ? 1 : 0.75 }}>{btn("●", "fire", { background: "rgba(248,113,113,0.3)", width: 74, height: 74, borderRadius: 37 })}{btn("▲", "jump", { background: "rgba(96,165,250,0.3)", width: 74, height: 74, borderRadius: 37, marginBottom: 26 })}</div>
         </div>
+      )}
+      {isTouch && portrait && hud && hud.state === "intro" && (
+        <div style={{ position: "absolute", left: 0, right: 0, top: VH * scale + 14, textAlign: "center", fontSize: 10, letterSpacing: "0.25em", color: "rgba(255,255,255,0.45)", pointerEvents: "none" }}>⟳ ROTATE FOR A BIGGER VIEW</div>
       )}
       <style>{`@keyframes bhMsg{0%{opacity:0;transform:scale(1.15)}12%{opacity:1;transform:scale(1)}80%{opacity:1}100%{opacity:0}}`}</style>
     </div>
