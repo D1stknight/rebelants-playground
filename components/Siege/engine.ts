@@ -48,7 +48,7 @@ export class Siege {
     const bloom = new AdvancedBloomFilter({ threshold: 0.35, bloomScale: 1.1, brightness: 1.0, blur: 6, quality: 4 }); this.L.fx.filters = [bloom];
     this.shock = new ShockwaveFilter({ center: { x: 0, y: 0 }, amplitude: 22, wavelength: 90, brightness: 1.05, radius: 260, speed: 900, time: 99 }); this.L.world.filters = [this.shock];
     this.buildPhysics(); this.buildScenery(); this.buildCatapult();
-    this.fit(); window.addEventListener("resize", this.fitBound);
+    this.fit(); window.addEventListener("resize", this.fitBound); this.app.renderer.on("resize", this.fitBound); requestAnimationFrame(this.fitBound); setTimeout(this.fitBound, 300);
     this.bindInput();
     this.ready = true; this.last = performance.now(); this.app.ticker.add(() => this.frame()); (window as any).__siege = this;   // debug handle
     this.pushHud();
