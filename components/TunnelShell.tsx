@@ -1,6 +1,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import TunnelRun from "./AntTunnel/TunnelRun";
+import { DESCENT_FACTIONS } from "../lib/descentConfig";
 import { usePoints } from "../lib/usePoints";
 import { loadProfile, getEffectivePlayerId, saveProfile } from "../lib/profile";
 
@@ -434,6 +435,8 @@ export default function TunnelShell() {
   const [tunnelCfg, setTunnelCfg] = useState(DEFAULT_TUNNEL_CONFIG);
 
     const [boardTheme, setBoardTheme] = useState<BoardTheme>("colony");
+  const [tunnelFaction, setTunnelFaction] = useState<string>(() => { try { return localStorage.getItem("ra:tunnel:faction") || localStorage.getItem("ra:gp:faction") || "samurai"; } catch { return "samurai"; } });
+  useEffect(() => { try { localStorage.setItem("ra:tunnel:faction", tunnelFaction); } catch {} }, [tunnelFaction]);
   const [layoutIndex, setLayoutIndex] = useState(0);
   const [countdown, setCountdown] = useState<number|null>(null);
   const [layoutMode, setLayoutMode] = useState<"random"|"pick">("random");
@@ -1293,6 +1296,18 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           </div>
         )}
 
+        {/* ── Ant selector ── */}
+        <div style={{maxWidth:900,margin:'0 auto 16px',padding:'0 4px'}}>
+          <div style={{fontSize:10,fontWeight:900,letterSpacing:'0.25em',textTransform:'uppercase',color:'rgba(255,255,255,0.3)',marginBottom:10}}>SELECT YOUR ANT</div>
+          <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:4,scrollbarWidth:'none'} as React.CSSProperties}>
+            {DESCENT_FACTIONS.map((f) => { const on = f.id === tunnelFaction; return (
+              <button key={f.id} type="button" disabled={isPlaying} onClick={() => setTunnelFaction(f.id)} title={f.name} style={{ flex:'0 0 auto', width:64, padding:0, background:on?'rgba(96,165,250,0.18)':'rgba(0,0,0,0.45)', border:on?'1px solid #60a5fa':'1px solid rgba(255,255,255,0.12)', borderRadius:10, color:'#fff', cursor:isPlaying?'default':'pointer', overflow:'hidden', boxShadow:on?'0 0 14px rgba(96,165,250,0.45)':'none', transform:on?'translateY(-3px)':'none', transition:'all .15s' }}>
+                <div style={{ height:56, display:'flex', alignItems:'flex-end', justifyContent:'center', paddingTop:4 }}><img src={`/descent/portraits/${f.id}.png`} alt={f.name} style={{ height:'94%', objectFit:'contain', filter:on?'none':'brightness(0.6) saturate(0.6)' }} /></div>
+                <div style={{ fontSize:7, fontWeight:800, letterSpacing:'0.08em', padding:'3px 2px 5px', color:on?'#93c5fd':'rgba(255,255,255,0.7)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{f.name.toUpperCase()}</div>
+              </button>); })}
+          </div>
+        </div>
+
         {/* ── Environment selector ── */}
         <div style={{maxWidth:900,margin:'0 auto 16px',padding:'0 4px'}}>
           <div style={{fontSize:10,fontWeight:900,letterSpacing:'0.25em',textTransform:'uppercase',color:'rgba(255,255,255,0.3)',marginBottom:10}}>SELECT YOUR TUNNEL ENVIRONMENT</div>
@@ -1416,6 +1431,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                     theme={{ ...theme, dark: boardTheme === "shadow" || boardTheme === "void" || boardTheme === "mythic" }}
                     cfg={{ runSeconds: tunnelCfg.tunnelRunSeconds, crystals: tunnelCfg.tunnelCrystalCount, sugars: tunnelCfg.tunnelSugarCount, crumbs: tunnelCfg.tunnelCrumbCount, wallBreaks: tunnelCfg.tunnelWallBreaks, spiderSpeedMs: tunnelCfg.tunnelSpiderSpeedMs }}
                     playing={isPlaying}
+                    faction={tunnelFaction}
                     onHud={onTunnelHud}
                     onEnd={finishRun}
                     onSfx={(n) => { const f = (sfx as any)[n === "hit" ? "spiderHit" : n]; if (typeof f === "function") f(); }}

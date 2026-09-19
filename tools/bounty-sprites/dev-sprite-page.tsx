@@ -10,6 +10,7 @@ function Rig({ fid }: { fid: string }) {
   const attack = useFBX(`/faction-wars/characters/${fid}/attack.fbx`) as any;
   const lose = useFBX(`/faction-wars/characters/${fid}/lose.fbx`) as any;
   const hit = useFBX(`/faction-wars/characters/${fid}/hit.fbx`) as any;
+  const win = useFBX(`/faction-wars/characters/${fid}/win.fbx`) as any;
   const { gl, scene, camera } = useThree();
   const ref = useRef<Object3D | null>(null);
   useEffect(() => {
@@ -29,7 +30,7 @@ function Rig({ fid }: { fid: string }) {
     // bake rest pose from idle frame 0 via a mixer
     const retarget = (clip: any) => { const c = clip.clone(); c.tracks = c.tracks.map((t: any) => { t.name = t.name.replace(/^mixamorig(?!_)([A-Z][^.]*)(\..+)$/, "mixamorig_$1$2"); return t; }).filter((t: any) => t.name.endsWith(".quaternion")); return c; };
     const mixer = new AnimationMixer(s);
-    const clips: any = { idle: retarget(idle.animations[0]), attack: retarget(attack.animations[0]), lose: retarget(lose.animations[0]), hit: retarget(hit.animations[0]) };
+    const clips: any = { idle: retarget(idle.animations[0]), attack: retarget(attack.animations[0]), lose: retarget(lose.animations[0]), hit: retarget(hit.animations[0]), win: retarget(win.animations[0]) };
     let action: any = null;
     (window as any).__clip = (name: string, t: number) => { if (action) action.stop(); action = mixer.clipAction(clips[name]); action.play(); action.time = t; mixer.update(0); s.updateMatrixWorld(true); };
     (window as any).__rot = (bone: string, x: number, y: number, z: number, add = true) => { const b = bones[bone]; if (!b) return "nobone " + bone; if (add) { b.rotation.x += x; b.rotation.y += y; b.rotation.z += z; } else b.rotation.set(x, y, z); s.updateMatrixWorld(true); return "ok"; };
@@ -45,7 +46,7 @@ function Rig({ fid }: { fid: string }) {
     (window as any).__shot = () => { gl.render(scene, camera); return gl.domElement.toDataURL("image/png"); };
     (window as any).__ready = true;
     return () => { scene.remove(s); };
-  }, [gltf, idle, attack, lose, hit, gl, scene, camera]);
+  }, [gltf, idle, attack, lose, hit, win, gl, scene, camera]);
   return null;
 }
 

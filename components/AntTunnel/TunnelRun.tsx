@@ -12,14 +12,15 @@ type Props = {
 
 export default function TunnelRun({ layout, theme, cfg, playing, faction = "samurai", onHud, onEnd, onSfx, onQuit, hudLine }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null); const wrapRef = useRef<HTMLDivElement | null>(null);
-  const gameRef = useRef<Tunnel | null>(null); const spritesRef = useRef(loadSprites(faction));
+  const gameRef = useRef<Tunnel | null>(null); const spritesRef = useRef(loadSprites(faction)); const facRef = useRef(faction);
+  if (facRef.current !== faction) { facRef.current = faction; spritesRef.current = loadSprites(faction); }
   const [isTouch, setIsTouch] = useState(false); const [vh, setVh] = useState<number | string>("100vh"); const [portrait, setPortrait] = useState(false);
   const cbRef = useRef({ onHud, onEnd, onSfx }); cbRef.current = { onHud, onEnd, onSfx };
   useEffect(() => { setIsTouch("ontouchstart" in window || navigator.maxTouchPoints > 0); }, []);
   const fullscreen = isTouch && playing;
 
   // (re)create the game whenever a run starts or the layout changes
-  const runKey = `${layout.join("|")}|${playing ? "p" : "i"}`;
+  const runKey = `${layout.join("|")}|${playing ? "p" : "i"}|${faction}`;
   useEffect(() => {
     const cv = canvasRef.current; if (!cv) return;
     const g = new Tunnel(cv, layout, theme, cfg, { onHud: (h) => cbRef.current.onHud(h), onEnd: (r) => cbRef.current.onEnd(r), onSfx: (n) => cbRef.current.onSfx(n) }, spritesRef.current);

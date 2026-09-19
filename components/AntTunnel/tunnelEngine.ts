@@ -11,7 +11,9 @@ export type Cfg = { runSeconds: number; crystals: number; sugars: number; crumbs
 export type Hud = { score: number; timeLeft: number; breaks: number; crystalsLeft: number; crystalsTotal: number; msg: string | null; state: "idle" | "play" | "won" | "lost"; hit: boolean };
 export type EndResult = { score: number; fullClear: boolean; crystalsCollected: number; crystalsTotal: number; clearMs: number | null; crumbs: number; sugars: number };
 export type Callbacks = { onHud: (h: Hud) => void; onEnd: (r: EndResult) => void; onSfx: (n: "crumb" | "sugar" | "crystal" | "wall" | "hit" | "win" | "lose" | "nowall") => void };
-export type Sprites = { idle: HTMLImageElement; run: HTMLImageElement; left: HTMLImageElement; right: HTMLImageElement; hit: HTMLImageElement; win: HTMLImageElement; death: HTMLImageElement; spider: HTMLImageElement };
+/** one 192×192 sheet per faction (tools/tunnel-sprites): 0 idle · 1–6 run side (faces right) · 7–10 run back · 11–14 run front · 15 hit · 16 win · 17 death · 18 dig · 19 idle breathe */
+export type Sprites = { sheet: HTMLImageElement; spider: HTMLImageElement };
+export const SF = 192, SCOLS = 8;
 
 const DIRV: Record<Dir, [number, number]> = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 const START: Cell = { row: 2, col: 2 }; const SPIDER_START: Cell = { row: 1, col: 10 };
@@ -23,9 +25,9 @@ type Pick = { row: number; col: number; kind: 0 | 1 | 2; taken: boolean; ph: num
 type Part = { x: number; y: number; vx: number; vy: number; life: number; c: string; s: number };
 
 export function loadSprites(faction = "samurai"): Sprites {
-  const mk = (n: string) => { const i = new Image(); i.src = `/tunnel/${faction}/${n}.png`; return i; };
+  const sheet = new Image(); sheet.src = `/tunnel/sheets/${faction}.png`;
   const spider = new Image(); spider.src = "/spiders/spider.png";
-  return { idle: mk("idle"), run: mk("run"), left: mk("left"), right: mk("right"), hit: mk("hit"), win: mk("win"), death: mk("death"), spider };
+  return { sheet, spider };
 }
 
 export class Tunnel {
@@ -36,7 +38,7 @@ export class Tunnel {
   input: Record<Dir, boolean> & { break: boolean } = { up: false, down: false, left: false, right: false, break: false }; breakLatch = false;
   // view
   vw = COLS * CELL; vh = ROWS * CELL; follow = false; camX = 0; camY = 0; zoom = 1; floorTex: HTMLCanvasElement | null = null; wallTex: HTMLCanvasElement | null = null;
-  seedR = Math.random() * 1000;
+  seedR = Math.random() * 1000; dustT = 0; digT = 0; runT = 0;
 
   constructor(canvas: HTMLCanvasElement, layout: string[], theme: Theme, cfg: Cfg, cb: Callbacks, sprites: Sprites) {
     this.ctx = canvas.getContext("2d")!; this.layout = new Set(layout); this.theme = theme; this.cfg = cfg; this.cb = cb; this.sp = sprites;
@@ -88,7 +90,9 @@ export class Tunnel {
     const want = (["up", "down", "left", "right"] as Dir[]).find((d) => this.input[d]) || null;
     if (want) { this.ant.want = want; this.facing = want; }
     if (this.input.break && !this.breakLatch) { this.breakLatch = true; this.doBreak(); } else if (!this.input.break) this.breakLatch = false;
-    this.moveMover(this.ant, dt, true);
+    const wasMoving = !!this.ant.dir; this.moveMover(this.ant, dt, true);
+    if (this.ant.dir) { this.runT += dt; this.dustT -= dt; if (this.dustT <= 0) { this.dustT = 0.11; const [dx, dy] = DIRV[this.ant.dir]; this.parts.push({ x: this.ant.x - dx * 0.35 + (Math.random() - 0.5) * 0.2, y: this.ant.y + 0.28 - dy * 0.3, vx: -dx * 0.8 + (Math.random() - 0.5) * 0.6, vy: -0.6 - Math.random() * 0.6, life: 0.3 + Math.random() * 0.2, c: "rgba(200,180,150,0.55)", s: 3 + Math.random() * 3 }); } } else if (wasMoving) this.runT = 0;
+    if (this.digT > 0) this.digT -= dt;
     // spider AI + move
     this.spiderThink(); this.moveMover(this.spider, dt, false);
     // pickups
@@ -150,7 +154,7 @@ export class Tunnel {
     if (this.breaks <= 0) { this.say("No wall breakers left."); this.cb.onSfx("nowall"); return; }
     const r = Math.floor(this.ant.y), c = Math.floor(this.ant.x); const [dx, dy] = DIRV[this.facing]; const tr = r + dy, tc = c + dx;
     if (!this.breakable(tr, tc)) { this.say("No breakable wall in front of you."); this.cb.onSfx("nowall"); return; }
-    this.broken.add(`${tr}:${tc}`); this.breaks--; this.cb.onSfx("wall"); this.burst(tc + 0.5, tr + 0.5, "#c8a97a", 18); this.shake = 0.4; this.say("Wall broken ✅", 0.9);
+    this.broken.add(`${tr}:${tc}`); this.breaks--; this.digT = 0.35; this.cb.onSfx("wall"); this.burst(tc + 0.5, tr + 0.5, "#c8a97a", 18); this.shake = 0.4; this.say("Wall broken ✅", 0.9);
   }
   burst(x: number, y: number, c: string, n: number) { for (let i = 0; i < n; i++) { const a = Math.random() * Math.PI * 2, sp = 1 + Math.random() * 3; this.parts.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1, life: 0.35 + Math.random() * 0.35, c, s: 2 + Math.random() * 3 }); } }
   end(won: boolean) {
@@ -199,16 +203,21 @@ export class Tunnel {
       if (p.taken) continue; const x = (p.col + 0.5) * CELL, y = (p.row + 0.5) * CELL; const bob = Math.sin(this.t * 3 + p.ph) * 1.5;
       if (p.kind === 0) { c.fillStyle = th.crumb; c.beginPath(); c.arc(x, y + bob * 0.3, 3.2, 0, Math.PI * 2); c.fill(); c.fillStyle = "rgba(255,255,255,0.35)"; c.beginPath(); c.arc(x - 1, y - 1 + bob * 0.3, 1.2, 0, Math.PI * 2); c.fill(); }
       else if (p.kind === 1) { c.save(); c.translate(x, y + bob); c.rotate(Math.PI / 4); c.fillStyle = th.sugar; c.shadowColor = th.sugar; c.shadowBlur = 8; c.fillRect(-5, -5, 10, 10); c.shadowBlur = 0; c.fillStyle = "rgba(255,255,255,0.5)"; c.fillRect(-4, -4, 3, 3); c.restore(); }
-      else { c.save(); c.translate(x, y + bob * 1.4); c.fillStyle = th.crystal; c.shadowColor = th.crystal; c.shadowBlur = 14; c.beginPath(); c.moveTo(0, -11); c.lineTo(8, -2); c.lineTo(0, 11); c.lineTo(-8, -2); c.closePath(); c.fill(); c.shadowBlur = 0; c.fillStyle = "rgba(255,255,255,0.55)"; c.beginPath(); c.moveTo(0, -11); c.lineTo(4, -3); c.lineTo(-3, -4); c.closePath(); c.fill(); c.restore(); }
+      else { const pulse = 0.6 + 0.4 * Math.sin(this.t * 4 + p.ph); c.save(); c.translate(x, y + bob * 1.4); const gl = c.createRadialGradient(0, 0, 2, 0, 0, 22 + pulse * 6); gl.addColorStop(0, hexA(th.crystal, 0.55 * pulse + 0.2)); gl.addColorStop(1, hexA(th.crystal, 0)); c.fillStyle = gl; c.beginPath(); c.arc(0, 0, 28, 0, Math.PI * 2); c.fill(); c.fillStyle = th.crystal; c.shadowColor = th.crystal; c.shadowBlur = 18 + pulse * 10; c.beginPath(); c.moveTo(0, -11); c.lineTo(8, -2); c.lineTo(0, 11); c.lineTo(-8, -2); c.closePath(); c.fill(); c.shadowBlur = 0; c.fillStyle = "rgba(255,255,255,0.55)"; c.beginPath(); c.moveTo(0, -11); c.lineTo(4, -3); c.lineTo(-3, -4); c.closePath(); c.fill(); const sk = Math.max(0, Math.sin(this.t * 5 + p.ph * 2)); if (sk > 0.6) { c.fillStyle = `rgba(255,255,255,${(sk - 0.6) * 2.5})`; c.fillRect(-1, -19 + 4 * sk, 2, 8); c.fillRect(-4, -16 + 4 * sk, 8, 2); } c.restore(); }
     }
     // spider
-    const sp = this.sp.spider; if (sp.complete && sp.naturalWidth) { const h = CELL * 2.2, w = h * (sp.naturalWidth / sp.naturalHeight); const bob = Math.sin(this.t * 9) * 1.5; c.save(); c.shadowColor = th.spiderGlow.startsWith("#") ? th.spiderGlow : "rgba(239,68,68,0.5)"; c.shadowBlur = 16; const flip = this.spider.dir === "left"; c.translate(this.spider.x * CELL, this.spider.y * CELL + bob); if (flip) c.scale(-1, 1); c.drawImage(sp, -w / 2, -h * 0.55, w, h); c.restore(); }
-    // ant
-    const moving = !!this.ant.dir; const img = this.state === "won" ? this.sp.win : this.state === "lost" ? this.sp.death : this.hitT > 0 ? this.sp.hit : !moving && this.state !== "play" ? this.sp.idle : this.facing === "left" ? this.sp.left : this.facing === "right" ? this.sp.right : moving ? this.sp.run : this.sp.idle;
-    if (img.complete && img.naturalWidth) {
-      const h = CELL * 2.1, w = h * (img.naturalWidth / img.naturalHeight); const bob = moving ? Math.abs(Math.sin(this.t * 14)) * 3 : Math.sin(this.t * 2) * 1;
+    const sp = this.sp.spider; if (sp.complete && sp.naturalWidth) { const h = CELL * 1.55, w = h * (sp.naturalWidth / sp.naturalHeight); const bob = Math.sin(this.t * 9) * 1.5; c.save(); c.shadowColor = th.spiderGlow.startsWith("#") ? th.spiderGlow : "rgba(239,68,68,0.5)"; c.shadowBlur = 16; const flip = this.spider.dir === "left"; c.translate(this.spider.x * CELL, this.spider.y * CELL + bob); if (flip) c.scale(-1, 1); c.drawImage(sp, -w / 2, -h * 0.55, w, h); c.restore(); }
+    // ant — sheet frame by state / facing, animated while moving
+    const sh = this.sp.sheet;
+    if (sh.complete && sh.naturalWidth) {
+      const moving = !!this.ant.dir; let fi = 0; let flip = false;
+      if (this.state === "won") fi = 16; else if (this.state === "lost") fi = 17; else if (this.hitT > 0) fi = 15; else if (this.digT > 0) { fi = 18; flip = this.facing === "left"; }
+      else if (moving) { const f = this.facing; const k = Math.floor(this.runT * 11); if (f === "up") fi = 7 + (k % 4); else if (f === "down") fi = 11 + (k % 4); else { fi = 1 + (k % 6); flip = f === "left"; } }
+      else fi = Math.floor(this.t * 1.2) % 2 === 0 ? 0 : 19;
+      if (!moving && this.state === "play") flip = this.facing === "left";
+      const h = CELL * 1.9, w = h; const bob = moving ? Math.abs(Math.sin(this.runT * Math.PI * 11 / 3)) * 1.2 : 0;
       const blink = this.invuln > 0 && this.hitT <= 0 && Math.floor(this.t * 16) % 2 === 0;
-      if (!blink) { c.save(); c.shadowColor = th.antGlow.startsWith("#") ? th.antGlow : "rgba(96,165,250,0.5)"; c.shadowBlur = 14; c.translate(this.ant.x * CELL, this.ant.y * CELL - bob); if (this.state === "lost") c.rotate(-0.4); c.drawImage(img, -w / 2, -h * 0.62, w, h); c.restore(); }
+      if (!blink) { c.save(); c.translate(this.ant.x * CELL, this.ant.y * CELL - bob); if (flip) c.scale(-1, 1); c.shadowColor = th.antGlow.startsWith("#") ? th.antGlow : "rgba(96,165,250,0.5)"; c.shadowBlur = 12; c.drawImage(sh, (fi % SCOLS) * SF, Math.floor(fi / SCOLS) * SF, SF, SF, -w / 2, -h + CELL * 0.42, w, h); c.restore(); }
     }
     // particles
     for (const q of this.parts) { c.globalAlpha = Math.min(1, q.life * 3); c.fillStyle = q.c; c.fillRect(q.x * CELL - q.s / 2, q.y * CELL - q.s / 2, q.s, q.s); } c.globalAlpha = 1;
@@ -220,6 +229,7 @@ export class Tunnel {
   }
 }
 
+function hexA(col: string, a: number) { let r = 0, g = 0, b = 0; if (col.startsWith("#")) { const h = col.slice(1); const n = parseInt(h.length === 3 ? h.split("").map((x) => x + x).join("") : h, 16); r = (n >> 16) & 255; g = (n >> 8) & 255; b = n & 255; } else { const m = col.match(/\d+/g); if (m) { r = +m[0]; g = +m[1]; b = +m[2]; } } return `rgba(${r},${g},${b},${Math.max(0, Math.min(1, a))})`; }
 function clamp(v: number, a: number, b: number) { return Math.max(a, Math.min(b, v)); }
 function mulberry(a: number) { return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 function cssColor(v: string, fallback: string) { return v && !v.includes("gradient") ? v : fallback; }
