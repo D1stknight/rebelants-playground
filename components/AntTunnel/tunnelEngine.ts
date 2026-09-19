@@ -6,7 +6,7 @@
 export const ROWS = 14, COLS = 22, CELL = 32;
 export type Cell = { row: number; col: number };
 export type Dir = "up" | "down" | "left" | "right";
-export type Theme = { bg: string; floor: string; wall: string; accent: string; crumb: string; sugar: string; crystal: string; antGlow: string; spiderGlow: string; neon?: boolean; dark?: boolean };
+export type Theme = { name?: string; bg: string; floor: string; wall: string; accent: string; crumb: string; sugar: string; crystal: string; antGlow: string; spiderGlow: string; neon?: boolean; dark?: boolean };
 export type Cfg = { runSeconds: number; crystals: number; sugars: number; crumbs: number; wallBreaks: number; spiderSpeedMs: number;
   /** hearts per run (0 = no hearts: a spider hit costs −3 s instead) */ lives?: number; /** floor power-ups on/off */ powerups?: boolean;
   /** banked points per floor cleared (× floor number) */ floorBonus?: number; /** seconds added back per floor cleared */ floorTimeBonus?: number;
@@ -62,13 +62,14 @@ export class Tunnel {
   // view
   vw = COLS * CELL; vh = ROWS * CELL; follow = false; camX = 0; camY = 0; zoom = 1; floorTex: HTMLCanvasElement | null = null; wallTex: HTMLCanvasElement | null = null;
   seedR = Math.random() * 1000; dustT = 0; digT = 0; runT = 0;
+  themes: Record<string, Theme> | null = null; themeId: string; transT = 0; transLabel = "";
   mods: ThemeMods; lives = 0; livesMax = 0; breakCd = 0; wallHits = new Map<string, number>(); dead = false;
   rocks = 0; rockLatch = false; shots: { x: number; y: number; dir: Dir; life: number }[] = []; crystalsRun = 0;
 
-  constructor(canvas: HTMLCanvasElement, layout: string[], theme: Theme, cfg: Cfg, cb: Callbacks, sprites: Sprites, layouts?: string[][], layoutIdx = 0) {
+  constructor(canvas: HTMLCanvasElement, layout: string[], theme: Theme, cfg: Cfg, cb: Callbacks, sprites: Sprites, layouts?: string[][], layoutIdx = 0, themes?: Record<string, Theme>) {
     this.ctx = canvas.getContext("2d")!; this.layout = new Set(layout); this.theme = theme; this.cfg = cfg; this.cb = cb; this.sp = sprites;
     this.layouts = layouts || [layout]; this.layoutIdx = layoutIdx;
-    this.mods = THEME_MODS[cfg.themeId || "colony"] || {}; if (this.mods.dark) this.theme = { ...theme, dark: true };
+    this.themeId = cfg.themeId || "colony"; this.themes = themes || null; this.mods = THEME_MODS[this.themeId] || {}; if (this.mods.dark) this.theme = { ...theme, dark: true };
     this.breaks = this.maxBreaks(); this.timeLeft = cfg.runSeconds;
     this.livesMax = Math.max(0, (cfg.lives ?? 0) > 0 ? (cfg.lives ?? 0) + (this.mods.lives || 0) : 0); if ((cfg.lives ?? 0) > 0) this.livesMax = Math.max(1, this.livesMax); this.lives = this.livesMax; this.rocks = Math.max(0, cfg.rocks ?? 3);
     this.ant = { x: START.col + 0.5, y: START.row + 0.5, dir: null, want: null, speed: ANT_SPEED };
@@ -143,6 +144,7 @@ export class Tunnel {
     if (this.hitT > 0) this.hitT -= dt; if (this.invuln > 0) this.invuln -= dt; if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 4); if (this.flash > 0) this.flash = Math.max(0, this.flash - dt * 4);
     for (const q of this.parts) { q.life -= dt; q.x += q.vx * dt; q.y += q.vy * dt; q.vy += 3 * dt; } this.parts = this.parts.filter((q) => q.life > 0);
     if (this.state !== "play") return;
+    if (this.transT > 0) { this.transT -= dt; if (this.transT <= 0) { this.transT = 0; this.say(`FLOOR ${this.floor} — GO!`, 1); } return; }   // floor countdown: everything frozen
     // timer
     if (this.breakCd > 0) this.breakCd -= dt;
     const prev = Math.ceil(this.timeLeft); this.timeLeft -= dt * (this.mods.timer || 1); if (Math.ceil(this.timeLeft) !== prev) this.pushHud();
@@ -251,6 +253,9 @@ export class Tunnel {
     this.floor++; this.timeLeft = Math.min(this.cfg.runSeconds, this.timeLeft + (this.cfg.floorTimeBonus ?? 20)); this.breaks = Math.max(1, Math.min(this.breaks, this.maxBreaks())); if (this.livesMax > 0) { this.livesMax = Math.min(this.cfg.livesCap ?? 10, this.livesMax + 1); this.lives = Math.min(this.livesMax, this.lives + 2); } this.wallHits.clear(); this.breakCd = 0;
     // next layout (never the same one twice in a row)
     if (this.layouts.length > 1) { let n = this.layoutIdx; while (n === this.layoutIdx) n = (Math.random() * this.layouts.length) | 0; this.layoutIdx = n; this.layout = new Set(this.layouts[n]); }
+    // new environment (never the same twice): swap textures + gameplay modifiers, then a 3 s countdown before the floor starts
+    if (this.themes) { const keys = Object.keys(this.themes).filter((k) => k !== this.themeId && THEME_MODS[k]); if (keys.length) { const k = keys[(Math.random() * keys.length) | 0]; this.themeId = k; this.mods = THEME_MODS[k] || {}; this.theme = { ...this.themes[k], dark: !!this.mods.dark }; this.bakeTextures(); this.breaks = Math.max(1, Math.min(this.breaks, this.maxBreaks())); } }
+    this.transT = 3.2; this.transLabel = this.theme.name || this.themeId;
     this.broken.clear(); this.picks = []; this.crystalsGot = 0; this.shots = []; this.placePickups(); this.spawnSpiders();
     this.ant.x = START.col + 0.5; this.ant.y = START.row + 0.5; this.ant.dir = null; this.ant.want = null; this.facing = "right"; this.invuln = 1.5; this.decoy = null; this.combo = 0; this.mult = 1;
     this.pushHud();
@@ -357,6 +362,15 @@ export class Tunnel {
     c.setTransform(1, 0, 0, 1, 0, 0);
     if (this.flash > 0) { c.fillStyle = `rgba(255,60,60,${this.flash * 0.35})`; c.fillRect(0, 0, W, H); }
     if (this.state === "idle") { c.fillStyle = "rgba(0,0,0,0.35)"; c.fillRect(0, 0, W, H); }
+    if (this.transT > 0 && this.state === "play") {
+      const n = Math.ceil(this.transT - 0.2); const frac = (this.transT - 0.2) % 1; const k = Math.min(W, H) / 400;
+      c.fillStyle = "rgba(0,0,0,0.55)"; c.fillRect(0, 0, W, H); c.textAlign = "center"; c.textBaseline = "middle";
+      c.fillStyle = "rgba(255,255,255,0.85)"; c.font = `800 ${Math.round(16 * k)}px system-ui, sans-serif`; c.fillText(`FLOOR ${this.floor}`, W / 2, H / 2 - 62 * k);
+      c.fillStyle = this.theme.accent || "#fff"; c.font = `900 ${Math.round(26 * k)}px system-ui, sans-serif`; c.fillText(this.transLabel.toUpperCase(), W / 2, H / 2 - 34 * k);
+      const info = [this.mods.spider ? `spiders ×${this.mods.spider}` : "", this.mods.dark ? "dark" : "", this.mods.wallHits ? `walls ${this.mods.wallHits} hits` : "", this.mods.breakCooldown ? "pick cooldown" : "", this.mods.relentless ? "relentless" : "", this.mods.timer ? "fast clock" : "", this.mods.breaks ? `${this.mods.breaks} breaks` : ""].filter(Boolean).join(" · ");
+      if (info) { c.fillStyle = "rgba(255,255,255,0.6)"; c.font = `600 ${Math.round(11 * k)}px system-ui, sans-serif`; c.fillText(info, W / 2, H / 2 - 12 * k); }
+      if (n >= 1) { c.save(); c.translate(W / 2, H / 2 + 40 * k); c.scale(1 + frac * 0.35, 1 + frac * 0.35); c.globalAlpha = 0.4 + frac * 0.6; c.fillStyle = "#fff"; c.shadowColor = this.theme.accent || "#60a5fa"; c.shadowBlur = 30; c.font = `900 ${Math.round(80 * k)}px system-ui, sans-serif`; c.fillText(String(n), 0, 0); c.restore(); }
+    }
   }
 }
 

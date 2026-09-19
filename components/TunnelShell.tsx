@@ -1427,7 +1427,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                     <span>🍬 Sugar = 5</span>
                     <span>💎 Crystal = 20</span>
                     <span>{tunnelCfg.tunnelLives > 0 ? `🧱 Space: 1st hit cracks (free), 2nd breaks (1 charge) · 🕷️ Hit = −1 heart · ${tunnelCfg.tunnelLives} hearts to start, +1 max & +2 back per floor (cap ${tunnelCfg.tunnelLivesCap}) · a ❤ hides on every floor (pink walls) · 🪨 ${tunnelCfg.tunnelRocks} rocks (X) once 3 spiders are out` : "🕷️ Hit = -3 sec"}</span>
-                    <span>Collect all crystals → next floor</span>
+                    <span>Collect all crystals → next floor in a random environment (3 s countdown)</span>
                   </div>
                 </div>
 
@@ -1460,6 +1460,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                     layout={(TUNNEL_LAYOUTS[layoutIndex] || TUNNEL_LAYOUTS[0]) as string[]}
                     layouts={TUNNEL_LAYOUTS as string[][]}
                     layoutIdx={layoutIndex}
+                    themes={themeMap}
                     theme={{ ...theme, dark: boardTheme === "shadow" || boardTheme === "void" || boardTheme === "mythic" }}
                     cfg={{ runSeconds: tunnelCfg.tunnelRunSeconds, crystals: tunnelCfg.tunnelCrystalCount, sugars: tunnelCfg.tunnelSugarCount, crumbs: tunnelCfg.tunnelCrumbCount, wallBreaks: tunnelCfg.tunnelWallBreaks, spiderSpeedMs: tunnelCfg.tunnelSpiderSpeedMs, lives: tunnelCfg.tunnelLives, powerups: tunnelCfg.tunnelPowerups, floorBonus: tunnelCfg.tunnelFloorBonus, floorTimeBonus: tunnelCfg.tunnelFloorTimeBonus, rocks: tunnelCfg.tunnelRocks, livesCap: tunnelCfg.tunnelLivesCap, powFreeze: tunnelCfg.tunnelPowFreeze, powClaw: tunnelCfg.tunnelPowClaw, powDecoy: tunnelCfg.tunnelPowDecoy, powRush: tunnelCfg.tunnelPowRush, themeId: boardTheme }}
                     playing={isPlaying}
