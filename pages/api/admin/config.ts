@@ -24,6 +24,11 @@ function isAuthed(req: NextApiRequest) {
 
 const DEFAULTS = {
   shuffleCost: 500,
+  shuffleSwaps: 8,
+  shuffleTrackBonus: 50,
+  shuffleFavorPity: 5,
+  shuffleRoyalEnabled: true,
+  shuffleRoyalUltraMult: 3,
   dailyClaim: 200,
   dailyEarnCap: 500,
   currency: "REBEL",
@@ -138,6 +143,11 @@ const rareMerchDecimal = Number.isFinite(rawRareMerch)
 
   const next = {
   shuffleCost: Number(src?.shuffleCost ?? DEFAULTS.shuffleCost),
+  shuffleSwaps: Math.max(3, Math.min(20, Number(src?.shuffleSwaps ?? DEFAULTS.shuffleSwaps))),
+  shuffleTrackBonus: Math.max(0, Math.min(100, Number(src?.shuffleTrackBonus ?? DEFAULTS.shuffleTrackBonus))),
+  shuffleFavorPity: Math.max(1, Math.min(50, Number(src?.shuffleFavorPity ?? DEFAULTS.shuffleFavorPity))),
+  shuffleRoyalEnabled: src?.shuffleRoyalEnabled !== false,
+  shuffleRoyalUltraMult: Math.max(1, Math.min(20, Number(src?.shuffleRoyalUltraMult ?? DEFAULTS.shuffleRoyalUltraMult))),
   dailyClaim: Number(src?.dailyClaim ?? DEFAULTS.dailyClaim),
   dailyEarnCap: Number(src?.dailyEarnCap ?? DEFAULTS.dailyEarnCap),
   currency: String(src?.currency ?? DEFAULTS.currency),

@@ -842,7 +842,9 @@ const [phase, setPhase] = useState<Phase>("idle");
 const { muted: shuffleMuted, toggleMute: toggleShuffleMute, startMusic, stopMusic, sfx: shuffleSfx } = useShuffleAudio();
 const [showHowPointsWork, setShowHowPointsWork] = useState(false);
 const [order, setOrder] = useState<number[]>(() => Array.from({ length: EGG_COUNT }, (_, i) => i));
-const stageRef = React.useRef<import("./QueenStage").QueenStageHandle | null>(null); const eggRefs = React.useRef<(HTMLButtonElement | null)[]>([]); const [hatched, setHatched] = useState<number | null>(null); const [crackHit, setCrackHit] = useState(0); const [pickedEgg, setPickedEgg] = useState<number | null>(null);
+const stageRef = React.useRef<import("./QueenStage").QueenStageHandle | null>(null); const eggRefs = React.useRef<(HTMLButtonElement | null)[]>([]); const [hatched, setHatched] = useState<number | null>(null); const [crackHit, setCrackHit] = useState(0);
+const [round, setRound] = useState<{ roundId: string; marked: number; royal: boolean } | null>(null); const [markedShow, setMarkedShow] = useState<number | null>(null); const [swapMs, setSwapMs] = useState(300);
+const [favor, setFavor] = useState<{ n: number; max: number }>({ n: 0, max: 5 }); const [domOrder, setDomOrder] = useState<number[]>(() => Array.from({ length: EGG_COUNT }, (_, i) => i)); const [royalReady, setRoyalReady] = useState(false); const [queenLine, setQueenLine] = useState<string>(""); const [lastRoll, setLastRoll] = useState<{ tracked?: boolean; blessed?: boolean; pity?: boolean; royal?: boolean } | null>(null); const [pickedEgg, setPickedEgg] = useState<number | null>(null);
 const [progress, setProgress] = useState(0);
 const [busy, setBusy] = useState(false);
 const [rarity, setRarity] = useState<Rarity>("none");
@@ -964,6 +966,12 @@ async function claimDailyNow() {
 }
 // ✅ NEW: show what the player actually won
 const [winText, setWinText] = useState<string>("");
+const refreshShuffleStatus = React.useCallback(async () => {
+  try { const prof = loadProfile(); const pid = String(effectivePlayerId || getEffectivePlayerId(prof) || prof?.id || "guest").trim().slice(0, 64) || "guest";
+    const r = await fetch(`/api/shuffle/status?playerId=${encodeURIComponent(pid)}`, { cache: "no-store" }); const j = await r.json().catch(() => null);
+    if (j?.ok) { setFavor({ n: Number(j.favor || 0), max: Number(j.favorMax || 5) }); setRoyalReady(!!j.royalReady); } } catch {}
+}, [effectivePlayerId]);
+React.useEffect(() => { refreshShuffleStatus(); }, [refreshShuffleStatus]);
 const runShuffle = async () => {
   if (busy) return;
 
@@ -987,24 +995,35 @@ const runShuffle = async () => {
   setBusy(true);
   setPhase("shuffling"); startMusic();
   setProgress(0);
-  setShowPrize(false);
+  setShowPrize(false); setHatched(null); setPickedEgg(null); setLastRoll(null);
 
-  let swapTimer: NodeJS.Timeout | null = null;
-  swapTimer = setInterval(() => setOrder(shuffledN(EGG_COUNT)), SWAP_EVERY_MS);
+  // ── server-owned round: which egg is marked + the swap sequence (so tracking can't be spoofed)
+  const prof0 = loadProfile();
+  const pid0 = String(effectivePlayerId || getEffectivePlayerId(prof0) || prof0?.id || "guest").trim().slice(0, 64) || "guest";
+  let rd: any = null;
+  try { const r = await fetch("/api/shuffle/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ playerId: pid0 }) }); rd = await r.json().catch(() => null); if (!r.ok || !rd?.ok) rd = null; } catch { rd = null; }
+  if (!rd) { // fallback: local round without the tracking bonus
+    const sw: [number, number][] = []; for (let k = 0; k < 8; k++) { let a = Math.floor(Math.random() * EGG_COUNT), b = Math.floor(Math.random() * EGG_COUNT); while (b === a) b = Math.floor(Math.random() * EGG_COUNT); sw.push([a, b]); }
+    rd = { roundId: "", marked: Math.floor(Math.random() * EGG_COUNT), swaps: sw, royal: false, favor: favor.n, favorMax: favor.max };
+  }
+  setRound({ roundId: rd.roundId, marked: rd.marked, royal: !!rd.royal }); setFavor({ n: Number(rd.favor || 0), max: Number(rd.favorMax || 5) }); setRoyalReady(false);
+  setQueenLine(rd.royal ? "A Royal Egg… the colony's fortune rides with you today." : ["Watch closely, little one.", "Eyes on the golden egg.", "The colony remembers the attentive.", "Follow it… if you can."][Math.floor(Math.random() * 4)]);
 
-  const t0 = performance.now();
-  const tick = (t: number) => {
-    const p = Math.min(1, (t - t0) / SHUFFLE_MS);
-    setProgress(Math.floor(p * 100));
-    if (p < 1) requestAnimationFrame(tick);
-    else {
-      if (swapTimer) clearInterval(swapTimer);
-      setProgress(100);
-      setPhase("pick");
-      setBusy(false);
-    }
-  };
-  requestAnimationFrame(tick);
+  // 1. the queen points at the marked egg — it glows gold
+  let ord = Array.from({ length: EGG_COUNT }, (_, i) => i); setOrder(ord); setDomOrder(shuffledN(EGG_COUNT));   // DOM order ≠ egg identity, so devtools can't reveal the marked egg
+  setMarkedShow(rd.marked); stageRef.current?.point(rd.marked);
+  await new Promise((r) => setTimeout(r, 1300));
+  setMarkedShow(null); stageRef.current?.idle();
+  // 2. visible swaps, faster toward the end
+  const swaps: [number, number][] = rd.swaps; const total = swaps.length;
+  for (let k = 0; k < total; k++) {
+    const [la, lb] = swaps[k]; const ea = ord.indexOf(la), eb = ord.indexOf(lb); if (ea < 0 || eb < 0) continue;
+    const ms = Math.round(520 - (k / Math.max(1, total - 1)) * 300); setSwapMs(ms);
+    ord = ord.slice(); ord[ea] = lb; ord[eb] = la; setOrder(ord); setProgress(Math.floor(((k + 1) / total) * 100));
+    await new Promise((r) => setTimeout(r, ms + 70));
+  }
+  setProgress(100); setSwapMs(300);
+  setPhase("pick"); setBusy(false); setQueenLine("Choose.");
 };
   const onPick = (eggIdx: number) => {
     if (phase !== "pick" || busy) return;
@@ -1027,10 +1046,11 @@ setTimeout(async () => {
   const rollRes = await fetch("/api/prizes/roll", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ playerId: pid }),
+    body: JSON.stringify({ playerId: pid, roundId: round?.roundId || "", pick: eggIdx }),
   });
 
   const rollJson = await rollRes.json().catch(() => null);
+  if (rollJson?.ok) { setLastRoll({ tracked: !!rollJson.tracked, blessed: !!rollJson.blessed, pity: !!rollJson.pity, royal: !!rollJson.royal }); setFavor({ n: Number(rollJson.favor || 0), max: Number(rollJson.favorMax || favor.max) }); }
 
   if (!rollRes.ok || !rollJson?.ok) {
     console.warn("Prize roll failed:", rollRes.status, rollJson);
@@ -1139,6 +1159,8 @@ window.dispatchEvent(new Event("ra:leaderboards-refresh"));
   
 // 👑 the queen casts on the chosen egg (point → raise → lightning → crack → hatch), then the prize modal opens
 try { await stageRef.current?.cast(eggIdx, r as any); } catch {}
+setQueenLine(r === "ultra" ? "MAGNIFICENT. The colony bows to you." : r === "rare" ? "Ahh — the colony smiles on you." : r === "common" ? "A fine egg. Small, but honest." : rollJson?.pity ? "Patience… my favor grows." : ["Empty. The tunnels are fickle.", "Not this one, little one.", "The colony gives nothing today."][Math.floor(Math.random() * 3)]);
+setRound(null);
 setRarity(r);
 setPhase("revealed");
 setShowPrize(true);
@@ -1176,7 +1198,7 @@ else shuffleSfx.none();
   setPrize(null);
   setProgress(0);
   setOrder(Array.from({ length: EGG_COUNT }, (_, i) => i));
-  setHatched(null); setPickedEgg(null); stageRef.current?.idle();
+  setHatched(null); setPickedEgg(null); stageRef.current?.idle(); setQueenLine(""); setLastRoll(null); refreshShuffleStatus();
   setPhase("idle");
 };
 
@@ -1378,12 +1400,12 @@ async function submitShipping() {
           </div>
 
           {/* Eggs */}
-          {Array.from({ length: EGG_COUNT }, (_, i) => (
+          {domOrder.map((i) => (
             <button
               key={i}
               ref={(el) => { eggRefs.current[i] = el; }}
               onMouseEnter={() => { if (phase === "pick" && !busy) stageRef.current?.point(i); }}
-              className={`egg-card ${phase === "pick" ? "can-pick" : ""} ${hatched === i ? "hatched" : ""} ${pickedEgg === i && busy ? "picked" : ""}`}
+              className={`egg-card ${phase === "pick" ? "can-pick" : ""} ${hatched === i ? "hatched" : ""} ${pickedEgg === i && busy ? "picked" : ""} ${markedShow === i ? "marked" : ""} ${(round?.royal || (royalReady && phase === "idle")) ? "royal" : ""}`}
               style={{
                 left: `${LANES[order[i]]}%`,
                 top: "72%",
@@ -1392,7 +1414,7 @@ async function submitShipping() {
                   ? 'drop-shadow(0 0 12px rgba(167,139,250,0.7)) drop-shadow(0 0 24px rgba(167,139,250,0.3))'
                   : 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))',
                 transform: phase==='pick' ? 'perspective(400px) rotateX(-5deg)' : 'perspective(400px) rotateX(0deg)',
-                transition:'all 0.3s ease',
+                transition: phase === 'shuffling' ? `left ${swapMs}ms cubic-bezier(.45,0,.55,1), filter 0.3s` : 'all 0.3s ease',
               }}
               onClick={() => onPick(i)}
               disabled={phase !== "pick" || busy}
@@ -1417,6 +1439,12 @@ async function submitShipping() {
             }} />
           )}
 
+          {queenLine && <div className="queen-line" key={queenLine}>👑 {queenLine}</div>}
+          {lastRoll?.tracked && phase === "revealed" && (
+            <div style={{ position:'absolute', bottom:14, left:'50%', transform:'translateX(-50%)', zIndex:9, pointerEvents:'none', fontFamily:"'Noto Serif JP', serif", fontSize:11, fontWeight:900, letterSpacing:'0.2em', textTransform:'uppercase', color:'#fbbf24', textShadow:'0 0 12px rgba(251,191,36,0.8)' }}>
+              ✦ YOU TRACKED THE EGG{lastRoll.blessed ? " — THE QUEEN'S BLESSING UPGRADED YOUR PRIZE" : ""} ✦
+            </div>
+          )}
           {/* Pick phase invitation */}
           {phase === 'pick' && !busy && (
             <div style={{ position:'absolute', bottom:16, left:'50%', transform:'translateX(-50%)', zIndex:8,
@@ -1489,6 +1517,14 @@ async function submitShipping() {
               CONNECT DISCORD
             </button>
           )}
+
+          {/* Queen's Favor meter + Royal Egg */}
+          <div title="Every empty egg fills the Queen's Favor. A full meter guarantees a crate." style={{ display:'flex', alignItems:'center', gap:8, fontFamily:"'Noto Serif JP', serif", fontSize:10, letterSpacing:'0.15em', textTransform:'uppercase', color:'rgba(255,255,255,0.55)' }}>
+            <span>FAVOR</span>
+            <div className="favor-bar" style={{ width: 90 }}><div style={{ width: `${Math.min(100, (favor.n / Math.max(1, favor.max)) * 100)}%` }} /></div>
+            <span style={{ color:'#c4b5fd', fontWeight:900 }}>{favor.n}/{favor.max}</span>
+            {(royalReady || round?.royal) && <span style={{ marginLeft:6, color:'#fbbf24', fontWeight:900, textShadow:'0 0 10px rgba(251,191,36,0.6)' }}>👑 ROYAL EGG {round?.royal ? "ACTIVE" : "READY"}</span>}
+          </div>
 
           {/* Balance */}
           <div style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:12, letterSpacing:'0.1em', color:'rgba(255,255,255,0.5)', textTransform:'uppercase' }}>
@@ -1675,6 +1711,13 @@ async function submitShipping() {
         .egg-card:disabled { cursor: not-allowed; }
         .egg-card.hatched .egg-body, .egg-card.hatched .egg-speckle { opacity: 0 !important; transition: opacity 0.15s; }
         .egg-card.picked { transform: translateX(-50%) translateY(-6px) scale(1.06) !important; }
+        .egg-card.marked .egg-body { box-shadow: inset -6px -8px 20px rgba(0,0,0,0.35), inset 4px 4px 12px rgba(255,255,220,0.6), 0 0 26px 8px rgba(251,191,36,0.85), 0 0 60px 20px rgba(251,191,36,0.35) !important; filter: brightness(1.25) saturate(1.2); animation: markedPulse 0.45s ease-in-out infinite alternate; }
+        @keyframes markedPulse { from { transform: scale(1); } to { transform: scale(1.1); } }
+        .egg-card.royal .egg-body { outline: 3px solid rgba(251,191,36,0.9); outline-offset: 3px; box-shadow: 0 0 18px rgba(251,191,36,0.5), inset -6px -8px 20px rgba(0,0,0,0.4), inset 4px 4px 12px rgba(255,255,200,0.4) !important; }
+        .favor-bar { height: 6px; border-radius: 4px; background: rgba(255,255,255,0.08); overflow: hidden; }
+        .favor-bar > div { height: 100%; background: linear-gradient(90deg,#7c3aed,#c4b5fd); transition: width .6s ease; box-shadow: 0 0 10px rgba(167,139,250,0.7); }
+        .queen-line { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 9; pointer-events: none; font-family: 'Noto Serif JP', serif; font-size: 12px; letter-spacing: 0.08em; color: #f5e9ff; background: rgba(20,4,40,0.72); border: 1px solid rgba(167,139,250,0.35); border-radius: 999px; padding: 6px 14px; white-space: nowrap; max-width: 92%; overflow: hidden; text-overflow: ellipsis; animation: lineIn .35s ease-out; }
+        @keyframes lineIn { from { opacity: 0; transform: translateX(-50%) translateY(-6px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
         .egg-card.can-pick:hover { transform: translateX(-50%) translateY(-12px) scale(1.12) rotateX(-8deg); }
 
         .egg-body {

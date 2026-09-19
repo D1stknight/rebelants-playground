@@ -10,12 +10,17 @@ export type StageSfx = "charge" | "bolt" | "crack1" | "crack2" | "crack3" | "hat
 export type QueenStageHandle = { point: (i: number) => void; cast: (i: number, rarity: Rarity) => Promise<void>; idle: () => void };
 type Props = { active?: boolean; apiRef?: React.MutableRefObject<QueenStageHandle | null>; getEggRect: (i: number) => DOMRect | null; onHatch?: (i: number) => void; onCrack?: (i: number, stage: number) => void; onSfx?: (n: StageSfx) => void };
 
-type Layers = { body: HTMLImageElement; staff: HTMLImageElement; arm: HTMLImageElement; meta: any };
+type Layers = { body: HTMLImageElement; staff: HTMLImageElement; arm: HTMLImageElement; faces: Record<string, HTMLImageElement>; meta: any };
 let cache: Promise<Layers> | null = null;
 function loadLayers(): Promise<Layers> {
   if (cache) return cache;
   const img = (src: string) => new Promise<HTMLImageElement>((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
-  cache = Promise.all([img("/queen/sprite/body.png"), img("/queen/sprite/staff.png"), img("/queen/sprite/arm.png"), fetch("/queen/sprite/layers.json").then((r) => r.json())]).then(([body, staff, arm, meta]) => ({ body, staff, arm, meta }));
+  cache = fetch("/queen/sprite/layers.json").then((r) => r.json()).then(async (meta) => {
+    const names: string[] = meta?.face?.names || [];
+    const [body, staff, arm, ...faceImgs] = await Promise.all([img("/queen/sprite/body.png"), img("/queen/sprite/staff.png"), img("/queen/sprite/arm.png"), ...names.map((n) => img(`/queen/sprite/face_${n}.png`).catch(() => null as any))]);
+    const faces: Record<string, HTMLImageElement> = {}; names.forEach((n, i) => { if (faceImgs[i]) faces[n] = faceImgs[i]; });
+    return { body, staff, arm, faces, meta };
+  });
   return cache;
 }
 const COLORS: Record<Rarity, { bolt: string; glow: string; core: string; rgb: string }> = {
@@ -40,7 +45,9 @@ const QueenStage = forwardRef<QueenStageHandle, Props>(function QueenStage({ act
     beam: null as null | { x: number; y: number; life: number; c: string },
     crack: null as null | { i: number; stage: number; rgb: string; t: number },
     eggGlow: 0, eggGlowC: "167,139,250",
+    expr: "idle", exprHold: 0, blinkAt: 2.5, blinkT: 0,
   });
+  const setFace = (n: string, hold = 0) => { const s = st.current; s.expr = n; s.exprHold = hold; };
 
   // ── geometry (css px). face = −1 mirrors her around her own centre line so the staff hand is on the egg's side
   const geom = () => {
@@ -63,7 +70,7 @@ const QueenStage = forwardRef<QueenStageHandle, Props>(function QueenStage({ act
     const s = st.current; s.faceT = e.x < s.W / 2 ? 1 : -1; s.leanT = s.faceT < 0 ? 1 : -1;
     const ex = s.faceT < 0 ? 2 * (s.W / 2) - e.x : e.x;                    // egg position in the un-mirrored frame
     const g0 = { ...geom() }; const fistApprox = g0.fist0; const a = Math.atan2(e.y - fistApprox.y, ex - fistApprox.x) / D; // −180..180, down-left ≈ 135
-    s.armT = POSE.point.arm; s.staffT = Math.max(-150, Math.min(-108, (a > 0 ? a - 360 : a) * 0.55 - 40));   // staff tip toward the egg (−90 = up, −225 = down-left), never through her body
+    s.armT = POSE.point.arm; s.staffT = Math.max(-265, Math.min(-160, a > 0 ? a - 360 : a));   // staff held out toward the egg, gem leading (−180 = level)   // staff tip toward the egg (−90 = up, −225 = down-left), never through her body
   };
 
   const burst = (x: number, y: number, c: string, n: number, sp = 3, g = 6, size = 3) => { for (let i = 0; i < n; i++) { const a = Math.random() * Math.PI * 2, v = (0.4 + Math.random()) * sp * 60; st.current.parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 60, life: 0.5 + Math.random() * 0.6, c, s: 2 + Math.random() * size, g: g * 60 }); } };
@@ -77,24 +84,24 @@ const QueenStage = forwardRef<QueenStageHandle, Props>(function QueenStage({ act
   const setCrack = (i: number, stage: number, rgb: string) => { const s = st.current; s.crack = { i, stage, rgb, t: 0 }; s.eggGlow = 0.5 + stage * 0.25; s.eggGlowC = rgb; onCrack?.(i, stage); onSfx?.(("crack" + stage) as StageSfx); };
 
   const api: QueenStageHandle = ({
-    point(i) { const s = st.current; if (!s.L) return; const e = eggCenter(i); if (!e) return; aim(e); s.gemT = 0.5; },
+    point(i) { const s = st.current; if (!s.L) return; const e = eggCenter(i); if (!e) return; aim(e); s.gemT = 0.5; setFace("focus"); },
     async cast(i, rarity) {
       const s = st.current; if (!s.L) { await wait(600); onCrack?.(i, 3); onHatch?.(i); return; }
       const e = eggCenter(i); if (!e) { onHatch?.(i); return; } const col = COLORS[rarity];
       // 1. point at the egg
-      aim(e); s.gemT = 0.6; await wait(500);
+      aim(e); s.gemT = 0.6; setFace("focus"); await wait(500);
       if (rarity === "none") {
-        onSfx?.("charge"); s.gemT = 1; await wait(300); const g = geom().gemWorld; burst(g.x, g.y, "#cbd5e1", 20, 2, 3); onSfx?.("fizzle"); s.gemT = 0; s.armT = POSE.droop.arm; s.staffT = POSE.droop.staff; await wait(350);
+        onSfx?.("charge"); s.gemT = 1; await wait(300); const g = geom().gemWorld; burst(g.x, g.y, "#cbd5e1", 20, 2, 3); onSfx?.("fizzle"); s.gemT = 0; s.armT = POSE.droop.arm; s.staffT = POSE.droop.staff; setFace("shock"); await wait(350); setFace("sad");
         for (let k = 1; k <= 3; k++) { setCrack(i, k, col.rgb); s.shake = 0.5; await wait(260); }
-        burst(e.x, e.y, "#d6c9a8", 18, 2.5, 5); s.crack = null; s.eggGlow = 0; onHatch?.(i); await wait(400); s.armT = 0; s.staffT = -90; s.leanT = 0; return;
+        burst(e.x, e.y, "#d6c9a8", 18, 2.5, 5); s.crack = null; s.eggGlow = 0; onHatch?.(i); await wait(400); s.armT = 0; s.staffT = -90; s.leanT = 0; setFace("sad", 2.5); return;
       }
       // 2. raise the staff and charge the gem
       const power = rarity === "ultra" ? 3 : rarity === "rare" ? 2 : 1;
-      s.armT = POSE.raise.arm; s.staffT = POSE.raise.staff; s.hop = 10; s.gemT = 1; onSfx?.("charge");
+      s.armT = POSE.raise.arm; s.staffT = POSE.raise.staff; s.hop = 10; s.gemT = 1; onSfx?.("charge"); setFace("intense");
       for (let k = 0; k < 12; k++) { const g = geom().gemWorld; const a = Math.random() * Math.PI * 2, r = 40 + Math.random() * 60; s.parts.push({ x: g.x + Math.cos(a) * r, y: g.y + Math.sin(a) * r, vx: -Math.cos(a) * r * 2.2, vy: -Math.sin(a) * r * 2.2, life: 0.45, c: col.bolt, s: 2 + power, g: 0 }); await wait(45); }
       s.hop = 0; await wait(100);
       // 3. strikes — each one deepens the cracks, light leaks out
-      const strikes = 3 + power * 2; let stage = 0;
+      const strikes = 3 + power * 2; let stage = 0; setFace("shock");
       for (let k = 0; k < strikes; k++) {
         const g = geom().gemWorld; bolt(g, { x: e.x, y: e.y - e.h * 0.25 }, col, 2 + power, true); if (power >= 2) bolt({ x: g.x + (Math.random() - 0.5) * 20, y: g.y }, { x: e.x + (Math.random() - 0.5) * 16, y: e.y - e.h * 0.2 }, col, 1.5, false);
         if (k === 0 || k === strikes - 1 || Math.random() < 0.5) onSfx?.("bolt");
@@ -104,11 +111,11 @@ const QueenStage = forwardRef<QueenStageHandle, Props>(function QueenStage({ act
       }
       await wait(120);
       // 4. hatch: shell bursts, light column in the rarity colour
-      s.crack = null; s.eggGlow = 0; onSfx?.("hatch"); burst(e.x, e.y, "#f3e2b0", 34, 4.5, 6, 4); burst(e.x, e.y, col.bolt, 36 + power * 14, 4 + power, 2); s.beam = { x: e.x, y: e.y, life: 1.3 + power * 0.3, c: col.bolt }; s.flash = 0.6 + power * 0.15; s.flashC = col.glow; onHatch?.(i);
+      s.crack = null; s.eggGlow = 0; onSfx?.("hatch"); setFace(rarity === "common" ? "smirk" : "happy", 3); burst(e.x, e.y, "#f3e2b0", 34, 4.5, 6, 4); burst(e.x, e.y, col.bolt, 36 + power * 14, 4 + power, 2); s.beam = { x: e.x, y: e.y, life: 1.3 + power * 0.3, c: col.bolt }; s.flash = 0.6 + power * 0.15; s.flashC = col.glow; onHatch?.(i);
       if (rarity === "ultra") { for (let k = 0; k < 48; k++) s.parts.push({ x: Math.random() * s.W, y: -10, vx: (Math.random() - 0.5) * 30, vy: 60 + Math.random() * 120, life: 1.6 + Math.random(), c: k % 2 ? "#fbbf24" : "#fff3c4", s: 2 + Math.random() * 3, g: 40 }); }
       await wait(1000); s.armT = 0; s.staffT = -90; s.leanT = 0; s.gemT = 0.2;
     },
-    idle() { const s = st.current; s.armT = 0; s.staffT = -90; s.leanT = 0; s.faceT = 1; s.gemT = 0; s.crack = null; s.eggGlow = 0; },
+    idle() { const s = st.current; s.armT = 0; s.staffT = -90; s.leanT = 0; s.faceT = 1; s.gemT = 0; s.crack = null; s.eggGlow = 0; setFace("idle"); },
   });
   useImperativeHandle(ref, () => api); useEffect(() => { if (apiRef) apiRef.current = api; return () => { if (apiRef) apiRef.current = null; }; });
 
@@ -122,6 +129,8 @@ const QueenStage = forwardRef<QueenStageHandle, Props>(function QueenStage({ act
       // pose easing (arm slower than the wrist; the flip is a quick snap)
       s.arm += (s.armT - s.arm) * Math.min(1, dt * 7); s.staff += (s.staffT - s.staff) * Math.min(1, dt * 9); s.lean += (s.leanT - s.lean) * Math.min(1, dt * 6); s.gem += (s.gemT - s.gem) * Math.min(1, dt * 8);
       s.face += (s.faceT - s.face) * Math.min(1, dt * 12); if (Math.abs(s.face) < 0.08) s.face = s.faceT * 0.08;
+      if (s.exprHold > 0) { s.exprHold -= dt; if (s.exprHold <= 0) s.expr = "idle"; }
+      if (s.expr === "idle") { s.blinkAt -= dt; if (s.blinkAt <= 0) { s.blinkT = 0.13; s.blinkAt = 2.2 + Math.random() * 3; } } if (s.blinkT > 0) s.blinkT -= dt;
       if (s.shake > 0) s.shake = Math.max(0, s.shake - dt * 3); if (s.flash > 0) s.flash = Math.max(0, s.flash - dt * 2.4); if (s.crack) s.crack.t += dt;
       for (const p of s.parts) { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += p.g * dt; } s.parts = s.parts.filter((p) => p.life > 0);
       for (const b of s.bolts) b.life -= dt; s.bolts = s.bolts.filter((b) => b.life > 0);
@@ -138,6 +147,8 @@ const QueenStage = forwardRef<QueenStageHandle, Props>(function QueenStage({ act
         ctx.save();
         ctx.translate(g.cx + sx, g.y + g.bh + bob + sy); ctx.rotate(s.lean * 0.05); ctx.scale(s.face < 0 ? -1 : 1, 1); ctx.translate(-g.cx, -(g.y + g.bh));   // lean + mirror about her centre line
         ctx.drawImage(s.L.body, g.x, g.y, g.bw, g.bh);
+        // expression layer over her face
+        { const fb = s.L.meta?.face?.box; const fn = s.expr === "idle" && s.blinkT > 0 ? "blink" : s.expr; const fi = fb && s.L.faces[fn] && fn !== "idle" ? s.L.faces[fn] : null; if (fi && fb) { const bx = s.L.meta.body.box[0], by = s.L.meta.body.box[1]; ctx.drawImage(fi, g.x + (fb[0] - bx) * g.sc * g.k, g.y + (fb[1] - by) * g.sc * g.k, fi.width * g.k, fi.height * g.k); } }
         // arm swings from the shoulder; the staff is held in the fist with its own wrist angle
         ctx.save(); ctx.translate(g.shoulder.x, g.shoulder.y); ctx.rotate(s.arm * D); ctx.translate(-g.shoulder.x, -g.shoulder.y);
         ctx.save(); ctx.translate(g.fist0.x, g.fist0.y); ctx.rotate(g.staffRot - s.arm * D); ctx.translate(-g.fist0.x, -g.fist0.y);

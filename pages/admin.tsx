@@ -7,6 +7,11 @@ import { pointsConfig as defaultConfig } from "../lib/pointsConfig";
 type PointsConfigShape = {
   currency: string;
   shuffleCost: number;
+  shuffleSwaps: number;
+  shuffleTrackBonus: number;
+  shuffleFavorPity: number;
+  shuffleRoyalEnabled: boolean;
+  shuffleRoyalUltraMult: number;
   dailyClaim: number;
   dailyEarnCap: number;
 
@@ -174,6 +179,11 @@ const [showClaims, setShowClaims] = useState(false);
 const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
   currency: defaultConfig.currency,
   shuffleCost: defaultConfig.shuffleCost,
+  shuffleSwaps: (defaultConfig as any).shuffleSwaps ?? 8,
+  shuffleTrackBonus: (defaultConfig as any).shuffleTrackBonus ?? 50,
+  shuffleFavorPity: (defaultConfig as any).shuffleFavorPity ?? 5,
+  shuffleRoyalEnabled: (defaultConfig as any).shuffleRoyalEnabled !== false,
+  shuffleRoyalUltraMult: (defaultConfig as any).shuffleRoyalUltraMult ?? 3,
   dailyClaim: defaultConfig.dailyClaim,
   dailyEarnCap: defaultConfig.dailyEarnCap,
 
@@ -1310,7 +1320,14 @@ String(c.status).toUpperCase()==="PENDING"
           <label style={{ fontSize: 12, opacity: 0.9 }}>Grand Prix<input value={cfg.gpCost} onChange={(e) => setCfg((c) => ({ ...c, gpCost: safeNum(e.target.value, c.gpCost) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
         </div>
         <div style={{ fontWeight: 900, fontSize: 12, margin: "12px 0 10px", color: "#60a5fa", paddingTop: 10, borderTop: "1px solid rgba(96,165,250,.2)" }}>🃏 SHUFFLE</div>
-        <label style={{ fontSize: 12, opacity: 0.9 }}>Shuffle Cost<input value={cfg.shuffleCost} onChange={(e) => setCfg((c) => ({ ...c, shuffleCost: safeNum(e.target.value, c.shuffleCost) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>Shuffle Cost<input value={cfg.shuffleCost} onChange={(e) => setCfg((c) => ({ ...c, shuffleCost: safeNum(e.target.value, c.shuffleCost) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>Visible swaps per round<input value={cfg.shuffleSwaps} onChange={(e) => setCfg((c) => ({ ...c, shuffleSwaps: safeNum(e.target.value, c.shuffleSwaps) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>Tracked-egg bonus % (none→common)<input value={cfg.shuffleTrackBonus} onChange={(e) => setCfg((c) => ({ ...c, shuffleTrackBonus: safeNum(e.target.value, c.shuffleTrackBonus) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>Queen's Favor: empties before a guaranteed common<input value={cfg.shuffleFavorPity} onChange={(e) => setCfg((c) => ({ ...c, shuffleFavorPity: safeNum(e.target.value, c.shuffleFavorPity) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>Royal Egg ultra ×<input value={cfg.shuffleRoyalUltraMult} onChange={(e) => setCfg((c) => ({ ...c, shuffleRoyalUltraMult: safeNum(e.target.value, c.shuffleRoyalUltraMult) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+          <label style={{ fontSize: 12, opacity: 0.9, display:"flex", alignItems:"center", gap:10, marginTop:22 }}><input type="checkbox" checked={cfg.shuffleRoyalEnabled !== false} onChange={(e) => setCfg((c) => ({ ...c, shuffleRoyalEnabled: e.target.checked }))} /> Daily Royal Egg on</label>
+        </div>
       </div>
       <div style={{ padding: 14, borderRadius: 14, border: "1px solid rgba(248,113,113,.3)", background: "rgba(248,113,113,.04)" }}>
         <div style={{ fontWeight: 900, fontSize: 12, marginBottom: 10, color: "#f87171" }}>⚔️ THE RAID</div>

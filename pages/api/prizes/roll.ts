@@ -2,6 +2,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
 import { pointsConfig as defaultConfig } from "../../../lib/pointsConfig";
+import { ROUND_KEY, FAVOR_KEY, ROYAL_KEY, dayKey } from "../shuffle/start";
 
 const ECON_KEY = "ra:config:economy";
 
@@ -52,6 +53,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
 const force = String(req.query.force || "").toLowerCase();
+const body = typeof req.body === "string" ? (() => { try { return JSON.parse(req.body); } catch { return {}; } })() : (req.body ?? {});
+const playerId = String(body.playerId || "guest").trim().slice(0, 64) || "guest";
 
 // ✅ Load Admin-config from Redis, fallback to defaults
 const raw = await redis.get(ECON_KEY);
@@ -72,12 +75,32 @@ const cfg: any = {
 };
 const currency = cfg.currency || "REBEL";
 
+// ── shell-game round (pages/api/shuffle/start): did the player pick the marked egg? is this the daily Royal Egg?
+let tracked = false, royal = false, roundOk = false;
+if (body.roundId) {
+  const rawRound = await redis.get(ROUND_KEY(String(body.roundId)));
+  const round: any = rawRound ? (typeof rawRound === "string" ? JSON.parse(rawRound) : rawRound) : null;
+  if (round && round.playerId === playerId) {
+    roundOk = true; tracked = Number(body.pick) === Number(round.marked); royal = !!round.royal;
+    await redis.del(ROUND_KEY(String(body.roundId)));            // one roll per round
+    if (royal) await redis.set(ROYAL_KEY(playerId, dayKey()), "1", { ex: 60 * 60 * 36 });
+  }
+}
+const weights: any = { ...(cfg?.rarityWeights || {}) };
+if (royal) weights.ultra = Math.max(0, Number(weights.ultra ?? 0)) * Math.max(1, Number(cfg.shuffleRoyalUltraMult ?? 3));
 // Use Admin-controlled rarity weights if present
-const rolledRarity = rollFromWeights(
-  cfg?.rarityWeights,
-  ["ultra", "rare", "common", "none"],
-  "none"
-);
+let rolledRarity = rollFromWeights(weights, ["ultra", "rare", "common", "none"], "none");
+// tracked the marked egg → the queen's blessing: a "none" becomes "common" (and a "common" becomes "rare" at a third of the odds)
+const trackBonus = clamp(Number(cfg.shuffleTrackBonus ?? 50) / 100, 0, 1);
+let blessed = false;
+if (tracked && roundOk) {
+  if (rolledRarity === "none" && Math.random() < trackBonus) { rolledRarity = "common"; blessed = true; }
+  else if (rolledRarity === "common" && Math.random() < trackBonus / 3) { rolledRarity = "rare"; blessed = true; }
+}
+// queen's favor (pity): consecutive empty eggs fill the meter; a full meter guarantees at least a common and resets
+const favorMax = Math.max(1, Number(cfg.shuffleFavorPity ?? 5)); let favor = Number((await redis.get(FAVOR_KEY(playerId))) || 0); let pity = false;
+if (rolledRarity === "none") { favor += 1; if (favor >= favorMax) { rolledRarity = "common"; pity = true; favor = 0; } } else favor = 0;
+await redis.set(FAVOR_KEY(playerId), String(favor), { ex: 60 * 60 * 24 * 30 });
 
 const rarity =
   force === "ultra" ? "ultra" :
@@ -85,12 +108,13 @@ const rarity =
   force === "common" ? "common" :
   force === "none" ? "none" :
   rolledRarity;
+const extra = { tracked: tracked && roundOk, blessed, pity, royal, favor, favorMax };
 
     // ---------- COMMON ----------
     if (rarity === "common") {
       const pts = Number(cfg?.rewards?.common ?? 0);
       return res.status(200).json({
-        ok: true,
+        ok: true, ...extra,
         rarity,
         prize:
           pts > 0
@@ -118,7 +142,7 @@ const rarity =
         if (rng <= 0) { picked = item; break; }
       }
       return res.status(200).json({
-        ok: true,
+        ok: true, ...extra,
         rarity,
         prize: {
           type: "merch",
@@ -131,7 +155,7 @@ const rarity =
     // No merch configured — fall back to points
     const pts = Number(cfg?.rewards?.rare ?? 0);
     return res.status(200).json({
-      ok: true,
+      ok: true, ...extra,
       rarity,
       prize:
         pts > 0
@@ -173,7 +197,7 @@ if (rarity === "ultra") {
         `ultra:${chain}:${contract}:${tokenId}`;
 
       return res.status(200).json({
-        ok: true,
+        ok: true, ...extra,
         rarity,
         prize: {
           type: "nft",
@@ -196,7 +220,7 @@ if (rarity === "ultra") {
   const pts = Math.max(ptsCfg, min);
 
   return res.status(200).json({
-    ok: true,
+    ok: true, ...extra,
     rarity,
     prize: {
       type: "points",
@@ -207,7 +231,7 @@ if (rarity === "ultra") {
 }
     // ---------- NONE ----------
     return res.status(200).json({
-      ok: true,
+      ok: true, ...extra,
       rarity,
       prize: { type: "none", label: "Nothing this time" },
     });

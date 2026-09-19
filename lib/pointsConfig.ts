@@ -22,6 +22,11 @@ export type PrizePools = {
 export type PointsConfig = {
   currency: PointsCurrency;
   shuffleCost: number;
+  shuffleSwaps: number;          // visible egg swaps per round
+  shuffleTrackBonus: number;     // % chance a tracked pick upgrades none→common (common→rare at a third)
+  shuffleFavorPity: number;      // empty eggs in a row that guarantee a common
+  shuffleRoyalEnabled: boolean;  // daily Royal Egg round
+  shuffleRoyalUltraMult: number; // ultra weight multiplier on the Royal Egg round
 
   rewards: {
     none: number;
@@ -81,6 +86,11 @@ export const pointsConfig: PointsConfig = {
 
   // COST to play 1 shuffle
   shuffleCost: 500,
+  shuffleSwaps: 8,
+  shuffleTrackBonus: 50,
+  shuffleFavorPity: 5,
+  shuffleRoyalEnabled: true,
+  shuffleRoyalUltraMult: 3,
 
   // ✅ Model C default points (you can override in Admin anytime)
   rewards: {
