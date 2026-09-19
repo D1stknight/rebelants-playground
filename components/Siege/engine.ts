@@ -55,7 +55,7 @@ export class Siege {
   }
   fitBound = () => this.fit();
   fit() {
-    const w = this.app.renderer.width / this.app.renderer.resolution, h = this.app.renderer.height / this.app.renderer.resolution;
+    const w = this.app.renderer.screen.width, h = this.app.renderer.screen.height;   // css px (Pixi v8 keeps renderer.width in css units too)
     this.scale = Math.min(w / (WORLD_W * PX), h / (WORLD_H * PX)); if (h / w > 0.9) this.scale = w / (WORLD_W * PX);   // portrait: fit width
     this.ox = (w - WORLD_W * PX * this.scale) / 2; this.oy = Math.max(0, (h - WORLD_H * PX * this.scale) / 2);
     for (const k of ["far", "world", "fx", "front"] as const) { this.L[k].scale.set(this.scale); this.L[k].position.set(this.ox, this.oy); }
