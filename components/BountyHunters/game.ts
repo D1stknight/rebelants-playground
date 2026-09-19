@@ -5,7 +5,7 @@ import { BOARDS, BOUNTY_HP, BOUNTY_LIVES, KILL_BOUNTY, type Board } from "../../
 import { buildLevel, ROWS, TILE, type Level, type Spawn } from "./levels";
 
 export const VW = 400, VH = 225;           // default view; phones in landscape widen it up to VW_MAX to match the screen
-export const VW_MAX = 480;
+export const VW_MAX = 720;                 // iPhone Safari landscape with its toolbars is ~3:1, so let the view go that wide
 const GRAV = 640, PSPEED = 92, JUMP = 262, BULLET = 280;
 
 export type Weapon = "rifle" | "spread" | "laser" | "flame";
@@ -60,9 +60,9 @@ export class BountyGame {
     this.pushHud();
   }
 
-  /** Widen the view (400–480 px) — the canvas backing store follows; used for phone landscape. */
+  /** Widen the view (400–VW_MAX px) — the canvas backing store follows; used for phone landscape. */
   setView(w: number) {
-    this.vw = Math.max(VW, Math.min(VW_MAX, Math.round(w)));
+    this.vw = Math.max(VW, Math.min(VW_MAX, Math.round(w)));   // never narrower than the boss arena camera needs
     const cv = this.ctx.canvas; if (cv.width !== this.vw) { cv.width = this.vw; cv.height = VH; }
     this.ctx.imageSmoothingEnabled = false;
     if (this.camLock != null) this.camLock = Math.min(this.level.bossX - 40, this.level.endX - this.vw);
@@ -459,7 +459,7 @@ export class BountyGame {
     for (let i = 0; i < 3; i++) {
       const s = this.bg[i]; if (!s.img.complete || !s.img.naturalWidth) { if (i === 0) { c.fillStyle = "#0a0810"; c.fillRect(0, 0, this.vw, VH); } continue; }
       const f = [0.15, 0.45, 0.8][i]; const off = -Math.floor((cam * f) % 480); const y = i === 2 ? VH - 64 - 32 + 8 : 0;
-      c.drawImage(s.img, off, y); c.drawImage(s.img, off + 480, y);
+      for (let k = 0; off + k * 480 < this.vw; k++) c.drawImage(s.img, off + k * 480, y);
     }
     c.save(); c.translate(Math.floor(-cam + sx), Math.floor(sy));
     // tiles

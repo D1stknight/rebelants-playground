@@ -91,8 +91,11 @@ export default function BountyGameView({ board, faction = "samurai", onEnd, onQu
   }, [board]);
 
   const press = (k: keyof Input, v: boolean) => (e: React.PointerEvent) => { e.preventDefault(); const g = gameRef.current; if (g) g.input[k] = v; };
+  // pad size: 60 px, shrinking on short landscape viewports (iPhone Safari with its toolbars is ~220 px tall)
+  const ps = portrait || typeof vh !== "number" ? 60 : Math.round(Math.max(40, Math.min(60, vh * 0.2)));
+  const pb = Math.round(ps * 1.23);
   const btn = (label: string, k: keyof Input, style: React.CSSProperties = {}) => (
-    <div onPointerDown={press(k, true)} onPointerUp={press(k, false)} onPointerLeave={press(k, false)} onPointerCancel={press(k, false)} style={{ width: 60, height: 60, borderRadius: 16, background: portrait ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.35)", boxShadow: portrait ? "none" : "0 0 0 1px rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 900, color: "#fff", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", touchAction: "none", ...style }}>{label}</div>
+    <div onPointerDown={press(k, true)} onPointerUp={press(k, false)} onPointerLeave={press(k, false)} onPointerCancel={press(k, false)} style={{ width: ps, height: ps, borderRadius: Math.round(ps * 0.27), background: portrait ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.35)", boxShadow: portrait ? "none" : "0 0 0 1px rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: Math.round(ps * 0.37), fontWeight: 900, color: "#fff", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", touchAction: "none", ...style }}>{label}</div>
   );
 
   const bossPct = hud?.bossHp != null ? hud.bossHp / hud.bossMax : null;
@@ -150,11 +153,11 @@ export default function BountyGameView({ board, faction = "samurai", onEnd, onQu
       {!isTouch && <div style={{ marginTop: 8, fontSize: 10, opacity: 0.4, letterSpacing: "0.2em" }}>← → MOVE · ↑ AIM UP · ↓ CROUCH / DROP · Z or SPACE JUMP · X or SHIFT FIRE · ESC QUIT</div>}
       {isTouch && (
         <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, top: portrait ? VH * scale + 8 : "auto", height: portrait ? "auto" : 150, display: "flex", justifyContent: "space-between", alignItems: "flex-end", padding: portrait ? "0 18px max(40px, env(safe-area-inset-bottom))" : "0 max(14px, env(safe-area-inset-left)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-right))", pointerEvents: "none", zIndex: 10 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "60px 60px 60px", gridTemplateRows: "60px 60px", gap: 6, pointerEvents: "auto", opacity: portrait ? 1 : 0.8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: `${ps}px ${ps}px ${ps}px`, gridTemplateRows: `${ps}px ${ps}px`, gap: Math.round(ps * 0.1), pointerEvents: "auto", opacity: portrait ? 1 : 0.8 }}>
             <div />{btn("▲", "up")}<div />
             {btn("◀", "left")}{btn("▼", "down")}{btn("▶", "right")}
           </div>
-          <div style={{ display: "flex", gap: 14, alignItems: "flex-end", pointerEvents: "auto", opacity: portrait ? 1 : 0.8 }}>{btn("●", "fire", { background: portrait ? "rgba(248,113,113,0.3)" : "rgba(180,40,40,0.45)", width: 74, height: 74, borderRadius: 37 })}{btn("▲", "jump", { background: portrait ? "rgba(96,165,250,0.3)" : "rgba(40,80,180,0.45)", width: 74, height: 74, borderRadius: 37, marginBottom: 26 })}</div>
+          <div style={{ display: "flex", gap: 14, alignItems: "flex-end", pointerEvents: "auto", opacity: portrait ? 1 : 0.8 }}>{btn("●", "fire", { background: portrait ? "rgba(248,113,113,0.3)" : "rgba(180,40,40,0.45)", width: pb, height: pb, borderRadius: pb / 2 })}{btn("▲", "jump", { background: portrait ? "rgba(96,165,250,0.3)" : "rgba(40,80,180,0.45)", width: pb, height: pb, borderRadius: pb / 2, marginBottom: Math.round(pb * 0.35) })}</div>
         </div>
       )}
       {isTouch && portrait && hud && hud.state === "intro" && (
