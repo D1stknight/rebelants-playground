@@ -5,12 +5,12 @@ import { createPortal } from "react-dom";
 import { Tunnel, loadSprites, type Cfg, type Dir, type EndResult, type Hud, type Theme, COLS, ROWS, CELL } from "./tunnelEngine";
 
 type Props = {
-  layout: string[]; theme: Theme; cfg: Cfg; playing: boolean; faction?: string;
+  layout: string[]; layouts?: string[][]; layoutIdx?: number; theme: Theme; cfg: Cfg; playing: boolean; faction?: string;
   onHud: (h: Hud) => void; onEnd: (r: EndResult) => void; onSfx: (n: string) => void; onQuit?: () => void;
   hudLine?: React.ReactNode;
 };
 
-export default function TunnelRun({ layout, theme, cfg, playing, faction = "samurai", onHud, onEnd, onSfx, onQuit, hudLine }: Props) {
+export default function TunnelRun({ layout, layouts, layoutIdx = 0, theme, cfg, playing, faction = "samurai", onHud, onEnd, onSfx, onQuit, hudLine }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null); const wrapRef = useRef<HTMLDivElement | null>(null);
   const gameRef = useRef<Tunnel | null>(null); const spritesRef = useRef(loadSprites(faction)); const facRef = useRef(faction);
   if (facRef.current !== faction) { facRef.current = faction; spritesRef.current = loadSprites(faction); }
@@ -23,7 +23,7 @@ export default function TunnelRun({ layout, theme, cfg, playing, faction = "samu
   const runKey = `${layout.join("|")}|${playing ? "p" : "i"}|${faction}`;
   useEffect(() => {
     const cv = canvasRef.current; if (!cv) return;
-    const g = new Tunnel(cv, layout, theme, cfg, { onHud: (h) => cbRef.current.onHud(h), onEnd: (r) => cbRef.current.onEnd(r), onSfx: (n) => cbRef.current.onSfx(n) }, spritesRef.current);
+    const g = new Tunnel(cv, layout, theme, cfg, { onHud: (h) => cbRef.current.onHud(h), onEnd: (r) => cbRef.current.onEnd(r), onSfx: (n) => cbRef.current.onSfx(n) }, spritesRef.current, layouts, layoutIdx);
     gameRef.current = g; (window as any).__tun = g; g.start(); if (playing) g.play();
     return () => { g.stop(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps

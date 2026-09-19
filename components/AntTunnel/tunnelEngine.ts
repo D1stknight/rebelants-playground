@@ -8,8 +8,9 @@ export type Cell = { row: number; col: number };
 export type Dir = "up" | "down" | "left" | "right";
 export type Theme = { bg: string; floor: string; wall: string; accent: string; crumb: string; sugar: string; crystal: string; antGlow: string; spiderGlow: string; neon?: boolean; dark?: boolean };
 export type Cfg = { runSeconds: number; crystals: number; sugars: number; crumbs: number; wallBreaks: number; spiderSpeedMs: number };
-export type Hud = { score: number; timeLeft: number; breaks: number; crystalsLeft: number; crystalsTotal: number; msg: string | null; state: "idle" | "play" | "won" | "lost"; hit: boolean };
-export type EndResult = { score: number; fullClear: boolean; crystalsCollected: number; crystalsTotal: number; clearMs: number | null; crumbs: number; sugars: number };
+export type Hud = { score: number; timeLeft: number; breaks: number; crystalsLeft: number; crystalsTotal: number; msg: string | null; state: "idle" | "play" | "won" | "lost"; hit: boolean; floor: number; combo: number; mult: number };
+export type EndResult = { score: number; fullClear: boolean; crystalsCollected: number; crystalsTotal: number; clearMs: number | null; crumbs: number; sugars: number; floors: number };
+export type SpiderKind = "chaser" | "patroller" | "ambusher";
 export type Callbacks = { onHud: (h: Hud) => void; onEnd: (r: EndResult) => void; onSfx: (n: "crumb" | "sugar" | "crystal" | "wall" | "hit" | "win" | "lose" | "nowall") => void };
 /** one 192×192 sheet per faction (tools/tunnel-sprites): 0 idle · 1–6 run side (faces right) · 7–10 run back · 11–14 run front · 15 hit · 16 win · 17 death · 18 dig · 19 idle breathe */
 export type Sprites = { sheet: HTMLImageElement; spider: HTMLImageElement };
@@ -21,7 +22,9 @@ const ANT_SPEED = 4.6;          // cells / s
 const SPIDER_BASE = 3.1;        // cells / s at 160 ms config; scales with tunnelSpiderSpeedMs
 
 type Mover = { x: number; y: number; dir: Dir | null; want: Dir | null; speed: number };
-type Pick = { row: number; col: number; kind: 0 | 1 | 2; taken: boolean; ph: number };  // 0 crumb 1 sugar 2 crystal
+type Spider = Mover & { kind: SpiderKind; camp: Cell | null; alert: number; tint: string; frozen: number };
+type Pick = { row: number; col: number; kind: 0 | 1 | 2 | 3 | 4 | 5 | 6; taken: boolean; ph: number };  // 0 crumb 1 sugar 2 crystal 3 dig claw 4 decoy 5 web freeze 6 sugar rush
+export const POWER_NAMES: Record<number, string> = { 3: "DIG CLAW +2", 4: "PHEROMONE DECOY", 5: "WEB FREEZE", 6: "SUGAR RUSH" };
 type Part = { x: number; y: number; vx: number; vy: number; life: number; c: string; s: number };
 
 export function loadSprites(faction = "samurai"): Sprites {
@@ -32,7 +35,8 @@ export function loadSprites(faction = "samurai"): Sprites {
 
 export class Tunnel {
   ctx: CanvasRenderingContext2D; layout: Set<string>; broken = new Set<string>(); theme: Theme; cfg: Cfg; cb: Callbacks; sp: Sprites;
-  ant: Mover; spider: Mover; facing: Dir = "right"; picks: Pick[] = []; parts: Part[] = [];
+  ant: Mover; spiders: Spider[] = []; facing: Dir = "right"; picks: Pick[] = []; parts: Part[] = [];
+  floor = 1; layouts: string[][]; layoutIdx = 0; combo = 0; comboT = 0; mult = 1; rush = 0; decoy: { x: number; y: number; t: number } | null = null; firstClearMs: number | null = null; sweeps = 0;
   score = 0; crumbsGot = 0; sugarsGot = 0; crystalsGot = 0; crystalsTotal = 0; breaks: number; timeLeft: number; t = 0; state: Hud["state"] = "idle";
   msg: string | null = null; msgT = 0; hitT = 0; invuln = 0; shake = 0; flash = 0; startedAt = 0; raf = 0; last = 0; acc = 0; over = false; hudT = 0;
   input: Record<Dir, boolean> & { break: boolean } = { up: false, down: false, left: false, right: false, break: false }; breakLatch = false;
@@ -40,13 +44,26 @@ export class Tunnel {
   vw = COLS * CELL; vh = ROWS * CELL; follow = false; camX = 0; camY = 0; zoom = 1; floorTex: HTMLCanvasElement | null = null; wallTex: HTMLCanvasElement | null = null;
   seedR = Math.random() * 1000; dustT = 0; digT = 0; runT = 0;
 
-  constructor(canvas: HTMLCanvasElement, layout: string[], theme: Theme, cfg: Cfg, cb: Callbacks, sprites: Sprites) {
+  constructor(canvas: HTMLCanvasElement, layout: string[], theme: Theme, cfg: Cfg, cb: Callbacks, sprites: Sprites, layouts?: string[][], layoutIdx = 0) {
     this.ctx = canvas.getContext("2d")!; this.layout = new Set(layout); this.theme = theme; this.cfg = cfg; this.cb = cb; this.sp = sprites;
+    this.layouts = layouts || [layout]; this.layoutIdx = layoutIdx;
     this.breaks = cfg.wallBreaks; this.timeLeft = cfg.runSeconds;
     this.ant = { x: START.col + 0.5, y: START.row + 0.5, dir: null, want: null, speed: ANT_SPEED };
-    this.spider = { x: SPIDER_START.col + 0.5, y: SPIDER_START.row + 0.5, dir: null, want: null, speed: SPIDER_BASE * (160 / Math.max(60, cfg.spiderSpeedMs)) };
-    this.bakeTextures(); this.placePickups(); this.pushHud();
+    this.bakeTextures(); this.placePickups(); this.spawnSpiders(); this.pushHud();
   }
+  spiderSpeed() { return SPIDER_BASE * (160 / Math.max(60, this.cfg.spiderSpeedMs)) * (1 + (this.floor - 1) * 0.08); }
+  /** floor 1: one chaser (the classic). floor 2 adds a patroller, floor 3 an ambusher, floor 4+ a second chaser */
+  spawnSpiders() {
+    this.spiders = [];
+    const mk = (kind: SpiderKind, cell: Cell, tint: string): Spider => ({ x: cell.col + 0.5, y: cell.row + 0.5, dir: null, want: null, speed: this.spiderSpeed(), kind, camp: kind === "ambusher" ? cell : null, alert: 0, tint, frozen: 0 });
+    const far = this.openCells().filter((c) => Math.abs(c.row - START.row) + Math.abs(c.col - START.col) > 10);
+    const pick = () => far.length ? far.splice((Math.random() * far.length) | 0, 1)[0] : SPIDER_START;
+    this.spiders.push(mk("chaser", this.isWall(SPIDER_START.row, SPIDER_START.col) ? pick() : SPIDER_START, ""));
+    if (this.floor >= 2) this.spiders.push(mk("patroller", pick(), "hue-rotate(120deg)"));
+    if (this.floor >= 3) { const cr = this.picks.filter((p) => p.kind === 2 && !p.taken); const c = cr.length ? cr[(Math.random() * cr.length) | 0] : pick(); this.spiders.push(mk("ambusher", { row: (c as any).row, col: (c as any).col }, "hue-rotate(-60deg) saturate(1.6)")); }
+    if (this.floor >= 4) this.spiders.push(mk("chaser", pick(), "brightness(1.3)"));
+  }
+  openCells() { const open: Cell[] = []; for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) if (!this.isWall(r, c) && !(r === START.row && c === START.col)) open.push({ row: r, col: c }); return open; }
 
   // ── grid helpers
   isBorder(r: number, c: number) { return r <= 0 || c <= 0 || r >= ROWS - 1 || c >= COLS - 1; }
@@ -57,6 +74,9 @@ export class Tunnel {
     for (let i = open.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [open[i], open[j]] = [open[j], open[i]]; }
     const take = (n: number, kind: 0 | 1 | 2) => { for (let i = 0; i < n && open.length; i++) { const c = open.pop()!; this.picks.push({ row: c.row, col: c.col, kind, taken: false, ph: Math.random() * 6 }); } };
     take(this.cfg.crumbs, 0); take(this.cfg.sugars, 1); take(this.cfg.crystals, 2);
+    // 1–2 power-ups per floor (none on the very first floor's opening seconds — they're placed far from the start)
+    const nPow = this.floor === 1 ? 1 : 2; const kinds: (3 | 4 | 5 | 6)[] = [3, 4, 5, 6];
+    for (let i = 0; i < nPow && open.length; i++) { const c = open.pop()!; this.picks.push({ row: c.row, col: c.col, kind: kinds[(Math.random() * kinds.length) | 0], taken: false, ph: Math.random() * 6 }); }
     this.crystalsTotal = this.picks.filter((p) => p.kind === 2).length;
   }
 
@@ -75,7 +95,7 @@ export class Tunnel {
   stop() { this.over = true; cancelAnimationFrame(this.raf); }
   setView(w: number, h: number, follow: boolean) { this.vw = Math.max(64, Math.round(w)); this.vh = Math.max(64, Math.round(h)); this.follow = follow; const cv = this.ctx.canvas; if (cv.width !== this.vw || cv.height !== this.vh) { cv.width = this.vw; cv.height = this.vh; } this.ctx.imageSmoothingEnabled = true; }
   say(m: string, t = 1.6) { this.msg = m; this.msgT = t; this.pushHud(); }
-  pushHud() { this.cb.onHud({ score: this.score, timeLeft: Math.ceil(this.timeLeft), breaks: this.breaks, crystalsLeft: this.crystalsTotal - this.crystalsGot, crystalsTotal: this.crystalsTotal, msg: this.msg, state: this.state, hit: this.hitT > 0 }); }
+  pushHud() { this.cb.onHud({ score: this.score, timeLeft: Math.ceil(this.timeLeft), breaks: this.breaks, crystalsLeft: this.crystalsTotal - this.crystalsGot, crystalsTotal: this.crystalsTotal, msg: this.msg, state: this.state, hit: this.hitT > 0, floor: this.floor, combo: this.combo, mult: this.mult }); }
 
   // ── simulation
   step(dt: number) {
@@ -93,24 +113,32 @@ export class Tunnel {
     const wasMoving = !!this.ant.dir; this.moveMover(this.ant, dt, true);
     if (this.ant.dir) { this.runT += dt; this.dustT -= dt; if (this.dustT <= 0) { this.dustT = 0.11; const [dx, dy] = DIRV[this.ant.dir]; this.parts.push({ x: this.ant.x - dx * 0.35 + (Math.random() - 0.5) * 0.2, y: this.ant.y + 0.28 - dy * 0.3, vx: -dx * 0.8 + (Math.random() - 0.5) * 0.6, vy: -0.6 - Math.random() * 0.6, life: 0.3 + Math.random() * 0.2, c: "rgba(200,180,150,0.55)", s: 3 + Math.random() * 3 }); } } else if (wasMoving) this.runT = 0;
     if (this.digT > 0) this.digT -= dt;
-    // spider AI + move
-    this.spiderThink(); this.moveMover(this.spider, dt, false);
+    if (this.rush > 0) { this.rush -= dt; this.ant.speed = ANT_SPEED * 1.45; if (this.rush <= 0) this.ant.speed = ANT_SPEED; }
+    if (this.decoy) { this.decoy.t -= dt; if (this.decoy.t <= 0) this.decoy = null; }
+    if (this.combo > 0) { this.comboT -= dt; if (this.comboT <= 0) { this.combo = 0; this.mult = 1; this.pushHud(); } }
+    // spiders
+    for (const sp of this.spiders) { if (sp.frozen > 0) { sp.frozen -= dt; continue; } this.spiderThink(sp); this.moveMover(sp, dt, false); }
     // pickups
     const ar = Math.floor(this.ant.y), ac = Math.floor(this.ant.x);
     for (const p of this.picks) {
       if (p.taken) continue; if (Math.abs(p.col + 0.5 - this.ant.x) < 0.45 && Math.abs(p.row + 0.5 - this.ant.y) < 0.45) {
-        p.taken = true; const val = p.kind === 0 ? 1 : p.kind === 1 ? 5 : 20; this.score += val;
+        p.taken = true;
+        if (p.kind >= 3) { this.powerUp(p.kind); this.burst(p.col + 0.5, p.row + 0.5, "#ffffff", 14); continue; }
+        // combo: keep picking things up within 1.6 s → ×2 after 8, ×3 after 18
+        this.combo++; this.comboT = 1.6; this.mult = this.combo >= 18 ? 3 : this.combo >= 8 ? 2 : 1;
+        const val = (p.kind === 0 ? 1 : p.kind === 1 ? 5 : 20) * this.mult; this.score += val;
         if (p.kind === 0) this.crumbsGot++; else if (p.kind === 1) this.sugarsGot++; else this.crystalsGot++;
         this.cb.onSfx(p.kind === 0 ? "crumb" : p.kind === 1 ? "sugar" : "crystal");
         this.burst(p.col + 0.5, p.row + 0.5, p.kind === 0 ? this.theme.crumb : p.kind === 1 ? this.theme.sugar : this.theme.crystal, p.kind === 2 ? 16 : 7);
+        if (this.combo === 8 || this.combo === 18) this.say(`COMBO ×${this.mult}`, 1.1);
         this.pushHud();
-        if (p.kind === 2 && this.crystalsGot >= this.crystalsTotal) { this.end(true); return; }
+        if (p.kind === 2 && this.crystalsGot >= this.crystalsTotal) { this.sweep(); return; }
       }
     }
     void ar; void ac;
     // spider hit
-    if (this.invuln <= 0 && Math.hypot(this.spider.x - this.ant.x, this.spider.y - this.ant.y) < 0.62) {
-      this.invuln = 0.9; this.hitT = 0.35; this.flash = 1; this.shake = 1; this.timeLeft = Math.max(0, this.timeLeft - 3); this.cb.onSfx("hit"); this.say("Spider hit! −3 seconds", 1.2); this.burst(this.ant.x, this.ant.y, "#ff5566", 12);
+    if (this.invuln <= 0 && this.spiders.some((sp) => Math.hypot(sp.x - this.ant.x, sp.y - this.ant.y) < 0.62)) {
+      this.invuln = 0.9; this.combo = 0; this.mult = 1; this.hitT = 0.35; this.flash = 1; this.shake = 1; this.timeLeft = Math.max(0, this.timeLeft - 3); this.cb.onSfx("hit"); this.say("Spider hit! −3 seconds", 1.2); this.burst(this.ant.x, this.ant.y, "#ff5566", 12);
     }
   }
   /** grid-locked smooth movement: turn at cell centres (with a little pre-turn slack), stop at walls */
@@ -132,23 +160,49 @@ export class Tunnel {
     m.x += dx * step; m.y += dy * step;
     if (isAnt && m.want && m.want !== m.dir) { /* keep trying at the next centre */ } else if (isAnt && !m.want && !this.input[m.dir]) { /* keep gliding like Pac-Man */ }
   }
-  spiderThink() {
-    const s = this.spider; const cx = Math.floor(s.x) + 0.5, cy = Math.floor(s.y) + 0.5;
+  spiderThink(s: Spider) {
+    const cx = Math.floor(s.x) + 0.5, cy = Math.floor(s.y) + 0.5;
     if (Math.abs(s.x - cx) > 0.1 || Math.abs(s.y - cy) > 0.1) return;   // decide only at centres
     if (s.want && s.want !== s.dir) return;
-    const r = Math.floor(s.y), c = Math.floor(s.x); const ar = Math.floor(this.ant.y), ac = Math.floor(this.ant.x);
-    const dist = Math.abs(ar - r) + Math.abs(ac - c);
+    const r = Math.floor(s.y), c = Math.floor(s.x);
+    // target: the decoy if one is live, else the ant (chaser / alerted ambusher) or the camp (ambusher going home)
+    let tr = Math.floor(this.ant.y), tc = Math.floor(this.ant.x);
+    if (this.decoy) { tr = Math.floor(this.decoy.y); tc = Math.floor(this.decoy.x); }
+    const distAnt = Math.abs(Math.floor(this.ant.y) - r) + Math.abs(Math.floor(this.ant.x) - c);
+    if (s.kind === "ambusher") { if (distAnt <= 5 && !this.decoy) s.alert = 3; else if (s.alert > 0) s.alert -= 1 / 8; if (s.alert <= 0 && s.camp) { tr = s.camp.row; tc = s.camp.col; if (r === tr && c === tc) { s.dir = null; return; } } }
     const cands = (["up", "down", "left", "right"] as Dir[]).filter((d) => { const [dx, dy] = DIRV[d]; return !this.isWall(r + dy, c + dx); });
     if (!cands.length) { s.dir = null; return; }
-    // don't reverse unless dead end
     const back = s.dir ? (["up", "down", "left", "right"] as Dir[]).find((d) => DIRV[d][0] === -DIRV[s.dir!][0] && DIRV[d][1] === -DIRV[s.dir!][1]) : null;
     const fwd = cands.filter((d) => d !== back); const pool = fwd.length ? fwd : cands;
-    const ranked = [...pool].sort((a, b) => { const da = Math.abs(ar - (r + DIRV[a][1])) + Math.abs(ac - (c + DIRV[a][0])); const db = Math.abs(ar - (r + DIRV[b][1])) + Math.abs(ac - (c + DIRV[b][0])); return da - db; });
-    const roll = Math.random(); let pick = ranked[0]; if (roll > 0.86 && ranked[1]) pick = ranked[1]; if (roll > 0.96) pick = pool[(Math.random() * pool.length) | 0];
+    let pick: Dir;
+    if (s.kind === "patroller") { pick = s.dir && pool.includes(s.dir) && Math.random() < 0.6 ? s.dir : pool[(Math.random() * pool.length) | 0]; }   // wanders a fixed-feeling loop, never hunts
+    else {
+      const ranked = [...pool].sort((a, b) => { const da = Math.abs(tr - (r + DIRV[a][1])) + Math.abs(tc - (c + DIRV[a][0])); const db = Math.abs(tr - (r + DIRV[b][1])) + Math.abs(tc - (c + DIRV[b][0])); return da - db; });
+      const roll = Math.random(); pick = ranked[0]; if (roll > 0.86 && ranked[1]) pick = ranked[1]; if (roll > 0.96) pick = pool[(Math.random() * pool.length) | 0];
+    }
     s.want = pick;
-    // lunge when close, ramp with time
-    const base = SPIDER_BASE * (160 / Math.max(60, this.cfg.spiderSpeedMs)) * (1 + Math.min(0.35, (this.cfg.runSeconds - this.timeLeft) / this.cfg.runSeconds * 0.35));
-    s.speed = dist <= 6 ? base * 1.35 : base;
+    const base = this.spiderSpeed() * (1 + Math.min(0.35, ((this.cfg.runSeconds - this.timeLeft) / this.cfg.runSeconds) * 0.35));
+    s.speed = s.kind === "patroller" ? base * 0.9 : s.kind === "ambusher" ? (s.alert > 0 ? base * 1.6 : base * 0.7) : distAnt <= 6 ? base * 1.35 : base;
+  }
+  powerUp(kind: number) {
+    this.cb.onSfx("sugar");
+    if (kind === 3) { this.breaks += 2; this.say("⛏ DIG CLAW +2 breaks", 1.4); }
+    else if (kind === 4) { this.decoy = { x: this.ant.x, y: this.ant.y, t: 4.5 }; this.say("🧪 PHEROMONE DECOY — spiders chase the scent", 1.6); }
+    else if (kind === 5) { for (const sp of this.spiders) sp.frozen = 3.2; this.say("❄ WEB FREEZE — spiders stuck 3 s", 1.4); }
+    else if (kind === 6) { this.rush = 4.5; this.say("⚡ SUGAR RUSH", 1.2); }
+    this.pushHud();
+  }
+  /** all crystals collected: bank a floor bonus and drop into the next layout with more spiders and fewer breaks */
+  sweep() {
+    this.sweeps++; if (this.firstClearMs == null) this.firstClearMs = Math.max(0, performance.now() - this.startedAt);
+    const bonus = 25 * this.floor + Math.ceil(this.timeLeft); this.score += bonus; this.cb.onSfx("win");
+    this.burst(this.ant.x, this.ant.y, this.theme.crystal, 40); this.say(`FLOOR ${this.floor} CLEARED  +${bonus}`, 2.2);
+    this.floor++; this.timeLeft = Math.min(this.cfg.runSeconds, this.timeLeft + 20); this.breaks = Math.max(1, Math.min(this.breaks, this.cfg.wallBreaks - (this.floor - 1)));
+    // next layout (never the same one twice in a row)
+    if (this.layouts.length > 1) { let n = this.layoutIdx; while (n === this.layoutIdx) n = (Math.random() * this.layouts.length) | 0; this.layoutIdx = n; this.layout = new Set(this.layouts[n]); }
+    this.broken.clear(); this.picks = []; this.placePickups(); this.spawnSpiders();
+    this.ant.x = START.col + 0.5; this.ant.y = START.row + 0.5; this.ant.dir = null; this.ant.want = null; this.facing = "right"; this.invuln = 1.5; this.decoy = null; this.combo = 0; this.mult = 1;
+    this.pushHud();
   }
   doBreak() {
     if (this.breaks <= 0) { this.say("No wall breakers left."); this.cb.onSfx("nowall"); return; }
@@ -158,11 +212,9 @@ export class Tunnel {
   }
   burst(x: number, y: number, c: string, n: number) { for (let i = 0; i < n; i++) { const a = Math.random() * Math.PI * 2, sp = 1 + Math.random() * 3; this.parts.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1, life: 0.35 + Math.random() * 0.35, c, s: 2 + Math.random() * 3 }); } }
   end(won: boolean) {
-    if (this.state !== "play") return; this.state = won ? "won" : "lost"; this.ant.dir = null; this.ant.want = null; this.spider.dir = null;
-    this.cb.onSfx(won ? "win" : "lose"); this.say(won ? "Crystal sweep! 👑" : "Time's up", 3);
-    if (won) this.burst(this.ant.x, this.ant.y, this.theme.crystal, 40);
-    const clearMs = won ? Math.max(0, performance.now() - this.startedAt) : null;
-    setTimeout(() => { if (!this.over) this.cb.onEnd({ score: this.score, fullClear: won, crystalsCollected: this.crystalsGot, crystalsTotal: this.crystalsTotal, clearMs, crumbs: this.crumbsGot, sugars: this.sugarsGot }); }, 900);
+    if (this.state !== "play") return; const swept = this.sweeps > 0; this.state = swept ? "won" : "lost"; this.ant.dir = null; this.ant.want = null; for (const sp of this.spiders) sp.dir = null;
+    this.cb.onSfx(swept ? "win" : "lose"); this.say(swept ? `Time's up — ${this.sweeps} floor${this.sweeps > 1 ? "s" : ""} cleared 👑` : "Time's up", 3); void won;
+    setTimeout(() => { if (!this.over) this.cb.onEnd({ score: this.score, fullClear: swept, crystalsCollected: this.crystalsGot, crystalsTotal: this.crystalsTotal, clearMs: this.firstClearMs, crumbs: this.crumbsGot, sugars: this.sugarsGot, floors: this.sweeps }); }, 900);
   }
 
   // ── rendering
@@ -205,19 +257,31 @@ export class Tunnel {
       else if (p.kind === 1) { c.save(); c.translate(x, y + bob); c.rotate(Math.PI / 4); c.fillStyle = th.sugar; c.shadowColor = th.sugar; c.shadowBlur = 8; c.fillRect(-5, -5, 10, 10); c.shadowBlur = 0; c.fillStyle = "rgba(255,255,255,0.5)"; c.fillRect(-4, -4, 3, 3); c.restore(); }
       else { const pulse = 0.6 + 0.4 * Math.sin(this.t * 4 + p.ph); c.save(); c.translate(x, y + bob * 1.4); const gl = c.createRadialGradient(0, 0, 2, 0, 0, 22 + pulse * 6); gl.addColorStop(0, hexA(th.crystal, 0.55 * pulse + 0.2)); gl.addColorStop(1, hexA(th.crystal, 0)); c.fillStyle = gl; c.beginPath(); c.arc(0, 0, 28, 0, Math.PI * 2); c.fill(); c.fillStyle = th.crystal; c.shadowColor = th.crystal; c.shadowBlur = 18 + pulse * 10; c.beginPath(); c.moveTo(0, -11); c.lineTo(8, -2); c.lineTo(0, 11); c.lineTo(-8, -2); c.closePath(); c.fill(); c.shadowBlur = 0; c.fillStyle = "rgba(255,255,255,0.55)"; c.beginPath(); c.moveTo(0, -11); c.lineTo(4, -3); c.lineTo(-3, -4); c.closePath(); c.fill(); const sk = Math.max(0, Math.sin(this.t * 5 + p.ph * 2)); if (sk > 0.6) { c.fillStyle = `rgba(255,255,255,${(sk - 0.6) * 2.5})`; c.fillRect(-1, -19 + 4 * sk, 2, 8); c.fillRect(-4, -16 + 4 * sk, 8, 2); } c.restore(); }
     }
-    // spider
-    const sp = this.sp.spider; if (sp.complete && sp.naturalWidth) { const h = CELL * 1.55, w = h * (sp.naturalWidth / sp.naturalHeight); const bob = Math.sin(this.t * 9) * 1.5; c.save(); c.shadowColor = th.spiderGlow.startsWith("#") ? th.spiderGlow : "rgba(239,68,68,0.5)"; c.shadowBlur = 16; const flip = this.spider.dir === "left"; c.translate(this.spider.x * CELL, this.spider.y * CELL + bob); if (flip) c.scale(-1, 1); c.drawImage(sp, -w / 2, -h * 0.55, w, h); c.restore(); }
+    // power-ups (emoji glyphs with a glow) + decoy marker
+    for (const p of this.picks) {
+      if (p.taken || p.kind < 3) continue; const x = (p.col + 0.5) * CELL, y = (p.row + 0.5) * CELL; const pulse = 0.6 + 0.4 * Math.sin(this.t * 5 + p.ph);
+      c.save(); c.translate(x, y + Math.sin(this.t * 3 + p.ph) * 2); const g2 = c.createRadialGradient(0, 0, 2, 0, 0, 16 + pulse * 6); g2.addColorStop(0, "rgba(255,255,255,0.35)"); g2.addColorStop(1, "rgba(255,255,255,0)"); c.fillStyle = g2; c.beginPath(); c.arc(0, 0, 22, 0, Math.PI * 2); c.fill();
+      c.font = "18px system-ui, 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif"; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(p.kind === 3 ? "⛏" : p.kind === 4 ? "🧪" : p.kind === 5 ? "❄️" : "⚡", 0, 1); c.restore();
+    }
+    if (this.decoy) { c.save(); c.translate(this.decoy.x * CELL, this.decoy.y * CELL); const g3 = c.createRadialGradient(0, 0, 2, 0, 0, 14 + Math.sin(this.t * 6) * 3); g3.addColorStop(0, "rgba(255,120,220,0.7)"); g3.addColorStop(1, "rgba(255,120,220,0)"); c.fillStyle = g3; c.beginPath(); c.arc(0, 0, 18, 0, Math.PI * 2); c.fill(); c.restore(); }
+    // spiders
+    const sp = this.sp.spider; if (sp.complete && sp.naturalWidth) for (const s of this.spiders) {
+      const h = CELL * 1.5, w = h * (sp.naturalWidth / sp.naturalHeight); const bob = s.frozen > 0 ? 0 : Math.sin(this.t * 9 + s.x) * 1.5;
+      c.save(); c.shadowColor = s.frozen > 0 ? "rgba(120,200,255,0.9)" : th.spiderGlow.startsWith("#") ? th.spiderGlow : "rgba(239,68,68,0.5)"; c.shadowBlur = 16; if (s.tint) c.filter = s.tint; if (s.frozen > 0) c.filter = (s.tint ? s.tint + " " : "") + "saturate(0.2) brightness(1.4)";
+      c.translate(s.x * CELL, s.y * CELL + bob); if (s.dir === "left") c.scale(-1, 1); c.drawImage(sp, -w / 2, -h * 0.55, w, h); c.restore();
+      if (s.kind === "ambusher" && s.alert > 0) { c.fillStyle = "#ff5566"; c.font = "bold 10px sans-serif"; c.textAlign = "center"; c.fillText("!", s.x * CELL, s.y * CELL - h * 0.6); }
+    }
     // ant — sheet frame by state / facing, animated while moving
     const sh = this.sp.sheet;
     if (sh.complete && sh.naturalWidth) {
       const moving = !!this.ant.dir; let fi = 0; let flip = false;
       if (this.state === "won") fi = 16; else if (this.state === "lost") fi = 17; else if (this.hitT > 0) fi = 15; else if (this.digT > 0) { fi = 18; flip = this.facing === "left"; }
       else if (moving) { const f = this.facing; const k = Math.floor(this.runT * 11); if (f === "up") fi = 7 + (k % 4); else if (f === "down") fi = 11 + (k % 4); else { fi = 1 + (k % 6); flip = f === "left"; } }
-      else fi = Math.floor(this.t * 1.2) % 2 === 0 ? 0 : 19;
+      else fi = 0;   // one steady idle frame (alternating frames made the legs flicker)
       if (!moving && this.state === "play") flip = this.facing === "left";
-      const h = CELL * 1.9, w = h; const bob = moving ? Math.abs(Math.sin(this.runT * Math.PI * 11 / 3)) * 1.2 : 0;
+      const h = CELL * 1.45, w = h; const bob = moving ? Math.abs(Math.sin(this.runT * Math.PI * 11 / 3)) * 1.0 : Math.sin(this.t * 2.2) * 0.6;
       const blink = this.invuln > 0 && this.hitT <= 0 && Math.floor(this.t * 16) % 2 === 0;
-      if (!blink) { c.save(); c.translate(this.ant.x * CELL, this.ant.y * CELL - bob); if (flip) c.scale(-1, 1); c.shadowColor = th.antGlow.startsWith("#") ? th.antGlow : "rgba(96,165,250,0.5)"; c.shadowBlur = 12; c.drawImage(sh, (fi % SCOLS) * SF, Math.floor(fi / SCOLS) * SF, SF, SF, -w / 2, -h + CELL * 0.42, w, h); c.restore(); }
+      if (!blink) { c.save(); c.translate(this.ant.x * CELL, this.ant.y * CELL - bob); if (flip) c.scale(-1, 1); c.shadowColor = th.antGlow.startsWith("#") ? th.antGlow : "rgba(96,165,250,0.5)"; c.shadowBlur = 12; c.drawImage(sh, (fi % SCOLS) * SF, Math.floor(fi / SCOLS) * SF, SF, SF, -w / 2, -h + CELL * 0.5, w, h); c.restore(); }
     }
     // particles
     for (const q of this.parts) { c.globalAlpha = Math.min(1, q.life * 3); c.fillStyle = q.c; c.fillRect(q.x * CELL - q.s / 2, q.y * CELL - q.s / 2, q.s, q.s); } c.globalAlpha = 1;

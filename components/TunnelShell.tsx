@@ -965,14 +965,14 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
   }
 
   // ── run end (the canvas engine reports the result; one path for time-out and crystal sweep)
-  const finishRun = React.useCallback(async (r: { score: number; fullClear: boolean; crystalsCollected: number; crystalsTotal: number; clearMs: number | null }) => {
+  const finishRun = React.useCallback(async (r: { score: number; fullClear: boolean; crystalsCollected: number; crystalsTotal: number; clearMs: number | null; floors?: number }) => {
     if (!isPlayingRef.current) return;
     isPlayingRef.current = false; setIsPlaying(false); setDidWinRun(r.fullClear); setScore(r.score);
     if (r.fullClear) sfx.win(); else sfx.lose();
     setLastRunResult({ layoutName: LAYOUT_NAMES[layoutIndex] || ("#" + (layoutIndex + 1)), layoutNum: layoutIndex + 1, score: r.score, clearTimeMs: r.clearMs, wasFullClear: r.fullClear });
     await recordTunnelRun({ score: r.score, fullClear: r.fullClear, crystalsCollected: r.crystalsCollected });
     await loadTunnelLeaderboard();
-    const label = r.fullClear ? "Crystal sweep complete!" : "Run complete.";
+    const label = r.fullClear ? `${r.floors || 1} floor${(r.floors || 1) > 1 ? "s" : ""} cleared!` : "Run complete.";
     if (r.score <= 0) { setRunMessage(`${label} No points earned this time.`); scrollBackToBoardHeader(); return; }
     setRunMessage(`${label} Claiming ${r.score} REBEL Points...${r.fullClear ? " 👑" : ""}`);
     try {
@@ -984,9 +984,9 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layoutIndex, earn, refresh, effectivePlayerId, playerName, runStartedAt]);
   const forceEnd = () => { const g = (window as any).__tun; if (g && g.state === "play") g.end(false); };
-  const [crystalsLeft, setCrystalsLeft] = useState(0);
-  const onTunnelHud = React.useCallback((h: { score: number; timeLeft: number; breaks: number; crystalsLeft: number; msg: string | null; hit: boolean }) => {
-    setScore(h.score); setTimeLeft(h.timeLeft); setWallBreaksLeft(h.breaks); setCrystalsLeft(h.crystalsLeft); if (h.msg) setRunMessage(h.msg); setHitFlash(h.hit);
+  const [crystalsLeft, setCrystalsLeft] = useState(0); const [tunnelFloor, setTunnelFloor] = useState(1); const [tunnelMult, setTunnelMult] = useState(1);
+  const onTunnelHud = React.useCallback((h: { score: number; timeLeft: number; breaks: number; crystalsLeft: number; msg: string | null; hit: boolean; floor: number; mult: number }) => {
+    setScore(h.score); setTimeLeft(h.timeLeft); setWallBreaksLeft(h.breaks); setCrystalsLeft(h.crystalsLeft); setTunnelFloor(h.floor); setTunnelMult(h.mult); if (h.msg) setRunMessage(h.msg); setHitFlash(h.hit);
   }, []);
   const isPlayingRef = useRef(false); useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
   function formatCountdown(ms: number): string {
@@ -1299,10 +1299,10 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
         {/* ── Ant selector ── */}
         <div style={{maxWidth:900,margin:'0 auto 16px',padding:'0 4px'}}>
           <div style={{fontSize:10,fontWeight:900,letterSpacing:'0.25em',textTransform:'uppercase',color:'rgba(255,255,255,0.3)',marginBottom:10}}>SELECT YOUR ANT</div>
-          <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:4,scrollbarWidth:'none'} as React.CSSProperties}>
+          <div style={{display:'flex',gap:6,overflowX:'auto',padding:'8px 2px 6px',scrollbarWidth:'none'} as React.CSSProperties}>
             {DESCENT_FACTIONS.map((f) => { const on = f.id === tunnelFaction; return (
               <button key={f.id} type="button" disabled={isPlaying} onClick={() => setTunnelFaction(f.id)} title={f.name} style={{ flex:'0 0 auto', width:64, padding:0, background:on?'rgba(96,165,250,0.18)':'rgba(0,0,0,0.45)', border:on?'1px solid #60a5fa':'1px solid rgba(255,255,255,0.12)', borderRadius:10, color:'#fff', cursor:isPlaying?'default':'pointer', overflow:'hidden', boxShadow:on?'0 0 14px rgba(96,165,250,0.45)':'none', transform:on?'translateY(-3px)':'none', transition:'all .15s' }}>
-                <div style={{ height:56, display:'flex', alignItems:'flex-end', justifyContent:'center', paddingTop:4 }}><img src={`/descent/portraits/${f.id}.png`} alt={f.name} style={{ height:'94%', objectFit:'contain', filter:on?'none':'brightness(0.6) saturate(0.6)' }} /></div>
+                <div style={{ height:64, display:'flex', alignItems:'flex-end', justifyContent:'center', paddingTop:6, overflow:'hidden' }}><img src={`/descent/portraits/${f.id}.png`} alt={f.name} style={{ height:'90%', objectFit:'contain', objectPosition:'bottom', filter:on?'none':'brightness(0.6) saturate(0.6)' }} /></div>
                 <div style={{ fontSize:7, fontWeight:800, letterSpacing:'0.08em', padding:'3px 2px 5px', color:on?'#93c5fd':'rgba(255,255,255,0.7)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{f.name.toUpperCase()}</div>
               </button>); })}
           </div>
@@ -1358,7 +1358,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
               <span style={{fontSize:11,opacity:0.6,fontStyle:"italic"}}>{DIFFICULTY[boardTheme].desc}</span>
             </div>
                   <div style={{ fontSize: 13, opacity: 0.82 }}>
-                                       Desktop: arrow keys / WASD move, Space breaks a wall. Phone: d-pad or swipe to move, ⛏ breaks. Your ant keeps running until it hits a wall — steer at the corners.
+                                       Desktop: arrow keys / WASD move, Space breaks a wall. Phone: d-pad or swipe, ⛏ breaks. Your ant keeps running until it hits a wall — steer at the corners. Collect every crystal to drop to the next floor (+20 s, more spiders, fewer breaks). Chain pickups for ×2 / ×3 combos. Power-ups: ⛏ +2 breaks · 🧪 decoy · ❄️ freeze · ⚡ rush.
                   </div>
 
                                   <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
@@ -1397,7 +1397,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                     <span>🍬 Sugar = 5</span>
                     <span>💎 Crystal = 20</span>
                     <span>🕷️ Hit = -3 sec</span>
-                    <span>Collect all crystals to win early</span>
+                    <span>Collect all crystals → next floor</span>
                   </div>
                 </div>
 
@@ -1428,6 +1428,8 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                 <div ref={boardScrollRef} style={{ position: "relative" }}>
                   <TunnelRun
                     layout={(TUNNEL_LAYOUTS[layoutIndex] || TUNNEL_LAYOUTS[0]) as string[]}
+                    layouts={TUNNEL_LAYOUTS as string[][]}
+                    layoutIdx={layoutIndex}
                     theme={{ ...theme, dark: boardTheme === "shadow" || boardTheme === "void" || boardTheme === "mythic" }}
                     cfg={{ runSeconds: tunnelCfg.tunnelRunSeconds, crystals: tunnelCfg.tunnelCrystalCount, sugars: tunnelCfg.tunnelSugarCount, crumbs: tunnelCfg.tunnelCrumbCount, wallBreaks: tunnelCfg.tunnelWallBreaks, spiderSpeedMs: tunnelCfg.tunnelSpiderSpeedMs }}
                     playing={isPlaying}
@@ -1436,7 +1438,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                     onEnd={finishRun}
                     onSfx={(n) => { const f = (sfx as any)[n === "hit" ? "spiderHit" : n]; if (typeof f === "function") f(); }}
                     onQuit={() => { if (window.confirm("Quit this run? The entry fee is spent and you keep your score so far.")) forceEnd(); }}
-                    hudLine={<div style={{ display: "flex", gap: 14, padding: "6px 14px", borderRadius: 999, background: "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.15)", fontSize: 13, fontWeight: 800 }}><span>⏱ {timeLeft}s</span><span style={{ color: "#93c5fd" }}>🎯 {score}</span><span style={{ color: "#fbbf24" }}>🧱 {wallBreaksLeft}</span></div>}
+                    hudLine={<div style={{ display: "flex", gap: 14, padding: "6px 14px", borderRadius: 999, background: "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.15)", fontSize: 13, fontWeight: 800 }}><span>⏱ {timeLeft}s</span><span style={{ color: "#93c5fd" }}>🎯 {score}</span><span style={{ color: "#fbbf24" }}>🧱 {wallBreaksLeft}</span><span style={{ color: "#c4b5fd" }}>🕳 F{tunnelFloor}</span>{tunnelMult > 1 && <span style={{ color: "#fb7185" }}>×{tunnelMult}</span>}</div>}
                   />
                   {countdown !== null && (
                     <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none", zIndex: 70 }}>
