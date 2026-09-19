@@ -60,12 +60,8 @@ function useShuffleAudio() {
 }
 import BuyPointsModal from "./BuyPointsModal";
 
-// lazy-load queen so 3D never blocks SSR
-const Queen3D = dynamic(() => import("./Queen3D"), { ssr: false }) as React.ComponentType<{
-  active?: boolean;
-  scale?: number;
-  y?: number;
-}>;
+// the queen is a 2-D paper doll on a canvas (components/QueenStage) — the 20 MB GLB is no longer loaded here
+const QueenStage = dynamic(() => import("./QueenStage"), { ssr: false }) as React.ComponentType<React.ComponentProps<typeof import("./QueenStage").default>>;
 
 type Phase = "idle" | "shuffling" | "pick" | "revealed";
 type WinPrize = {
@@ -838,6 +834,7 @@ const [phase, setPhase] = useState<Phase>("idle");
 const { muted: shuffleMuted, toggleMute: toggleShuffleMute, startMusic, stopMusic, sfx: shuffleSfx } = useShuffleAudio();
 const [showHowPointsWork, setShowHowPointsWork] = useState(false);
 const [order, setOrder] = useState<number[]>(() => Array.from({ length: EGG_COUNT }, (_, i) => i));
+const stageRef = React.useRef<import("./QueenStage").QueenStageHandle | null>(null); const eggRefs = React.useRef<(HTMLButtonElement | null)[]>([]); const [hatched, setHatched] = useState<number | null>(null); const [pickedEgg, setPickedEgg] = useState<number | null>(null);
 const [progress, setProgress] = useState(0);
 const [busy, setBusy] = useState(false);
 const [rarity, setRarity] = useState<Rarity>("none");
@@ -1001,10 +998,11 @@ const runShuffle = async () => {
   };
   requestAnimationFrame(tick);
 };
-  const onPick = () => {
+  const onPick = (eggIdx: number) => {
     if (phase !== "pick" || busy) return;
     shuffleSfx.pick();
     setBusy(true);
+    setPickedEgg(eggIdx); setHatched(null); stageRef.current?.point(eggIdx);
 
 setTimeout(async () => {
   // ✅ Determine player identity ONCE (wins MUST follow effective identity)
@@ -1131,6 +1129,8 @@ await fetch("/api/wins/add", {
 
 window.dispatchEvent(new Event("ra:leaderboards-refresh"));
   
+// 👑 the queen casts on the chosen egg (point → raise → lightning → crack → hatch), then the prize modal opens
+try { await stageRef.current?.cast(eggIdx, r as any); } catch {}
 setRarity(r);
 setPhase("revealed");
 setShowPrize(true);
@@ -1168,6 +1168,7 @@ else shuffleSfx.none();
   setPrize(null);
   setProgress(0);
   setOrder(Array.from({ length: EGG_COUNT }, (_, i) => i));
+  setHatched(null); setPickedEgg(null); stageRef.current?.idle();
   setPhase("idle");
 };
 
@@ -1356,10 +1357,8 @@ async function submitShipping() {
             animation: phase==='shuffling' ? 'queenAuraActive 0.6s ease-in-out infinite alternate' : 'queenAura 3s ease-in-out infinite alternate',
           }} />
 
-          {/* Queen 3D — centered, pushed down from top */}
-          <div style={{ position:'absolute', top:'50%', left:'50%', transform:'translate(-50%, -68%)', zIndex:3, pointerEvents:'none' }}>
-            <Queen3D active={phase === "shuffling"} scale={shuffleConfig.queenScale} y={-0.1} />
-          </div>
+          {/* Queen — paper-doll canvas over the whole scene (she stands above the egg rail; her lightning is drawn over the eggs) */}
+          <QueenStage apiRef={stageRef} active={phase === "shuffling"} getEggRect={(i) => eggRefs.current[i]?.getBoundingClientRect() || null} onHatch={(i) => setHatched(i)} />
 
           {/* Rails */}
           <div className="rail rail-top" style={{ zIndex:4 }} />
@@ -1374,7 +1373,9 @@ async function submitShipping() {
           {Array.from({ length: EGG_COUNT }, (_, i) => (
             <button
               key={i}
-              className={`egg-card ${phase === "pick" ? "can-pick" : ""}`}
+              ref={(el) => { eggRefs.current[i] = el; }}
+              onMouseEnter={() => { if (phase === "pick" && !busy) stageRef.current?.point(i); }}
+              className={`egg-card ${phase === "pick" ? "can-pick" : ""} ${hatched === i ? "hatched" : ""} ${pickedEgg === i && busy ? "picked" : ""}`}
               style={{
                 left: `${LANES[order[i]]}%`,
                 top: "72%",
@@ -1385,7 +1386,7 @@ async function submitShipping() {
                 transform: phase==='pick' ? 'perspective(400px) rotateX(-5deg)' : 'perspective(400px) rotateX(0deg)',
                 transition:'all 0.3s ease',
               }}
-              onClick={onPick}
+              onClick={() => onPick(i)}
               disabled={phase !== "pick" || busy}
               aria-label="Pick egg"
             >
@@ -1411,7 +1412,7 @@ async function submitShipping() {
           )}
 
           {/* Pick phase invitation */}
-          {phase === 'pick' && (
+          {phase === 'pick' && !busy && (
             <div style={{ position:'absolute', bottom:16, left:'50%', transform:'translateX(-50%)', zIndex:8,
               fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:12, fontWeight:900, letterSpacing:'0.25em', textTransform:'uppercase',
               color:'#a78bfa', animation:'pickPulse 1.5s ease-in-out infinite',
@@ -1666,6 +1667,8 @@ async function submitShipping() {
           z-index: 6;
         }
         .egg-card:disabled { cursor: not-allowed; }
+        .egg-card.hatched .egg-body, .egg-card.hatched .egg-speckle { opacity: 0 !important; transition: opacity 0.15s; }
+        .egg-card.picked { transform: translateX(-50%) translateY(-6px) scale(1.06) !important; }
         .egg-card.can-pick:hover { transform: translateX(-50%) translateY(-12px) scale(1.12) rotateX(-8deg); }
 
         .egg-body {
