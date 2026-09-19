@@ -50,8 +50,10 @@ const BountyHunters: React.FC = () => {
 
   async function start() {
     if (!canStart) return; setStarting(true); setErr("");
+    // phones: go full screen inside the tap gesture (must be synchronous — before the await). iOS Safari 16.4+ supports it; Android Chrome too.
+    try { if ("ontouchstart" in window || navigator.maxTouchPoints > 0) { const el: any = document.documentElement; (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el, { navigationUI: "hide" })?.catch?.(() => {}); } } catch {}
     const s = await spend(cost, "bounty");
-    if (!s?.ok) { setStarting(false); setErr("Couldn't charge the entry fee — check your REBEL balance."); return; }
+    if (!s?.ok) { setStarting(false); setErr("Couldn't charge the entry fee — check your REBEL balance."); try { if (document.fullscreenElement || (document as any).webkitFullscreenElement) (document.exitFullscreen || (document as any).webkitExitFullscreen)?.call(document); } catch {} return; }
     setStarting(false); try { window.scrollTo(0, 0); } catch {} setPhase("playing");
   }
 
@@ -59,6 +61,7 @@ const BountyHunters: React.FC = () => {
   const onEnd = useCallback(async (r: { cleared: boolean; bounty: number; kills: number; boardN: number }) => {
     const paid = Math.max(0, Math.round(r.cleared ? r.bounty : r.bounty * BOUNTY_DEATH_KEEP));
     setResult({ ...r, paid }); setPhase("result");
+    try { if (document.fullscreenElement || (document as any).webkitFullscreenElement) (document.exitFullscreen || (document as any).webkitExitFullscreen)?.call(document); } catch {}
     const key = Date.now(); finishedRef.current = key;
     if (paid > 0) { try { await earn(paid); } catch {} }
     try {

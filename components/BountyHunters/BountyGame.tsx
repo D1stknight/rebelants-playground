@@ -77,19 +77,23 @@ export default function BountyGameView({ board, faction = "samurai", onEnd, onQu
         onHud: (h) => setHud({ ...h }),
         onSfx: (n) => { const s = (audioRef.current.sfx as any)[n]; if (s) s(); },
         onEnd: (r) => { audioRef.current.music(null); onEnd(r); },
+        onFatal: (m) => setFatal(m),
       }, faction, vwRef.current);
       gameRef.current = g; (window as any).__bg = g; g.start();
     } catch (e: any) { console.error("BountyGame failed to start", e); setFatal(String(e?.message || e)); return; }
-    const onErr = (ev: ErrorEvent) => { if (!gameRef.current || gameRef.current.over) return; setFatal(String(ev.message || "error")); };
-    window.addEventListener("error", onErr);
+
     audioRef.current.music(board.music, 0.35);
     const kd = (e: KeyboardEvent) => { const k = KEYS[e.key]; if (k) { g.input[k] = true; e.preventDefault(); } if (e.key === "Escape") onQuit(); };
     const ku = (e: KeyboardEvent) => { const k = KEYS[e.key]; if (k) { g.input[k] = false; e.preventDefault(); } };
     window.addEventListener("keydown", kd); window.addEventListener("keyup", ku);
-    return () => { g.stop(); window.removeEventListener("keydown", kd); window.removeEventListener("keyup", ku); window.removeEventListener("error", onErr); audioRef.current.music(null); };
+    return () => { g.stop(); window.removeEventListener("keydown", kd); window.removeEventListener("keyup", ku); audioRef.current.music(null); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [board]);
 
+  const [fs, setFs] = useState(false);
+  useEffect(() => { const f = () => setFs(!!(document.fullscreenElement || (document as any).webkitFullscreenElement)); f(); document.addEventListener("fullscreenchange", f); document.addEventListener("webkitfullscreenchange", f); return () => { document.removeEventListener("fullscreenchange", f); document.removeEventListener("webkitfullscreenchange", f); }; }, []);
+  const canFs = typeof document !== "undefined" && !!((document.documentElement as any).requestFullscreen || (document.documentElement as any).webkitRequestFullscreen);
+  const toggleFs = () => { try { if (fs) { (document.exitFullscreen || (document as any).webkitExitFullscreen)?.call(document); } else { const el: any = document.documentElement; (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el, { navigationUI: "hide" })?.catch?.(() => {}); } } catch {} };
   const press = (k: keyof Input, v: boolean) => (e: React.PointerEvent) => { e.preventDefault(); const g = gameRef.current; if (g) g.input[k] = v; };
   // pad size: 60 px, shrinking on short landscape viewports (iPhone Safari with its toolbars is ~220 px tall)
   const ps = portrait || typeof vh !== "number" ? 60 : Math.round(Math.max(40, Math.min(60, vh * 0.2)));
@@ -148,6 +152,7 @@ export default function BountyGameView({ board, faction = "samurai", onEnd, onQu
           </div>
         )}
         <button type="button" onClick={audio.toggleMute} style={{ position: "absolute", left: 8, ...(isTouch ? { top: 44 } : { bottom: 8 }), background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 999, width: 26, height: 26, color: "#fff", fontSize: 12, cursor: "pointer" }}>{audio.muted ? "🔇" : "🔊"}</button>
+        {canFs && <button type="button" onClick={toggleFs} title="Full screen" style={{ position: "absolute", left: 40, ...(isTouch ? { top: 44 } : { bottom: 8 }), background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 999, width: 26, height: 26, color: "#fff", fontSize: 12, cursor: "pointer" }}>{fs ? "▣" : "⛶"}</button>}
         <button type="button" onClick={onQuit} style={{ position: "absolute", right: 8, ...(isTouch ? { top: 44 } : { bottom: 8 }), background: "rgba(0,0,0,0.5)", border: "1px solid rgba(248,113,113,0.4)", borderRadius: 999, padding: "4px 10px", color: "#f87171", fontSize: 9, fontWeight: 800, letterSpacing: "0.12em", cursor: "pointer", fontFamily: FONT }}>✕ QUIT</button>
       </div>
       {!isTouch && <div style={{ marginTop: 8, fontSize: 10, opacity: 0.4, letterSpacing: "0.2em" }}>← → MOVE · ↑ AIM UP · ↓ CROUCH / DROP · Z or SPACE JUMP · X or SHIFT FIRE · ESC QUIT</div>}

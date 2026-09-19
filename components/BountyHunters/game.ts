@@ -12,7 +12,7 @@ export type Weapon = "rifle" | "spread" | "laser" | "flame";
 export type Input = { left: boolean; right: boolean; up: boolean; down: boolean; jump: boolean; fire: boolean };
 export type Hud = { lives: number; hp: number; maxHp: number; weapon: Weapon; bounty: number; board: Board; bossHp: number | null; bossMax: number; kills: number; progress: number; state: GameState; msg: string | null };
 export type GameState = "intro" | "play" | "dying" | "boss" | "cleared" | "gameover";
-export type Callbacks = { onHud: (h: Hud) => void; onSfx: (name: string) => void; onEnd: (r: { cleared: boolean; bounty: number; kills: number; boardN: number }) => void };
+export type Callbacks = { onHud: (h: Hud) => void; onSfx: (name: string) => void; onFatal?: (msg: string) => void; onEnd: (r: { cleared: boolean; bounty: number; kills: number; boardN: number }) => void };
 
 type Ent = {
   kind: Spawn["kind"] | "player" | "bullet" | "ebullet" | "item" | "fx";
@@ -144,7 +144,24 @@ export class BountyGame {
   }
 
   // ── loop
-  start() { this.last = performance.now(); const loop = (now: number) => { if (this.over) return; const dt = Math.min(0.05, (now - this.last) / 1000); this.last = now; this.acc += dt; while (this.acc >= 1 / 120) { this.step(1 / 120); this.acc -= 1 / 120; } this.render(); this.raf = requestAnimationFrame(loop); }; this.raf = requestAnimationFrame(loop); }
+  errCount = 0; lastErr: string | null = null;
+  start() {
+    this.last = performance.now();
+    const loop = (now: number) => {
+      if (this.over) return;
+      const dt = Math.min(0.05, (now - this.last) / 1000); this.last = now; this.acc += dt;
+      try {
+        while (this.acc >= 1 / 120) { this.step(1 / 120); this.acc -= 1 / 120; }
+        this.render(); this.errCount = 0;
+      } catch (e: any) {
+        // a bad frame must not kill the run: log it, drop the accumulated time and keep going
+        this.acc = 0; this.errCount++; this.lastErr = String(e?.message || e); console.error("BountyGame frame error", e);
+        if (this.errCount > 90 && this.cb.onFatal) { this.over = true; this.cb.onFatal(this.lastErr); return; }
+      }
+      this.raf = requestAnimationFrame(loop);
+    };
+    this.raf = requestAnimationFrame(loop);
+  }
   stop() { this.over = true; cancelAnimationFrame(this.raf); }
 
   pushHud() { this.cb.onHud({ lives: this.lives, hp: this.hp, maxHp: this.maxHp, weapon: this.weapon, bounty: this.bounty, board: this.board, bossHp: this.boss && this.state === "boss" ? Math.max(0, this.boss.hp) : null, bossMax: this.board.boss.hp, kills: this.kills, progress: Math.min(1, this.player.x / this.level.bossX), state: this.state, msg: this.msg }); }
