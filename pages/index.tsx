@@ -24,6 +24,7 @@ const GAMES = [
   { id:'shuffle',title:"QUEEN'S EGG SHUFFLE",desc:"FIND THE QUEEN'S EGG. BEAT THE ODDS. WIN BIG.",               icon:'🥚',  path:'/shuffle',       color:'#a855f7', glow:'rgba(168,85,247,0.4)', badge:'LUCK',     bg:'rgba(168,85,247,0.08)'  },
   { id:'descent',title:'HIVE DESCENT',        desc:'DESCEND THROUGH 10 FLOORS. FACE THE QUEEN. WIN OR DIE.', icon:'🐜',  path:'/descent',     color:'#ff3399', glow:'rgba(255,51,153,0.45)',badge:'ROGUELITE', bg:'rgba(255,51,153,0.08)' },
   { id:'bounty', title:'BOUNTY HUNTERS',      desc:'RUN. GUN. TAKE THE HEAD. FOUR BOARDS OF CORRUPTED HIVE, FOUR WANTED BOSSES.', icon:'🏹',  path:'/bounty',      color:'#a78bfa', glow:'rgba(167,139,250,0.45)', badge:'RUN & GUN', bg:'rgba(167,139,250,0.08)' },
+  { id:'gp',     title:'REBEL GRAND PRIX',    desc:'KART RACING. FIVE CUPS, FIFTEEN TRACKS, EIGHT ANTS ON THE GRID. DRIFT. BOX. WASP.', icon:'🏁',  path:'/grand-prix',  color:'#ffd166', glow:'rgba(255,209,102,0.45)', badge:'KART RACING', bg:'rgba(255,209,102,0.08)' },
 ];
 
 const ECONOMY = [
@@ -768,7 +769,6 @@ export default function LandingPage() {
 
               {/* ── Coming Soon Games ── */}
               {[
-                { id:'cs2', icon:'🏁', title:'REBEL GRAND PRIX', tag:'COMING SOON', color:'#ffd166', glow:'rgba(255,209,102,0.35)', bg:'rgba(255,209,102,0.04)', desc:'KART RACING. FIVE CUPS, FIFTEEN TRACKS, EIGHT ANTS ON THE GRID. DRIFT, BOX, WASP.' },
                 { id:'cs3', icon:'⚡', title:'LIGHTNING RAIDS', tag:'COMING SOON', color:'#fbbf24', glow:'rgba(251,191,36,0.35)', bg:'rgba(251,191,36,0.04)', desc:'STRIKE FAST. HIT HARD. VANISH BEFORE THEY KNOW YOU WERE THERE.' },
               ].map((g, i) => (
                 <div key={g.id}
