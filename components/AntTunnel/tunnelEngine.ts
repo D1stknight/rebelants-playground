@@ -10,7 +10,8 @@ export type Theme = { bg: string; floor: string; wall: string; accent: string; c
 export type Cfg = { runSeconds: number; crystals: number; sugars: number; crumbs: number; wallBreaks: number; spiderSpeedMs: number;
   /** hearts per run (0 = no hearts: a spider hit costs −3 s instead) */ lives?: number; /** floor power-ups on/off */ powerups?: boolean;
   /** banked points per floor cleared (× floor number) */ floorBonus?: number; /** seconds added back per floor cleared */ floorTimeBonus?: number;
-  /** rocks per run — throwable once 3+ spiders are on the floor, each kills one spider */ rocks?: number; /** hearts cap (max grows +1 per floor cleared) */ livesCap?: number;
+  /** rocks per run — throwable once 3+ spiders are on the floor, each kills one spider */ rocks?: number;
+  /** power-ups placed per floor (each kind) */ powFreeze?: number; powClaw?: number; powDecoy?: number; powRush?: number; /** hearts cap (max grows +1 per floor cleared) */ livesCap?: number;
   /** environment id (colony, neon, …) → THEME_MODS gameplay modifiers */ themeId?: string };
 /** what each tunnel environment actually does to the run (the lobby's DIFFICULTY text describes these) */
 export type ThemeMods = { spider?: number; dark?: boolean; breakCooldown?: number; relentless?: boolean; breaks?: number; wallHits?: number; timer?: number; lives?: number };
@@ -22,14 +23,14 @@ export const THEME_MODS: Record<string, ThemeMods> = {
   ice:    { spider: 1.25, relentless: true },
   golden: { breaks: -2 },
   shadow: { dark: true },
-  amber:  { wallHits: 2 },
+  amber:  { wallHits: 3 },
   toxic:  { dark: true, spider: 1.2, timer: 1.25 },
   void:   { dark: true, spider: 1.35, breaks: -3, lives: -1 },
 };
 export type Hud = { score: number; timeLeft: number; breaks: number; lives: number; livesMax: number; rocks: number; rocksOn: boolean; crystalsLeft: number; crystalsTotal: number; msg: string | null; state: "idle" | "play" | "won" | "lost"; hit: boolean; floor: number; combo: number; mult: number };
 export type EndResult = { score: number; fullClear: boolean; crystalsCollected: number; crystalsTotal: number; clearMs: number | null; crumbs: number; sugars: number; floors: number };
 export type SpiderKind = "chaser" | "patroller" | "ambusher";
-export type Callbacks = { onHud: (h: Hud) => void; onEnd: (r: EndResult) => void; onSfx: (n: "crumb" | "sugar" | "crystal" | "wall" | "hit" | "win" | "lose" | "nowall") => void };
+export type Callbacks = { onHud: (h: Hud) => void; onEnd: (r: EndResult) => void; onSfx: (n: "crumb" | "sugar" | "crystal" | "wall" | "crack" | "hit" | "win" | "lose" | "nowall" | "floor") => void };
 /** one 192×192 sheet per faction (tools/tunnel-sprites): 0 idle · 1–6 run side (faces right) · 7–10 run back · 11–14 run front · 15 hit · 16 win · 17 death · 18 dig · 19 idle breathe */
 export type Sprites = { sheet: HTMLImageElement; spider: HTMLImageElement };
 export const SF = 192, SCOLS = 8;
@@ -99,8 +100,11 @@ export class Tunnel {
     const take = (n: number, kind: 0 | 1 | 2) => { for (let i = 0; i < n && open.length; i++) { const c = open.pop()!; this.picks.push({ row: c.row, col: c.col, kind, taken: false, ph: Math.random() * 6 }); } };
     take(this.cfg.crumbs, 0); take(this.cfg.sugars, 1); take(this.cfg.crystals, 2);
     // 1–2 power-ups per floor (none on the very first floor's opening seconds — they're placed far from the start)
-    const nPow = this.cfg.powerups === false ? 0 : this.floor === 1 ? 1 : 2; const kinds: (3 | 4 | 5 | 6)[] = [3, 4, 5, 6];
-    for (let i = 0; i < nPow && open.length; i++) { const c = open.pop()!; this.picks.push({ row: c.row, col: c.col, kind: kinds[(Math.random() * kinds.length) | 0], taken: false, ph: Math.random() * 6 }); }
+    // power-ups per floor from admin (freeze 2 · claw 1 · decoy 1 · rush 1 by default); the master toggle zeroes them all
+    if (this.cfg.powerups !== false) {
+      const counts: [3 | 4 | 5 | 6, number][] = [[5, this.cfg.powFreeze ?? 2], [3, this.cfg.powClaw ?? 1], [4, this.cfg.powDecoy ?? 1], [6, this.cfg.powRush ?? 1]];
+      for (const [kind, n] of counts) for (let i = 0; i < n && open.length; i++) { const c = open.pop()!; this.picks.push({ row: c.row, col: c.col, kind, taken: false, ph: Math.random() * 6 }); }
+    }
     this.crystalsTotal = this.picks.filter((p) => p.kind === 2).length;
     // one heart per floor (when hearts are on). Half the time it is buried in a breakable wall next to a corridor — the wall glows pink.
     if (this.livesMax > 0) {
@@ -242,7 +246,7 @@ export class Tunnel {
   /** all crystals collected: bank a floor bonus and drop into the next layout with more spiders and fewer breaks */
   sweep() {
     this.sweeps++; if (this.firstClearMs == null) this.firstClearMs = Math.max(0, performance.now() - this.startedAt);
-    const bonus = (this.cfg.floorBonus ?? 25) * this.floor + Math.ceil(this.timeLeft); this.score += bonus; this.cb.onSfx("win");
+    const bonus = (this.cfg.floorBonus ?? 25) * this.floor + Math.ceil(this.timeLeft); this.score += bonus; this.cb.onSfx("floor");
     this.burst(this.ant.x, this.ant.y, this.theme.crystal, 40); this.say(`FLOOR ${this.floor} CLEARED  +${bonus}`, 2.2);
     this.floor++; this.timeLeft = Math.min(this.cfg.runSeconds, this.timeLeft + (this.cfg.floorTimeBonus ?? 20)); this.breaks = Math.max(1, Math.min(this.breaks, this.maxBreaks())); if (this.livesMax > 0) { this.livesMax = Math.min(this.cfg.livesCap ?? 10, this.livesMax + 1); this.lives = Math.min(this.livesMax, this.lives + 2); } this.wallHits.clear(); this.breakCd = 0;
     // next layout (never the same one twice in a row)
@@ -261,8 +265,8 @@ export class Tunnel {
     const r = Math.floor(this.ant.y), c = Math.floor(this.ant.x); const [dx, dy] = DIRV[this.facing]; const tr = r + dy, tc = c + dx;
     if (!this.breakable(tr, tc)) { this.say("No breakable wall in front of you."); this.cb.onSfx("nowall"); return; }
     if (this.breakCd > 0) { this.say(`🌋 Too hot — pick cools in ${this.breakCd.toFixed(1)} s`, 0.8); this.cb.onSfx("nowall"); return; }
-    const k = `${tr}:${tc}`; const need = this.mods.wallHits || 1; const hits = (this.wallHits.get(k) || 0) + 1; this.digT = 0.35; this.breakCd = this.mods.breakCooldown || 0;
-    if (hits < need) { this.wallHits.set(k, hits); this.cb.onSfx("wall"); this.burst(tc + 0.5, tr + 0.5, "#c8a97a", 8); this.shake = 0.25; this.say(`Cracked! ${need - hits} more hit${need - hits > 1 ? "s" : ""}`, 0.9); return; }
+    const k = `${tr}:${tc}`; const need = this.mods.wallHits || 2; const hits = (this.wallHits.get(k) || 0) + 1; this.digT = 0.35; this.breakCd = this.mods.breakCooldown || 0;
+    if (hits < need) { this.wallHits.set(k, hits); this.cb.onSfx("crack"); this.burst(tc + 0.5, tr + 0.5, "#c8a97a", 10); this.shake = 0.3; this.say(need - hits > 1 ? `Cracked! ${need - hits} more hits` : "Cracked! One more hit breaks it (no charge used)", 0.9); return; }
     this.broken.add(k); this.wallHits.delete(k); this.breaks--; if (this.picks.some((p) => p.kind === 7 && !p.taken && p.row === tr && p.col === tc)) this.say("❤ A heart was buried here!", 1.4); this.cb.onSfx("wall"); this.burst(tc + 0.5, tr + 0.5, "#c8a97a", 18); this.shake = 0.4; this.say("Wall broken ✅", 0.9);
   }
   burst(x: number, y: number, c: string, n: number) { for (let i = 0; i < n; i++) { const a = Math.random() * Math.PI * 2, sp = 1 + Math.random() * 3; this.parts.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1, life: 0.35 + Math.random() * 0.35, c, s: 2 + Math.random() * 3 }); } }
@@ -302,7 +306,7 @@ export class Tunnel {
     const r0 = Math.max(0, Math.floor(this.camY / CELL)), r1 = Math.min(ROWS - 1, Math.ceil((this.camY + H / this.zoom) / CELL)), c0 = Math.max(0, Math.floor(this.camX / CELL)), c1 = Math.min(COLS - 1, Math.ceil((this.camX + W / this.zoom) / CELL));
     for (let r = r0; r <= r1; r++) for (let col = c0; col <= c1; col++) {
       const x = col * CELL, y = r * CELL;
-      if (this.isWall(r, col)) { c.drawImage(this.wallTex!, x, y); if (this.wallHits.size && this.wallHits.has(`${r}:${col}`)) { c.strokeStyle = "rgba(0,0,0,0.75)"; c.lineWidth = 2; c.beginPath(); c.moveTo(x + 6, y + 4); c.lineTo(x + 14, y + 15); c.lineTo(x + 10, y + 22); c.lineTo(x + 20, y + 29); c.moveTo(x + 14, y + 15); c.lineTo(x + 24, y + 12); c.stroke(); } }
+      if (this.isWall(r, col)) { c.drawImage(this.wallTex!, x, y); const wh = this.wallHits.size ? this.wallHits.get(`${r}:${col}`) || 0 : 0; if (wh > 0) { c.strokeStyle = "rgba(0,0,0,0.8)"; c.lineWidth = 2; c.beginPath(); c.moveTo(x + 6, y + 4); c.lineTo(x + 14, y + 15); c.lineTo(x + 10, y + 22); c.lineTo(x + 20, y + 29); c.moveTo(x + 14, y + 15); c.lineTo(x + 24, y + 12); if (wh > 1) { c.moveTo(x + 26, y + 3); c.lineTo(x + 20, y + 13); c.lineTo(x + 28, y + 20); c.moveTo(x + 3, y + 26); c.lineTo(x + 12, y + 24); } c.stroke(); c.strokeStyle = "rgba(255,255,255,0.25)"; c.lineWidth = 1; c.beginPath(); c.moveTo(x + 7, y + 5); c.lineTo(x + 15, y + 16); c.stroke(); } }
       else { c.drawImage(this.floorTex!, x, y); if (this.broken.has(`${r}:${col}`)) { c.fillStyle = "rgba(0,0,0,0.25)"; c.fillRect(x + 4, y + 4, CELL - 8, CELL - 8); c.fillStyle = shadeCss(wallBase(th), 0.9); for (let k = 0; k < 4; k++) { c.beginPath(); c.arc(x + 8 + k * 6, y + CELL - 6 - (k % 2) * 3, 2.5, 0, Math.PI * 2); c.fill(); } } }
     }
     // pickups

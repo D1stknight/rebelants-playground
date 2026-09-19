@@ -23,6 +23,10 @@ type PointsConfigShape = {
   tunnelFloorTimeBonus: number;
   tunnelRocks: number;
   tunnelLivesCap: number;
+  tunnelPowFreeze: number;
+  tunnelPowClaw: number;
+  tunnelPowDecoy: number;
+  tunnelPowRush: number;
   descentCost: number;
   bountyCost: number;
   gpCost: number;
@@ -186,6 +190,10 @@ const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
   tunnelFloorTimeBonus: (defaultConfig as any).tunnelFloorTimeBonus ?? 20,
   tunnelRocks: (defaultConfig as any).tunnelRocks ?? 3,
   tunnelLivesCap: (defaultConfig as any).tunnelLivesCap ?? 10,
+  tunnelPowFreeze: (defaultConfig as any).tunnelPowFreeze ?? 2,
+  tunnelPowClaw: (defaultConfig as any).tunnelPowClaw ?? 1,
+  tunnelPowDecoy: (defaultConfig as any).tunnelPowDecoy ?? 1,
+  tunnelPowRush: (defaultConfig as any).tunnelPowRush ?? 1,
   descentCost: (defaultConfig as any).descentCost ?? 300,
   bountyCost: (defaultConfig as any).bountyCost ?? 100,
   gpCost: (defaultConfig as any).gpCost ?? 100,
@@ -1289,7 +1297,11 @@ String(c.status).toUpperCase()==="PENDING"
           <label style={{ fontSize: 12, opacity: 0.9 }}>Floor Time Bonus (s)<input value={cfg.tunnelFloorTimeBonus} onChange={(e) => setCfg((c) => ({ ...c, tunnelFloorTimeBonus: safeNum(e.target.value, c.tunnelFloorTimeBonus) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
           <label style={{ fontSize: 12, opacity: 0.9 }}>Hearts Cap (max grows per floor)<input value={cfg.tunnelLivesCap} onChange={(e) => setCfg((c) => ({ ...c, tunnelLivesCap: safeNum(e.target.value, c.tunnelLivesCap) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
           <label style={{ fontSize: 12, opacity: 0.9 }}>Rocks per run (3+ spiders)<input value={cfg.tunnelRocks} onChange={(e) => setCfg((c) => ({ ...c, tunnelRocks: safeNum(e.target.value, c.tunnelRocks) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
-          <label style={{ fontSize: 12, opacity: 0.9, gridColumn:"1/-1", display:"flex", alignItems:"center", gap:10, marginTop:4 }}><input type="checkbox" checked={cfg.tunnelPowerups !== false} onChange={(e) => setCfg((c) => ({ ...c, tunnelPowerups: e.target.checked }))} /> Floor power-ups (Dig Claw · Decoy · Web Freeze · Sugar Rush)</label>
+          <label style={{ fontSize: 12, opacity: 0.9, gridColumn:"1/-1", display:"flex", alignItems:"center", gap:10, marginTop:4 }}><input type="checkbox" checked={cfg.tunnelPowerups !== false} onChange={(e) => setCfg((c) => ({ ...c, tunnelPowerups: e.target.checked }))} /> Floor power-ups on (counts per floor below)</label>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>❄ Web Freeze / floor<input value={cfg.tunnelPowFreeze} onChange={(e) => setCfg((c) => ({ ...c, tunnelPowFreeze: safeNum(e.target.value, c.tunnelPowFreeze) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>⛏ Dig Claw / floor<input value={cfg.tunnelPowClaw} onChange={(e) => setCfg((c) => ({ ...c, tunnelPowClaw: safeNum(e.target.value, c.tunnelPowClaw) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>🧪 Decoy / floor<input value={cfg.tunnelPowDecoy} onChange={(e) => setCfg((c) => ({ ...c, tunnelPowDecoy: safeNum(e.target.value, c.tunnelPowDecoy) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>⚡ Sugar Rush / floor<input value={cfg.tunnelPowRush} onChange={(e) => setCfg((c) => ({ ...c, tunnelPowRush: safeNum(e.target.value, c.tunnelPowRush) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
         </div>
         <div style={{ fontWeight: 900, fontSize: 12, margin: "12px 0 10px", color: "#60a5fa", paddingTop: 10, borderTop: "1px solid rgba(96,165,250,.2)" }}>🎮 ENTRY COSTS</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>

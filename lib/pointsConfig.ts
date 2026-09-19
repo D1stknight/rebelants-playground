@@ -67,6 +67,10 @@ export type PointsConfig = {
   tunnelFloorTimeBonus: number; // seconds added back per floor cleared
   tunnelRocks: number;          // rocks per run (usable with 3+ spiders)
   tunnelLivesCap: number;       // hearts cap (max grows +1 per floor)
+  tunnelPowFreeze: number;      // Web Freeze pickups per floor
+  tunnelPowClaw: number;        // Dig Claw per floor
+  tunnelPowDecoy: number;       // Pheromone Decoy per floor
+  tunnelPowRush: number;        // Sugar Rush per floor
   descentCost: number;          // Hive Descent entry
   bountyCost: number;           // Bounty Hunters entry
   gpCost: number;               // Rebel Grand Prix entry
@@ -155,6 +159,10 @@ export const pointsConfig: PointsConfig = {
   tunnelFloorTimeBonus: 20,
   tunnelRocks: 3,
   tunnelLivesCap: 10,
+  tunnelPowFreeze: 2,
+  tunnelPowClaw: 1,
+  tunnelPowDecoy: 1,
+  tunnelPowRush: 1,
   descentCost: 300,
   bountyCost: 100,
   gpCost: 100,

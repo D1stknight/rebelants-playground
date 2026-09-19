@@ -57,6 +57,8 @@ function useAudio() {
     crystal: () => { if (!mutedRef.current) play("/audio/collect-crystal.mp3", 1.0); },
     sugar:   () => { if (!mutedRef.current) play("/audio/collect-crumb.mp3",   0.1); },
     wall:    () => { if (!mutedRef.current) play("/audio/wall-break.mp3",      0.75); },
+    crack:   () => { if (!mutedRef.current) play("/audio/wall-break.mp3",      0.35); },
+    floor:   () => { if (!mutedRef.current) play("/audio/tunnel-win.mp3",      0.7); },   // floor cleared — music keeps playing
     win:     () => { if (!mutedRef.current) { stopAmbient(); play("/audio/tunnel-win.mp3", 0.9); } },
     lose:    () => { if (!mutedRef.current) { stopAmbient(); play("/audio/tunnel-lose.mp3", 0.8); } },
     spiderHit: () => { if (!mutedRef.current) play("/audio/spider-hit.mp3", 0.6); },
@@ -125,6 +127,10 @@ const DEFAULT_TUNNEL_CONFIG = {
   tunnelFloorTimeBonus: 20,
   tunnelRocks: 3,
   tunnelLivesCap: 10,
+  tunnelPowFreeze: 2,
+  tunnelPowClaw: 1,
+  tunnelPowDecoy: 1,
+  tunnelPowRush: 1,
 };
 
 const START_CELL: Cell = { row: 2, col: 2 };
@@ -409,7 +415,7 @@ const DIFFICULTY: Record<string, {label:string;emoji:string;desc:string}> = {
   ice:     {label:"Ice Caverns",  emoji:"🧊", desc:"Frozen. Spiders 25% faster and never lose your trail."},
   golden:  {label:"Golden Vault",  emoji:"🏆", desc:"Guarded vault. Two fewer wall breaks."},
   shadow:  {label:"Shadow Realm",  emoji:"👁️", desc:"Lantern-only sight. You barely see the walls."},
-  amber:   {label:"Amber Ruins",  emoji:"🏺", desc:"Ancient stone. Every wall takes two hits."},
+  amber:   {label:"Amber Ruins",  emoji:"🏺", desc:"Ancient stone. Every wall takes three hits."},
   toxic:   {label:"Toxic Depths",  emoji:"☢️", desc:"Poison mist. Dark, spiders 20% faster, clock runs 25% faster."},
   void:    {label:"Void Core", emoji:"💀", desc:"Pure darkness. Spiders 35% faster, three fewer breaks, one fewer heart."},
 };
@@ -816,6 +822,10 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
           tunnelFloorTimeBonus: Number(cfg?.tunnelFloorTimeBonus ?? DEFAULT_TUNNEL_CONFIG.tunnelFloorTimeBonus),
           tunnelRocks: Number(cfg?.tunnelRocks ?? DEFAULT_TUNNEL_CONFIG.tunnelRocks),
           tunnelLivesCap: Number(cfg?.tunnelLivesCap ?? DEFAULT_TUNNEL_CONFIG.tunnelLivesCap),
+          tunnelPowFreeze: Number(cfg?.tunnelPowFreeze ?? DEFAULT_TUNNEL_CONFIG.tunnelPowFreeze),
+          tunnelPowClaw: Number(cfg?.tunnelPowClaw ?? DEFAULT_TUNNEL_CONFIG.tunnelPowClaw),
+          tunnelPowDecoy: Number(cfg?.tunnelPowDecoy ?? DEFAULT_TUNNEL_CONFIG.tunnelPowDecoy),
+          tunnelPowRush: Number(cfg?.tunnelPowRush ?? DEFAULT_TUNNEL_CONFIG.tunnelPowRush),
         };
 
         setTunnelCfg(nextCfg);
@@ -1416,7 +1426,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                     <span>🍞 Crumb = 1</span>
                     <span>🍬 Sugar = 5</span>
                     <span>💎 Crystal = 20</span>
-                    <span>{tunnelCfg.tunnelLives > 0 ? `🕷️ Hit = −1 heart · ${tunnelCfg.tunnelLives} hearts to start, +1 max & +2 back per floor (cap ${tunnelCfg.tunnelLivesCap}) · a ❤ hides on every floor (pink walls) · 🪨 ${tunnelCfg.tunnelRocks} rocks (X) once 3 spiders are out` : "🕷️ Hit = -3 sec"}</span>
+                    <span>{tunnelCfg.tunnelLives > 0 ? `🧱 Space: 1st hit cracks (free), 2nd breaks (1 charge) · 🕷️ Hit = −1 heart · ${tunnelCfg.tunnelLives} hearts to start, +1 max & +2 back per floor (cap ${tunnelCfg.tunnelLivesCap}) · a ❤ hides on every floor (pink walls) · 🪨 ${tunnelCfg.tunnelRocks} rocks (X) once 3 spiders are out` : "🕷️ Hit = -3 sec"}</span>
                     <span>Collect all crystals → next floor</span>
                   </div>
                 </div>
@@ -1451,7 +1461,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
                     layouts={TUNNEL_LAYOUTS as string[][]}
                     layoutIdx={layoutIndex}
                     theme={{ ...theme, dark: boardTheme === "shadow" || boardTheme === "void" || boardTheme === "mythic" }}
-                    cfg={{ runSeconds: tunnelCfg.tunnelRunSeconds, crystals: tunnelCfg.tunnelCrystalCount, sugars: tunnelCfg.tunnelSugarCount, crumbs: tunnelCfg.tunnelCrumbCount, wallBreaks: tunnelCfg.tunnelWallBreaks, spiderSpeedMs: tunnelCfg.tunnelSpiderSpeedMs, lives: tunnelCfg.tunnelLives, powerups: tunnelCfg.tunnelPowerups, floorBonus: tunnelCfg.tunnelFloorBonus, floorTimeBonus: tunnelCfg.tunnelFloorTimeBonus, rocks: tunnelCfg.tunnelRocks, livesCap: tunnelCfg.tunnelLivesCap, themeId: boardTheme }}
+                    cfg={{ runSeconds: tunnelCfg.tunnelRunSeconds, crystals: tunnelCfg.tunnelCrystalCount, sugars: tunnelCfg.tunnelSugarCount, crumbs: tunnelCfg.tunnelCrumbCount, wallBreaks: tunnelCfg.tunnelWallBreaks, spiderSpeedMs: tunnelCfg.tunnelSpiderSpeedMs, lives: tunnelCfg.tunnelLives, powerups: tunnelCfg.tunnelPowerups, floorBonus: tunnelCfg.tunnelFloorBonus, floorTimeBonus: tunnelCfg.tunnelFloorTimeBonus, rocks: tunnelCfg.tunnelRocks, livesCap: tunnelCfg.tunnelLivesCap, powFreeze: tunnelCfg.tunnelPowFreeze, powClaw: tunnelCfg.tunnelPowClaw, powDecoy: tunnelCfg.tunnelPowDecoy, powRush: tunnelCfg.tunnelPowRush, themeId: boardTheme }}
                     playing={isPlaying}
                     faction={tunnelFaction}
                     onHud={onTunnelHud}
