@@ -19,7 +19,7 @@ const SiegePage: NextPage = () => (
       <div style={{ maxWidth: 1180, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, fontFamily: "'Cinzel', Georgia, serif" }}>
           <Link href="/" style={{ color: "#a29a88", textDecoration: "none", fontSize: 12, letterSpacing: "0.25em" }}>← REBEL ANTS</Link>
-          <div style={{ fontSize: 11, letterSpacing: "0.3em", color: "#f0a63a", border: "1px solid rgba(240,166,58,0.35)", borderRadius: 999, padding: "4px 12px" }}>PHASE 1 · SOLO DRILL</div>
+          <div style={{ fontSize: 11, letterSpacing: "0.3em", color: "#f0a63a", border: "1px solid rgba(240,166,58,0.35)", borderRadius: 999, padding: "4px 12px" }}>SOLO DRILL · TESTING</div>
         </div>
         <div style={{ textAlign: "center", marginBottom: 14 }}>
           <div style={{ fontFamily: "'Cinzel', Georgia, serif", fontSize: "clamp(28px, 5vw, 54px)", fontWeight: 900, letterSpacing: "0.12em", color: "#ffd27a", textShadow: "0 0 40px rgba(240,166,58,0.35)", lineHeight: 1 }}>THE SIEGE</div>
@@ -27,7 +27,7 @@ const SiegePage: NextPage = () => (
         </div>
         <SiegeView />
         <div style={{ marginTop: 14, display: "flex", gap: 14, flexWrap: "wrap", justifyContent: "center", fontSize: 12, color: "#a29a88", letterSpacing: "0.05em" }}>
-          <span>🪨 Drag back from anywhere, release to fire</span><span>🕸 Hit tower <b style={{ color: "#e9e2d2" }}>bases</b> — they topple</span><span>🪲 Rams need several hits</span><span>📱 Phone: turn to landscape</span>
+          <span>🎯 Move to aim, hold to charge, release</span><span>🕸 Hit tower <b style={{ color: "#e9e2d2" }}>bases</b> — they topple</span><span>🪲 Rams need several hits</span><span>⚔️ Ronin · Samurai · Warrior · Buke · Shogun man the catapult; the rest fight from the battlements</span><span>📱 Phone: turn to landscape</span>
         </div>
       </div>
     </div>

@@ -1,7 +1,7 @@
 // components/Siege/SiegeView.tsx — phase 1 solo drill: canvas + DOM HUD. The engine (PixiJS + planck) is loaded on the client only.
 import React, { useEffect, useRef, useState } from "react";
-import { type Hud, FACTIONS, KIT, POV_FACTIONS } from "./shared";
-const modeOf = (f: string) => ((POV_FACTIONS as readonly string[]).includes(f) ? "pov" : "side");
+import { type Hud, FACTIONS, KIT, viewOf } from "./shared";
+const modeOf = viewOf;
 
 const EMPTY: Hud = { gate: 1000, gateMax: 1000, wave: 0, waves: 6, horde: 0, score: 0, kills: 0, reload: 0, state: "ready", msg: null };
 
@@ -16,13 +16,12 @@ export default function SiegeView() {
     (async () => {
       try {
         const cb = { onHud: (h: Hud) => { if (alive) setHud(h); }, onEnd: (r: any) => { if (alive) setResult(r); } };
-        if (mode === "pov") { const mod = await import("./pov"); if (!alive || !canvasRef.current) return; eng = new mod.SiegePov(canvasRef.current, cb); }
-        else { const mod = await import("./engine"); if (!alive || !canvasRef.current) return; eng = new mod.Siege(canvasRef.current, cb); }
+        const mod = await import("./world3d"); if (!alive || !canvasRef.current) return; eng = new mod.SiegeWorld(canvasRef.current, cb);
         eng.faction = factionRef.current; engRef.current = eng; await eng.init();
       } catch (e: any) { console.error(e); if (alive) setErr(e?.message || String(e)); }
     })();
     return () => { alive = false; try { eng?.destroy(); } catch {} engRef.current = null; };
-  }, [gen, mode]);
+  }, [gen]);
 
   const toggleFs = async () => { const el = wrapRef.current; if (!el) return; try { if (!document.fullscreenElement) { await el.requestFullscreen?.(); setFs(true); } else { await document.exitFullscreen?.(); setFs(false); } } catch {} };
   useEffect(() => { const h = () => setFs(!!document.fullscreenElement); document.addEventListener("fullscreenchange", h); return () => document.removeEventListener("fullscreenchange", h); }, []);
@@ -32,7 +31,7 @@ export default function SiegeView() {
 
   return (
     <div ref={wrapRef} style={{ position: "relative", width: "100%", aspectRatio: fs ? undefined : "52 / 22", height: fs ? "100%" : undefined, background: "#0b0e17", borderRadius: fs ? 0 : 16, overflow: "hidden", border: fs ? "none" : "1px solid rgba(240,166,58,0.18)", boxShadow: fs ? "none" : "0 20px 60px rgba(0,0,0,0.55)", touchAction: "none", userSelect: "none", WebkitUserSelect: "none" }}>
-      <canvas key={mode} ref={canvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", display: "block", touchAction: "none", cursor: mode === "pov" ? "crosshair" : "default" }} />
+      <canvas ref={canvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", display: "block", touchAction: "none", cursor: mode === "pov" ? "crosshair" : "default" }} />
       {/* HUD */}
       <div style={{ position: "absolute", top: 10, left: 12, right: 12, display: "flex", gap: 8, alignItems: "flex-start", pointerEvents: "none", fontFamily: "'Cinzel', Georgia, serif" }}>
         <div style={{ ...pill, minWidth: 190 }}>
@@ -44,18 +43,18 @@ export default function SiegeView() {
         <div style={{ flex: 1 }} />
         <div style={pill}>SCORE <span style={{ color: "#ffd27a" }}>{hud.score}</span></div>
         <div style={{ ...pill, minWidth: 110 }}>
-          <div style={{ fontSize: 10, opacity: 0.8, marginBottom: 4 }}>{hud.charge ? (hud.charge > 0.92 ? "CHARGED — RELEASE!" : "CHARGING…") : hud.reload > 0 ? "RELOADING" : mode === "pov" ? "AIM · HOLD TO CHARGE" : "READY — DRAG TO AIM"}</div>
+          <div style={{ fontSize: 10, opacity: 0.8, marginBottom: 4 }}>{hud.charge ? (hud.charge > 0.92 ? "CHARGED — RELEASE!" : "CHARGING…") : hud.reload > 0 ? "RELOADING" : "AIM · HOLD TO CHARGE"}</div>
           <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,0.08)", overflow: "hidden" }}><div style={{ width: `${hud.charge ? hud.charge * 100 : (1 - hud.reload) * 100}%`, height: "100%", background: hud.charge ? (hud.charge > 0.92 ? "#ff8a4a" : "#9ec7ff") : hud.reload > 0 ? "#a29a88" : "#ffd27a" }} /></div>
         </div>
       </div>
       {/* faction picker */}
-      <div style={{ position: "absolute", left: 12, bottom: 10, display: "flex", gap: 6, alignItems: "flex-end" }}>
+      <div style={{ position: "absolute", left: 12, right: 110, bottom: 10, display: "flex", gap: 5, alignItems: "flex-end", overflowX: "auto", scrollbarWidth: "none" }}>
         {[...FACTIONS, "boulder"].map((f) => { const on = f === faction; return (
-          <button key={f} type="button" title={KIT[f].name} onClick={() => { if (f === faction) return; try { localStorage.setItem("ra:siege:faction", f); } catch {} setFaction(f); if (modeOf(f) === mode) engRef.current?.setFaction?.(f); else { setResult(null); } }}
-            style={{ width: on ? 54 : 44, height: on ? 54 : 44, borderRadius: 10, padding: 0, overflow: "hidden", cursor: "pointer", background: on ? "rgba(240,166,58,0.18)" : "rgba(8,10,20,0.7)", border: on ? "1px solid #f0a63a" : "1px solid rgba(255,255,255,0.15)", boxShadow: on ? "0 0 14px rgba(240,166,58,0.5)" : "none", transition: "all .15s", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-            {f === "boulder" ? <span style={{ fontSize: on ? 26 : 20, lineHeight: 1, paddingBottom: 8 }}>🪨</span> : <img src={`/descent/portraits/${f}.png`} alt={f} style={{ height: "92%", objectFit: "contain", objectPosition: "bottom", filter: on ? "none" : "brightness(0.65) saturate(0.7)" }} />}
+          <button key={f} type="button" title={KIT[f].name} onClick={() => { if (f === faction) return; try { localStorage.setItem("ra:siege:faction", f); } catch {} setFaction(f); engRef.current?.setFaction?.(f); }}
+            style={{ width: on ? 46 : 36, height: on ? 46 : 36, borderRadius: 8, flex: "0 0 auto", padding: 0, overflow: "hidden", cursor: "pointer", background: on ? "rgba(240,166,58,0.18)" : "rgba(8,10,20,0.7)", border: on ? "1px solid #f0a63a" : "1px solid rgba(255,255,255,0.15)", boxShadow: on ? "0 0 14px rgba(240,166,58,0.5)" : "none", transition: "all .15s", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+            {f === "boulder" ? <span style={{ fontSize: on ? 22 : 17, lineHeight: 1, paddingBottom: 6 }}>🪨</span> : <img src={`/descent/portraits/${f}.png`} alt={f} style={{ height: "92%", objectFit: "contain", objectPosition: "bottom", filter: on ? "none" : "brightness(0.65) saturate(0.7)" }} />}
           </button>); })}
-        <div style={{ marginLeft: 8, fontFamily: "'Cinzel', Georgia, serif", fontSize: 11, color: "#e9e2d2", background: "rgba(8,10,20,0.7)", border: "1px solid rgba(240,166,58,0.25)", borderRadius: 8, padding: "6px 10px", maxWidth: 300 }}>
+        <div style={{ marginLeft: 6, fontFamily: "'Cinzel', Georgia, serif", fontSize: 11, color: "#e9e2d2", background: "rgba(8,10,20,0.7)", border: "1px solid rgba(240,166,58,0.25)", borderRadius: 8, padding: "5px 10px", maxWidth: 320, flex: "0 0 auto" }}>
           <div style={{ color: "#ffd27a", letterSpacing: "0.15em" }}>{KIT[faction].name.toUpperCase()} <span style={{ opacity: 0.6, fontSize: 9 }}>· {mode === "pov" ? "BATTLEMENTS VIEW" : "CATAPULT VIEW"}</span></div><div style={{ fontFamily: "system-ui, sans-serif", fontSize: 11, opacity: 0.85, marginTop: 2 }}>{KIT[faction].ammo}</div>
         </div>
       </div>
@@ -64,8 +63,8 @@ export default function SiegeView() {
       {hud.state === "ready" && !err && (
         <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "rgba(5,7,14,0.55)", pointerEvents: "none", fontFamily: "'Cinzel', Georgia, serif", textAlign: "center", padding: 20 }}>
           <div style={{ fontSize: "clamp(26px, 5vw, 56px)", fontWeight: 900, letterSpacing: "0.1em", color: "#ffd27a", textShadow: "0 0 40px rgba(240,166,58,0.5)" }}>THE SIEGE</div>
-          <div style={{ fontSize: "clamp(11px, 1.6vw, 15px)", letterSpacing: "0.25em", color: "#e9e2d2", opacity: 0.85, marginTop: 8 }}>{mode === "pov" ? "ON THE BATTLEMENTS · HOLD THE GATE FOR 6 WAVES" : "SOLO DRILL · HOLD THE GATE FOR 6 WAVES"}</div>
-          <div style={{ marginTop: 22, fontSize: "clamp(12px, 1.5vw, 14px)", color: "#a29a88", fontFamily: "system-ui, sans-serif", letterSpacing: "0.02em", maxWidth: 520 }}>{mode === "pov" ? <>Move to aim at the ground marker, <b style={{ color: "#e9e2d2" }}>hold</b> to charge, release to throw. Charged shots unleash your faction's big move.</> : <>Press anywhere and drag <b style={{ color: "#e9e2d2" }}>back</b> like a slingshot, release to fire. Hit tower bases to topple them, crush the ram, keep crawlers off the gate.</>}</div>
+          <div style={{ fontSize: "clamp(11px, 1.6vw, 15px)", letterSpacing: "0.25em", color: "#e9e2d2", opacity: 0.85, marginTop: 8 }}>{mode === "pov" ? "ON THE BATTLEMENTS · HOLD THE GATE FOR 6 WAVES" : "AT THE CATAPULT · HOLD THE GATE FOR 6 WAVES"}</div>
+          <div style={{ marginTop: 22, fontSize: "clamp(12px, 1.5vw, 14px)", color: "#a29a88", fontFamily: "system-ui, sans-serif", letterSpacing: "0.02em", maxWidth: 520 }}><>Move to aim at the marker, <b style={{ color: "#e9e2d2" }}>hold</b> to charge, release to {mode === "pov" ? "throw" : "fire the catapult"}. Charged shots unleash your faction's big move. Hit tower bases, crush the ram, keep the crawlers off the wall.</></div>
           <div style={{ marginTop: 24, fontSize: 13, letterSpacing: "0.3em", color: "#ffd27a", animation: "siegePulse 1.4s ease-in-out infinite" }}>{mode === "pov" ? "TAP TO TAKE THE WALL" : "TAP TO MAN THE CATAPULT"}</div>
         </div>
       )}
