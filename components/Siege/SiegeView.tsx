@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { type Hud, FACTIONS, KIT, viewOf } from "./shared";
 const modeOf = viewOf;
 
-const EMPTY: Hud = { gate: 1000, gateMax: 1000, wave: 0, waves: 6, horde: 0, score: 0, kills: 0, reload: 0, state: "ready", msg: null };
+const EMPTY: Hud = { gate: 1000, gateMax: 1000, wave: 0, waves: 6, horde: 0, score: 0, kills: 0, reload: 0, state: "ready", msg: null, intro: true };
 
 export default function SiegeView() {
   const wrapRef = useRef<HTMLDivElement | null>(null); const canvasRef = useRef<HTMLCanvasElement | null>(null); const engRef = useRef<any>(null);
@@ -23,7 +23,10 @@ export default function SiegeView() {
     return () => { alive = false; try { eng?.destroy(); } catch {} engRef.current = null; };
   }, [gen]);
 
-  const toggleFs = async () => { const el = wrapRef.current; if (!el) return; try { if (!document.fullscreenElement) { await el.requestFullscreen?.(); setFs(true); } else { await document.exitFullscreen?.(); setFs(false); } } catch {} };
+  const goFs = async () => { const el = wrapRef.current; if (!el || document.fullscreenElement) return; try { await el.requestFullscreen?.(); setFs(true); } catch {} try { await (screen.orientation as any)?.lock?.("landscape"); } catch {} };
+  const toggleFs = async () => { try { if (!document.fullscreenElement) await goFs(); else { await document.exitFullscreen?.(); setFs(false); } } catch {} };
+  // the first tap (skip intro / man the wall) also takes the screen: it is a user gesture, so fullscreen is allowed
+  const onCanvasDown = () => { if (hud.state === "ready" && !fs) goFs(); };
   useEffect(() => { const h = () => setFs(!!document.fullscreenElement); document.addEventListener("fullscreenchange", h); return () => document.removeEventListener("fullscreenchange", h); }, []);
 
   const gatePct = Math.max(0, Math.min(100, (hud.gate / hud.gateMax) * 100)); const gateColor = gatePct > 60 ? "#5fc78a" : gatePct > 30 ? "#f0a63a" : "#e0475b";
@@ -31,7 +34,7 @@ export default function SiegeView() {
 
   return (
     <div ref={wrapRef} style={{ position: "relative", width: "100%", aspectRatio: fs ? undefined : "52 / 22", height: fs ? "100%" : undefined, background: "#0b0e17", borderRadius: fs ? 0 : 16, overflow: "hidden", border: fs ? "none" : "1px solid rgba(240,166,58,0.18)", boxShadow: fs ? "none" : "0 20px 60px rgba(0,0,0,0.55)", touchAction: "none", userSelect: "none", WebkitUserSelect: "none" }}>
-      <canvas ref={canvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", display: "block", touchAction: "none", cursor: mode === "pov" ? "crosshair" : "default" }} />
+      <canvas ref={canvasRef} onPointerDown={onCanvasDown} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", display: "block", touchAction: "none", cursor: mode === "pov" ? "crosshair" : "default" }} />
       {/* HUD */}
       <div style={{ position: "absolute", top: 10, left: 12, right: 12, display: "flex", gap: 8, alignItems: "flex-start", pointerEvents: "none", fontFamily: "'Cinzel', Georgia, serif" }}>
         <div style={{ ...pill, minWidth: 190 }}>
@@ -48,20 +51,33 @@ export default function SiegeView() {
         </div>
       </div>
       {/* faction picker */}
-      <div style={{ position: "absolute", left: 12, right: 110, bottom: 10, display: "flex", gap: 5, alignItems: "flex-end", overflowX: "auto", scrollbarWidth: "none" }}>
-        {[...FACTIONS, "boulder"].map((f) => { const on = f === faction; return (
-          <button key={f} type="button" title={KIT[f].name} onClick={() => { if (f === faction) return; try { localStorage.setItem("ra:siege:faction", f); } catch {} setFaction(f); engRef.current?.setFaction?.(f); }}
-            style={{ width: on ? 46 : 36, height: on ? 46 : 36, borderRadius: 8, flex: "0 0 auto", padding: 0, overflow: "hidden", cursor: "pointer", background: on ? "rgba(240,166,58,0.18)" : "rgba(8,10,20,0.7)", border: on ? "1px solid #f0a63a" : "1px solid rgba(255,255,255,0.15)", boxShadow: on ? "0 0 14px rgba(240,166,58,0.5)" : "none", transition: "all .15s", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-            {f === "boulder" ? <span style={{ fontSize: on ? 22 : 17, lineHeight: 1, paddingBottom: 6 }}>🪨</span> : <img src={`/descent/portraits/${f}.png`} alt={f} style={{ height: "92%", objectFit: "contain", objectPosition: "bottom", filter: on ? "none" : "brightness(0.65) saturate(0.7)" }} />}
-          </button>); })}
-        <div style={{ marginLeft: 6, fontFamily: "'Cinzel', Georgia, serif", fontSize: 11, color: "#e9e2d2", background: "rgba(8,10,20,0.7)", border: "1px solid rgba(240,166,58,0.25)", borderRadius: 8, padding: "5px 10px", maxWidth: 320, flex: "0 0 auto" }}>
-          <div style={{ color: "#ffd27a", letterSpacing: "0.15em" }}>{KIT[faction].name.toUpperCase()} <span style={{ opacity: 0.6, fontSize: 9 }}>· {mode === "pov" ? "BATTLEMENTS VIEW" : "CATAPULT VIEW"}</span></div><div style={{ fontFamily: "system-ui, sans-serif", fontSize: 11, opacity: 0.85, marginTop: 2 }}>{KIT[faction].ammo}</div>
+      <div style={{ position: "absolute", left: 12, right: 12, bottom: 10, display: "flex", flexDirection: "column", gap: 6, pointerEvents: "none" }}>
+        <div style={{ alignSelf: "flex-end", marginRight: 100, fontFamily: "'Cinzel', Georgia, serif", fontSize: 12, color: "#e9e2d2", background: "rgba(8,10,20,0.72)", border: "1px solid rgba(240,166,58,0.25)", borderRadius: 8, padding: "6px 12px", maxWidth: 460, backdropFilter: "blur(4px)" }}>
+          <div style={{ color: "#ffd27a", letterSpacing: "0.15em" }}>{KIT[faction].name.toUpperCase()} <span style={{ opacity: 0.6, fontSize: 9 }}>· {mode === "pov" ? "BATTLEMENTS VIEW" : "CATAPULT VIEW"}</span></div><div style={{ fontFamily: "system-ui, sans-serif", fontSize: 12, opacity: 0.85, marginTop: 2 }}>{KIT[faction].ammo}</div>
+        </div>
+        <div style={{ display: "flex", gap: 6, alignItems: "flex-end", overflowX: "auto", scrollbarWidth: "none", pointerEvents: "auto", paddingRight: 100 }}>
+          {[...FACTIONS, "boulder"].map((f) => { const on = f === faction; const sz = on ? 76 : 60; return (
+            <button key={f} type="button" title={KIT[f].name} onClick={() => { if (f === faction) return; try { localStorage.setItem("ra:siege:faction", f); } catch {} setFaction(f); engRef.current?.setFaction?.(f); }}
+              style={{ width: sz, height: sz + 16, borderRadius: 10, flex: "0 0 auto", padding: 0, overflow: "hidden", cursor: "pointer", background: on ? "linear-gradient(180deg, rgba(240,166,58,0.22), rgba(240,166,58,0.08))" : "rgba(8,10,20,0.72)", border: on ? "1px solid #f0a63a" : "1px solid rgba(255,255,255,0.15)", boxShadow: on ? "0 0 18px rgba(240,166,58,0.55)" : "none", transition: "all .15s", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", backdropFilter: "blur(4px)" }}>
+              {f === "boulder" ? <span style={{ fontSize: on ? 34 : 26, lineHeight: 1, flex: 1, display: "flex", alignItems: "flex-end", paddingBottom: 4 }}>🪨</span> : <img src={`/descent/portraits/${f}.png`} alt={f} style={{ height: sz - 6, objectFit: "contain", objectPosition: "bottom", filter: on ? "none" : "brightness(0.6) saturate(0.6)", transition: "filter .15s" }} />}
+              <span style={{ fontFamily: "'Cinzel', Georgia, serif", fontSize: on ? 10 : 8, letterSpacing: "0.12em", color: on ? "#ffd27a" : "#a29a88", lineHeight: "16px", whiteSpace: "nowrap" }}>{KIT[f].name.toUpperCase()}</span>
+            </button>); })}
         </div>
       </div>
       <button type="button" onClick={toggleFs} style={{ position: "absolute", right: 12, bottom: 10, background: "rgba(8,10,20,0.7)", border: "1px solid rgba(240,166,58,0.3)", borderRadius: 8, color: "#e9e2d2", fontSize: 12, padding: "6px 10px", cursor: "pointer" }}>{fs ? "✕ exit" : "⛶ full screen"}</button>
       {hud.msg && <div key={hud.msg} style={{ position: "absolute", top: "18%", left: 0, right: 0, textAlign: "center", pointerEvents: "none", fontFamily: "'Cinzel', Georgia, serif", fontSize: "clamp(16px, 2.6vw, 30px)", fontWeight: 900, letterSpacing: "0.12em", color: "#ffd27a", textShadow: "0 0 24px rgba(240,166,58,0.7), 0 2px 0 #000", animation: "siegeMsg .4s ease-out" }}>{hud.msg}</div>}
-      {hud.state === "ready" && !err && (
-        <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "rgba(5,7,14,0.55)", pointerEvents: "none", fontFamily: "'Cinzel', Georgia, serif", textAlign: "center", padding: 20 }}>
+      {hud.state === "ready" && hud.intro && !err && (
+        <div style={{ position: "absolute", inset: 0, pointerEvents: "none", fontFamily: "'Cinzel', Georgia, serif", textAlign: "center", background: "linear-gradient(180deg, rgba(5,7,14,0.35), transparent 30%, transparent 70%, rgba(5,7,14,0.6))" }}>
+          <div style={{ position: "absolute", top: "30%", left: 0, right: 0, animation: "siegeTitle 11s ease-in-out both" }}>
+            <div style={{ fontSize: "clamp(11px, 1.6vw, 16px)", letterSpacing: "0.45em", color: "#e9e2d2", opacity: 0.8, animation: "siegeIntroA 11s ease-in-out both" }}>THE HORDE IS ON THE FIELD</div>
+            <div style={{ fontSize: "clamp(34px, 7vw, 84px)", fontWeight: 900, letterSpacing: "0.14em", color: "#ffd27a", textShadow: "0 0 60px rgba(240,166,58,0.55), 0 3px 0 #000", marginTop: 10, animation: "siegeIntroB 11s ease-in-out both" }}>THE SIEGE</div>
+            <div style={{ fontSize: "clamp(11px, 1.6vw, 16px)", letterSpacing: "0.4em", color: "#e9e2d2", opacity: 0.85, marginTop: 10, animation: "siegeIntroC 11s ease-in-out both" }}>HOLD THE GATE UNTIL THE HORN</div>
+          </div>
+          <div style={{ position: "absolute", bottom: 120, left: 0, right: 0, fontSize: 11, letterSpacing: "0.3em", color: "#a29a88" }}>TAP TO SKIP</div>
+        </div>
+      )}
+      {hud.state === "ready" && !hud.intro && !err && (
+        <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "rgba(5,7,14,0.45)", pointerEvents: "none", fontFamily: "'Cinzel', Georgia, serif", textAlign: "center", padding: 20 }}>
           <div style={{ fontSize: "clamp(26px, 5vw, 56px)", fontWeight: 900, letterSpacing: "0.1em", color: "#ffd27a", textShadow: "0 0 40px rgba(240,166,58,0.5)" }}>THE SIEGE</div>
           <div style={{ fontSize: "clamp(11px, 1.6vw, 15px)", letterSpacing: "0.25em", color: "#e9e2d2", opacity: 0.85, marginTop: 8 }}>{mode === "pov" ? "ON THE BATTLEMENTS · HOLD THE GATE FOR 6 WAVES" : "AT THE CATAPULT · HOLD THE GATE FOR 6 WAVES"}</div>
           <div style={{ marginTop: 22, fontSize: "clamp(12px, 1.5vw, 14px)", color: "#a29a88", fontFamily: "system-ui, sans-serif", letterSpacing: "0.02em", maxWidth: 520 }}><>Move to aim at the marker, <b style={{ color: "#e9e2d2" }}>hold</b> to charge, release to {mode === "pov" ? "throw" : "fire the catapult"}. Charged shots unleash your faction's big move. Hit tower bases, crush the ram, keep the crawlers off the wall.</></div>
@@ -78,7 +94,11 @@ export default function SiegeView() {
         </div>
       )}
       {err && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#e0475b", background: "rgba(0,0,0,0.7)", padding: 20, textAlign: "center", fontSize: 13 }}>The siege engine could not start on this device ({err}). WebGL is required.</div>}
-      <style>{`@keyframes siegeMsg { from { opacity:0; transform: translateY(-8px) scale(.96);} to { opacity:1; transform:none; } } @keyframes siegePulse { 0%,100% { opacity:.55 } 50% { opacity:1 } }`}</style>
+      <style>{`@keyframes siegeMsg { from { opacity:0; transform: translateY(-8px) scale(.96);} to { opacity:1; transform:none; } } @keyframes siegePulse { 0%,100% { opacity:.55 } 50% { opacity:1 } }
+        @keyframes siegeTitle { 0%,100% { opacity:1 } }
+        @keyframes siegeIntroA { 0%,8% { opacity:0; transform:translateY(6px) } 18%,40% { opacity:.8; transform:none } 50%,100% { opacity:0 } }
+        @keyframes siegeIntroB { 0%,30% { opacity:0; letter-spacing:.5em } 42%,88% { opacity:1; letter-spacing:.14em } 100% { opacity:0 } }
+        @keyframes siegeIntroC { 0%,48% { opacity:0; transform:translateY(6px) } 58%,88% { opacity:.85; transform:none } 100% { opacity:0 } }`}</style>
     </div>
   );
 }

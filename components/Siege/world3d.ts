@@ -27,6 +27,7 @@ type Part = { s: THREE.Sprite; v: THREE.Vector3; life: number; life0: number; g:
 type Bolt = { l: THREE.Line; life: number };
 type Zone = { kind: "ward" | "trap" | "standard"; pos: THREE.Vector3; r: number; life: number; life0: number; m: THREE.Object3D; tick: number; k: number };
 type Fling = { s: Spider; v: THREE.Vector3; t: number; k: number };
+const INTRO_LEN = 11;
 
 const rigCache: Record<string, Promise<Rig>> = {};
 function loadRig(fid: string): Promise<Rig> {
@@ -51,6 +52,7 @@ export class SiegeWorld {
   marker!: THREE.Mesh; aim = new THREE.Vector3(0, 0, -30); pointer = { x: 0.5, y: 0.6 }; charge = 0; charging = false; reload = 0; reloadTime = 1.2;
   state: Hud["state"] = "ready"; gateHp = 1000; gateMax = 1000; wave = 0; score = 0; kills = 0; msg: string | null = null; msgT = 0; hordeLeft = 0; spawnQueue: { at: number; fn: () => void }[] = []; waveT = 0; waveDone = false; hudT = 0; t = 0; shake = 0; rally = 0;
   leap: { t: number; from: THREE.Vector3; to: THREE.Vector3; phase: "fly" | "land" | "back"; k: number } | null = null; camKick = new THREE.Vector3();
+  sky!: THREE.Mesh; intro = true; introT = 0; introPath!: THREE.CatmullRomCurve3; introLook!: THREE.CatmullRomCurve3;
   spiderMat = new THREE.MeshStandardMaterial({ color: 0x2a1d3a, roughness: 0.55, metalness: 0.1 }); spiderMat2 = new THREE.MeshStandardMaterial({ color: 0x4b2a6b, roughness: 0.45, metalness: 0.15, emissive: 0x160a24 }); eyeMat = new THREE.MeshBasicMaterial({ color: 0xff3b3b }); legMat = new THREE.MeshStandardMaterial({ color: 0x1d1626, roughness: 0.7 });
   silkMat = new THREE.MeshStandardMaterial({ color: 0x5a3f80, roughness: 0.6, emissive: 0x1a0f2a }); silkMat2 = new THREE.MeshStandardMaterial({ color: 0x7c5cb0, roughness: 0.55, emissive: 0x24143a }); woodMat = new THREE.MeshStandardMaterial({ color: 0x4a3220, roughness: 0.85 }); shellMat = new THREE.MeshStandardMaterial({ color: 0x2a1f18, roughness: 0.4, metalness: 0.2 }); rockMat = new THREE.MeshStandardMaterial({ color: 0x6b6470, roughness: 0.95 });
   spearGeo!: THREE.BufferGeometry; tipGeo!: THREE.BufferGeometry; boltMat = new THREE.LineBasicMaterial({ color: 0xcfe1ff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
@@ -59,25 +61,29 @@ export class SiegeWorld {
 
   async init() {
     this.view = viewOf(this.faction);
+    // React strict mode mounts twice: the first instance is destroyed before its assets finish loading — never touch the canvas from it
+    await Promise.resolve(); if (this.over) return;
     const r = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true, powerPreference: "high-performance" }); this.renderer = r;
     r.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1)); r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.15; r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap;
     this.scene = new THREE.Scene(); this.scene.background = new THREE.Color(0x0a0d1c); this.scene.fog = new THREE.FogExp2(0x161226, 0.0055);
-    this.camera = new THREE.PerspectiveCamera(58, 1, 0.1, 500);
+    this.camera = new THREE.PerspectiveCamera(58, 1, 0.1, 1500);
     const tl = new THREE.TextureLoader(); const load = (n: string, p: string) => new Promise<void>((res) => tl.load(p, (t) => { t.colorSpace = THREE.SRGBColorSpace; this.tex[n] = t; res(); }, undefined, () => res()));
     await Promise.all([load("wall", "/siege/art/wall_tile.png"), load("ground", "/siege/art/ground_tile.png"), load("backdrop", "/siege/art/backdrop.png"), ...["glow", "flare", "spark", "smoke", "dirt", "ring", "flame", "bolt2", "star", "slash"].map((n) => load(n, `/siege/fx/${n}.png`))]);
+    if (this.over) { r.dispose(); return; }
     this.buildWorld(); this.buildCatapult();
     const rp = new RenderPass(this.scene, this.camera); const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.5, 0.6, 0.84); this.composer = new EffectComposer(r); this.composer.addPass(rp); this.composer.addPass(bloom);
     this.placeCamera(true); this.fit(); window.addEventListener("resize", this.fitBound); requestAnimationFrame(this.fitBound); setTimeout(this.fitBound, 300);
-    this.bindInput(); this.buildGarrison().catch(() => {}); await this.setFaction(this.faction);
-    this.ready = true; (window as any).__siege = this; this.pushHud(); this.loop();
+    this.bindInput(); await Promise.all([this.buildGarrison().catch(() => {}), this.setFaction(this.faction)]); if (this.over) return;
+    this.buildIntro();
+    this.ready = true; (window as any).__siege = this; (window as any).__THREE = THREE; this.pushHud(); this.loop();
   }
   fitBound = () => this.fit();
   fit() { const el = this.canvas.parentElement || this.canvas; const w = Math.max(1, el.clientWidth), h = Math.max(1, el.clientHeight); this.renderer.setSize(w, h, false); this.composer.setSize(w, h); this.camera.aspect = w / h; this.camera.fov = this.view === "pov" ? (w / h < 1.2 ? 72 : 58) : (w / h < 1.2 ? 62 : 46); this.camera.updateProjectionMatrix(); }
-  destroy() { this.over = true; window.removeEventListener("resize", this.fitBound); try { this.renderer.dispose(); } catch {} }
+  destroy() { this.over = true; window.removeEventListener("resize", this.fitBound); try { this.renderer?.dispose(); this.renderer?.forceContextLoss?.(); } catch {} }
 
   // ── cameras
-  camBase() { return this.view === "pov" ? new THREE.Vector3(POV_X + 2.6, WALL_TOP + 3.4, 2.6) : new THREE.Vector3(31, WALL_TOP + 5.5, -12); }
-  camLook() { return this.view === "pov" ? new THREE.Vector3(POV_X + 2.6, WALL_TOP - 1.5, -30) : new THREE.Vector3(-5, 4.5, -10); }
+  camBase() { return this.view === "pov" ? new THREE.Vector3(POV_X + 2.6, WALL_TOP + 3.4, 2.6) : new THREE.Vector3(29.5, WALL_TOP + 4.6, -9.5); }
+  camLook() { return this.view === "pov" ? new THREE.Vector3(POV_X + 2.6, WALL_TOP - 1.5, -30) : new THREE.Vector3(1, 6.5, -5); }
   placeCamera(snap = false) { const cp = this.camBase(), lk = this.camLook(); if (snap) { this.camera.position.copy(cp); this.camera.lookAt(lk); } }
 
   // ── the world
@@ -125,7 +131,7 @@ export class SiegeWorld {
     // painted backdrop + sky dome
     if (this.tex.backdrop) { const bd = new THREE.Mesh(new THREE.PlaneGeometry(1200, 530), new THREE.MeshBasicMaterial({ map: this.tex.backdrop, fog: false, depthWrite: false })); bd.position.set(0, 140, -380); S.add(bd); const bd2 = bd.clone(); bd2.position.set(-380, 140, -60); bd2.rotation.y = Math.PI / 2; S.add(bd2); }
     const skyMat = new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, fog: false, uniforms: {}, vertexShader: "varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }", fragmentShader: "varying vec3 vP; float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); } void main(){ float h = normalize(vP).y; vec3 top = vec3(0.03,0.04,0.10); vec3 mid = vec3(0.10,0.10,0.23); vec3 hor = vec3(0.30,0.17,0.24); vec3 c = h > 0.25 ? mix(mid, top, (h-0.25)/0.75) : mix(hor, mid, clamp(h/0.25, 0.0, 1.0)); vec2 uv = normalize(vP).xz / max(0.05, h + 0.4) * 60.0; float s = step(0.9985, hash(floor(uv))) * clamp(h * 3.0, 0.0, 1.0); c += s * 0.9; gl_FragColor = vec4(c, 1.0); }" });
-    const sky = new THREE.Mesh(new THREE.SphereGeometry(460, 24, 16), skyMat); sky.renderOrder = -10; S.add(sky);
+    const sky = new THREE.Mesh(new THREE.SphereGeometry(460, 24, 16), skyMat); sky.renderOrder = -10; S.add(sky); this.sky = sky;
     // lights
     const moonL = new THREE.DirectionalLight(0xbfc8ff, 3.0); moonL.position.set(70, 90, -90); moonL.castShadow = true; moonL.shadow.mapSize.set(2048, 2048); const sc = moonL.shadow.camera as THREE.OrthographicCamera; sc.left = -70; sc.right = 70; sc.top = 70; sc.bottom = -70; sc.near = 10; sc.far = 320; moonL.shadow.bias = -0.0008; S.add(moonL); S.add(moonL.target);
     S.add(new THREE.HemisphereLight(0x6a7ab8, 0x2a2028, 1.5));
@@ -163,23 +169,40 @@ export class SiegeWorld {
   standAt(a: Actor, x: number, z: number, faceField = true) { a.obj.position.set(x, WALL_TOP + 0.25 - a.obj.userData.minY, z); a.obj.rotation.y = faceField ? Math.PI : 0; }
   async setFaction(fid: string) {
     this.faction = fid; this.view = viewOf(fid); this.reloadTime = (KIT[fid] || KIT.boulder).reload;
-    if (this.hero) { this.scene.remove(this.hero.obj); this.hero = null; } this.leap = null;
-    this.catapult.visible = this.view === "side"; this.placeCamera(true); this.fit();
+    if (this.hero) { this.scene.remove(this.hero.obj); this.hero = null; } this.leap = null; this.handBone = null;
+    this.catapult.visible = this.view === "side"; if (!this.intro) this.placeCamera(true); this.fit(); if (this.intro && this.introPath) { this.introPath.points[4] = this.camBase(); this.introLook.points[4] = this.camLook(); }
     if (fid === "boulder") return;
     const a = await this.makeActor(fid); if (this.over || this.faction !== fid) return;
-    if (this.view === "pov") this.standAt(a, POV_X, WALL_Z + 0.55); else this.standAt(a, CATAPULT.x + 2.4, WALL_Z + 0.2);
+    if (this.view === "pov") this.standAt(a, POV_X, WALL_Z + 0.55); else this.standAt(a, CATAPULT.x - 2.7, WALL_Z + 0.3);
     this.heroHome.copy(a.obj.position); this.scene.add(a.obj); this.hero = a;
+    this.handBone = null; a.obj.traverse((o) => { if (!this.handBone && /RightHand$/i.test(o.name)) this.handBone = o; });
   }
   async buildGarrison() {
-    const spots: [string, number, number][] = [["ashigaru", -21, WALL_Z + 0.4], ["samurai", 5.5, WALL_Z + 0.4], ["yamabushi", 19, WALL_Z + 0.4], ["ashigaru", 26.5, WALL_Z + 0.4], ["kenshi", -26, WALL_Z + 0.4]];
+    const spots: [string, number, number][] = [["ashigaru", -21, WALL_Z + 0.4], ["samurai", 5.5, WALL_Z + 0.4], ["yamabushi", 15.5, WALL_Z + 0.4], ["ashigaru", 26.5, WALL_Z + 0.4], ["kenshi", -26, WALL_Z + 0.4]];
     for (const [fid, x, z] of spots) { const a = await this.makeActor(fid); if (this.over) return; this.standAt(a, x, z); this.scene.add(a.obj); this.garrison.push({ a, cd: 1.5 + Math.random() * 3 }); }
   }
+
+  // ── intro: a slow fly-in over the marching horde, up the wall face, settling into your station
+  buildIntro() {
+    this.introPath = new THREE.CatmullRomCurve3([new THREE.Vector3(-75, 9, FIELD_Z - 125), new THREE.Vector3(-34, 8, FIELD_Z - 80), new THREE.Vector3(10, 11, FIELD_Z - 42), new THREE.Vector3(26, 17, FIELD_Z - 22), this.camBase()], false, "catmullrom", 0.3);
+    this.introLook = new THREE.CatmullRomCurve3([new THREE.Vector3(0, 6, FIELD_Z - 60), new THREE.Vector3(0, 8, FIELD_Z - 20), new THREE.Vector3(0, 10, FIELD_Z), new THREE.Vector3(0, 12, WALL_Z + 6), this.camLook()], false, "catmullrom", 0.3);
+    this.introT = 0; this.intro = true; this.marker.visible = false;
+    // the horde is already on the field, far out, marching
+    for (let i = 0; i < 16; i++) { this.spawnSpider(0.9 + Math.random() * 0.6); const s = this.spiders[this.spiders.length - 1]; s.z = FIELD_Z - 95 - Math.random() * 30; s.x = (Math.random() - 0.5) * 60; s.g.position.set(s.x, 0, s.z); }
+  }
+  stepIntro(dt: number) {
+    this.introT += dt; const u = Math.min(1, this.introT / INTRO_LEN); const e = u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
+    this.camera.position.copy(this.introPath.getPointAt(e)); this.camKick.copy(this.introLook.getPointAt(e)); this.camera.lookAt(this.camKick);
+    for (const s of this.spiders) if (!s.dead) { s.z += s.speed * 0.5 * dt; s.g.position.set(s.x, 0, s.z); const ph = this.t * 6 + s.ph; s.legs.forEach((l, i) => { l.rotation.x = Math.sin(ph + i * 1.3) * 0.5; }); s.g.rotation.set(0, Math.PI, 0); }
+    if (u >= 1) this.endIntro();
+  }
+  endIntro() { if (!this.intro) return; this.intro = false; this.marker.visible = true; this.camera.position.copy(this.camBase()); this.camKick.copy(this.camLook()); this.camera.lookAt(this.camKick); this.pushHud(); }
 
   // ── input + aim
   bindInput() {
     const cv = this.canvas; const pos = (e: PointerEvent) => { const r = cv.getBoundingClientRect(); this.pointer.x = (e.clientX - r.left) / r.width; this.pointer.y = (e.clientY - r.top) / r.height; };
     cv.addEventListener("pointermove", (e) => pos(e));
-    cv.addEventListener("pointerdown", (e) => { pos(e); if (this.state === "ready") { this.start(); return; } if (this.state !== "play" || this.reload > 0 || this.leap) return; this.charging = true; this.charge = 0; cv.setPointerCapture(e.pointerId); e.preventDefault(); });
+    cv.addEventListener("pointerdown", (e) => { pos(e); if (this.intro) { this.endIntro(); return; } if (this.state === "ready") { this.start(); return; } if (this.state !== "play" || this.reload > 0 || this.leap) return; this.charging = true; this.charge = 0; cv.setPointerCapture(e.pointerId); e.preventDefault(); });
     const up = (e: PointerEvent) => { if (!this.charging) return; pos(e); this.charging = false; this.fire(Math.min(1, this.charge / 0.7)); this.charge = 0; };
     cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", up);
     cv.addEventListener("touchstart", (e) => e.preventDefault(), { passive: false });
@@ -205,7 +228,12 @@ export class SiegeWorld {
     const dx = to.x - from.x, dz = to.z - from.z, dy = to.y - from.y; const dist = Math.max(0.01, Math.hypot(dx, dz)); const disc = sp ** 4 - G * (G * dist * dist + 2 * dy * sp * sp);
     const ang = disc < 0 ? 0.9 : Math.atan((sp * sp + Math.sqrt(disc)) / (G * dist)); const vh = Math.cos(ang) * sp, vy = Math.sin(ang) * sp; return new THREE.Vector3((dx / dist) * vh, vy, (dz / dist) * vh);
   }
-  hand() { if (this.view === "side") return this.cupPos(); const h = this.hero ? this.hero.obj.position.clone() : new THREE.Vector3(POV_X, WALL_TOP, WALL_Z); h.y += 1.9; h.z -= 0.4; return h; }
+  handBone: THREE.Object3D | null = null;
+  hand() {
+    if (this.view === "side") return this.cupPos();
+    if (this.handBone) { const p = new THREE.Vector3(); this.handBone.getWorldPosition(p); return p; }
+    const h = this.hero ? this.hero.obj.position.clone() : new THREE.Vector3(POV_X, WALL_TOP, WALL_Z); h.y += 1.4; h.z -= 0.4; return h;
+  }
 
   // ── firing: every faction's kit
   fire(k: number) {
@@ -439,7 +467,7 @@ export class SiegeWorld {
   }
   end(won: boolean) { if (this.state !== "play") return; this.state = won ? "won" : "lost"; this.say(won ? "THE HORN SOUNDS — the gate held 👑" : "THE GATE HAS FALLEN", 4); this.cb.onSfx?.(won ? "win" : "lose"); if (!won) { this.shake = 2; this.puff(new THREE.Vector3(0, 3, FIELD_Z), "smoke", 30, 0x6a5a5a, 6, 3, 2.2); } this.pushHud(); setTimeout(() => this.cb.onEnd?.({ won, score: this.score, kills: this.kills, waves: this.wave }), 1500); }
   say(m: string, t = 1.6) { this.msg = m; this.msgT = t; this.pushHud(); }
-  pushHud() { this.cb.onHud({ gate: Math.ceil(this.gateHp), gateMax: this.gateMax, wave: this.wave, waves: WAVES.length, horde: Math.max(0, this.hordeLeft), score: this.score, kills: this.kills, reload: this.reloadTime > 0 ? Math.max(0, this.reload / (this.reloadTime * 1.3)) : 0, state: this.state, msg: this.msg, charge: this.charging ? Math.min(1, this.charge / 0.7) : 0 }); }
+  pushHud() { this.cb.onHud({ gate: Math.ceil(this.gateHp), gateMax: this.gateMax, wave: this.wave, waves: WAVES.length, horde: Math.max(0, this.hordeLeft), score: this.score, kills: this.kills, reload: this.reloadTime > 0 ? Math.max(0, this.reload / (this.reloadTime * 1.3)) : 0, state: this.state, msg: this.msg, charge: this.charging ? Math.min(1, this.charge / 0.7) : 0, intro: this.intro }); }
 
   // ── VFX
   puff(p: THREE.Vector3, tex: string, n: number, color: number, size: number, speed: number, life = 0.6) {
@@ -455,6 +483,10 @@ export class SiegeWorld {
     const l2 = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0x7c9cff, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false })); this.scene.add(l2); this.bolts.push({ l: l2, life: 0.3 });
   }
 
+  flicker(dt: number) {
+    void dt; for (const [i, f] of this.flames.entries()) { if (!f.userData.sy) f.userData.sy = f.scale.y; const k = 0.85 + Math.sin(this.t * 11 + i * 1.7) * 0.12 + Math.random() * 0.08; f.scale.y = f.userData.sy * k; (f.material as THREE.SpriteMaterial).opacity = (i % 2 === 0 ? 0.9 : 0.35) * k; }
+    for (const [i, l] of this.torchLights.entries()) l.intensity = 11 * (0.9 + Math.sin(this.t * 9 + i * 2.1) * 0.12 + Math.random() * 0.1) * (l.userData.k || 1);
+  }
   // ── loop
   loop = () => { if (this.over) return; requestAnimationFrame(this.loop); const dt = Math.min(0.05, this.clock.getDelta()); this.t += dt; if (this.state === "play") this.step(dt); this.render(dt); };
   step(dt: number) {
@@ -465,21 +497,22 @@ export class SiegeWorld {
     this.hudT += dt; if (this.hudT > 0.12) { this.hudT = 0; this.pushHud(); }
   }
   render(dt: number) {
-    this.hero?.mixer.update(dt); for (const g of this.garrison) g.a.mixer.update(dt); this.updateAim();
+    this.hero?.mixer.update(dt); for (const g of this.garrison) g.a.mixer.update(dt);
+    if (this.intro) { this.stepIntro(dt); this.flicker(dt); this.sky.position.copy(this.camera.position); this.composer.render(); return; }
+    this.updateAim();
     if (this.hero && !this.leap) { const o = this.hero.obj; const want = Math.atan2(this.aim.x - o.position.x, -(this.aim.z - o.position.z)); this.heroSpin += (want * (this.view === "pov" ? 0.6 : 0.3) - this.heroSpin) * Math.min(1, dt * 6); o.rotation.y = Math.PI + this.heroSpin; }
     // catapult arm: cocks while charging, snaps on release, resets over the reload
     if (this.catapult.visible) { const want = this.charging ? 1.1 + Math.min(1, this.charge / 0.7) * 0.3 : this.armK > 0 ? -0.7 : 0.95; this.armK = Math.max(0, this.armK - dt * 1.4); this.arm.rotation.x += (want - this.arm.rotation.x) * Math.min(1, dt * (this.armK > 0.9 ? 30 : 6)); }
-    for (const [i, f] of this.flames.entries()) { if (!f.userData.sy) f.userData.sy = f.scale.y; const k = 0.85 + Math.sin(this.t * 11 + i * 1.7) * 0.12 + Math.random() * 0.08; f.scale.y = f.userData.sy * k; (f.material as THREE.SpriteMaterial).opacity = (i % 2 === 0 ? 0.9 : 0.35) * k; }
-    for (const [i, l] of this.torchLights.entries()) l.intensity = 11 * (0.9 + Math.sin(this.t * 9 + i * 2.1) * 0.12 + Math.random() * 0.1) * (l.userData.k || 1);
+    this.flicker(dt);
     for (const p of this.parts) { p.life -= dt; p.s.position.addScaledVector(p.v, dt); p.v.y -= p.g * dt; const k = Math.max(0, p.life / p.life0); (p.s.material as THREE.SpriteMaterial).opacity = Math.min(1, k * 1.5); const sz = p.size * (1 + (1 - k) * (p.grow - 1)); p.s.scale.set(sz, sz, 1); }
     for (const p of this.parts) if (p.life <= 0) { this.scene.remove(p.s); p.s.material.dispose(); } this.parts = this.parts.filter((p) => p.life > 0);
     for (const b of this.bolts) { b.life -= dt; (b.l.material as THREE.LineBasicMaterial).opacity = Math.max(0, b.life / 0.25); } for (const b of this.bolts) if (b.life <= 0) { this.scene.remove(b.l); b.l.geometry.dispose(); } this.bolts = this.bolts.filter((b) => b.life > 0);
     // camera
     const cp = this.camBase(), look = this.camLook();
     if (this.view === "pov") { look.x += this.aim.x * 0.12; look.z = Math.min(-8, this.aim.z * 0.35); cp.x += this.aim.x * 0.02 + (this.charging ? -this.charge * 0.25 : 0); }
-    else { look.x += (this.aim.x + 8) * 0.05; look.z += (this.aim.z + 20) * 0.08; cp.z += (this.aim.z + 20) * 0.03; if (this.leap && this.hero) { look.lerp(this.hero.obj.position, 0.5); } }
+    else { look.x += (this.aim.x + 6) * 0.05; look.z += (this.aim.z + 18) * 0.07; cp.z += (this.aim.z + 18) * 0.025; if (this.leap && this.hero) { look.lerp(this.hero.obj.position, 0.5); } }
     if (this.shake > 0) { this.shake = Math.max(0, this.shake - dt * 2.5); cp.x += (Math.random() - 0.5) * this.shake * 0.25; cp.y += (Math.random() - 0.5) * this.shake * 0.2; }
-    this.camera.position.lerp(cp, Math.min(1, dt * 4)); this.camKick.lerp(look, Math.min(1, dt * 4)); this.camera.lookAt(this.camKick);
+    this.camera.position.lerp(cp, Math.min(1, dt * 4)); this.camKick.lerp(look, Math.min(1, dt * 4)); this.camera.lookAt(this.camKick); this.sky.position.copy(this.camera.position);
     this.composer.render();
   }
 }
