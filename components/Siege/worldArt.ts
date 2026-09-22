@@ -2,6 +2,8 @@
 // Everything is procedural (textures from tools/siege-art/pbr.py) so it stays light enough for phones. Units: metres; the wall runs along x, the field is -z.
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { clone as skClone } from "three/examples/jsm/utils/SkeletonUtils.js";
 
 export const WT = 9, WZ = -1.5, WTH = 3, FZ = WZ - WTH / 2;       // wall top, wall centre z, thickness, field face z
 export const SUN_DIR = new THREE.Vector3(-0.45, 0.32, -0.83).normalize();
@@ -286,7 +288,40 @@ export function buildTrebuchet(c: Ctx, pos: THREE.Vector3): Treb {
 
 // ── the horde
 export type Leg = { hip: THREE.Group; knee: THREE.Group; side: number; base: number; grp: number };
-export type Bug = { g: THREE.Group; body: THREE.Group; legs: Leg[]; wings: THREE.Mesh[]; lod: THREE.Group };
+export type Bug = { g: THREE.Group; body: THREE.Group; legs: Leg[]; wings: THREE.Mesh[]; lod: THREE.Group; mixer?: THREE.AnimationMixer; acts?: Record<string, THREE.AnimationAction> };
+// ── Quaternius "Animated Enemies" (CC0, via poly.pizza): rigged Spider (Walk/Idle/Attack/Jump/Death) and Wasp (Flying/Attack/Death)
+export type BugModel = { scene: THREE.Object3D; clips: Record<string, THREE.AnimationClip>; k: number; minY: number };
+export type BugModels = { spider?: BugModel; wasp?: BugModel };
+export async function loadBugModels(): Promise<BugModels> {
+  const gl = new GLTFLoader(); const out: BugModels = {};
+  const one = async (url: string, extent: number): Promise<BugModel | undefined> => { try {
+    const g = await gl.loadAsync(url); const sc = g.scene; sc.updateMatrixWorld(true); const box = new THREE.Box3(); sc.traverse((o: any) => { if (o.isMesh) { o.geometry.computeBoundingBox(); const bb = o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld); if (isFinite(bb.min.x)) box.union(bb); } }); const sz = box.getSize(new THREE.Vector3());
+    const clips: Record<string, THREE.AnimationClip> = {}; for (const a of g.animations) clips[a.name.split("_").pop() || a.name] = a;
+    sc.traverse((o: any) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; } });
+    const k = extent / Math.max(sz.x, sz.z, 1e-6); return { scene: sc, clips, k, minY: box.min.y }; } catch { return undefined; } };
+  [out.spider, out.wasp] = await Promise.all([one("/siege/models/Spider.glb", 2.7), one("/siege/models/Wasp.glb", 1.75)]);
+  return out;
+}
+const tintCache: Record<string, Map<THREE.Material, THREE.Material>> = {};
+function tinted(m: THREE.Material, kind: string) {
+  if (kind === "crawler" || kind === "wasp") return m; const cache = (tintCache[kind] ||= new Map()); const hit = cache.get(m); if (hit) return hit;
+  const c = (m as THREE.MeshStandardMaterial).clone(); const base = c.color.clone(); const dark = base.r + base.g + base.b < 0.3;
+  if (kind === "slinger") { if (dark) c.color.setHex(0xcfc6dc); c.roughness = 0.5; }
+  if (kind === "brood") { if (dark) { c.color.setHex(0x2a1030); c.emissive = new THREE.Color(0x3a0a40); c.emissiveIntensity = 0.5; } else { c.emissive = new THREE.Color(0xff2a6a); c.emissiveIntensity = 0.6; } }
+  cache.set(m, c); return c;
+}
+function buildSkinnedBug(kind: "crawler" | "slinger" | "wasp" | "brood", src: BugModel): Bug {
+  const g = new THREE.Group(); const body = new THREE.Group(); g.add(body);
+  const m = skClone(src.scene) as THREE.Object3D; m.scale.multiplyScalar(src.k); m.position.y = -src.minY * src.k; m.rotation.y = Math.PI;   // model faces +z → flip so the head leads (-z in bug space)
+  m.traverse((o: any) => { if (o.isMesh) { o.material = Array.isArray(o.material) ? o.material.map((x: THREE.Material) => tinted(x, kind)) : tinted(o.material, kind); o.frustumCulled = false; o.castShadow = true; } });
+  body.add(m);
+  if (kind === "slinger") { const sac = new THREE.Mesh(new THREE.SphereGeometry(0.32, 14, 10), mats().silk); sac.position.set(0, 0.95, 0.55); body.add(sac); }
+  if (kind === "brood") for (let i = 0; i < 9; i++) { const a = R(0, Math.PI * 2), b = R(0.3, 1.2); const e = new THREE.Mesh(new THREE.SphereGeometry(R(0.07, 0.11), 10, 8), mats().egg); e.position.set(Math.cos(a) * Math.sin(b) * 0.4, 0.75 + Math.cos(b) * 0.3, 0.5 + Math.sin(a) * Math.sin(b) * 0.45); body.add(e); }
+  const mixer = new THREE.AnimationMixer(m); const acts: Record<string, THREE.AnimationAction> = {};
+  for (const [n, c] of Object.entries(src.clips)) { const a = mixer.clipAction(c); if (n === "Death") { a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; } acts[n] = a; }
+  const first = acts.Walk || acts.Flying || Object.values(acts)[0]; if (first) { first.play(); first.time = Math.random() * first.getClip().duration; }
+  return { g, body, legs: [], wings: [], lod: new THREE.Group(), mixer, acts };
+}
 let bugMats: Record<string, THREE.Material> | null = null;
 function mats() {
   if (bugMats) return bugMats;
@@ -310,7 +345,8 @@ function leg(body: THREE.Group, side: number, x: number, z: number, base: number
   const tib = new THREE.Mesh(new THREE.CylinderGeometry(th * 0.25, th * 0.72, L2, 6), m); tib.geometry.translate(0, -L2 / 2, 0); tib.rotation.z = side * 0.42; tib.castShadow = true; knee.add(tib);
   return { hip, knee, side, base, grp };
 }
-export function buildBug(kind: "crawler" | "slinger" | "wasp" | "brute" | "brood"): Bug {
+export function buildBug(kind: "crawler" | "slinger" | "wasp" | "brute" | "brood", models?: BugModels): Bug {
+  if (kind !== "brute") { const src = kind === "wasp" ? models?.wasp : models?.spider; if (src) return buildSkinnedBug(kind, src); }
   const M = mats(); const g = new THREE.Group(); const body = new THREE.Group(); g.add(body); const legs: Leg[] = []; const wings: THREE.Mesh[] = [];
   const add = (geo: THREE.BufferGeometry, m: THREE.Material, x: number, y: number, z: number, sx = 1, sy = 1, sz = 1) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.scale.set(sx, sy, sz); o.castShadow = true; body.add(o); return o; };
   if (kind === "wasp") {

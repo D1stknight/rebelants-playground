@@ -12,7 +12,7 @@ import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { type Hud, type Callbacks, type View, KIT, WAVES, viewOf } from "./shared";
-import { buildSky, buildCastle, buildField, buildMesas, buildTrebuchet, buildBug, gait, pbr, mergeByMaterial, Embers, SUN_DIR, type Leg, type Treb } from "./worldArt";
+import { buildSky, buildCastle, buildField, buildMesas, buildTrebuchet, buildBug, loadBugModels, gait, pbr, mergeByMaterial, Embers, SUN_DIR, type Leg, type Treb, type BugModels } from "./worldArt";
 
 const G = 20; const WALL_TOP = 9, WALL_Z = -1.5, WALL_T = 3; const FIELD_Z = WALL_Z - WALL_T / 2;
 const CLIPS = ["idle", "attack", "magic", "special", "win"] as const;
@@ -20,7 +20,7 @@ const CATAPULT = new THREE.Vector3(28, WALL_TOP + 0.2, WALL_Z + 2.2); const POV_
 type Rig = { scene: THREE.Object3D; clips: Record<string, THREE.AnimationClip>; k: number; minY: number };
 type Actor = { obj: THREE.Object3D; mixer: THREE.AnimationMixer; actions: Record<string, THREE.AnimationAction>; current: THREE.AnimationAction | null; fid: string };
 type SpiderKind = "crawler" | "slinger" | "wasp" | "brute" | "brood";
-type Spider = { g: THREE.Group; body: THREE.Group; lod: THREE.Group; legs: Leg[]; wings: THREE.Mesh[]; kind: SpiderKind; x: number; y: number; z: number; hp: number; hpMax: number; size: number; speed: number; ph: number; stun: number; dead: boolean; arrived: boolean; wob: number; pinned: number; cd: number; holdZ: number };
+type Spider = { g: THREE.Group; body: THREE.Group; lod: THREE.Group; legs: Leg[]; mixer?: THREE.AnimationMixer; acts?: Record<string, THREE.AnimationAction>; anim?: string; wings: THREE.Mesh[]; kind: SpiderKind; x: number; y: number; z: number; hp: number; hpMax: number; size: number; speed: number; ph: number; stun: number; dead: boolean; arrived: boolean; wob: number; pinned: number; cd: number; holdZ: number };
 type Engine = { kind: "tower" | "ram"; g: THREE.Group; x: number; z: number; hp: number; hpMax: number; speed: number; arrived: boolean; dead: boolean; wheels: THREE.Mesh[]; bangT: number };
 type Target = { pos: THREE.Vector3; r: number; s?: Spider; e?: Engine };
 type ShotKind = "spear" | "orb" | "arrow" | "boulder" | "blade" | "ward" | "stake" | "hook" | "standard" | "web" | "venom";
@@ -83,7 +83,7 @@ export class SiegeWorld {
     this.buildWorld(); this.buildCatapult();
     const rp = new RenderPass(this.scene, this.camera); const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.32, 0.5, 0.92); this.composer = new EffectComposer(r); this.composer.addPass(rp); this.composer.addPass(bloom);
     this.placeCamera(true); this.fit(); window.addEventListener("resize", this.fitBound); requestAnimationFrame(this.fitBound); setTimeout(this.fitBound, 300);
-    this.bindInput(); await Promise.all([this.buildGarrison().catch(() => {}), this.setFaction(this.faction)]); if (this.over) return;
+    this.bindInput(); await Promise.all([this.buildGarrison().catch(() => {}), this.setFaction(this.faction), loadBugModels().then((m) => { this.bugModels = m; })]); if (this.over) return;
     this.buildIntro(); this.embers = new Embers(this.scene, this.tex.glow);
     this.ready = true; (window as any).__siege = this; (window as any).__THREE = THREE; this.pushHud(); this.loop();
   }
@@ -112,7 +112,7 @@ export class SiegeWorld {
     this.marker = new THREE.Mesh(new THREE.RingGeometry(1.2, 1.6, 40), new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false })); this.marker.rotation.x = -Math.PI / 2; this.marker.position.set(0, 0.06, -30); S.add(this.marker);
     const shaft = new THREE.CylinderGeometry(0.035, 0.05, 2.4, 6); shaft.rotateX(-Math.PI / 2); const tip = new THREE.ConeGeometry(0.09, 0.45, 6); tip.rotateX(-Math.PI / 2); tip.translate(0, 0, -1.4); this.spearGeo = shaft; this.tipGeo = tip;
   }
-  sun!: THREE.DirectionalLight;
+  sun!: THREE.DirectionalLight; bugModels: BugModels = {};
   torch(x: number, y: number, z: number, k: number, light = false) {
     if (light) { const l = new THREE.PointLight(0xff9a3a, 6 * k, 16, 1.8); l.position.set(x, y, z); l.userData.k = k; this.scene.add(l); this.torchLights.push(l); }
     const f = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.tex.flame, color: 0xffc36a, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })); f.scale.set(0.6 * k, 1.0 * k, 1); f.position.set(x, y + 0.2, z); this.scene.add(f); this.flames.push(f);
@@ -292,16 +292,25 @@ export class SiegeWorld {
 
   // ── the horde
   spawnSpider(size = 1, kind: SpiderKind = "crawler") {
-    const bug = buildBug(kind); const g = bug.g;
+    const bug = buildBug(kind, this.bugModels); const g = bug.g;
     const scale = size * (kind === "brood" ? 2.4 : kind === "brute" ? 2.1 : kind === "wasp" ? 1.5 : 1.7); g.scale.setScalar(scale);
     const x = kind === "brood" ? 0 : (Math.random() - 0.5) * 48, z = FIELD_Z - 70 - Math.random() * 25; g.position.set(x, terrainH(x, z), z); g.rotation.y = Math.PI; this.scene.add(g);
     const hp = kind === "brood" ? 3200 : kind === "brute" ? 520 : kind === "wasp" ? 45 : kind === "slinger" ? 90 : 60 * size * size;
     const speed = kind === "brood" ? 1.3 : kind === "brute" ? 1.9 : kind === "wasp" ? 7 : (4.2 + Math.random() * 1.6) / Math.sqrt(size);
-    const sp: Spider = { g, body: bug.body, lod: bug.lod, legs: bug.legs, wings: bug.wings, kind, x, y: kind === "wasp" ? 6 : 0, z, hp, hpMax: hp, size: size * (kind === "brood" ? 1.6 : kind === "brute" ? 1.3 : 1), speed, ph: Math.random() * 6, stun: 0, dead: false, arrived: false, wob: Math.random() * 6, pinned: 0, cd: 2 + Math.random() * 2, holdZ: kind === "slinger" ? FIELD_Z - 26 - Math.random() * 6 : kind === "brood" ? FIELD_Z - 34 : 0 };
+    const sp: Spider = { g, body: bug.body, lod: bug.lod, legs: bug.legs, mixer: bug.mixer, acts: bug.acts, anim: bug.acts?.Walk ? "Walk" : "Flying", wings: bug.wings, kind, x, y: kind === "wasp" ? 6 : 0, z, hp, hpMax: hp, size: size * (kind === "brood" ? 1.6 : kind === "brute" ? 1.3 : 1), speed, ph: Math.random() * 6, stun: 0, dead: false, arrived: false, wob: Math.random() * 6, pinned: 0, cd: 2 + Math.random() * 2, holdZ: kind === "slinger" ? FIELD_Z - 26 - Math.random() * 6 : kind === "brood" ? FIELD_Z - 34 : 0 };
     this.spiders.push(sp); this.hordeLeft++;
     if (kind === "brood") { this.boss = sp; this.say("THE BROOD MOTHER", 3.2, true); this.cb.onSfx?.("horn"); }
   }
-  gait(s: Spider, phase: number, amp: number) { gait(s, phase, amp); }
+  gait(s: Spider, phase: number, amp: number) { if (s.mixer) return; gait(s, phase, amp); }
+  /** crossfade a rigged enemy to a clip (Walk / Idle / Attack / Flying / Jump / Death) */
+  setAnim(s: Spider, name: string, speed = 1) { if (!s.acts || s.anim === name) { if (s.acts?.[name]) s.acts[name].timeScale = speed; return; } const next = s.acts[name]; if (!next) return; const cur = s.anim ? s.acts[s.anim] : null; next.reset(); next.timeScale = speed; next.play(); if (cur) cur.crossFadeTo(next, 0.2, false); s.anim = name; }
+  animFor(s: Spider) {
+    if (!s.acts) return; if (s.pinned > 0 || s.stun > 0) return this.setAnim(s, s.kind === "wasp" ? "Flying" : "Idle");
+    if (s.kind === "wasp") return this.setAnim(s, s.z >= FIELD_Z - 1.6 ? "Attack" : "Flying");
+    if ((s.kind === "slinger" || s.kind === "brood") && s.z >= s.holdZ) return this.setAnim(s, s.cd < 0.6 ? "Attack" : "Idle");
+    if (s.arrived) return this.setAnim(s, s.y >= WALL_TOP - 0.2 ? "Attack" : "Walk", s.y >= WALL_TOP - 0.2 ? 1 : 1.4);
+    this.setAnim(s, "Walk", Math.min(2, 0.6 + s.speed * 0.22));
+  }
   spawnTower() {
     const g = new THREE.Group(); const w = this.woodMat; const silk = new THREE.MeshStandardMaterial({ color: 0xece4f4, roughness: 0.75, transparent: true, opacity: 0.88, side: THREE.DoubleSide, emissive: 0x3a1a5a, emissiveIntensity: 0.25 });
     const box = (sx: number, sy: number, sz: number, x: number, y: number, z: number, m: THREE.Material = w, rx = 0, rz = 0) => { const b = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), m); b.position.set(x, y, z); b.rotation.set(rx, 0, rz); b.castShadow = true; g.add(b); return b; };
@@ -334,7 +343,7 @@ export class SiegeWorld {
   }
   stepHorde(dt: number) {
     for (const s of this.spiders) {
-      if (s.dead) continue; if (s.pinned > 0) { s.pinned -= dt; this.gait(s, this.t * 30, 0.15 * 1.6); continue; } if (s.stun > 0) { s.stun -= dt; continue; }
+      if (s.dead) continue; this.animFor(s); if (s.pinned > 0) { s.pinned -= dt; this.gait(s, this.t * 30, 0.15 * 1.6); continue; } if (s.stun > 0) { s.stun -= dt; continue; }
       const ph = this.t * 9 + s.ph;
       if (s.kind === "wasp") {   // flies in over the field, hovers over the parapet and stings the defenders
         for (const w of s.wings) w.rotation.y = -Math.sign(w.position.x) * (0.25 + Math.sin(this.t * 42 + s.ph) * 0.6);
@@ -384,7 +393,8 @@ export class SiegeWorld {
     if (s.kind === "brood" && s.hp <= 0) { this.say("THE BROOD MOTHER FALLS", 3.4, true); this.score += 1000; this.shake = 2; this.boss = null; }
     s.dead = true; this.kills++; this.score += Math.round(10 * s.size * (s.kind === "brute" ? 4 : s.kind === "wasp" ? 2 : 1)); this.hordeLeft--; this.cb.onSfx?.("squish");
     const p = this.center(s); this.puff(p, "dirt", 10, 0x8b5cf6, 1.2 * s.size, 3.5); this.puff(p, "glow", 3, 0xc4b5fd, 2 * s.size, 0.8, 0.5); this.puff(p, "smoke", 4, 0x6a5a7a, 1.6 * s.size, 1.2, 0.9);
-    const g = s.g; const t0 = this.t; const y0 = g.position.y; const tick = () => { if (this.over) return; const k = this.t - t0; g.rotation.x += 0.15; g.position.y = y0 - k * k * 6; if (k < 1.4) requestAnimationFrame(tick); else this.scene.remove(g); }; tick();
+    const g = s.g; const t0 = this.t; const y0 = g.position.y; const falls = s.kind === "wasp" || (s.arrived && s.y > 0.5); if (s.acts?.Death) { const d = s.acts.Death; d.reset(); d.play(); if (s.anim && s.acts[s.anim]) s.acts[s.anim].crossFadeTo(d, 0.12, false); s.anim = "Death"; }
+    const tick = () => { if (this.over) return; const k = this.t - t0; if (s.mixer) { g.position.y = falls ? y0 - k * k * 6 : y0 - Math.max(0, k - 1.3) * 1.6; } else { g.rotation.x += 0.15; g.position.y = y0 - k * k * 6; } if (k < (s.mixer ? 2.4 : 1.4)) requestAnimationFrame(tick); else { this.scene.remove(g); s.mixer?.stopAllAction(); s.mixer = undefined; } }; tick();
   }
   hurtEngine(e: Engine, d: number, at: THREE.Vector3) {
     if (e.dead) return; const low = at.y < 2.2 && e.kind === "tower"; e.hp -= d * (low ? 1.8 : 1); this.puff(at, "spark", 4, e.kind === "tower" ? 0xc4b5fd : 0xffc36a, 0.7, 1.5); if (e.hp > 0) { e.g.position.x += (Math.random() - 0.5) * 0.2; return; }
@@ -523,14 +533,14 @@ export class SiegeWorld {
     this.hudT += dt; if (this.hudT > 0.12) { this.hudT = 0; this.pushHud(); }
   }
   render(dt: number) {
-    this.hero?.mixer.update(dt); for (const g of this.garrison) g.a.mixer.update(dt);
+    this.hero?.mixer.update(dt); for (const g of this.garrison) g.a.mixer.update(dt); for (const s of this.spiders) s.mixer?.update(dt); for (const f of this.flings) f.s.mixer?.update(dt);
     (this.sky.material as THREE.ShaderMaterial).uniforms.uT.value = this.t; this.embers?.update(dt, this.camera.position, this.t);
     if (this.menu || this.intro) { if (this.menu) this.stepMenu(dt); else this.stepIntro(dt); this.flicker(dt); this.sky.position.copy(this.camera.position); this.composer.render(); return; }
     this.updateAim();
     if (this.hero && !this.leap) { const o = this.hero.obj; const want = Math.atan2(this.aim.x - o.position.x, -(this.aim.z - o.position.z)); this.heroSpin += (want * (this.view === "pov" ? 0.6 : 0.3) - this.heroSpin) * Math.min(1, dt * 6); o.rotation.y = Math.PI + this.heroSpin; }
     // catapult arm: cocks while charging, snaps on release, resets over the reload
     this.stepTreb(dt);
-    { const cp = this.camera.position; for (const s of this.spiders) { if (s.dead) continue; const near = s.g.position.distanceTo(cp) < 42 + s.size * 8; s.body.visible = near; s.lod.visible = !near; } }
+    { const cp = this.camera.position; for (const s of this.spiders) { if (s.mixer) continue; if (s.dead) continue; const near = s.g.position.distanceTo(cp) < 42 + s.size * 8; s.body.visible = near; s.lod.visible = !near; } }
     this.flicker(dt);
     for (const p of this.parts) { p.life -= dt; p.s.position.addScaledVector(p.v, dt); p.v.y -= p.g * dt; const k = Math.max(0, p.life / p.life0); (p.s.material as THREE.SpriteMaterial).opacity = Math.min(1, k * 1.5); const sz = p.size * (1 + (1 - k) * (p.grow - 1)); p.s.scale.set(sz, sz, 1); }
     for (const p of this.parts) if (p.life <= 0) { this.scene.remove(p.s); p.s.material.dispose(); } this.parts = this.parts.filter((p) => p.life > 0);
