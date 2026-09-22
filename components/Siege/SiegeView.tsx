@@ -97,14 +97,12 @@ export default function SiegeView() {
           {hud.treb && (
             <button type="button" onClick={() => engRef.current?.placeTreb?.()} style={{ position: "absolute", left: "50%", bottom: compact ? 76 : 64, transform: "translateX(-50%)", fontFamily: cinzel, fontSize: compact ? 12 : 15, letterSpacing: "0.26em", color: "#1a0f06", background: "linear-gradient(180deg,#f3d58f,#c9953f)", border: "1px solid #fff0c0", padding: compact ? "7px 16px" : "10px 24px", cursor: "pointer", boxShadow: "0 0 24px rgba(255,190,90,0.6), 0 4px 10px #000", animation: "siegePulse 1.4s ease-in-out infinite" }}>⚒ SET TREBUCHET HERE <span style={{ opacity: 0.6, fontSize: "0.75em" }}>(E)</span></button>
           )}
-          {/* walk / run pad */}
+          {/* move pad: drag the stick anywhere (push all the way to run) */}
           <div style={{ position: "absolute", right: 14, bottom: 12, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5 }}>
-            {!compact && <div style={{ fontFamily: "system-ui, sans-serif", fontSize: 10, color: MUTED, textShadow: "0 1px 3px #000", pointerEvents: "none" }}><b style={{ color: CREAM }}>A / D</b> walk · <b style={{ color: CREAM }}>SHIFT</b> run</div>}
-            <div style={{ display: "flex", gap: 6 }}>
-              {([-1, 1] as const).map((d) => (
-                <button key={d} type="button" aria-label={d < 0 ? "walk left" : "walk right"} onPointerDown={(e) => { e.preventDefault(); (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); engRef.current?.setMove?.(d); }} onPointerUp={() => engRef.current?.setMove?.(0)} onPointerCancel={() => engRef.current?.setMove?.(0)} onContextMenu={(e) => e.preventDefault()} style={{ ...btn, width: compact ? 46 : 54, height: compact ? 40 : 46, fontSize: 18, padding: 0, touchAction: "none" }}>{d < 0 ? "◀" : "▶"}</button>
-              ))}
-              <button type="button" onClick={() => { const r = !run; setRun(r); engRef.current?.setMove?.(engRef.current?.moveIn ?? 0, r); }} style={{ ...btn, height: compact ? 40 : 46, padding: "0 10px", color: run ? "#1a0f06" : CREAM, background: run ? "linear-gradient(180deg,#f3d58f,#c9953f)" : btn.background }}>RUN</button>
+            {!compact && <div style={{ fontFamily: "system-ui, sans-serif", fontSize: 10, color: MUTED, textShadow: "0 1px 3px #000", pointerEvents: "none" }}><b style={{ color: CREAM }}>WASD</b> move · <b style={{ color: CREAM }}>SHIFT</b> run</div>}
+            <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+              <button type="button" onClick={() => { const r = !run; setRun(r); const e = engRef.current; e?.setMove?.(e.moveIn ?? 0, e.moveInZ ?? 0, r); }} style={{ ...btn, height: compact ? 34 : 38, padding: "0 10px", color: run ? "#1a0f06" : CREAM, background: run ? "linear-gradient(180deg,#f3d58f,#c9953f)" : btn.background }}>RUN</button>
+              <Stick size={compact ? 92 : 112} onMove={(x, z) => { const e = engRef.current; e?.setMove?.(x, z); }} />
             </div>
           </div>
           {/* boss bar */}
@@ -197,6 +195,19 @@ export default function SiegeView() {
         @keyframes siegeIntroA { 0%,8% { opacity:0; transform:translateY(6px) } 18%,40% { opacity:.85; transform:none } 50%,100% { opacity:0 } }
         @keyframes siegeIntroB { 0%,30% { opacity:0; letter-spacing:.5em } 42%,88% { opacity:1; letter-spacing:.16em } 100% { opacity:0 } }
         @keyframes siegeIntroC { 0%,48% { opacity:0; transform:translateY(6px) } 58%,88% { opacity:.85; transform:none } 100% { opacity:0 } }`}</style>
+    </div>
+  );
+}
+/** virtual joystick: x right +, z toward the camera + (i.e. back), each -1…1 */
+function Stick({ size, onMove }: { size: number; onMove: (x: number, z: number) => void }) {
+  const [k, setK] = useState({ x: 0, y: 0 }); const ref = useRef<HTMLDivElement | null>(null); const R = size / 2 - 18;
+  const upd = (e: React.PointerEvent) => { const r = ref.current!.getBoundingClientRect(); let x = e.clientX - (r.left + r.width / 2), y = e.clientY - (r.top + r.height / 2); const d = Math.hypot(x, y); if (d > R) { x *= R / d; y *= R / d; } setK({ x, y }); const m = Math.hypot(x, y) / R; onMove(m < 0.12 ? 0 : x / R, m < 0.12 ? 0 : y / R); };
+  const end = () => { setK({ x: 0, y: 0 }); onMove(0, 0); };
+  return (
+    <div ref={ref} onPointerDown={(e) => { e.preventDefault(); (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); upd(e); }} onPointerMove={(e) => { if ((e.currentTarget as HTMLElement).hasPointerCapture(e.pointerId)) upd(e); }} onPointerUp={end} onPointerCancel={end} onContextMenu={(e) => e.preventDefault()}
+      style={{ width: size, height: size, borderRadius: "50%", position: "relative", touchAction: "none", cursor: "grab", background: "radial-gradient(circle, rgba(20,12,6,0.35), rgba(20,12,6,0.7))", border: "1px solid rgba(232,193,112,0.45)", boxShadow: "inset 0 0 18px rgba(0,0,0,0.6)", backdropFilter: "blur(3px)" }}>
+      {["▲", "▼", "◀", "▶"].map((c, i) => <span key={c} style={{ position: "absolute", fontSize: 9, color: "rgba(232,193,112,0.55)", left: i === 2 ? 6 : i === 3 ? undefined : "50%", right: i === 3 ? 6 : undefined, top: i === 0 ? 4 : i === 1 ? undefined : "50%", bottom: i === 1 ? 4 : undefined, transform: i < 2 ? "translateX(-50%)" : "translateY(-50%)", pointerEvents: "none" }}>{c}</span>)}
+      <div style={{ position: "absolute", width: 36, height: 36, left: "50%", top: "50%", marginLeft: -18, marginTop: -18, transform: `translate(${k.x}px, ${k.y}px)`, borderRadius: "50%", background: "radial-gradient(circle at 40% 35%, #f3d58f, #a8762e)", boxShadow: "0 2px 8px #000", pointerEvents: "none" }} />
     </div>
   );
 }

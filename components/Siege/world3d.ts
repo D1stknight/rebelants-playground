@@ -17,7 +17,8 @@ import { buildSky, buildCastle, buildField, buildMesas, buildTrebuchet, buildBug
 
 const G = 20; const WALL_TOP = 9, WALL_Z = -1.5, WALL_T = 3; const FIELD_Z = WALL_Z - WALL_T / 2;
 const CLIPS = ["idle", "attack", "magic", "special", "win"] as const;
-const HERO_Z = WALL_Z + 0.55, TREB_Z = WALL_Z + 5.5, X_MIN = -50, X_MAX = 50;   // the walking line along the wall-walk; trebuchets stand on the rampart terrace behind it
+const HERO_Z = WALL_Z + 0.55, TREB_Z = WALL_Z + 5.5, X_MIN = -50, X_MAX = 50, Z_MIN = FIELD_Z + 0.95, Z_MAX = 8.5;   // the walkable deck: parapet (front) → rampart terrace (back); trebuchets stand on the terrace
+const TOWERS = [-15.5, 15.5, -42, 42], TOWER_Z = WALL_Z - 4.5, TOWER_R = 4.6, HERO_R = 0.45;
 const CATAPULT = new THREE.Vector3(28, WALL_TOP + 0.2, TREB_Z); const POV_X = -27.5; const SIDE_X = 30.6;   // default stations (battlements / catapult)
 const WALK = 3.4, RUN = 7.5;
 type Rig = { scene: THREE.Object3D; clips: Record<string, THREE.AnimationClip>; k: number; minY: number };
@@ -61,7 +62,7 @@ function loadRig(fid: string): Promise<Rig> {
 export class SiegeWorld {
   canvas: HTMLCanvasElement; cb: Callbacks; faction = "ronin"; view: View = "side"; over = false; ready = false;
   renderer!: THREE.WebGLRenderer; scene!: THREE.Scene; camera!: THREE.PerspectiveCamera; composer!: EffectComposer; clock = new THREE.Clock();
-  tex: Record<string, THREE.Texture> = {}; hero: Actor | null = null; heroHome = new THREE.Vector3(); heroSpin = 0; heroX = SIDE_X; heroV = 0; heroYaw = Math.PI; loco: "idle" | "walk" | "run" = "idle"; keys = { l: false, r: false, run: false }; moveIn = 0; runIn = false; trebSet = false; lights: { l: THREE.PointLight; until: number; follow: THREE.Object3D | null; i0: number; t0: number }[] = []; warmed = false; perf = { acc: 0, n: 0, level: 0 }; bloom!: UnrealBloomPass; garrison: { a: Actor; cd: number }[] = []; catapult!: THREE.Group; arm!: THREE.Group; armK = 0; treb!: Treb; armMode: "ready" | "swing" | "return" = "ready"; armT = 0; armA = 2.15; pendingFire: number | null = null; embers!: Embers; menu = true; paused = false; boss: Spider | null = null; banner = false;
+  tex: Record<string, THREE.Texture> = {}; hero: Actor | null = null; heroHome = new THREE.Vector3(); heroSpin = 0; heroX = SIDE_X; heroZ = HERO_Z; heroV = 0; heroVX = 0; heroVZ = 0; heroYaw = Math.PI; loco: "idle" | "walk" | "run" = "idle"; keys = { l: false, r: false, f: false, b: false, run: false }; moveIn = 0; moveInZ = 0; runIn = false; trebSet = false; lights: { l: THREE.PointLight; until: number; follow: THREE.Object3D | null; i0: number; t0: number }[] = []; warmed = false; perf = { acc: 0, n: 0, level: 0 }; bloom!: UnrealBloomPass; garrison: { a: Actor; cd: number }[] = []; catapult!: THREE.Group; arm!: THREE.Group; armK = 0; treb!: Treb; armMode: "ready" | "swing" | "return" = "ready"; armT = 0; armA = 2.15; pendingFire: number | null = null; embers!: Embers; menu = true; paused = false; boss: Spider | null = null; banner = false;
   spiders: Spider[] = []; engines: Engine[] = []; shots: Shot[] = []; parts: Part[] = []; bolts: Bolt[] = []; zones: Zone[] = []; flings: Fling[] = []; flames: THREE.Sprite[] = []; torchLights: THREE.PointLight[] = [];
   marker!: THREE.Mesh; aim = new THREE.Vector3(0, 0, -30); pointer = { x: 0.5, y: 0.6 }; charge = 0; charging = false; reload = 0; reloadTime = 1.2;
   state: Hud["state"] = "ready"; gateHp = 1000; gateMax = 1000; wave = 0; score = 0; kills = 0; msg: string | null = null; msgT = 0; hordeLeft = 0; spawnQueue: { at: number; fn: () => void }[] = []; waveT = 0; waveDone = false; hudT = 0; t = 0; shake = 0; rally = 0;
@@ -117,8 +118,8 @@ export class SiegeWorld {
   destroy() { this.over = true; window.removeEventListener("resize", this.fitBound); window.removeEventListener("keydown", this.onKD); window.removeEventListener("keyup", this.onKU); window.removeEventListener("blur", this.onBlur); try { this.renderer?.dispose(); this.renderer?.forceContextLoss?.(); } catch {} }
 
   // ── cameras
-  camBase() { return this.view === "pov" ? new THREE.Vector3(this.heroX + 1.7, WALL_TOP + 3.9, HERO_Z + 3.95) : new THREE.Vector3(this.heroX + 3.2, WALL_TOP + 7.6, HERO_Z + 12.5); }
-  camLook() { return this.view === "pov" ? new THREE.Vector3(this.heroX + 1.7, WALL_TOP - 1.2, -30) : new THREE.Vector3(this.heroX - 5, 0, FIELD_Z - 38); }
+  camBase() { return this.view === "pov" ? new THREE.Vector3(this.heroX + 1.4, WALL_TOP + 6.4, this.heroZ + 6.3) : new THREE.Vector3(this.heroX + 2.6, WALL_TOP + 9.2, this.heroZ + 8.6); }
+  camLook() { return this.view === "pov" ? new THREE.Vector3(this.heroX + 1.4, 0.5, this.heroZ - 26) : new THREE.Vector3(this.heroX - 4, 0, this.heroZ - 28); }
   placeCamera(snap = false) { const cp = this.camBase(), lk = this.camLook(); if (snap) { this.camera.position.copy(cp); this.camera.lookAt(lk); } }
 
   // ── the world (art lives in worldArt.ts)
@@ -185,12 +186,12 @@ export class SiegeWorld {
   play(n: string, speed = 1) { if (this.hero) this.playA(this.hero, n, speed); }
   standAt(a: Actor, x: number, z: number, faceField = true) { a.obj.position.set(x, WALL_TOP + 0.25 - a.obj.userData.minY, z); a.obj.rotation.y = faceField ? Math.PI : 0; }
   async setFaction(fid: string) {
-    const was = this.view; this.faction = fid; this.view = viewOf(fid); this.reloadTime = (KIT[fid] || KIT.boulder).reload; if (this.state !== "play" || was !== this.view) this.heroX = this.view === "pov" ? POV_X : SIDE_X; if (!this.trebSet) this.trebFollow();
+    const was = this.view; this.faction = fid; this.view = viewOf(fid); this.reloadTime = (KIT[fid] || KIT.boulder).reload; if (this.state !== "play" || was !== this.view) { this.heroX = this.view === "pov" ? POV_X : SIDE_X; this.heroZ = HERO_Z; } if (!this.trebSet) this.trebFollow();
     if (this.hero) { this.scene.remove(this.hero.obj); this.hero = null; } this.leap = null; this.handBone = null;
     this.catapult.visible = true; if (!this.intro && !this.menu) this.placeCamera(true); this.fit(); if ((this.intro || this.menu) && this.introPath) { this.introPath.points[4] = this.camBase(); this.introLook.points[4] = this.camLook(); }
     if (fid === "boulder") return;
     const a = await this.makeActor(fid); if (this.over || this.faction !== fid) return;
-    this.standAt(a, this.heroX, HERO_Z); a.obj.rotation.y = this.heroYaw; this.loco = "idle";
+    this.standAt(a, this.heroX, this.heroZ); a.obj.rotation.y = this.heroYaw; this.loco = "idle";
     this.heroHome.copy(a.obj.position); this.scene.add(a.obj); this.hero = a;
     this.handBone = null; a.obj.traverse((o) => { if (!this.handBone && /RightHand$/i.test(o.name)) this.handBone = o; });
   }
@@ -231,13 +232,13 @@ export class SiegeWorld {
     const up = (e: PointerEvent) => { if (!this.charging) return; pos(e); this.charging = false; this.fire(Math.min(1, this.charge / 0.7)); this.charge = 0; };
     cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", up);
     cv.addEventListener("touchstart", (e) => e.preventDefault(), { passive: false });
-    const kd = (e: KeyboardEvent, v: boolean) => { const k = e.key.toLowerCase(); if (k === "a" || k === "arrowleft") this.keys.l = v; else if (k === "d" || k === "arrowright") this.keys.r = v; else if (k === "shift") this.keys.run = v; else if (v && k === "e") this.placeTreb(); else return; e.preventDefault(); };
-    this.onKD = (e) => kd(e, true); this.onKU = (e) => kd(e, false); this.onBlur = () => { this.keys = { l: false, r: false, run: false }; };
+    const kd = (e: KeyboardEvent, v: boolean) => { const k = e.key.toLowerCase(); if (k === "a" || k === "arrowleft") this.keys.l = v; else if (k === "d" || k === "arrowright") this.keys.r = v; else if (k === "w" || k === "arrowup") this.keys.f = v; else if (k === "s" || k === "arrowdown") this.keys.b = v; else if (k === "shift") this.keys.run = v; else if (v && k === "e") this.placeTreb(); else return; e.preventDefault(); };
+    this.onKD = (e) => kd(e, true); this.onKU = (e) => kd(e, false); this.onBlur = () => { this.keys = { l: false, r: false, f: false, b: false, run: false }; };
     window.addEventListener("keydown", this.onKD); window.addEventListener("keyup", this.onKU); window.addEventListener("blur", this.onBlur);
   }
   onKD: (e: KeyboardEvent) => void = () => {}; onKU: (e: KeyboardEvent) => void = () => {}; onBlur = () => {};
-  /** touch controls from the HUD: -1 / 0 / 1 and run */
-  setMove(dir: number, run?: boolean) { this.moveIn = dir; if (run !== undefined) this.runIn = run; }
+  /** touch joystick from the HUD: x (right +), z (back +), each -1…1; a full push runs */
+  setMove(dx: number, dz = 0, run?: boolean) { this.moveIn = dx; this.moveInZ = dz; if (run !== undefined) this.runIn = run; }
   needTreb() { return this.view === "side" && this.faction !== "ronin" && !this.trebSet; }
   trebFollow() { const own = this.view === "side" && this.faction !== "ronin"; const x = own ? Math.max(X_MIN + 2, Math.min(X_MAX - 2, this.heroX - 2.4)) : CATAPULT.x; this.treb.g.position.set(x, CATAPULT.y, TREB_Z); if (this.trebRing) { this.trebRing.visible = own && !this.trebSet && !this.menu && !this.intro; this.trebRing.position.set(x, WALL_TOP + 0.24, TREB_Z); } }
   placeTreb() {
@@ -246,13 +247,28 @@ export class SiegeWorld {
     this.say("Trebuchet set — it stays here. Walk the wall to see your shots.", 2.4); this.pushHud();
   }
   trebRing: THREE.Mesh | null = null;
-  /** walk / run along the wall-walk */
+  /** keep the hero on the deck: parapet, towers, gatehouse, trebuchet, the garrison, torches, the crew's stores */
+  collide(x: number, z: number) {
+    const R = HERO_R; x = Math.max(X_MIN, Math.min(X_MAX, x)); z = Math.max(Z_MIN, Math.min(Z_MAX, z));
+    const circ = (cx: number, cz: number, r: number) => { const dx = x - cx, dz = z - cz, d = Math.hypot(dx, dz), m = r + R; if (d < m) { const k = d > 1e-4 ? m / d : 1; x = cx + dx * k; z = cz + (d > 1e-4 ? dz * k : m); } };
+    const box = (x0: number, x1: number, z0: number, z1: number) => { if (x < x0 - R || x > x1 + R || z < z0 - R || z > z1 + R) return; const pl = x - (x0 - R), pr = x1 + R - x, pf = z - (z0 - R), pb = z1 + R - z; const m = Math.min(pl, pr, pf, pb); if (m === pl) x = x0 - R; else if (m === pr) x = x1 + R; else if (m === pf) z = z0 - R; else z = z1 + R; };
+    for (const tx of TOWERS) circ(tx, TOWER_Z, TOWER_R);
+    box(-5, 5, FIELD_Z - 1, FIELD_Z + 1.4); circ(-5.2, FIELD_Z - 0.9, 1.6); circ(5.2, FIELD_Z - 0.9, 1.6);
+    if (this.trebSet) { const t = this.treb.g.position; box(t.x - 1.4, t.x + 1.4, t.z - 3.2, t.z + 3.2); }
+    for (const g of this.garrison) circ(g.a.obj.position.x, g.a.obj.position.z, 0.35);
+    for (const tx of [-36.5, -30, -23.5, 11.5, 18, 33.5]) circ(tx, FIELD_Z + 0.55, 0.1);
+    box(CATAPULT.x - 4.4, CATAPULT.x - 1.6, 7.7, 9.2); box(CATAPULT.x + 3.5, CATAPULT.x + 5.6, 7.8, 9.2);
+    return [Math.max(X_MIN, Math.min(X_MAX, x)), Math.max(Z_MIN, Math.min(Z_MAX, z))];
+  }
+  /** move freely on the wall-walk and the terrace behind it (camera-relative: forward = toward the field) */
   stepHero(dt: number) {
     if (!this.hero || this.leap) return;
-    const dir = ((this.keys.r ? 1 : 0) - (this.keys.l ? 1 : 0)) || this.moveIn; const run = this.keys.run || this.runIn;
-    const want = dir * (run ? RUN : WALK); this.heroV += (want - this.heroV) * Math.min(1, dt * 7); if (!dir && Math.abs(this.heroV) < 0.08) this.heroV = 0;
-    const nx = Math.max(X_MIN, Math.min(X_MAX, this.heroX + this.heroV * dt)); if (nx !== this.heroX + this.heroV * dt) this.heroV = 0; this.heroX = nx;
-    const o = this.hero.obj; o.position.x = this.heroX; const sp = Math.abs(this.heroV); const loco = sp > 5.2 ? "run" : sp > 0.35 ? "walk" : "idle";
+    let ix = (this.keys.r ? 1 : 0) - (this.keys.l ? 1 : 0) + this.moveIn, iz = (this.keys.b ? 1 : 0) - (this.keys.f ? 1 : 0) + this.moveInZ; const mag = Math.min(1, Math.hypot(ix, iz)); if (mag > 0) { const n = Math.hypot(ix, iz); ix /= n; iz /= n; }
+    const run = this.keys.run || this.runIn || Math.hypot(this.moveIn, this.moveInZ) > 0.92; const spd = (run ? RUN : WALK) * (this.keys.l || this.keys.r || this.keys.f || this.keys.b ? 1 : Math.max(0.35, mag));
+    const k = Math.min(1, dt * 8); this.heroVX += (ix * spd * (mag > 0 ? 1 : 0) - this.heroVX) * k; this.heroVZ += (iz * spd * (mag > 0 ? 1 : 0) - this.heroVZ) * k; if (!mag && Math.hypot(this.heroVX, this.heroVZ) < 0.08) { this.heroVX = 0; this.heroVZ = 0; }
+    const [nx, nz] = this.collide(this.heroX + this.heroVX * dt, this.heroZ + this.heroVZ * dt); if (dt > 0) { this.heroVX = (nx - this.heroX) / dt * 0.5 + this.heroVX * 0.5; this.heroVZ = (nz - this.heroZ) / dt * 0.5 + this.heroVZ * 0.5; } this.heroX = nx; this.heroZ = nz;
+    this.heroV = Math.hypot(this.heroVX, this.heroVZ);
+    const o = this.hero.obj; o.position.x = this.heroX; o.position.z = this.heroZ; const sp = this.heroV; const loco = sp > 5.2 ? "run" : sp > 0.35 ? "walk" : "idle";
     const A = this.hero.actions; const cur = this.hero.current; const busy = !!cur && cur !== A.idle && cur !== A.walk && cur !== A.run;
     if (loco !== this.loco) { this.loco = loco; if (!busy) this.playA(this.hero, loco, 1, 0.22); }
     const act = A[this.loco]; let bob = 0;
@@ -285,7 +301,7 @@ export class SiegeWorld {
   hand() {
     if (this.view === "side") return this.cupPos();
     if (this.handBone) { const p = new THREE.Vector3(); this.handBone.getWorldPosition(p); return p; }
-    const h = this.hero ? this.hero.obj.position.clone() : new THREE.Vector3(this.heroX, WALL_TOP, HERO_Z); h.y += 1.4; h.z -= 0.4; return h;
+    const h = this.hero ? this.hero.obj.position.clone() : new THREE.Vector3(this.heroX, WALL_TOP, this.heroZ); h.y += 1.4; h.z -= 0.4; return h;
   }
 
   // ── firing: every faction's kit
@@ -603,7 +619,7 @@ export class SiegeWorld {
     (this.sky.material as THREE.ShaderMaterial).uniforms.uT.value = this.t; this.embers?.update(dt, this.camera.position, this.t);
     if (this.menu || this.intro) { if (this.menu) this.stepMenu(dt); else this.stepIntro(dt); this.flicker(dt); this.sky.position.copy(this.camera.position); this.composer.render(); return; }
     this.updateAim();
-    if (this.hero && !this.leap) { const o = this.hero.obj; const want = Math.atan2(this.aim.x - o.position.x, -(this.aim.z - o.position.z)); this.heroSpin += (want * (this.view === "pov" ? 0.6 : 0.3) - this.heroSpin) * Math.min(1, dt * 6); const face = Math.abs(this.heroV) > 0.35 && !this.charging ? (this.heroV > 0 ? Math.PI / 2 : -Math.PI / 2) : Math.PI - this.heroSpin; let d = face - this.heroYaw; d = Math.atan2(Math.sin(d), Math.cos(d)); this.heroYaw += d * Math.min(1, dt * 9); o.rotation.y = this.heroYaw; }
+    if (this.hero && !this.leap) { const o = this.hero.obj; const want = Math.atan2(this.aim.x - o.position.x, -(this.aim.z - o.position.z)); this.heroSpin += (want * (this.view === "pov" ? 0.6 : 0.3) - this.heroSpin) * Math.min(1, dt * 6); const face = this.heroV > 0.35 && !this.charging ? Math.atan2(this.heroVX, this.heroVZ) : Math.PI - this.heroSpin; let d = face - this.heroYaw; d = Math.atan2(Math.sin(d), Math.cos(d)); this.heroYaw += d * Math.min(1, dt * 9); o.rotation.y = this.heroYaw; }
     // catapult arm: cocks while charging, snaps on release, resets over the reload
     this.stepTreb(dt);
     { const cp = this.camera.position; for (const s of this.spiders) { if (s.mixer) continue; if (s.dead) continue; const near = s.g.position.distanceTo(cp) < 42 + s.size * 8; s.body.visible = near; s.lod.visible = !near; } }
@@ -613,8 +629,8 @@ export class SiegeWorld {
     for (const b of this.bolts) { b.life -= dt; (b.l.material as THREE.LineBasicMaterial).opacity = Math.max(0, b.life / 0.25); } for (const b of this.bolts) if (b.life <= 0) { this.scene.remove(b.l); b.l.geometry.dispose(); (b.l.material as THREE.Material).dispose(); } this.bolts = this.bolts.filter((b) => b.life > 0);
     // camera
     const cp = this.camBase(), look = this.camLook();
-    if (this.view === "pov") { look.x += (this.aim.x - this.heroX) * 0.12; look.z = Math.min(-8, this.aim.z * 0.35); cp.x += (this.aim.x - this.heroX) * 0.02 + (this.charging ? -this.charge * 0.25 : 0); }
-    else { look.x += (this.aim.x - (this.heroX - 5)) * 0.14; look.z += (this.aim.z - (FIELD_Z - 38)) * 0.08; cp.x += (this.aim.x - (this.heroX - 5)) * 0.02; if (this.leap && this.hero) { look.lerp(this.hero.obj.position, 0.5); } }
+    if (this.view === "pov") { look.x += (this.aim.x - this.heroX) * 0.12; look.z += (this.aim.z - (this.heroZ - 26)) * 0.12; cp.x += (this.aim.x - this.heroX) * 0.02 + (this.charging ? -this.charge * 0.25 : 0); }
+    else { look.x += (this.aim.x - (this.heroX - 4)) * 0.14; look.z += (this.aim.z - (this.heroZ - 28)) * 0.08; cp.x += (this.aim.x - (this.heroX - 4)) * 0.02; if (this.leap && this.hero) { look.lerp(this.hero.obj.position, 0.5); } }
     if (this.shake > 0) { this.shake = Math.max(0, this.shake - dt * 2.5); cp.x += (Math.random() - 0.5) * this.shake * 0.25; cp.y += (Math.random() - 0.5) * this.shake * 0.2; }
     this.camera.position.lerp(cp, Math.min(1, dt * 4)); this.camKick.lerp(look, Math.min(1, dt * 4)); this.camera.lookAt(this.camKick); this.sky.position.copy(this.camera.position);
     this.composer.render();
