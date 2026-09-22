@@ -100,7 +100,7 @@ export function buildMesas(c: Ctx) {
 
 type Mk = (geo: THREE.BufferGeometry, mat: THREE.Material, x: number, y: number, z: number, uvScale?: number) => THREE.Mesh;
 
-/** the citadel: curtain wall with batter, corbelled parapet and chunky merlons; a gatehouse with a pointed arch, doors and portcullis; round towers; the keep; the trebuchet bastion */
+/** the citadel: curtain wall with batter, corbelled parapet and chunky merlons; a gatehouse with a pointed arch, doors and portcullis; round towers; the keep; a rampart terrace behind the wall-walk */
 export function buildCastle(c: Ctx, trebX: number) {
   const { S, tex } = c;
   const stone = pbr(tex, "ashlar", { ns: 1.3 }), stone2 = pbr(tex, "ashlar2", { ns: 1.3 }), flag = pbr(tex, "flag", { ns: 0.9 }), wood = pbr(tex, "wood", { ns: 1 });
@@ -120,7 +120,9 @@ export function buildCastle(c: Ctx, trebX: number) {
   const mer: [number, number, number][] = [], cap: [number, number, number][] = []; for (let x = -L / 2 + 1; x < L / 2; x += 1.9) if (!skip(x)) { mer.push([x, WT + 1.62, FZ + 0.12]); cap.push([x, WT + 2.3, FZ + 0.12]); }
   inst(new THREE.BoxGeometry(1.15, 1.25, 0.8), stone, mer); inst(new THREE.BoxGeometry(1.32, 0.16, 0.96), stone2, cap);
   mk(new THREE.BoxGeometry(L, 0.2, WTH - 0.7), flag, 0, WT + 0.1, WZ + 0.3);                                 // wall-walk flagstones
-  mk(new THREE.BoxGeometry(L, 0.9, 0.45), stone, 0, WT + 0.45, WZ + WTH / 2 - 0.2);                          // inner parapet
+  // rampart terrace behind the wall-walk: one continuous deck you can walk and set a trebuchet on
+  { const z0 = WZ + WTH / 2, D = 9.5; mk(new THREE.BoxGeometry(L, WT, D), stone2, 0, WT / 2, z0 + D / 2); mk(new THREE.BoxGeometry(L, 0.2, D), flag, 0, WT + 0.1, z0 + D / 2); mk(new THREE.BoxGeometry(L, 1.0, 0.5), stone, 0, WT + 0.5, z0 + D - 0.25);
+    const pm: [number, number, number][] = []; for (let x = -L / 2 + 1.5; x < L / 2; x += 3.8) pm.push([x, WT + 1.35, z0 + D - 0.25]); inst(new THREE.BoxGeometry(0.9, 0.7, 0.55), stone2, pm); }
   for (let x = -55; x <= 55; x += 11) { if (skip(x) || Math.abs(x - trebX) < 6) continue; mk(new THREE.BoxGeometry(1.8, WT - 2, 1.4), stone2, x, (WT - 2) / 2, FZ - 0.7); const t = mk(new THREE.CylinderGeometry(0.01, 1.28, 1.3, 4, 1), stone2, x, WT - 1.35, FZ - 0.7); t.rotation.y = Math.PI / 4; t.scale.set(1, 1, 0.78); }
   // crimson banners on the wall face
   const bmat = new THREE.MeshStandardMaterial({ map: bannerTex(), side: THREE.DoubleSide, roughness: 0.9 });
@@ -134,7 +136,7 @@ export function buildCastle(c: Ctx, trebX: number) {
   const fg = new THREE.ExtrudeGeometry(facade, { depth: 1.4, bevelEnabled: false }); mk(fg, stone, 0, 0, FZ - 0.9);
   const ring = new THREE.Shape(); archPath(ring, 5.8, 4.4, 0); const ringHole = new THREE.Path(); archPath(ringHole, 4.6, 4.4, 0); ring.holes.push(ringHole);
   const rg = new THREE.ExtrudeGeometry(ring, { depth: 0.3, bevelEnabled: false }); const rm = mk(rg, stone2, 0, 0, FZ - 1.1); rm.scale.set(1, 1, 1);
-  mk(new THREE.BoxGeometry(GW, GH, WTH + 1.2), stone, 0, GH / 2, WZ + 0.9);                                   // gatehouse body behind the facade
+  mk(new THREE.BoxGeometry(GW, GH, 1.4), stone, 0, GH / 2, FZ + 0.7);                                          // gatehouse body (thin: the wall-walk passes behind it)
   mk(new THREE.BoxGeometry(4.8, 6.6, 1.6), dark, 0, 3.3, FZ + 1.0);                                          // passage darkness
   // doors: two leaves filling the arch, timber with iron straps and studs
   const doorS = new THREE.Shape(); archPath(doorS, 4.5, 4.4, 0); const dg = new THREE.ExtrudeGeometry(doorS, { depth: 0.25, bevelEnabled: false }); mk(dg, wood, 0, 0, FZ + 0.2, 0.5);
@@ -148,7 +150,7 @@ export function buildCastle(c: Ctx, trebX: number) {
   const gc: [number, number, number][] = []; for (let x = -GW / 2 + 0.5; x <= GW / 2 - 0.4; x += 1.1) gc.push([x, GH - 0.3, FZ - 1.1]); inst(new THREE.BoxGeometry(0.42, 0.6, 0.5), stone2, gc);
   mk(new THREE.BoxGeometry(GW + 0.4, 1.0, 0.8), stone, 0, GH + 0.5, FZ - 0.9);
   const gm: [number, number, number][] = []; for (let x = -GW / 2 + 0.8; x <= GW / 2 - 0.7; x += 1.9) gm.push([x, GH + 1.62, FZ - 0.9]); inst(new THREE.BoxGeometry(1.15, 1.25, 0.8), stone, gm);
-  mk(new THREE.BoxGeometry(GW, 0.2, WTH + 2), flag, 0, GH + 0.1, WZ + 0.4);
+  mk(new THREE.BoxGeometry(GW, 0.2, 2.4), flag, 0, GH + 0.1, FZ + 0.25);
   for (const sx of [-1, 1]) {
     const tx = sx * (GW / 2 + 0.2), tz = FZ - 0.9; const cone = new THREE.Mesh(new THREE.ConeGeometry(1.6, 2.4, 20, 1, true), stone2); cone.rotation.x = Math.PI; cone.position.set(tx, GH - 3.8, tz); S.add(cone);
     const cy = new THREE.Mesh(new THREE.CylinderGeometry(1.55, 1.55, 6.6, 20), pbr(tex, "ashlar", { repeat: [2.5, 1.7], ns: 1.3 })); cy.position.set(tx, GH + 0.7, tz); cy.castShadow = true; S.add(cy);
@@ -160,7 +162,7 @@ export function buildCastle(c: Ctx, trebX: number) {
 
   // ── round towers
   for (const tx of [-15.5, 15.5, -42, 42]) {
-    const tz = WZ - 1.2, H = 19, r0 = 4.2; const circ = 2 * Math.PI * r0;
+    const tz = WZ - 4.5, H = 19, r0 = 4.2; /* towers stand proud of the wall so the wall-walk runs behind them */ const circ = 2 * Math.PI * r0;
     const tw = new THREE.Mesh(new THREE.CylinderGeometry(r0, r0 + 0.6, H, 32, 1), pbr(tex, "ashlar", { repeat: [circ / 4, H / 4], ns: 1.3 })); tw.position.set(tx, H / 2, tz); tw.castShadow = true; tw.receiveShadow = true; S.add(tw);
     const rc: [number, number, number, number][] = []; for (let i = 0; i < 22; i++) { const a = (i / 22) * Math.PI * 2; rc.push([tx + Math.cos(a) * (r0 + 0.15), H - 0.4, tz + Math.sin(a) * (r0 + 0.15), -a + Math.PI / 2]); } inst(new THREE.BoxGeometry(0.45, 0.6, 0.5), stone2, rc);
     const crown = new THREE.Mesh(new THREE.CylinderGeometry(r0 + 0.5, r0 + 0.5, 1.2, 32), pbr(tex, "ashlar", { repeat: [circ / 4, 0.3], ns: 1.3 })); crown.position.set(tx, H + 0.5, tz); crown.castShadow = true; S.add(crown);
@@ -170,7 +172,7 @@ export function buildCastle(c: Ctx, trebX: number) {
     const w = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 1.0), new THREE.MeshBasicMaterial({ color: 0xffb35a })); w.position.set(tx + 1.8, 12, tz - Math.sqrt(r0 * r0 - 1.8 * 1.8) - 0.3); w.lookAt(tx + 3.6, 12, tz - 20); S.add(w);
   }
   // ── the keep behind the wall
-  { const kx = -8, kz = WZ + 17, KW = 24, KH = 28, KD = 14;
+  { const kx = -8, kz = WZ + 24, KW = 24, KH = 28, KD = 14;
     mk(new THREE.BoxGeometry(KW, KH, KD), stone, kx, KH / 2, kz);
     for (const bx of [-KW / 2, -KW / 6, KW / 6, KW / 2]) mk(new THREE.BoxGeometry(1.6, KH - 4, 1.4), stone2, kx + bx, (KH - 4) / 2, kz - KD / 2 - 0.6);
     const km: [number, number, number][] = []; for (let x = -KW / 2 + 0.7; x <= KW / 2; x += 1.9) km.push([kx + x, KH + 0.7, kz - KD / 2 + 0.3]); inst(new THREE.BoxGeometry(1.15, 1.4, 0.7), stone, km);
@@ -182,14 +184,11 @@ export function buildCastle(c: Ctx, trebX: number) {
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 5, 6), iron); pole.position.set(kx + 5, KH + 26, kz + 2); S.add(pole);
     const fl = new THREE.Mesh(new THREE.PlaneGeometry(3, 1.6, 8, 1), new THREE.MeshStandardMaterial({ color: 0xb01e28, side: THREE.DoubleSide })); fl.position.set(kx + 6.5, KH + 27.6, kz + 2); fl.name = "flag"; S.add(fl);
   }
-  // ── trebuchet bastion: a platform behind the wall at trebX
-  { const bz0 = WZ + WTH / 2, BD = 9, BW = 11; mk(new THREE.BoxGeometry(BW, WT, BD), stone, trebX, WT / 2, bz0 + BD / 2); mk(new THREE.BoxGeometry(BW, 0.2, BD), flag, trebX, WT + 0.1, bz0 + BD / 2);
-    for (const sx of [-1, 1]) mk(new THREE.BoxGeometry(0.5, 1.0, BD), stone, trebX + sx * (BW / 2 - 0.25), WT + 0.5, bz0 + BD / 2);
-    mk(new THREE.BoxGeometry(BW, 1.0, 0.5), stone, trebX, WT + 0.5, bz0 + BD - 0.25);
-    for (const [x, z] of [[trebX - BW / 2 + 0.6, bz0 + BD - 0.6], [trebX + BW / 2 - 0.6, bz0 + BD - 0.6]]) c.torch(x, WT + 1.9, z, 1.1, true);
+  // ── the crew's stores at the back of the terrace
+  { const bz0 = WZ + WTH / 2;
     // stacked ammunition + barrels
-    const rockM = pbr(tex, "rock", { color: 0xcfc2b0, ns: 1.2 }); for (let i = 0; i < 7; i++) { const r = new THREE.Mesh(new THREE.DodecahedronGeometry(0.42, 1), rockM); r.position.set(trebX - 4 + (i % 3) * 0.8 + (i > 2 ? 0.4 : 0), WT + 0.6 + (i > 2 ? 0.55 : 0) + (i > 5 ? 0.55 : 0), bz0 + 6 + (i % 2) * 0.5); r.castShadow = true; S.add(r); }
-    for (const [x, z] of [[trebX + 4, bz0 + 6.5], [trebX + 4.2, bz0 + 7.6]]) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 1.1, 12), wood); b.position.set(x, WT + 0.75, z); b.castShadow = true; S.add(b); }
+    const rockM = pbr(tex, "rock", { color: 0xcfc2b0, ns: 1.2 }); for (let i = 0; i < 7; i++) { const r = new THREE.Mesh(new THREE.DodecahedronGeometry(0.42, 1), rockM); r.position.set(trebX - 4 + (i % 3) * 0.8 + (i > 2 ? 0.4 : 0), WT + 0.6 + (i > 2 ? 0.55 : 0) + (i > 5 ? 0.55 : 0), bz0 + 8 + (i % 2) * 0.5); r.castShadow = true; S.add(r); }
+    for (const [x, z] of [[trebX + 4, bz0 + 8.3], [trebX + 5.1, bz0 + 8.4]]) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 1.1, 12), wood); b.position.set(x, WT + 0.75, z); b.castShadow = true; S.add(b); }
   }
 }
 

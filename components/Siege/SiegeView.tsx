@@ -31,7 +31,7 @@ function Bar({ v, color = GOLD }: { v: number; color?: string }) {
 export default function SiegeView() {
   const wrapRef = useRef<HTMLDivElement | null>(null); const canvasRef = useRef<HTMLCanvasElement | null>(null); const engRef = useRef<any>(null); const autoStart = useRef(false);
   const [hud, setHud] = useState<Hud>(EMPTY); const [result, setResult] = useState<{ won: boolean; score: number; kills: number; waves: number } | null>(null); const [err, setErr] = useState<string | null>(null); const [gen, setGen] = useState(0);
-  const [fs, setFs] = useState(false); const [picker, setPicker] = useState(false); const [loading, setLoading] = useState(true);
+  const [fs, setFs] = useState(false); const [run, setRun] = useState(false); const [picker, setPicker] = useState(false); const [loading, setLoading] = useState(true);
   const [faction, setFaction] = useState<string>(() => { try { const f = localStorage.getItem("ra:siege:faction"); return f && (FACTIONS as readonly string[]).includes(f) ? f : "ronin"; } catch { return "ronin"; } });
   const factionRef = useRef(faction); factionRef.current = faction; const mode = viewOf(faction);
   const [boxH, setBoxH] = useState(600); const compact = boxH < 460;
@@ -92,6 +92,20 @@ export default function SiegeView() {
           <div style={{ position: "absolute", left: "50%", bottom: 16, transform: "translateX(-50%)", textAlign: "center", pointerEvents: "none" }}>
             <div style={{ fontSize: 10, letterSpacing: "0.3em", color: hud.charge ? (hud.charge > 0.92 ? "#ffb070" : CREAM) : MUTED, textShadow: "0 1px 3px #000", marginBottom: 5 }}>{hud.charge ? (hud.charge > 0.92 ? "RELEASE" : "CHARGING") : hud.reload > 0 ? "RELOADING" : "HOLD TO CHARGE"}</div>
             <div style={{ width: "min(240px, 30vw)", height: 4, background: "rgba(0,0,0,0.55)", border: "1px solid rgba(232,193,112,0.35)" }}><div style={{ height: "100%", width: `${hud.charge ? hud.charge * 100 : (1 - hud.reload) * 100}%`, background: hud.charge ? (hud.charge > 0.92 ? "#ffb070" : GOLD) : hud.reload > 0 ? "#7a6a52" : GOLD }} /></div>
+          </div>
+          {/* set the trebuchet (catapult crews, once) */}
+          {hud.treb && (
+            <button type="button" onClick={() => engRef.current?.placeTreb?.()} style={{ position: "absolute", left: "50%", bottom: compact ? 76 : 64, transform: "translateX(-50%)", fontFamily: cinzel, fontSize: compact ? 12 : 15, letterSpacing: "0.26em", color: "#1a0f06", background: "linear-gradient(180deg,#f3d58f,#c9953f)", border: "1px solid #fff0c0", padding: compact ? "7px 16px" : "10px 24px", cursor: "pointer", boxShadow: "0 0 24px rgba(255,190,90,0.6), 0 4px 10px #000", animation: "siegePulse 1.4s ease-in-out infinite" }}>⚒ SET TREBUCHET HERE <span style={{ opacity: 0.6, fontSize: "0.75em" }}>(E)</span></button>
+          )}
+          {/* walk / run pad */}
+          <div style={{ position: "absolute", right: 14, bottom: 12, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5 }}>
+            {!compact && <div style={{ fontFamily: "system-ui, sans-serif", fontSize: 10, color: MUTED, textShadow: "0 1px 3px #000", pointerEvents: "none" }}><b style={{ color: CREAM }}>A / D</b> walk · <b style={{ color: CREAM }}>SHIFT</b> run</div>}
+            <div style={{ display: "flex", gap: 6 }}>
+              {([-1, 1] as const).map((d) => (
+                <button key={d} type="button" aria-label={d < 0 ? "walk left" : "walk right"} onPointerDown={(e) => { e.preventDefault(); (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); engRef.current?.setMove?.(d); }} onPointerUp={() => engRef.current?.setMove?.(0)} onPointerCancel={() => engRef.current?.setMove?.(0)} onContextMenu={(e) => e.preventDefault()} style={{ ...btn, width: compact ? 46 : 54, height: compact ? 40 : 46, fontSize: 18, padding: 0, touchAction: "none" }}>{d < 0 ? "◀" : "▶"}</button>
+              ))}
+              <button type="button" onClick={() => { const r = !run; setRun(r); engRef.current?.setMove?.(engRef.current?.moveIn ?? 0, r); }} style={{ ...btn, height: compact ? 40 : 46, padding: "0 10px", color: run ? "#1a0f06" : CREAM, background: run ? "linear-gradient(180deg,#f3d58f,#c9953f)" : btn.background }}>RUN</button>
+            </div>
           </div>
           {/* boss bar */}
           {hud.boss && (
@@ -177,6 +191,7 @@ export default function SiegeView() {
       )}
       {err && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#e0533a", background: "rgba(0,0,0,0.7)", padding: 20, textAlign: "center", fontSize: 13, fontFamily: "system-ui, sans-serif" }}>The siege engine could not start on this device ({err}). WebGL is required.</div>}
       <style>{`@keyframes siegeMsg { from { opacity:0; transform: translateY(-8px) scale(.96);} to { opacity:1; transform:none; } }
+        @keyframes siegePulse { 0%,100% { filter: brightness(1) } 50% { filter: brightness(1.25) } }
         @keyframes siegeBanner { 0% { opacity:0; letter-spacing:.4em } 18% { opacity:1 } 80% { opacity:1 } 100% { opacity:0 } }
         @keyframes siegeRise { from { opacity:0; transform: translateY(10px) } to { opacity:1; transform:none } }
         @keyframes siegeIntroA { 0%,8% { opacity:0; transform:translateY(6px) } 18%,40% { opacity:.85; transform:none } 50%,100% { opacity:0 } }

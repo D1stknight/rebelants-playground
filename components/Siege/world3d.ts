@@ -1,6 +1,7 @@
 // components/Siege/world3d.ts — The Siege: one three.js world, two cameras.
 //   side  — the Citadel view: a ¾ cinematic shot along the wall; you man a catapult on the wall-walk (Ronin / Samurai / Warrior / Buke / Shogun).
 //   pov   — the Battlements view: over the shoulder of your ant; you throw from the parapet (Ashigaru / Yamabushi / Kenshi / Sohei / Bushi / Wokou).
+// Both walk the wall-walk (A/D or ◀ ▶, Shift / RUN to run). Catapult crews set their trebuchet down once, anywhere on the rampart, then roam free.
 // Same controls in both: move to aim (marker on the ground or the wall face), hold to charge, release. Horde runs up the field (-z), climbs the wall
 // face at z = FIELD_Z; silk towers and beetle rams roll up to the gate. Units are metres; the wall runs along x, the field is -z.
 import * as THREE from "three";
@@ -16,7 +17,9 @@ import { buildSky, buildCastle, buildField, buildMesas, buildTrebuchet, buildBug
 
 const G = 20; const WALL_TOP = 9, WALL_Z = -1.5, WALL_T = 3; const FIELD_Z = WALL_Z - WALL_T / 2;
 const CLIPS = ["idle", "attack", "magic", "special", "win"] as const;
-const CATAPULT = new THREE.Vector3(28, WALL_TOP + 0.2, WALL_Z + 2.2); const POV_X = -27.5;   // where you stand in the battlements view (between the gatehouse and the west gate tower)
+const HERO_Z = WALL_Z + 0.55, TREB_Z = WALL_Z + 5.5, X_MIN = -50, X_MAX = 50;   // the walking line along the wall-walk; trebuchets stand on the rampart terrace behind it
+const CATAPULT = new THREE.Vector3(28, WALL_TOP + 0.2, TREB_Z); const POV_X = -27.5; const SIDE_X = 30.6;   // default stations (battlements / catapult)
+const WALK = 3.4, RUN = 7.5;
 type Rig = { scene: THREE.Object3D; clips: Record<string, THREE.AnimationClip>; k: number; minY: number };
 type Actor = { obj: THREE.Object3D; mixer: THREE.AnimationMixer; actions: Record<string, THREE.AnimationAction>; current: THREE.AnimationAction | null; fid: string };
 type SpiderKind = "crawler" | "slinger" | "wasp" | "brute" | "brood";
@@ -24,7 +27,7 @@ type Spider = { g: THREE.Group; body: THREE.Group; lod: THREE.Group; legs: Leg[]
 type Engine = { kind: "tower" | "ram"; g: THREE.Group; x: number; z: number; hp: number; hpMax: number; speed: number; arrived: boolean; dead: boolean; wheels: THREE.Mesh[]; bangT: number };
 type Target = { pos: THREE.Vector3; r: number; s?: Spider; e?: Engine };
 type ShotKind = "spear" | "orb" | "arrow" | "boulder" | "blade" | "ward" | "stake" | "hook" | "standard" | "web" | "venom";
-type Shot = { m: THREE.Object3D; p: THREE.Vector3; v: THREE.Vector3; kind: ShotKind; life: number; dmg: number; hit: Set<object>; light?: THREE.PointLight; k: number; ally?: boolean; sub?: string; rope?: THREE.Line; stuck?: boolean };
+type Shot = { m: THREE.Object3D; p: THREE.Vector3; v: THREE.Vector3; kind: ShotKind; life: number; dmg: number; hit: Set<object>; k: number; ally?: boolean; sub?: string; rope?: THREE.Line; stuck?: boolean };
 type Part = { s: THREE.Sprite; v: THREE.Vector3; life: number; life0: number; g: number; grow: number; size: number };
 type Bolt = { l: THREE.Line; life: number };
 type Zone = { kind: "ward" | "trap" | "standard"; pos: THREE.Vector3; r: number; life: number; life0: number; m: THREE.Object3D; tick: number; k: number };
@@ -49,6 +52,7 @@ function loadRig(fid: string): Promise<Rig> {
     const fbxs = await Promise.all(CLIPS.map((c) => fb.loadAsync(`/faction-wars/characters/${fid}/${c}.fbx`).catch(() => null)));
     const clips: Record<string, THREE.AnimationClip> = {};
     CLIPS.forEach((c, i) => { const src = fbxs[i]?.animations?.[0]; if (!src) return; const clip = src.clone(); clip.tracks = clip.tracks.map((t) => { t.name = t.name.replace(/^mixamorig(?!_)([A-Z][^.]*)(\..+)$/, "mixamorig_$1$2"); return t; }).filter((t) => t.name.endsWith(".quaternion")); clips[c] = clip; });
+    try { const lj = await (await fetch(`/siege/anim/${fid}.json`)).json(); for (const n of ["walk", "run"]) { const L = lj[n]; if (!L) continue; const times = Float32Array.from({ length: L.n }, (_, i) => i / L.fps); clips[n] = new THREE.AnimationClip(n, L.dur, Object.entries(L.tracks as Record<string, number[]>).map(([b, q]) => new THREE.QuaternionKeyframeTrack(`mixamorig_${b}.quaternion`, times, q))); clips[n].userData = { bob: L.bob }; } } catch {}
     return { scene: s, clips, k: 1.85 / h, minY: box.min.y };
   })();
   return rigCache[fid];
@@ -57,7 +61,7 @@ function loadRig(fid: string): Promise<Rig> {
 export class SiegeWorld {
   canvas: HTMLCanvasElement; cb: Callbacks; faction = "ronin"; view: View = "side"; over = false; ready = false;
   renderer!: THREE.WebGLRenderer; scene!: THREE.Scene; camera!: THREE.PerspectiveCamera; composer!: EffectComposer; clock = new THREE.Clock();
-  tex: Record<string, THREE.Texture> = {}; hero: Actor | null = null; heroHome = new THREE.Vector3(); heroSpin = 0; garrison: { a: Actor; cd: number }[] = []; catapult!: THREE.Group; arm!: THREE.Group; armK = 0; treb!: Treb; armMode: "ready" | "swing" | "return" = "ready"; armT = 0; armA = 2.15; pendingFire: number | null = null; embers!: Embers; menu = true; paused = false; boss: Spider | null = null; banner = false;
+  tex: Record<string, THREE.Texture> = {}; hero: Actor | null = null; heroHome = new THREE.Vector3(); heroSpin = 0; heroX = SIDE_X; heroV = 0; heroYaw = Math.PI; loco: "idle" | "walk" | "run" = "idle"; keys = { l: false, r: false, run: false }; moveIn = 0; runIn = false; trebSet = false; lights: { l: THREE.PointLight; until: number; follow: THREE.Object3D | null; i0: number; t0: number }[] = []; warmed = false; perf = { acc: 0, n: 0, level: 0 }; bloom!: UnrealBloomPass; garrison: { a: Actor; cd: number }[] = []; catapult!: THREE.Group; arm!: THREE.Group; armK = 0; treb!: Treb; armMode: "ready" | "swing" | "return" = "ready"; armT = 0; armA = 2.15; pendingFire: number | null = null; embers!: Embers; menu = true; paused = false; boss: Spider | null = null; banner = false;
   spiders: Spider[] = []; engines: Engine[] = []; shots: Shot[] = []; parts: Part[] = []; bolts: Bolt[] = []; zones: Zone[] = []; flings: Fling[] = []; flames: THREE.Sprite[] = []; torchLights: THREE.PointLight[] = [];
   marker!: THREE.Mesh; aim = new THREE.Vector3(0, 0, -30); pointer = { x: 0.5, y: 0.6 }; charge = 0; charging = false; reload = 0; reloadTime = 1.2;
   state: Hud["state"] = "ready"; gateHp = 1000; gateMax = 1000; wave = 0; score = 0; kills = 0; msg: string | null = null; msgT = 0; hordeLeft = 0; spawnQueue: { at: number; fn: () => void }[] = []; waveT = 0; waveDone = false; hudT = 0; t = 0; shake = 0; rally = 0;
@@ -81,19 +85,40 @@ export class SiegeWorld {
     await Promise.all([...["ashlar", "ashlar2", "flag", "dirt", "wood", "rock"].flatMap((n) => [load(n + "_a", `/siege/tex/${n}_a.jpg`), load(n + "_n", `/siege/tex/${n}_n.jpg`, false), load(n + "_r", `/siege/tex/${n}_r.jpg`, false)]), ...["glow", "flare", "spark", "smoke", "dirt", "ring", "flame", "bolt2", "star", "slash", "scorch", "smoke2"].map((n) => load(n, `/siege/fx/${n}.png`))]);
     if (this.over) { r.dispose(); return; }
     this.buildWorld(); this.buildCatapult();
-    const rp = new RenderPass(this.scene, this.camera); const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.32, 0.5, 0.92); this.composer = new EffectComposer(r); this.composer.addPass(rp); this.composer.addPass(bloom);
+    const rp = new RenderPass(this.scene, this.camera); const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.32, 0.5, 0.92); this.bloom = bloom; this.composer = new EffectComposer(r); this.composer.addPass(rp); this.composer.addPass(bloom);
     this.placeCamera(true); this.fit(); window.addEventListener("resize", this.fitBound); requestAnimationFrame(this.fitBound); setTimeout(this.fitBound, 300);
     this.bindInput(); await Promise.all([this.buildGarrison().catch(() => {}), this.setFaction(this.faction), loadBugModels().then((m) => { this.bugModels = m; })]); if (this.over) return;
-    this.buildIntro(); this.embers = new Embers(this.scene, this.tex.glow);
+    this.buildIntro(); this.embers = new Embers(this.scene, this.tex.glow); this.warm();
     this.ready = true; (window as any).__siege = this; (window as any).__THREE = THREE; this.pushHud(); this.loop();
+  }
+  /** compile every shader the fight will need (each bug kind, every shot, the fx sprites, their shadow passes) up front — no first-use hitches mid-wave */
+  warm() {
+    const g = new THREE.Group(); g.position.set(0, 2, FIELD_Z - 24); this.scene.add(g);
+    for (const k of ["crawler", "slinger", "wasp", "brute", "brood"] as SpiderKind[]) { const b = buildBug(k, this.bugModels); b.g.position.x = (g.children.length - 2) * 4; b.lod.visible = true; g.add(b.g); }
+    const nShots = this.shots.length, nParts = this.parts.length; const p = new THREE.Vector3(0, 4, FIELD_Z - 20), v = new THREE.Vector3();
+    this.spawnSpear(p, v, 0); this.spawnBlade(p, v, 0); this.spawnOrb(p, v, 0, "storm"); this.spawnStake(p, v, 0); this.spawnHook(p, v, 0); this.spawnBoulder(p, v, 0, "blade"); this.spawnBoulder(p, v, 0, "shield"); this.spawnBoulder(p, v, 0, "great"); this.spawnStandard(p, v, 0);
+    for (const n of ["smoke", "dirt", "flare", "spark"] as const) this.puff(p, n as any, 1, 0xffffff, 1, 1); this.ringFx(p, 0xffffff, 3); this.slashFx(p);
+    const cam = this.camera.position.clone(), q = this.camera.quaternion.clone(); this.camera.position.set(0, 8, FIELD_Z - 8); this.camera.lookAt(0, 2, FIELD_Z - 24);
+    try { this.renderer.compile(this.scene, this.camera); this.composer.render(); } catch {}
+    this.camera.position.copy(cam); this.camera.quaternion.copy(q);
+    for (const sh of this.shots.splice(nShots)) { this.scene.remove(sh.m); if (sh.rope) this.scene.remove(sh.rope); } for (const pt of this.parts.splice(nParts)) this.scene.remove(pt.s); for (const b of this.bolts) this.scene.remove(b.l); this.bolts = [];
+    for (const l of this.lights) { l.l.intensity = 0; l.follow = null; } this.scene.remove(g); this.drop(g); this.warmed = true;
+  }
+  /** adaptive quality: if frames run long for a couple of seconds, step down (pixel ratio → bloom → shadow res) */
+  perfStep(raw: number) {
+    if (raw > 0.25 || this.menu) return; const P = this.perf; P.acc += raw; P.n++; if (P.n < 120) return; const avg = P.acc / P.n; P.acc = 0; P.n = 0;
+    if (avg < 1 / 40 || P.level >= 3) return; P.level++;
+    if (P.level === 1) { this.renderer.setPixelRatio(1); this.fit(); }
+    else if (P.level === 2) { this.bloom.enabled = false; }
+    else { this.sun.shadow.mapSize.set(1024, 1024); this.sun.shadow.map?.dispose(); (this.sun.shadow as any).map = null; }
   }
   fitBound = () => this.fit();
   fit() { const el = this.canvas.parentElement || this.canvas; const w = Math.max(1, el.clientWidth), h = Math.max(1, el.clientHeight); this.renderer.setSize(w, h, false); this.composer.setSize(w, h); this.camera.aspect = w / h; this.camera.fov = this.view === "pov" ? (w / h < 1.2 ? 72 : 58) : (w / h < 1.2 ? 70 : 54); this.camera.updateProjectionMatrix(); }
-  destroy() { this.over = true; window.removeEventListener("resize", this.fitBound); try { this.renderer?.dispose(); this.renderer?.forceContextLoss?.(); } catch {} }
+  destroy() { this.over = true; window.removeEventListener("resize", this.fitBound); window.removeEventListener("keydown", this.onKD); window.removeEventListener("keyup", this.onKU); window.removeEventListener("blur", this.onBlur); try { this.renderer?.dispose(); this.renderer?.forceContextLoss?.(); } catch {} }
 
   // ── cameras
-  camBase() { return this.view === "pov" ? new THREE.Vector3(POV_X + 1.7, WALL_TOP + 3.9, 3.0) : new THREE.Vector3(CATAPULT.x + 6.2, WALL_TOP + 5.4, CATAPULT.z + 8.2); }
-  camLook() { return this.view === "pov" ? new THREE.Vector3(POV_X + 1.7, WALL_TOP - 1.2, -30) : new THREE.Vector3(CATAPULT.x - 12, 1, FIELD_Z - 40); }
+  camBase() { return this.view === "pov" ? new THREE.Vector3(this.heroX + 1.7, WALL_TOP + 3.9, HERO_Z + 3.95) : new THREE.Vector3(this.heroX + 3.2, WALL_TOP + 7.6, HERO_Z + 12.5); }
+  camLook() { return this.view === "pov" ? new THREE.Vector3(this.heroX + 1.7, WALL_TOP - 1.2, -30) : new THREE.Vector3(this.heroX - 5, 0, FIELD_Z - 38); }
   placeCamera(snap = false) { const cp = this.camBase(), lk = this.camLook(); if (snap) { this.camera.position.copy(cp); this.camera.lookAt(lk); } }
 
   // ── the world (art lives in worldArt.ts)
@@ -103,16 +128,28 @@ export class SiegeWorld {
     const gg = new THREE.PlaneGeometry(500, 500, 180, 180); gg.rotateX(-Math.PI / 2); { const pos = gg.attributes.position as THREE.BufferAttribute; for (let i = 0; i < pos.count; i++) pos.setY(i, terrainH(pos.getX(i), pos.getZ(i))); gg.computeVertexNormals(); }
     const ground = new THREE.Mesh(gg, pbr(this.tex, "dirt", { repeat: [62, 62], ns: 1.4, color: 0xf0e2cc })); ground.receiveShadow = true; S.add(ground);
     buildCastle(ctx, CATAPULT.x); buildField(ctx, CRATERS); buildMesas(ctx);
-    for (const tx of [-36.5, -30, -23.5, 11.5, 20.5, 36]) this.torch(tx, WALL_TOP + 1.9, WALL_Z + 1.1, 1.05, tx === -30 || tx === -23.5);
+    for (const tx of [-36.5, -30, -23.5, 11.5, 18, 33.5]) this.torch(tx, WALL_TOP + 1.9, FIELD_Z + 0.55, 1.05);
     for (const tx of [-27, 27]) this.torch(tx, 6.2, FIELD_Z - 0.6, 1.2);
     this.sky = buildSky(S);
     // golden-hour sun (shadows) + sky/ground fill
     const sun = new THREE.DirectionalLight(0xffd6a0, 3.4); sun.position.copy(SUN_DIR).multiplyScalar(150); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); const sc = sun.shadow.camera as THREE.OrthographicCamera; sc.left = -75; sc.right = 75; sc.top = 75; sc.bottom = -75; sc.near = 20; sc.far = 400; sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.04; sun.target.position.set(0, 0, -20); S.add(sun); S.add(sun.target); this.sun = sun;
     S.add(new THREE.HemisphereLight(0xbcd2ff, 0x8a6a4a, 1.1));
+    for (let i = 0; i < 3; i++) { const l = new THREE.PointLight(0xffffff, 0, 20, 1.6); l.position.set(0, -50, 0); S.add(l); this.lights.push({ l, until: 0, follow: null, i0: 0, t0: 0 }); }
     this.marker = new THREE.Mesh(new THREE.RingGeometry(1.2, 1.6, 40), new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false })); this.marker.rotation.x = -Math.PI / 2; this.marker.position.set(0, 0.06, -30); S.add(this.marker);
-    const shaft = new THREE.CylinderGeometry(0.035, 0.05, 2.4, 6); shaft.rotateX(-Math.PI / 2); const tip = new THREE.ConeGeometry(0.09, 0.45, 6); tip.rotateX(-Math.PI / 2); tip.translate(0, 0, -1.4); this.spearGeo = shaft; this.tipGeo = tip;
+    const shaft = new THREE.CylinderGeometry(0.035, 0.05, 2.4, 6); shaft.rotateX(-Math.PI / 2); const tip = new THREE.ConeGeometry(0.09, 0.45, 6); tip.rotateX(-Math.PI / 2); tip.translate(0, 0, -1.4); this.spearGeo = shaft; this.tipGeo = tip; shaft.userData.keep = tip.userData.keep = true;
   }
-  sun!: THREE.DirectionalLight; bugModels: BugModels = {};
+  sun!: THREE.DirectionalLight; bugModels: BugModels = {}; ringGeo = new THREE.RingGeometry(0.6, 1, 40);
+  /** free the GPU buffers of a one-off object (shared geometry is tagged keep) */
+  drop(o: THREE.Object3D) { o.traverse((c: any) => { if (c.isSkinnedMesh) c.skeleton?.dispose?.(); if (c.geometry && !c.geometry.userData.keep && !c.isSkinnedMesh) c.geometry.dispose(); if (c.isSprite || c.isLine) c.material?.dispose?.(); }); }
+  /** borrow a pooled point light: a short flash (dur < 1 s fades out), or one that follows an object until it leaves the scene */
+  flash(p: THREE.Vector3, col: number, intensity: number, dist: number, dur: number, follow: THREE.Object3D | null = null) {
+    let slot = this.lights.find((x) => x.l.intensity === 0) || this.lights.slice().sort((a, b) => (a.follow ? 1 : 0) - (b.follow ? 1 : 0) || a.until - b.until)[0];
+    slot.l.color.setHex(col); slot.l.distance = dist; slot.l.intensity = intensity; slot.l.position.copy(p); slot.i0 = intensity; slot.t0 = this.t; slot.until = this.t + dur; slot.follow = follow;
+  }
+  stepLights() {
+    for (const x of this.lights) { if (x.l.intensity === 0) continue; if (x.follow) { if (!x.follow.parent) { x.l.intensity = 0; x.follow = null; continue; } x.follow.getWorldPosition(x.l.position); }
+      if (this.t >= x.until) { x.l.intensity = 0; x.follow = null; continue; } const d = x.until - x.t0; if (d < 1) x.l.intensity = x.i0 * Math.max(0, (x.until - this.t) / d); }
+  }
   torch(x: number, y: number, z: number, k: number, light = false) {
     if (light) { const l = new THREE.PointLight(0xff9a3a, 6 * k, 16, 1.8); l.position.set(x, y, z); l.userData.k = k; this.scene.add(l); this.torchLights.push(l); }
     const f = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.tex.flame, color: 0xffc36a, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })); f.scale.set(0.6 * k, 1.0 * k, 1); f.position.set(x, y + 0.2, z); this.scene.add(f); this.flames.push(f);
@@ -120,7 +157,8 @@ export class SiegeWorld {
     const post = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.4, 6), new THREE.MeshStandardMaterial({ color: 0x5a4030, emissive: 0x2a1a10 })); post.position.set(x, y - 0.8, z); this.scene.add(post);
   }
   buildCatapult() {
-    this.treb = buildTrebuchet({ S: this.scene, tex: this.tex, torch: () => {}, terrainH }, CATAPULT); this.catapult = this.treb.g; this.arm = this.treb.arm; this.arm.rotation.x = this.armA;
+    this.treb = buildTrebuchet({ S: this.scene, tex: this.tex, torch: () => {}, terrainH }, CATAPULT); this.treb.g.rotation.y = 0; this.catapult = this.treb.g; this.arm = this.treb.arm; this.arm.rotation.x = this.armA;
+    const ring = new THREE.Mesh(new THREE.RingGeometry(3.2, 3.6, 48), new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0.75, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending })); ring.rotation.x = -Math.PI / 2; ring.visible = false; this.scene.add(ring); this.trebRing = ring;
   }
   cupPos() { const p = this.treb.tipLocal.clone(); this.arm.localToWorld(p); return p; }
   /** trebuchet: cocked (arm back, sling on the deck) → swing on release (projectile leaves near vertical) → winch back down over the reload */
@@ -139,25 +177,25 @@ export class SiegeWorld {
   async makeActor(fid: string, scale = 1): Promise<Actor> {
     const rig = await loadRig(fid); const obj = skClone(rig.scene) as THREE.Object3D; obj.scale.setScalar(rig.k * scale); obj.userData.minY = rig.minY * rig.k * scale;
     const mixer = new THREE.AnimationMixer(obj); const actions: Record<string, THREE.AnimationAction> = {};
-    for (const [n, clip] of Object.entries(rig.clips)) { const a = mixer.clipAction(clip); if (n === "idle") a.setLoop(THREE.LoopRepeat, Infinity); else { a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; } actions[n] = a; }
-    const actor: Actor = { obj, mixer, actions, current: null, fid }; mixer.addEventListener("finished", () => { if (actor.current && actor.current !== actions.idle) this.playA(actor, "idle"); });
+    for (const [n, clip] of Object.entries(rig.clips)) { const a = mixer.clipAction(clip); if (n === "idle" || n === "walk" || n === "run") a.setLoop(THREE.LoopRepeat, Infinity); else { a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; } actions[n] = a; }
+    const actor: Actor = { obj, mixer, actions, current: null, fid }; mixer.addEventListener("finished", () => { if (actor.current && actor.current !== actions.idle) this.playA(actor, actor === this.hero ? this.loco : "idle"); });
     this.playA(actor, "idle"); actions.idle && (actions.idle.time = Math.random() * 2); return actor;
   }
-  playA(a: Actor, n: string, speed = 1) { const act = a.actions[n] || a.actions.idle; if (!act) return; if (a.current && a.current !== act) a.current.fadeOut(0.1); act.reset(); act.setEffectiveTimeScale(speed); act.fadeIn(0.1); act.play(); a.current = act; }
+  playA(a: Actor, n: string, speed = 1, fade = 0.1) { const act = a.actions[n] || a.actions.idle; if (!act) return; if (a.current && a.current !== act) a.current.fadeOut(fade); act.reset(); act.setEffectiveTimeScale(speed); act.fadeIn(fade); act.play(); a.current = act; }
   play(n: string, speed = 1) { if (this.hero) this.playA(this.hero, n, speed); }
   standAt(a: Actor, x: number, z: number, faceField = true) { a.obj.position.set(x, WALL_TOP + 0.25 - a.obj.userData.minY, z); a.obj.rotation.y = faceField ? Math.PI : 0; }
   async setFaction(fid: string) {
-    this.faction = fid; this.view = viewOf(fid); this.reloadTime = (KIT[fid] || KIT.boulder).reload;
+    const was = this.view; this.faction = fid; this.view = viewOf(fid); this.reloadTime = (KIT[fid] || KIT.boulder).reload; if (this.state !== "play" || was !== this.view) this.heroX = this.view === "pov" ? POV_X : SIDE_X; if (!this.trebSet) this.trebFollow();
     if (this.hero) { this.scene.remove(this.hero.obj); this.hero = null; } this.leap = null; this.handBone = null;
     this.catapult.visible = true; if (!this.intro && !this.menu) this.placeCamera(true); this.fit(); if ((this.intro || this.menu) && this.introPath) { this.introPath.points[4] = this.camBase(); this.introLook.points[4] = this.camLook(); }
     if (fid === "boulder") return;
     const a = await this.makeActor(fid); if (this.over || this.faction !== fid) return;
-    if (this.view === "pov") this.standAt(a, POV_X, WALL_Z + 0.55); else this.standAt(a, CATAPULT.x - 2.6, WALL_Z + 3.6);
+    this.standAt(a, this.heroX, HERO_Z); a.obj.rotation.y = this.heroYaw; this.loco = "idle";
     this.heroHome.copy(a.obj.position); this.scene.add(a.obj); this.hero = a;
     this.handBone = null; a.obj.traverse((o) => { if (!this.handBone && /RightHand$/i.test(o.name)) this.handBone = o; });
   }
   async buildGarrison() {
-    const spots: [string, number, number][] = [["ashigaru", -21, WALL_Z + 0.4], ["samurai", 8.4, WALL_Z + 0.4], ["yamabushi", 21, WALL_Z + 0.4], ["ashigaru", 36, WALL_Z + 0.4], ["kenshi", -34, WALL_Z + 0.4]];
+    const spots: [string, number, number][] = [["ashigaru", -21, FIELD_Z + 0.95], ["samurai", 8.4, FIELD_Z + 0.95], ["yamabushi", 21, FIELD_Z + 0.95], ["ashigaru", 36, FIELD_Z + 0.95], ["kenshi", -34, FIELD_Z + 0.95]];
     for (const [fid, x, z] of spots) { const a = await this.makeActor(fid); if (this.over) return; this.standAt(a, x, z); this.scene.add(a.obj); this.garrison.push({ a, cd: 1.5 + Math.random() * 3 }); }
   }
 
@@ -183,16 +221,44 @@ export class SiegeWorld {
     for (const s of this.spiders) if (!s.dead) { s.z += s.speed * 0.5 * dt; s.g.position.set(s.x, terrainH(s.x, s.z), s.z); const ph = this.t * 6 + s.ph; this.gait(s, ph, 0.5 * 1.6); s.g.rotation.set(0, Math.PI, 0); }
     if (u >= 1) this.endIntro();
   }
-  endIntro() { if (!this.intro) return; this.intro = false; this.marker.visible = true; this.camera.position.copy(this.camBase()); this.camKick.copy(this.camLook()); this.camera.lookAt(this.camKick); for (const s of this.spiders) if (!s.dead) { s.dead = true; this.scene.remove(s.g); } this.spiders = this.spiders.filter((x) => !x.dead); this.hordeLeft = 0; this.start(); }
+  endIntro() { if (!this.intro) return; this.intro = false; this.marker.visible = true; this.camera.position.copy(this.camBase()); this.camKick.copy(this.camLook()); this.camera.lookAt(this.camKick); for (const s of this.spiders) if (!s.dead) { s.dead = true; this.scene.remove(s.g); this.drop(s.g); } this.spiders = this.spiders.filter((x) => !x.dead); this.hordeLeft = 0; this.start(); }
 
   // ── input + aim
   bindInput() {
     const cv = this.canvas; const pos = (e: PointerEvent) => { const r = cv.getBoundingClientRect(); this.pointer.x = (e.clientX - r.left) / r.width; this.pointer.y = (e.clientY - r.top) / r.height; };
     cv.addEventListener("pointermove", (e) => pos(e));
-    cv.addEventListener("pointerdown", (e) => { pos(e); if (this.menu || this.paused) return; if (this.intro) { this.endIntro(); return; } if (this.state === "ready") { this.start(); return; } if (this.state !== "play" || this.reload > 0 || this.leap) return; this.charging = true; this.charge = 0; cv.setPointerCapture(e.pointerId); e.preventDefault(); });
+    cv.addEventListener("pointerdown", (e) => { pos(e); if (this.menu || this.paused) return; if (this.intro) { this.endIntro(); return; } if (this.state === "ready") { this.start(); return; } if (this.state !== "play" || this.reload > 0 || this.leap) return; if (this.needTreb()) { this.say("Walk to a spot and SET TREBUCHET (E) — it stays there", 2.2); this.pushHud(); return; } this.charging = true; this.charge = 0; cv.setPointerCapture(e.pointerId); e.preventDefault(); });
     const up = (e: PointerEvent) => { if (!this.charging) return; pos(e); this.charging = false; this.fire(Math.min(1, this.charge / 0.7)); this.charge = 0; };
     cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", up);
     cv.addEventListener("touchstart", (e) => e.preventDefault(), { passive: false });
+    const kd = (e: KeyboardEvent, v: boolean) => { const k = e.key.toLowerCase(); if (k === "a" || k === "arrowleft") this.keys.l = v; else if (k === "d" || k === "arrowright") this.keys.r = v; else if (k === "shift") this.keys.run = v; else if (v && k === "e") this.placeTreb(); else return; e.preventDefault(); };
+    this.onKD = (e) => kd(e, true); this.onKU = (e) => kd(e, false); this.onBlur = () => { this.keys = { l: false, r: false, run: false }; };
+    window.addEventListener("keydown", this.onKD); window.addEventListener("keyup", this.onKU); window.addEventListener("blur", this.onBlur);
+  }
+  onKD: (e: KeyboardEvent) => void = () => {}; onKU: (e: KeyboardEvent) => void = () => {}; onBlur = () => {};
+  /** touch controls from the HUD: -1 / 0 / 1 and run */
+  setMove(dir: number, run?: boolean) { this.moveIn = dir; if (run !== undefined) this.runIn = run; }
+  needTreb() { return this.view === "side" && this.faction !== "ronin" && !this.trebSet; }
+  trebFollow() { const own = this.view === "side" && this.faction !== "ronin"; const x = own ? Math.max(X_MIN + 2, Math.min(X_MAX - 2, this.heroX - 2.4)) : CATAPULT.x; this.treb.g.position.set(x, CATAPULT.y, TREB_Z); if (this.trebRing) { this.trebRing.visible = own && !this.trebSet && !this.menu && !this.intro; this.trebRing.position.set(x, WALL_TOP + 0.24, TREB_Z); } }
+  placeTreb() {
+    if (!this.needTreb() || this.menu || this.intro || this.paused || !this.treb) return; this.trebFollow(); this.trebSet = true; if (this.trebRing) this.trebRing.visible = false;
+    const p = this.treb.g.position.clone(); this.puff(p.clone().add(new THREE.Vector3(0, 0.4, 0)), "dirt", 14, 0xb8a48a, 1.2, 2.2); this.puff(p.clone().add(new THREE.Vector3(0, 0.6, 0)), "smoke", 6, 0xaaa090, 1.6, 1, 0.8); this.shake = Math.max(this.shake, 0.5); this.cb.onSfx?.("crash");
+    this.say("Trebuchet set — it stays here. Walk the wall to see your shots.", 2.4); this.pushHud();
+  }
+  trebRing: THREE.Mesh | null = null;
+  /** walk / run along the wall-walk */
+  stepHero(dt: number) {
+    if (!this.hero || this.leap) return;
+    const dir = ((this.keys.r ? 1 : 0) - (this.keys.l ? 1 : 0)) || this.moveIn; const run = this.keys.run || this.runIn;
+    const want = dir * (run ? RUN : WALK); this.heroV += (want - this.heroV) * Math.min(1, dt * 7); if (!dir && Math.abs(this.heroV) < 0.08) this.heroV = 0;
+    const nx = Math.max(X_MIN, Math.min(X_MAX, this.heroX + this.heroV * dt)); if (nx !== this.heroX + this.heroV * dt) this.heroV = 0; this.heroX = nx;
+    const o = this.hero.obj; o.position.x = this.heroX; const sp = Math.abs(this.heroV); const loco = sp > 5.2 ? "run" : sp > 0.35 ? "walk" : "idle";
+    const A = this.hero.actions; const cur = this.hero.current; const busy = !!cur && cur !== A.idle && cur !== A.walk && cur !== A.run;
+    if (loco !== this.loco) { this.loco = loco; if (!busy) this.playA(this.hero, loco, 1, 0.22); }
+    const act = A[this.loco]; let bob = 0;
+    if (this.loco !== "idle" && act && cur === act) { act.setEffectiveTimeScale(Math.max(0.6, Math.min(1.3, sp / (this.loco === "run" ? RUN : WALK)))); const b = (act.getClip().userData as any)?.bob as number[] | undefined; if (b?.length) bob = b[Math.floor(act.time * 30) % b.length] * 1.0; }
+    o.position.y = WALL_TOP + 0.25 - o.userData.minY + bob;
+    if (!this.trebSet) this.trebFollow();
   }
   updateAim() {
     const ndc = new THREE.Vector2(this.pointer.x * 2 - 1, -(this.pointer.y * 2 - 1)); const rc = new THREE.Raycaster(); rc.setFromCamera(ndc, this.camera);
@@ -219,7 +285,7 @@ export class SiegeWorld {
   hand() {
     if (this.view === "side") return this.cupPos();
     if (this.handBone) { const p = new THREE.Vector3(); this.handBone.getWorldPosition(p); return p; }
-    const h = this.hero ? this.hero.obj.position.clone() : new THREE.Vector3(POV_X, WALL_TOP, WALL_Z); h.y += 1.4; h.z -= 0.4; return h;
+    const h = this.hero ? this.hero.obj.position.clone() : new THREE.Vector3(this.heroX, WALL_TOP, HERO_Z); h.y += 1.4; h.z -= 0.4; return h;
   }
 
   // ── firing: every faction's kit
@@ -256,7 +322,7 @@ export class SiegeWorld {
   }
   spawnOrb(p: THREE.Vector3, v: THREE.Vector3, k: number, sub: "storm" | "ward") {
     const col = sub === "storm" ? 0x9ec7ff : 0xffd27a; const m = new THREE.Group(); m.add(new THREE.Mesh(new THREE.SphereGeometry(0.28 + k * 0.18, 16, 12), new THREE.MeshBasicMaterial({ color: sub === "storm" ? 0xdfe8ff : 0xfff2c0 }))); const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.tex.glow, color: col, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })); halo.scale.set(3.2 + k * 2, 3.2 + k * 2, 1); m.add(halo);
-    const light = new THREE.PointLight(col, 8 + k * 10, 18, 1.8); m.add(light); this.mkShot(m, p, v, sub === "storm" ? "orb" : "ward", 80 + k * 50, k, { light });
+    this.flash(p, col, 8 + k * 10, 18, 7, m); this.mkShot(m, p, v, sub === "storm" ? "orb" : "ward", 80 + k * 50, k);
   }
   spawnStake(p: THREE.Vector3, v: THREE.Vector3, k: number) {
     const m = new THREE.Group(); const st = new THREE.Mesh(new THREE.ConeGeometry(0.16, 1.6, 6), new THREE.MeshStandardMaterial({ color: 0x2a2418, roughness: 0.8 })); st.rotation.x = -Math.PI / 2; m.add(st); const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.tex.glow, color: 0xb8ffb0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.5 })); gl.scale.set(1.2, 1.2, 1); m.add(gl);
@@ -287,7 +353,7 @@ export class SiegeWorld {
     const L = this.leap; if (!L || !this.hero) return; L.t += dt; const o = this.hero.obj;
     if (L.phase === "fly") { const T = 0.85; const u = Math.min(1, L.t / T); const p = L.from.clone().lerp(L.to, u); p.y = L.from.y * (1 - u) + L.to.y * u + Math.sin(u * Math.PI) * 6 - o.userData.minY; o.position.copy(p); o.rotation.y = Math.atan2(L.to.x - L.from.x, L.to.z - L.from.z) + Math.PI; if (u >= 1) { L.phase = "land"; L.t = 0; this.play("attack", 2); const gp = L.to.clone(); this.ringFx(gp, 0xff6b7a, 8 + L.k * 4); this.puff(gp, "dirt", 12, 0xb8a48a, 1.2, 4); this.shake = Math.max(this.shake, 0.7); this.cb.onSfx?.("crash"); const R = 5 + L.k * 2.5; for (const tg of this.targetsNear(gp, R)) { this.hurtTarget(tg, 260 + L.k * 120, "slash"); } } }
     else if (L.phase === "land") { if (L.t > 0.55) { L.phase = "back"; L.t = 0; this.puff(o.position.clone().add(new THREE.Vector3(0, 1, 0)), "smoke", 10, 0x9a8aa8, 1.6, 1.5, 0.7); o.visible = false; } }
-    else if (L.t > 0.35) { o.visible = true; o.position.copy(this.heroHome); o.rotation.y = Math.PI; this.play("win", 1.6); this.puff(this.heroHome.clone().add(new THREE.Vector3(0, 1, 0)), "smoke", 8, 0x9a8aa8, 1.4, 1.2, 0.6); this.leap = null; }
+    else if (L.t > 0.35) { o.visible = true; o.position.copy(L.from); o.rotation.y = this.heroYaw = Math.PI; this.play("win", 1.6); this.puff(L.from.clone().add(new THREE.Vector3(0, 1, 0)), "smoke", 8, 0x9a8aa8, 1.4, 1.2, 0.6); this.leap = null; }
   }
 
   // ── the horde
@@ -357,7 +423,7 @@ export class SiegeWorld {
       }
       if (s.kind === "brood") {   // the boss: crawls to a vantage, births crawlers, spits venom
         if (s.z < s.holdZ) { s.z += s.speed * dt; this.gait(s, ph * 0.5, 0.4 * 1.6); }
-        else { s.cd -= dt; this.gait(s, this.t * 2, 0.12 * 1.6); if (s.cd <= 0) { s.cd = 5.5; if (Math.random() < 0.5) { for (let i = 0; i < 3; i++) { this.spawnSpider(0.8 + Math.random() * 0.3); const c = this.spiders[this.spiders.length - 1]; c.x = s.x + (Math.random() - 0.5) * 6; c.z = s.z + 2; c.g.position.set(c.x, terrainH(c.x, c.z), c.z); } this.puff(this.center(s), "smoke", 8, 0x8b5cf6, 2, 1.5, 0.8); this.say("The Brood Mother births more crawlers!", 1.4); } else { const from = this.center(s); const to = new THREE.Vector3((Math.random() - 0.5) * 8, 3, FIELD_Z - 0.5); const m = new THREE.Mesh(new THREE.SphereGeometry(0.6, 10, 8), new THREE.MeshBasicMaterial({ color: 0x9dff6a })); const l = new THREE.PointLight(0x9dff6a, 40, 20); m.add(l); this.mkShot(m, from, this.ballistic(from, to, 26), "venom", 45, 0); this.say("Venom!", 0.8); } } }
+        else { s.cd -= dt; this.gait(s, this.t * 2, 0.12 * 1.6); if (s.cd <= 0) { s.cd = 5.5; if (Math.random() < 0.5) { for (let i = 0; i < 3; i++) { this.spawnSpider(0.8 + Math.random() * 0.3); const c = this.spiders[this.spiders.length - 1]; c.x = s.x + (Math.random() - 0.5) * 6; c.z = s.z + 2; c.g.position.set(c.x, terrainH(c.x, c.z), c.z); } this.puff(this.center(s), "smoke", 8, 0x8b5cf6, 2, 1.5, 0.8); this.say("The Brood Mother births more crawlers!", 1.4); } else { const from = this.center(s); const to = new THREE.Vector3((Math.random() - 0.5) * 8, 3, FIELD_Z - 0.5); const m = new THREE.Mesh(new THREE.SphereGeometry(0.6, 10, 8), new THREE.MeshBasicMaterial({ color: 0x9dff6a })); this.flash(from, 0x9dff6a, 40, 20, 7, m); this.mkShot(m, from, this.ballistic(from, to, 26), "venom", 45, 0); this.say("Venom!", 0.8); } } }
         s.g.position.set(s.x, terrainH(s.x, s.z), s.z); s.g.rotation.set(0, Math.PI, 0); continue;
       }
       if (!s.arrived) {
@@ -394,7 +460,7 @@ export class SiegeWorld {
     s.dead = true; this.kills++; this.score += Math.round(10 * s.size * (s.kind === "brute" ? 4 : s.kind === "wasp" ? 2 : 1)); this.hordeLeft--; this.cb.onSfx?.("squish");
     const p = this.center(s); this.puff(p, "dirt", 10, 0x8b5cf6, 1.2 * s.size, 3.5); this.puff(p, "glow", 3, 0xc4b5fd, 2 * s.size, 0.8, 0.5); this.puff(p, "smoke", 4, 0x6a5a7a, 1.6 * s.size, 1.2, 0.9);
     const g = s.g; const t0 = this.t; const y0 = g.position.y; const falls = s.kind === "wasp" || (s.arrived && s.y > 0.5); if (s.acts?.Death) { const d = s.acts.Death; d.reset(); d.play(); if (s.anim && s.acts[s.anim]) s.acts[s.anim].crossFadeTo(d, 0.12, false); s.anim = "Death"; }
-    const tick = () => { if (this.over) return; const k = this.t - t0; if (s.mixer) { g.position.y = falls ? y0 - k * k * 6 : y0 - Math.max(0, k - 1.3) * 1.6; } else { g.rotation.x += 0.15; g.position.y = y0 - k * k * 6; } if (k < (s.mixer ? 2.4 : 1.4)) requestAnimationFrame(tick); else { this.scene.remove(g); s.mixer?.stopAllAction(); s.mixer = undefined; } }; tick();
+    const tick = () => { if (this.over) return; const k = this.t - t0; if (s.mixer) { g.position.y = falls ? y0 - k * k * 6 : y0 - Math.max(0, k - 1.3) * 1.6; } else { g.rotation.x += 0.15; g.position.y = y0 - k * k * 6; } if (k < (s.mixer ? 2.4 : 1.4)) requestAnimationFrame(tick); else { this.scene.remove(g); s.mixer?.stopAllAction(); s.mixer = undefined; this.drop(g); } }; tick();
   }
   hurtEngine(e: Engine, d: number, at: THREE.Vector3) {
     if (e.dead) return; const low = at.y < 2.2 && e.kind === "tower"; e.hp -= d * (low ? 1.8 : 1); this.puff(at, "spark", 4, e.kind === "tower" ? 0xc4b5fd : 0xffc36a, 0.7, 1.5); if (e.hp > 0) { e.g.position.x += (Math.random() - 0.5) * 0.2; return; }
@@ -431,13 +497,13 @@ export class SiegeWorld {
         sh.life = Math.min(sh.life, 1.2);
       }
     }
-    for (const sh of this.shots) if (sh.life <= 0) { this.scene.remove(sh.m); sh.light?.dispose(); if (sh.rope) this.scene.remove(sh.rope); }
+    for (const sh of this.shots) if (sh.life <= 0) { this.scene.remove(sh.m); this.drop(sh.m); if (sh.rope) { this.scene.remove(sh.rope); this.drop(sh.rope); } }
     this.shots = this.shots.filter((sh) => sh.life > 0);
   }
   impact(sh: Shot) {
     const p = sh.p.clone(); p.y = Math.max(p.y, 0.3); const k = sh.k;
     if (sh.kind === "orb") { this.stormBurst(p, k, sh.dmg); return; }
-    if (sh.kind === "ward") { const life = 6 + k * 4; const m = new THREE.Group(); const ring = new THREE.Mesh(new THREE.RingGeometry(4.6, 5.2, 48), new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0.9, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false })); ring.rotation.x = -Math.PI / 2; ring.position.y = 0.1; m.add(ring); const disc = new THREE.Mesh(new THREE.CircleGeometry(5, 48), new THREE.MeshBasicMaterial({ color: 0xffb347, transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false })); disc.rotation.x = -Math.PI / 2; disc.position.y = 0.08; m.add(disc); const pil = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.tex.glow, color: 0xffe08a, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.6 })); pil.scale.set(8, 14, 1); pil.position.y = 5; m.add(pil); const l = new THREE.PointLight(0xffd27a, 60, 30, 1.6); l.position.y = 3; m.add(l); m.position.set(p.x, terrainH(p.x, p.z), p.z); this.scene.add(m);
+    if (sh.kind === "ward") { const life = 6 + k * 4; const m = new THREE.Group(); const ring = new THREE.Mesh(new THREE.RingGeometry(4.6, 5.2, 48), new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0.9, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false })); ring.rotation.x = -Math.PI / 2; ring.position.y = 0.1; m.add(ring); const disc = new THREE.Mesh(new THREE.CircleGeometry(5, 48), new THREE.MeshBasicMaterial({ color: 0xffb347, transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false })); disc.rotation.x = -Math.PI / 2; disc.position.y = 0.08; m.add(disc); const pil = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.tex.glow, color: 0xffe08a, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.6 })); pil.scale.set(8, 14, 1); pil.position.y = 5; m.add(pil); m.position.set(p.x, terrainH(p.x, p.z), p.z); this.scene.add(m); this.flash(new THREE.Vector3(p.x, terrainH(p.x, p.z) + 3, p.z), 0xffd27a, 60, 30, life);
       this.zones.push({ kind: "ward", pos: new THREE.Vector3(p.x, 0, p.z), r: 5 + k * 1.5, life, life0: life, m, tick: 0, k }); this.ringFx(p, 0xffd27a, 8); this.puff(p, "flare", 1, 0xfff0c0, 8, 0, 0.3); this.cb.onSfx?.("impact"); return; }
     if (sh.kind === "standard") { const life = 8 + k * 4; const m = sh.m; m.position.set(p.x, 0, p.z); m.quaternion.identity(); m.rotation.x = Math.PI / 2; m.position.y = terrainH(p.x, p.z) + 1.6; this.scene.add(m); const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.tex.glow, color: 0xffd27a, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.6 })); gl.scale.set(6, 6, 1); gl.position.y = 2; m.add(gl); const wrap = new THREE.Group(); wrap.add(m); this.scene.add(wrap);
       this.zones.push({ kind: "standard", pos: new THREE.Vector3(p.x, 0, p.z), r: 9 + k * 3, life, life0: life, m: wrap, tick: 0, k }); this.rally = life; this.ringFx(p, 0xffd27a, 10); this.puff(p, "dirt", 6, 0xb8a48a, 0.8, 2); this.cb.onSfx?.("horn"); sh.m = new THREE.Group(); return; }
@@ -447,16 +513,16 @@ export class SiegeWorld {
     this.ringFx(p, sub === "blade" ? 0xff8a8a : sub === "shield" ? 0x8fb8ff : 0xffc36a, R * 1.4); this.puff(p, "dirt", 10 + k * 8, 0x9c8a6a, 1 + k, 3 + k * 2); this.puff(p, "smoke", 5, 0x6f6a80, 2 + k, 1.2, 1.1); this.puff(p, "flare", 1, 0xfff2c0, 5 + k * 4, 0, 0.2);
     if (sub === "blade") for (let i = 0; i < 6; i++) this.slashFx(p.clone().add(new THREE.Vector3(Math.cos(i) * 2.2, 0.8, Math.sin(i) * 2.2)));
     if (sub === "shield") { this.gateHp = Math.min(this.gateMax, this.gateHp + 40 + k * 40); this.say("Buke: the gate mends", 0.7); this.ringFx(new THREE.Vector3(0, 0, FIELD_Z - 1), 0x8fb8ff, 5); }
-    const flash = new THREE.PointLight(sub === "great" ? 0xffa04a : 0xffc36a, 120 + k * 120, 40, 1.5); flash.position.copy(p).add(new THREE.Vector3(0, 1.5, 0)); this.scene.add(flash); setTimeout(() => this.scene.remove(flash), 110);
+    this.flash(p.clone().add(new THREE.Vector3(0, 1.5, 0)), sub === "great" ? 0xffa04a : 0xffc36a, 120 + k * 120, 40, 0.12);
     this.shake = Math.max(this.shake, sub === "great" ? 1 : 0.5 + k * 0.4); this.cb.onSfx?.("crash");
     // the boulder stays as a rock on the field for a while
-    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(sub === "great" ? 1.1 : 0.75, 0), this.rockMat); rock.position.set(p.x, terrainH(p.x, p.z) + 0.5, p.z); rock.rotation.set(Math.random(), Math.random(), 0); this.scene.add(rock); setTimeout(() => this.scene.remove(rock), 12000);
+    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(sub === "great" ? 1.1 : 0.75, 0), this.rockMat); rock.position.set(p.x, terrainH(p.x, p.z) + 0.5, p.z); rock.rotation.set(Math.random(), Math.random(), 0); this.scene.add(rock); setTimeout(() => { this.scene.remove(rock); rock.geometry.dispose(); }, 12000);
   }
   stormBurst(p: THREE.Vector3, k: number, dmg: number) {
     const n = 6 + Math.round(k * 6); const r = 9 + k * 6;
     const targets = this.targetsNear(p, r).sort((a, b) => a.pos.distanceTo(p) - b.pos.distanceTo(p)).slice(0, n);
     let from = p; this.puff(p, "flare", 1, 0xbfd6ff, 8 + k * 6, 0, 0.3); this.ringFx(p, 0x9ec7ff, 6 + k * 6); this.shake = Math.max(this.shake, 0.6 + k * 0.5); this.cb.onSfx?.("crash");
-    const flash = new THREE.PointLight(0x9ec7ff, 90, 45, 1.6); flash.position.copy(p); this.scene.add(flash); setTimeout(() => this.scene.remove(flash), 120);
+    this.flash(p, 0x9ec7ff, 90, 45, 0.13);
     for (const tg of targets) { this.bolt(from, tg.pos); this.hurtTarget(tg, dmg, "bolt"); if (tg.s) tg.s.stun = 1.4; this.puff(tg.pos, "spark", 4, 0xbfd6ff, 1.2, 1.5); from = tg.pos; }
     if (!targets.length) this.puff(p, "dirt", 8, 0x9c8a6a, 1, 3);
   }
@@ -471,10 +537,10 @@ export class SiegeWorld {
     this.flings = this.flings.filter((f) => f.t < 99);
   }
   stepZones(dt: number) {
-    for (const z of this.zones) { z.life -= dt; z.tick += dt; const k = Math.min(1, z.life / 0.8); z.m.scale.setScalar(Math.max(0.01, k)); if (z.kind === "trap" && z.life <= 0) { this.scene.remove(z.m); continue; }
+    for (const z of this.zones) { z.life -= dt; z.tick += dt; const k = Math.min(1, z.life / 0.8); z.m.scale.setScalar(Math.max(0.01, k)); if (z.kind === "trap" && z.life <= 0) { this.scene.remove(z.m); this.drop(z.m); continue; }
       if (z.kind === "ward") { z.m.rotation.y += dt * 0.6; if (z.tick > 0.5) { z.tick = 0; for (const tg of this.targetsNear(z.pos, z.r)) { this.hurtTarget(tg, 28 + z.k * 14); this.puff(tg.pos, "spark", 2, 0xffe08a, 0.8, 1); } this.gateHp = Math.min(this.gateMax, this.gateHp + 6 + z.k * 4); } }
       if (z.kind === "standard") { z.m.rotation.y = Math.sin(this.t * 3) * 0.06; if (z.tick > 0.35) { z.tick = 0; const tg = this.targetsNear(z.pos, z.r); if (tg.length) { const t = tg[(Math.random() * tg.length) | 0]; const from = new THREE.Vector3((Math.random() - 0.5) * 30, WALL_TOP + 2, WALL_Z); this.spawnSpear(from, this.ballistic(from, t.pos, 40), 0, true); } } }
-      if (z.life <= 0) this.scene.remove(z.m); }
+      if (z.life <= 0) { this.scene.remove(z.m); this.drop(z.m); } }
     this.zones = this.zones.filter((z) => z.life > 0);
   }
   stepGarrison(dt: number) {
@@ -503,7 +569,7 @@ export class SiegeWorld {
   }
   end(won: boolean) { if (this.state !== "play") return; this.state = won ? "won" : "lost"; this.say(won ? "THE GATE HOLDS" : "THE GATE HAS FALLEN", 4, true); this.cb.onSfx?.(won ? "win" : "lose"); if (!won) { this.shake = 2; this.puff(new THREE.Vector3(0, 3, FIELD_Z), "smoke", 30, 0x6a5a5a, 6, 3, 2.2); } this.pushHud(); setTimeout(() => this.cb.onEnd?.({ won, score: this.score, kills: this.kills, waves: this.wave }), 1500); }
   say(m: string, t = 1.6, banner = false) { this.msg = m; this.msgT = t; this.banner = banner; this.pushHud(); }
-  pushHud() { this.cb.onHud({ gate: Math.ceil(this.gateHp), gateMax: this.gateMax, wave: this.wave, waves: WAVES.length, horde: Math.max(0, this.hordeLeft), score: this.score, kills: this.kills, reload: this.reloadTime > 0 ? Math.max(0, this.reload / (this.reloadTime * 1.3)) : 0, state: this.state, msg: this.msg, charge: this.charging ? Math.min(1, this.charge / 0.7) : 0, intro: this.intro, menu: this.menu, banner: this.banner, paused: this.paused, boss: this.boss && !this.boss.dead ? { name: "THE BROOD MOTHER", hp: Math.max(0, this.boss.hp), max: this.boss.hpMax } : null }); }
+  pushHud() { this.cb.onHud({ gate: Math.ceil(this.gateHp), gateMax: this.gateMax, wave: this.wave, waves: WAVES.length, horde: Math.max(0, this.hordeLeft), score: this.score, kills: this.kills, reload: this.reloadTime > 0 ? Math.max(0, this.reload / (this.reloadTime * 1.3)) : 0, state: this.state, msg: this.msg, charge: this.charging ? Math.min(1, this.charge / 0.7) : 0, intro: this.intro, menu: this.menu, banner: this.banner, paused: this.paused, boss: this.boss && !this.boss.dead ? { name: "THE BROOD MOTHER", hp: Math.max(0, this.boss.hp), max: this.boss.hpMax } : null , treb: this.needTreb() }); }
 
   // ── VFX
   puff(p: THREE.Vector3, tex: string, n: number, color: number, size: number, speed: number, life = 0.6) {
@@ -512,7 +578,7 @@ export class SiegeWorld {
       this.parts.push({ s, v: new THREE.Vector3(Math.cos(a) * Math.sin(b) * v, Math.abs(Math.cos(b)) * v + v * 0.4, Math.sin(a) * Math.sin(b) * v), life: lf, life0: lf, g: speed > 0 ? 9 : 0, grow: 1 + Math.random() * 0.8, size: sz }); }
   }
   slashFx(p: THREE.Vector3) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.tex.slash, color: 0xff8a8a, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })); s.scale.set(2.4, 2.4, 1); s.position.copy(p); s.material.rotation = Math.random() * 6.28; this.scene.add(s); this.parts.push({ s, v: new THREE.Vector3(0, 1.5, 0), life: 0.3, life0: 0.3, g: 0, grow: 1.7, size: 2.4 }); }
-  ringFx(p: THREE.Vector3, color: number, r: number) { const m = new THREE.Mesh(new THREE.RingGeometry(0.6, 1, 40), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.position.set(p.x, Math.max(p.y - 0.4, terrainH(p.x, p.z)) + 0.1, p.z); this.scene.add(m); const t0 = this.t; const tick = () => { if (this.over) return; const k = (this.t - t0) / 0.45; if (k >= 1) { this.scene.remove(m); return; } m.scale.setScalar(1 + k * r); (m.material as THREE.MeshBasicMaterial).opacity = 0.9 * (1 - k); requestAnimationFrame(tick); }; tick(); }
+  ringFx(p: THREE.Vector3, color: number, r: number) { const m = new THREE.Mesh(this.ringGeo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.position.set(p.x, Math.max(p.y - 0.4, terrainH(p.x, p.z)) + 0.1, p.z); this.scene.add(m); const t0 = this.t; const tick = () => { if (this.over) return; const k = (this.t - t0) / 0.45; if (k >= 1) { this.scene.remove(m); (m.material as THREE.Material).dispose(); return; } m.scale.setScalar(1 + k * r); (m.material as THREE.MeshBasicMaterial).opacity = 0.9 * (1 - k); requestAnimationFrame(tick); }; tick(); }
   bolt(a: THREE.Vector3, b: THREE.Vector3) {
     const pts: THREE.Vector3[] = []; const n = 9; for (let i = 0; i <= n; i++) { const t = i / n; const q = a.clone().lerp(b, t); if (i > 0 && i < n) q.add(new THREE.Vector3((Math.random() - 0.5) * 1.2, (Math.random() - 0.5) * 1.2, (Math.random() - 0.5) * 1.2)); pts.push(q); }
     const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), this.boltMat.clone()); this.scene.add(l); this.bolts.push({ l, life: 0.22 });
@@ -524,11 +590,11 @@ export class SiegeWorld {
     for (const [i, l] of this.torchLights.entries()) l.intensity = 6 * (0.9 + Math.sin(this.t * 9 + i * 2.1) * 0.12 + Math.random() * 0.1) * (l.userData.k || 1);
   }
   // ── loop
-  loop = () => { if (this.over) return; requestAnimationFrame(this.loop); const dt = Math.min(0.05, this.clock.getDelta()); this.t += dt; if (this.state === "play" && !this.menu && !this.paused && !this.intro) this.step(dt); this.render(dt); };
+  loop = () => { if (this.over) return; requestAnimationFrame(this.loop); const raw = this.clock.getDelta(); this.perfStep(raw); const dt = Math.min(0.05, raw); this.t += dt; if (this.state === "play" && !this.menu && !this.paused && !this.intro) this.step(dt); this.render(dt); };
   step(dt: number) {
     this.waveT += dt; if (this.reload > 0) this.reload -= dt; if (this.charging) this.charge += dt; if (this.msgT > 0) { this.msgT -= dt; if (this.msgT <= 0) { this.msg = null; this.pushHud(); } }
     while (this.spawnQueue.length && this.spawnQueue[0].at <= this.waveT) this.spawnQueue.shift()!.fn();
-    this.stepHorde(dt); this.stepShots(dt); this.stepFlings(dt); this.stepZones(dt); this.stepGarrison(dt); this.stepLeap(dt);
+    this.stepHorde(dt); this.stepShots(dt); this.stepFlings(dt); this.stepZones(dt); this.stepGarrison(dt); this.stepLeap(dt); this.stepHero(dt);
     if (!this.waveDone && !this.spawnQueue.length && this.hordeLeft <= 0) { this.waveDone = true; this.score += 50 * this.wave; setTimeout(() => { if (this.state === "play") this.nextWave(); }, 1800); }
     this.hudT += dt; if (this.hudT > 0.12) { this.hudT = 0; this.pushHud(); }
   }
@@ -537,18 +603,18 @@ export class SiegeWorld {
     (this.sky.material as THREE.ShaderMaterial).uniforms.uT.value = this.t; this.embers?.update(dt, this.camera.position, this.t);
     if (this.menu || this.intro) { if (this.menu) this.stepMenu(dt); else this.stepIntro(dt); this.flicker(dt); this.sky.position.copy(this.camera.position); this.composer.render(); return; }
     this.updateAim();
-    if (this.hero && !this.leap) { const o = this.hero.obj; const want = Math.atan2(this.aim.x - o.position.x, -(this.aim.z - o.position.z)); this.heroSpin += (want * (this.view === "pov" ? 0.6 : 0.3) - this.heroSpin) * Math.min(1, dt * 6); o.rotation.y = Math.PI + this.heroSpin; }
+    if (this.hero && !this.leap) { const o = this.hero.obj; const want = Math.atan2(this.aim.x - o.position.x, -(this.aim.z - o.position.z)); this.heroSpin += (want * (this.view === "pov" ? 0.6 : 0.3) - this.heroSpin) * Math.min(1, dt * 6); const face = Math.abs(this.heroV) > 0.35 && !this.charging ? (this.heroV > 0 ? Math.PI / 2 : -Math.PI / 2) : Math.PI - this.heroSpin; let d = face - this.heroYaw; d = Math.atan2(Math.sin(d), Math.cos(d)); this.heroYaw += d * Math.min(1, dt * 9); o.rotation.y = this.heroYaw; }
     // catapult arm: cocks while charging, snaps on release, resets over the reload
     this.stepTreb(dt);
     { const cp = this.camera.position; for (const s of this.spiders) { if (s.mixer) continue; if (s.dead) continue; const near = s.g.position.distanceTo(cp) < 42 + s.size * 8; s.body.visible = near; s.lod.visible = !near; } }
-    this.flicker(dt);
+    this.flicker(dt); this.stepLights();
     for (const p of this.parts) { p.life -= dt; p.s.position.addScaledVector(p.v, dt); p.v.y -= p.g * dt; const k = Math.max(0, p.life / p.life0); (p.s.material as THREE.SpriteMaterial).opacity = Math.min(1, k * 1.5); const sz = p.size * (1 + (1 - k) * (p.grow - 1)); p.s.scale.set(sz, sz, 1); }
     for (const p of this.parts) if (p.life <= 0) { this.scene.remove(p.s); p.s.material.dispose(); } this.parts = this.parts.filter((p) => p.life > 0);
-    for (const b of this.bolts) { b.life -= dt; (b.l.material as THREE.LineBasicMaterial).opacity = Math.max(0, b.life / 0.25); } for (const b of this.bolts) if (b.life <= 0) { this.scene.remove(b.l); b.l.geometry.dispose(); } this.bolts = this.bolts.filter((b) => b.life > 0);
+    for (const b of this.bolts) { b.life -= dt; (b.l.material as THREE.LineBasicMaterial).opacity = Math.max(0, b.life / 0.25); } for (const b of this.bolts) if (b.life <= 0) { this.scene.remove(b.l); b.l.geometry.dispose(); (b.l.material as THREE.Material).dispose(); } this.bolts = this.bolts.filter((b) => b.life > 0);
     // camera
     const cp = this.camBase(), look = this.camLook();
-    if (this.view === "pov") { look.x += (this.aim.x - POV_X) * 0.12; look.z = Math.min(-8, this.aim.z * 0.35); cp.x += (this.aim.x - POV_X) * 0.02 + (this.charging ? -this.charge * 0.25 : 0); }
-    else { look.x += (this.aim.x - (CATAPULT.x - 12)) * 0.14; look.z += (this.aim.z - (FIELD_Z - 40)) * 0.08; cp.x += (this.aim.x - (CATAPULT.x - 12)) * 0.02; if (this.leap && this.hero) { look.lerp(this.hero.obj.position, 0.5); } }
+    if (this.view === "pov") { look.x += (this.aim.x - this.heroX) * 0.12; look.z = Math.min(-8, this.aim.z * 0.35); cp.x += (this.aim.x - this.heroX) * 0.02 + (this.charging ? -this.charge * 0.25 : 0); }
+    else { look.x += (this.aim.x - (this.heroX - 5)) * 0.14; look.z += (this.aim.z - (FIELD_Z - 38)) * 0.08; cp.x += (this.aim.x - (this.heroX - 5)) * 0.02; if (this.leap && this.hero) { look.lerp(this.hero.obj.position, 0.5); } }
     if (this.shake > 0) { this.shake = Math.max(0, this.shake - dt * 2.5); cp.x += (Math.random() - 0.5) * this.shake * 0.25; cp.y += (Math.random() - 0.5) * this.shake * 0.2; }
     this.camera.position.lerp(cp, Math.min(1, dt * 4)); this.camKick.lerp(look, Math.min(1, dt * 4)); this.camera.lookAt(this.camKick); this.sky.position.copy(this.camera.position);
     this.composer.render();
