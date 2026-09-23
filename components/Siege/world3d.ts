@@ -47,20 +47,35 @@ export function terrainH(x: number, z: number) {
 }
 const CRATERS: [number, number, number][] = [[-14, FIELD_Z - 34, 5], [18, FIELD_Z - 52, 6], [-30, FIELD_Z - 70, 5], [6, FIELD_Z - 88, 7], [34, FIELD_Z - 40, 4.5]];
 
-const rigCache: Record<string, Promise<Rig>> = {};
-function loadRig(fid: string): Promise<Rig> {
-  if (!rigCache[fid]) rigCache[fid] = (async () => {
-    const gl = new GLTFLoader(); const dr = new DRACOLoader(); dr.setDecoderPath("/draco/"); gl.setDRACOLoader(dr); const fb = new FBXLoader();
+/** phones + tablets: lighter everything (half-res textures, no bloom, smaller shadows, fewer garrison ants) */
+export const LOW_GFX = typeof navigator !== "undefined" && (/iPhone|iPad|iPod|Android|Mobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent)));
+/** shrink a texture's pixels before they reach the GPU (phones) */
+function shrinkTex(t: THREE.Texture | null | undefined, max = 512) {
+  const im: any = t?.image; if (!t || !im || !im.width || im.width <= max) return;
+  try { const k = max / Math.max(im.width, im.height); const c = document.createElement("canvas"); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k); c.getContext("2d")!.drawImage(im, 0, 0, c.width, c.height); t.image = c; t.needsUpdate = true; im.close?.(); } catch {}
+}
+type Glb = { scene: THREE.Object3D; k: number; minY: number };
+const glbCache: Record<string, Promise<Glb>> = {}; const clipCache: Record<string, Promise<THREE.AnimationClip | null>> = {}; const locoCache: Record<string, Promise<Record<string, THREE.AnimationClip>>> = {};
+function loadGlb(fid: string) {
+  return (glbCache[fid] ||= (async () => {
+    const gl = new GLTFLoader(); const dr = new DRACOLoader(); dr.setDecoderPath("/draco/"); gl.setDRACOLoader(dr);
     const gltf = await gl.loadAsync(`/faction-wars/characters/${fid}/${fid}.glb`); const s = gltf.scene;
-    s.traverse((o: any) => { if (o.isMesh || o.isSkinnedMesh) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; const ms = Array.isArray(o.material) ? o.material : [o.material]; for (const m of ms) if (m) { m.side = THREE.DoubleSide; m.transparent = false; m.opacity = 1; } } });
+    s.traverse((o: any) => { if (o.isMesh || o.isSkinnedMesh) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; const ms = Array.isArray(o.material) ? o.material : [o.material]; for (const m of ms) if (m) { m.side = THREE.DoubleSide; m.transparent = false; m.opacity = 1; if (LOW_GFX) for (const key of ["map", "normalMap", "roughnessMap", "metalnessMap", "emissiveMap", "aoMap"]) shrinkTex(m[key]); } } });
     s.updateMatrixWorld(true); const box = new THREE.Box3().setFromObject(s); const h = Math.max(0.01, box.max.y - box.min.y);
-    const fbxs = await Promise.all(CLIPS.map((c) => fb.loadAsync(`/faction-wars/characters/${fid}/${c}.fbx`).catch(() => null)));
-    const clips: Record<string, THREE.AnimationClip> = {};
-    CLIPS.forEach((c, i) => { const src = fbxs[i]?.animations?.[0]; if (!src) return; const clip = src.clone(); clip.tracks = clip.tracks.map((t) => { t.name = t.name.replace(/^mixamorig(?!_)([A-Z][^.]*)(\..+)$/, "mixamorig_$1$2"); return t; }).filter((t) => t.name.endsWith(".quaternion")); clips[c] = clip; });
-    try { const lj = await (await fetch(`/siege/anim/${fid}.json`)).json(); for (const n of ["walk", "run"]) { const L = lj[n]; if (!L) continue; const times = Float32Array.from({ length: L.n }, (_, i) => i / L.fps); clips[n] = new THREE.AnimationClip(n, L.dur, Object.entries(L.tracks as Record<string, number[]>).map(([b, q]) => new THREE.QuaternionKeyframeTrack(`mixamorig_${b}.quaternion`, times, q))); clips[n].userData = { bob: L.bob }; } } catch {}
-    return { scene: s, clips, k: 1.85 / h, minY: box.min.y };
-  })();
-  return rigCache[fid];
+    return { scene: s, k: 1.85 / h, minY: box.min.y };
+  })());
+}
+function loadClip(fid: string, c: string) {
+  return (clipCache[fid + "/" + c] ||= new FBXLoader().loadAsync(`/faction-wars/characters/${fid}/${c}.fbx`).then((f) => { const src = f.animations?.[0]; if (!src) return null; const clip = src.clone(); clip.tracks = clip.tracks.map((t) => { t.name = t.name.replace(/^mixamorig(?!_)([A-Z][^.]*)(\..+)$/, "mixamorig_$1$2"); return t; }).filter((t) => t.name.endsWith(".quaternion")); return clip; }).catch(() => null));
+}
+function loadLoco(fid: string) {
+  return (locoCache[fid] ||= (async () => { const out: Record<string, THREE.AnimationClip> = {}; try { const lj = await (await fetch(`/siege/anim/${fid}.json`)).json(); for (const n of ["walk", "run"]) { const L = lj[n]; if (!L) continue; const times = Float32Array.from({ length: L.n }, (_, i) => i / L.fps); out[n] = new THREE.AnimationClip(n, L.dur, Object.entries(L.tracks as Record<string, number[]>).map(([b, q]) => new THREE.QuaternionKeyframeTrack(`mixamorig_${b}.quaternion`, times, q))); out[n].userData = { bob: L.bob }; } } catch {} return out; })());
+}
+/** the hero gets every clip + walk/run; garrison ants only what they use (much less to download on a phone) */
+async function loadRig(fid: string, clipNames: readonly string[] = CLIPS, loco = true): Promise<Rig> {
+  const [g, loc, ...cl] = await Promise.all([loadGlb(fid), loco ? loadLoco(fid) : Promise.resolve({} as Record<string, THREE.AnimationClip>), ...clipNames.map((c) => loadClip(fid, c))]);
+  const clips: Record<string, THREE.AnimationClip> = { ...loc }; clipNames.forEach((c, i) => { if (cl[i]) clips[c] = cl[i]!; });
+  return { scene: g.scene, clips, k: g.k, minY: g.minY };
 }
 
 export class SiegeWorld {
@@ -82,15 +97,16 @@ export class SiegeWorld {
     this.view = viewOf(this.faction);
     // React strict mode mounts twice: the first instance is destroyed before its assets finish loading — never touch the canvas from it
     await Promise.resolve(); if (this.over) return;
-    const r = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true, powerPreference: "high-performance" }); this.renderer = r;
-    r.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1)); r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 0.92; r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap;
+    const r = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: !LOW_GFX, powerPreference: "high-performance" }); this.renderer = r;
+    this.canvas.addEventListener("webglcontextlost", (e) => { e.preventDefault(); this.cb.onLost?.(); });
+    r.setPixelRatio(Math.min(LOW_GFX ? 1.25 : 1.5, window.devicePixelRatio || 1)); if (LOW_GFX) this.perf.level = 1; r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 0.92; r.shadowMap.enabled = true; r.shadowMap.type = LOW_GFX ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
     this.scene = new THREE.Scene(); this.scene.background = new THREE.Color(0xe8c49a); this.scene.fog = new THREE.FogExp2(0xd8b48e, 0.0036);
     this.camera = new THREE.PerspectiveCamera(58, 1, 0.1, 1500);
     const tl = new THREE.TextureLoader(); const load = (n: string, p: string, srgb = true) => new Promise<void>((res) => tl.load(p, (t) => { if (srgb) t.colorSpace = THREE.SRGBColorSpace; this.tex[n] = t; res(); }, undefined, () => res()));
-    await Promise.all([...["ashlar", "ashlar2", "flag", "dirt", "wood", "rock"].flatMap((n) => [load(n + "_a", `/siege/tex/${n}_a.jpg`), load(n + "_n", `/siege/tex/${n}_n.jpg`, false), load(n + "_r", `/siege/tex/${n}_r.jpg`, false)]), ...["glow", "flare", "spark", "smoke", "dirt", "ring", "flame", "bolt2", "star", "slash", "scorch", "smoke2"].map((n) => load(n, `/siege/fx/${n}.png`))]);
+    await Promise.all([...["ashlar", "ashlar2", "flag", "dirt", "wood", "rock"].flatMap((n) => [load(n + "_a", `/siege/tex/${LOW_GFX ? "m/" : ""}${n}_a.jpg`), load(n + "_n", `/siege/tex/${LOW_GFX ? "m/" : ""}${n}_n.jpg`, false), load(n + "_r", `/siege/tex/${LOW_GFX ? "m/" : ""}${n}_r.jpg`, false)]), ...["glow", "flare", "spark", "smoke", "dirt", "ring", "flame", "bolt2", "star", "slash", "scorch", "smoke2"].map((n) => load(n, `/siege/fx/${n}.png`))]);
     if (this.over) { r.dispose(); return; }
     this.buildWorld(); this.buildCatapult();
-    const rp = new RenderPass(this.scene, this.camera); const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.32, 0.5, 0.92); this.bloom = bloom; this.composer = new EffectComposer(r); this.composer.addPass(rp); this.composer.addPass(bloom);
+    const rp = new RenderPass(this.scene, this.camera); const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.32, 0.5, 0.92); this.bloom = bloom; if (LOW_GFX) bloom.enabled = false; this.composer = new EffectComposer(r); this.composer.addPass(rp); this.composer.addPass(bloom);
     this.placeCamera(true); this.fit(); window.addEventListener("resize", this.fitBound); requestAnimationFrame(this.fitBound); setTimeout(this.fitBound, 300);
     this.bindInput(); await Promise.all([this.buildGarrison().catch(() => {}), this.setFaction(this.faction), loadBugModels().then((m) => { this.bugModels = m; })]); if (this.over) return;
     this.buildIntro(); this.embers = new Embers(this.scene, this.tex.glow); this.warm();
@@ -145,7 +161,7 @@ export class SiegeWorld {
     for (const tx of [-27, 27]) this.torch(tx, 6.2, FIELD_Z - 0.6, 1.2);
     this.sky = buildSky(S);
     // golden-hour sun (shadows) + sky/ground fill
-    const sun = new THREE.DirectionalLight(0xffd6a0, 3.4); sun.position.copy(SUN_DIR).multiplyScalar(150); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); const sc = sun.shadow.camera as THREE.OrthographicCamera; sc.left = -75; sc.right = 75; sc.top = 75; sc.bottom = -75; sc.near = 20; sc.far = 400; sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.04; sun.target.position.set(0, 0, -20); S.add(sun); S.add(sun.target); this.sun = sun;
+    const sun = new THREE.DirectionalLight(0xffd6a0, 3.4); sun.position.copy(SUN_DIR).multiplyScalar(150); sun.castShadow = true; sun.shadow.mapSize.set(LOW_GFX ? 1024 : 2048, LOW_GFX ? 1024 : 2048); const sc = sun.shadow.camera as THREE.OrthographicCamera; sc.left = -75; sc.right = 75; sc.top = 75; sc.bottom = -75; sc.near = 20; sc.far = 400; sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.04; sun.target.position.set(0, 0, -20); S.add(sun); S.add(sun.target); this.sun = sun;
     S.add(new THREE.HemisphereLight(0xbcd2ff, 0x8a6a4a, 1.1));
     for (let i = 0; i < 3; i++) { const l = new THREE.PointLight(0xffffff, 0, 20, 1.6); l.position.set(0, -50, 0); S.add(l); this.lights.push({ l, until: 0, follow: null, i0: 0, t0: 0 }); }
     this.marker = new THREE.Mesh(new THREE.RingGeometry(1.2, 1.6, 40), new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false })); this.marker.rotation.x = -Math.PI / 2; this.marker.position.set(0, 0.06, -30); S.add(this.marker);
@@ -190,8 +206,8 @@ export class SiegeWorld {
     const tipL = this.treb.tipLocal.clone(); this.arm.localToWorld(tipL); this.treb.g.worldToLocal(tipL); (this.treb.sling.geometry as THREE.BufferGeometry).setFromPoints([tipL, pouch]);
   }
   // ── actors (rigged FW ants)
-  async makeActor(fid: string, scale = 1): Promise<Actor> {
-    const rig = await loadRig(fid); const obj = skClone(rig.scene) as THREE.Object3D; obj.scale.setScalar(rig.k * scale); obj.userData.minY = rig.minY * rig.k * scale;
+  async makeActor(fid: string, scale = 1, clipNames: readonly string[] = CLIPS, loco = true): Promise<Actor> {
+    const rig = await loadRig(fid, clipNames, loco); const obj = skClone(rig.scene) as THREE.Object3D; obj.scale.setScalar(rig.k * scale); obj.userData.minY = rig.minY * rig.k * scale;
     const mixer = new THREE.AnimationMixer(obj); const actions: Record<string, THREE.AnimationAction> = {};
     for (const [n, clip] of Object.entries(rig.clips)) { const a = mixer.clipAction(clip); if (n === "idle" || n === "walk" || n === "run") a.setLoop(THREE.LoopRepeat, Infinity); else { a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; } actions[n] = a; }
     const actor: Actor = { obj, mixer, actions, current: null, fid }; mixer.addEventListener("finished", () => { if (actor.current && actor.current !== actions.idle) this.playA(actor, actor === this.hero ? this.loco : "idle"); });
@@ -212,7 +228,9 @@ export class SiegeWorld {
   }
   async buildGarrison() {
     const Z = FIELD_Z + 0.95; const spots: [string, number, number][] = [["ashigaru", -21, Z], ["samurai", 8.4, Z], ["yamabushi", 21, Z], ["ashigaru", 36, Z], ["kenshi", -34, Z], ["bushi", -48, Z], ["sohei", -9, Z], ["warrior", 28, Z], ["buke", 48, Z], ["wokou", -25.5, Z]];
-    for (const [fid, x, z] of spots) { const a = await this.makeActor(fid); if (this.over) return; this.standAt(a, x, z); this.scene.add(a.obj); this.garrison.push({ a, cd: 1.5 + Math.random() * 3 }); }
+    const use = LOW_GFX ? spots.slice(0, 5) : spots;
+    const actors = await Promise.all(use.map(([fid]) => this.makeActor(fid, 1, fid === "yamabushi" ? ["idle", "attack", "magic"] : ["idle", "attack"], false).catch(() => null))); if (this.over) return;
+    use.forEach(([, x, z], i) => { const a = actors[i]; if (!a) return; this.standAt(a, x, z); this.scene.add(a.obj); this.garrison.push({ a, cd: 1.5 + Math.random() * 3 }); });
   }
 
   // ── intro: a slow fly-in over the marching horde, up the wall face, settling into your station

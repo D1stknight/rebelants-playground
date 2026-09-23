@@ -48,7 +48,7 @@ export default function SiegeView() {
     let alive = true; let eng: any = null; setHud(EMPTY); setErr(null); setLoading(true);
     (async () => {
       try {
-        const cb = { audio: audioRef.current || undefined, onHud: (h: Hud) => { if (alive) setHud(h); }, onEnd: (r: any) => { if (alive) setResult(r); } };
+        const cb = { audio: audioRef.current || undefined, onLost: () => { if (alive) setErr("lost"); }, onHud: (h: Hud) => { if (alive) setHud(h); }, onEnd: (r: any) => { if (alive) setResult(r); } };
         const mod = await import("./world3d"); if (!alive || !canvasRef.current) return; eng = new mod.SiegeWorld(canvasRef.current, cb);
         eng.faction = factionRef.current; engRef.current = eng; await eng.init(); if (!alive) return; setLoading(false);
         if (autoStart.current) { autoStart.current = false; eng.startIntro(); }
@@ -57,8 +57,14 @@ export default function SiegeView() {
     return () => { alive = false; try { eng?.destroy(); } catch {} engRef.current = null; };
   }, [gen]);
 
-  const goFs = async () => { const el = wrapRef.current; if (!el || document.fullscreenElement) return; try { await el.requestFullscreen?.(); setFs(true); } catch {} try { await (screen.orientation as any)?.lock?.("landscape"); } catch {} };
-  const toggleFs = async () => { try { if (!document.fullscreenElement) await goFs(); else { await document.exitFullscreen?.(); setFs(false); } } catch {} };
+  // real fullscreen where the browser has it; iPhone Safari doesn't, so the game pins itself over the whole page instead
+  const [pseudoFs, setPseudoFs] = useState(false);
+  const refit = () => { for (const t of [30, 250, 700]) setTimeout(() => engRef.current?.fit?.(), t); };
+  const goFs = async () => { const el = wrapRef.current as any; if (!el || document.fullscreenElement || pseudoFs) return; let ok = false; try { if (el.requestFullscreen) { await el.requestFullscreen(); ok = true; } else if (el.webkitRequestFullscreen) { el.webkitRequestFullscreen(); ok = true; } } catch {} if (ok) setFs(true); else { setPseudoFs(true); try { window.scrollTo(0, 0); } catch {} } try { await (screen.orientation as any)?.lock?.("landscape"); } catch {} refit(); };
+  const toggleFs = async () => { try { if (pseudoFs) { setPseudoFs(false); refit(); return; } if (!document.fullscreenElement) await goFs(); else { await document.exitFullscreen?.(); setFs(false); refit(); } } catch {} };
+  useEffect(() => { if (!pseudoFs) return; const b = document.body.style.overflow; document.body.style.overflow = "hidden"; const r = () => engRef.current?.fit?.(); window.addEventListener("orientationchange", r); return () => { document.body.style.overflow = b; window.removeEventListener("orientationchange", r); }; }, [pseudoFs]);
+  const [portrait, setPortrait] = useState(false);
+  useEffect(() => { const u = () => setPortrait(window.innerHeight > window.innerWidth * 1.05 && ("ontouchstart" in window || navigator.maxTouchPoints > 0)); u(); window.addEventListener("resize", u); return () => window.removeEventListener("resize", u); }, []);
   useEffect(() => { const h = () => setFs(!!document.fullscreenElement); document.addEventListener("fullscreenchange", h); return () => document.removeEventListener("fullscreenchange", h); }, []);
 
   const choose = (f: string) => { click(); if (f === faction) return; try { localStorage.setItem("ra:siege:faction", f); } catch {} setFaction(f); engRef.current?.setFaction?.(f); };
@@ -73,11 +79,14 @@ export default function SiegeView() {
   const st = STATS[faction] || STATS.ronin;
 
   return (
-    <div ref={wrapRef} style={{ position: "relative", width: "100%", aspectRatio: fs ? undefined : "16 / 9", maxHeight: fs ? undefined : "calc(100vh - 70px)", height: fs ? "100%" : undefined, background: "#140f0a", borderRadius: fs ? 0 : 14, overflow: "hidden", border: fs ? "none" : "1px solid rgba(232,193,112,0.2)", boxShadow: fs ? "none" : "0 24px 70px rgba(0,0,0,0.6)", touchAction: "none", userSelect: "none", WebkitUserSelect: "none", fontFamily: cinzel }}>
+    <div ref={wrapRef} style={{ position: pseudoFs ? "fixed" : "relative", ...(pseudoFs ? { left: 0, top: 0, right: 0, bottom: 0, zIndex: 1000, width: "100vw", height: "100dvh" } : {}), width: pseudoFs ? "100vw" : "100%", aspectRatio: fs || pseudoFs ? undefined : "16 / 9", maxHeight: fs || pseudoFs ? undefined : "calc(100vh - 70px)", height: pseudoFs ? "100dvh" : fs ? "100%" : undefined, background: "#140f0a", borderRadius: fs || pseudoFs ? 0 : 14, overflow: "hidden", border: fs || pseudoFs ? "none" : "1px solid rgba(232,193,112,0.2)", boxShadow: fs || pseudoFs ? "none" : "0 24px 70px rgba(0,0,0,0.6)", touchAction: "none", userSelect: "none", WebkitUserSelect: "none", fontFamily: cinzel }}>
       <canvas ref={canvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", display: "block", touchAction: "none", cursor: mode === "pov" ? "crosshair" : "default" }} />
       {/* cinematic vignette */}
       <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "radial-gradient(ellipse at 50% 55%, transparent 55%, rgba(20,10,4,0.45) 100%)" }} />
 
+      {portrait && !err && (
+        <div style={{ position: "absolute", left: "50%", top: pseudoFs || fs ? 58 : 46, transform: "translateX(-50%)", zIndex: 5, pointerEvents: "none", fontSize: 11, letterSpacing: "0.2em", color: "#f3dca8", background: "rgba(20,12,6,0.8)", border: "1px solid rgba(232,193,112,0.45)", padding: "6px 12px", whiteSpace: "nowrap", animation: "siegePulse 1.6s ease-in-out infinite" }}>↻ TURN YOUR PHONE SIDEWAYS</div>
+      )}
       {/* ── HUD (souls-style) */}
       {playing && (
         <>
@@ -92,7 +101,7 @@ export default function SiegeView() {
             <div style={{ fontSize: 20, letterSpacing: "0.1em", color: GOLD, textShadow: "0 0 14px rgba(232,193,112,0.5), 0 2px 3px #000", pointerEvents: "none" }}>{hud.score.toLocaleString()}</div>
             <button type="button" onClick={toggleMute} style={btn} aria-label={muted ? "unmute" : "mute"}>{muted ? "🔇" : "🔊"}</button>
             <button type="button" onClick={openPicker} style={btn}>⚔ DEFENDER</button>
-            <button type="button" onClick={toggleFs} style={btn}>{fs ? "✕" : "⛶"}</button>
+            <button type="button" onClick={toggleFs} style={btn}>{fs || pseudoFs ? "✕" : "⛶"}</button>
           </div>
           {/* defender medallion */}
           <div style={{ position: "absolute", left: 16, bottom: 14, display: "flex", alignItems: "center", gap: 10, pointerEvents: "none" }}>
@@ -201,7 +210,7 @@ export default function SiegeView() {
           </div>
         </div>
       )}
-      {err && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#e0533a", background: "rgba(0,0,0,0.7)", padding: 20, textAlign: "center", fontSize: 13, fontFamily: "system-ui, sans-serif" }}>The siege engine could not start on this device ({err}). WebGL is required.</div>}
+      {err && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#e0533a", background: "rgba(0,0,0,0.7)", padding: 20, textAlign: "center", fontSize: 13, fontFamily: "system-ui, sans-serif" }}>{err === "lost" ? <div>Your phone ran out of graphics memory.<br /><button type="button" onClick={() => { setErr(null); setGen((g) => g + 1); }} style={{ ...btn, marginTop: 12, fontSize: 13 }}>↻ RELOAD THE SIEGE</button></div> : <>The siege engine could not start on this device ({err}). WebGL is required.</>}</div>}
       <style>{`@keyframes siegeMsg { from { opacity:0; transform: translateY(-8px) scale(.96);} to { opacity:1; transform:none; } }
         @keyframes siegePulse { 0%,100% { filter: brightness(1) } 50% { filter: brightness(1.25) } }
         @keyframes siegeBanner { 0% { opacity:0; letter-spacing:.4em } 18% { opacity:1 } 80% { opacity:1 } 100% { opacity:0 } }
