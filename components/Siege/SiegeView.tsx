@@ -1,8 +1,8 @@
 // components/Siege/SiegeView.tsx — The Siege shell: title + defender selection, souls-style HUD, banners, boss bar. The 3D engine loads on the client only.
 import React, { useEffect, useRef, useState } from "react";
-import { type Hud, FACTIONS, KIT, viewOf } from "./shared";
+import { type Hud, FACTIONS, KIT, WAVES, viewOf } from "./shared";
 
-const EMPTY: Hud = { gate: 1000, gateMax: 1000, wave: 0, waves: 8, horde: 0, score: 0, kills: 0, reload: 0, state: "ready", msg: null, intro: false, menu: true };
+const EMPTY: Hud = { gate: 1000, gateMax: 1000, wave: 0, waves: WAVES.length, horde: 0, score: 0, kills: 0, reload: 0, state: "ready", msg: null, intro: false, menu: true };
 /** power · range · area · speed (0–10). Ronin leads every column by design. */
 const STATS: Record<string, [number, number, number, number]> = {
   ronin: [10, 9, 9, 9], samurai: [8, 7, 7, 6], warrior: [9, 6, 9, 3], buke: [6, 7, 6, 6], shogun: [6, 8, 8, 4],
@@ -172,7 +172,7 @@ export default function SiegeView() {
           </div>
           <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 14, flex: "0 0 auto" }}>
             <button type="button" disabled={loading && !picker} onClick={manTheWall} style={{ fontFamily: cinzel, fontSize: compact ? 12 : "clamp(13px, 1.5vw, 17px)", letterSpacing: "0.3em", padding: compact ? "6px 22px" : "clamp(8px, 1.2vh, 13px) clamp(22px, 3vw, 44px)", color: "#1e1206", cursor: loading && !picker ? "wait" : "pointer", background: "linear-gradient(180deg, #f6d68a, #d49a3e 60%, #a8682a)", border: "1px solid #ffe3a3", boxShadow: "0 0 26px rgba(255,170,80,0.55), inset 0 1px 0 rgba(255,255,255,0.6)", opacity: loading && !picker ? 0.6 : 1 }}>{loading && !picker ? "RAISING THE WALLS…" : picker ? "RETURN TO THE WALL" : "MAN THE WALL"}</button>
-            {!compact && <div style={{ fontFamily: "system-ui, sans-serif", fontSize: 11, color: MUTED, maxWidth: 260, lineHeight: 1.35 }}>Move to aim · <b style={{ color: CREAM }}>hold</b> to charge · release to fire. 8 waves and the Brood Mother.</div>}
+            {!compact && <div style={{ fontFamily: "system-ui, sans-serif", fontSize: 11, color: MUTED, maxWidth: 260, lineHeight: 1.35 }}>Move to aim · <b style={{ color: CREAM }}>hold</b> to charge · release to fire. 12 waves, every stretch of the wall, and the Brood Mother.</div>}
           </div>
         </div>
       )}

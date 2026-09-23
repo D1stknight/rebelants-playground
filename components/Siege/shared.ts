@@ -22,12 +22,16 @@ export const KIT: Record<string, { name: string; ammo: string; clip: "attack" | 
 };
 export type Wave = { crawlers: number; big: number; tower?: number; ram?: number; slingers?: number; wasps?: number; brutes?: number; brood?: boolean; gap: number; name?: string };
 export const WAVES: Wave[] = [
-  { crawlers: 8, big: 0, gap: 0.9, name: "WAVE 1 — scouts" },
-  { crawlers: 12, big: 2, gap: 0.7, name: "WAVE 2 — the crawl" },
-  { crawlers: 10, big: 2, slingers: 2, tower: 1, gap: 0.7, name: "WAVE 3 — web-slingers" },
-  { crawlers: 14, big: 3, wasps: 6, gap: 0.6, name: "WAVE 4 — wasps on the wind" },
-  { crawlers: 14, big: 3, slingers: 2, tower: 1, ram: 1, gap: 0.55, name: "WAVE 5 — the ram" },
-  { crawlers: 16, big: 4, brutes: 2, wasps: 4, gap: 0.5, name: "WAVE 6 — beetle brutes" },
-  { crawlers: 22, big: 6, slingers: 3, wasps: 6, brutes: 2, tower: 2, ram: 1, gap: 0.45, name: "WAVE 7 — the great push" },
-  { crawlers: 10, big: 4, brutes: 1, wasps: 4, brood: true, gap: 0.6, name: "FINAL WAVE — THE BROOD MOTHER" },
+  { crawlers: 10, big: 0, gap: 0.8, name: "WAVE 1 — scouts" },
+  { crawlers: 16, big: 2, gap: 0.6, name: "WAVE 2 — the crawl" },
+  { crawlers: 14, big: 2, slingers: 3, tower: 1, gap: 0.6, name: "WAVE 3 — web-slingers" },
+  { crawlers: 14, big: 3, wasps: 8, gap: 0.55, name: "WAVE 4 — wasps on the wind" },
+  { crawlers: 18, big: 3, slingers: 3, tower: 1, ram: 1, gap: 0.5, name: "WAVE 5 — the ram" },
+  { crawlers: 18, big: 4, brutes: 3, wasps: 6, gap: 0.45, name: "WAVE 6 — beetle brutes" },
+  { crawlers: 40, big: 0, wasps: 4, gap: 0.22, name: "WAVE 7 — the swarm" },
+  { crawlers: 22, big: 5, slingers: 4, wasps: 5, tower: 2, ram: 1, gap: 0.4, name: "WAVE 8 — twin towers" },
+  { crawlers: 22, big: 6, brutes: 5, wasps: 6, ram: 2, gap: 0.4, name: "WAVE 9 — the iron shell" },
+  { crawlers: 16, big: 2, slingers: 4, wasps: 22, gap: 0.45, name: "WAVE 10 — the sky hive" },
+  { crawlers: 38, big: 8, slingers: 5, wasps: 10, brutes: 4, tower: 3, ram: 2, gap: 0.3, name: "WAVE 11 — the great push" },
+  { crawlers: 24, big: 6, brutes: 3, wasps: 8, slingers: 2, brood: true, gap: 0.45, name: "FINAL WAVE — THE BROOD MOTHER" },
 ];
