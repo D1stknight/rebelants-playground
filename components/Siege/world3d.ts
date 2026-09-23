@@ -62,7 +62,7 @@ function loadRig(fid: string): Promise<Rig> {
 export class SiegeWorld {
   canvas: HTMLCanvasElement; cb: Callbacks; faction = "ronin"; view: View = "side"; over = false; ready = false;
   renderer!: THREE.WebGLRenderer; scene!: THREE.Scene; camera!: THREE.PerspectiveCamera; composer!: EffectComposer; clock = new THREE.Clock();
-  tex: Record<string, THREE.Texture> = {}; hero: Actor | null = null; heroHome = new THREE.Vector3(); heroSpin = 0; heroX = SIDE_X; heroZ = HERO_Z; heroV = 0; heroVX = 0; heroVZ = 0; heroYaw = Math.PI; loco: "idle" | "walk" | "run" = "idle"; keys = { l: false, r: false, f: false, b: false, run: false }; moveIn = 0; moveInZ = 0; runIn = false; trebSet = false; lights: { l: THREE.PointLight; until: number; follow: THREE.Object3D | null; i0: number; t0: number }[] = []; warmed = false; perf = { acc: 0, n: 0, level: 0 }; bloom!: UnrealBloomPass; garrison: { a: Actor; cd: number }[] = []; catapult!: THREE.Group; arm!: THREE.Group; armK = 0; treb!: Treb; armMode: "ready" | "swing" | "return" = "ready"; armT = 0; armA = 2.15; pendingFire: number | null = null; embers!: Embers; menu = true; paused = false; boss: Spider | null = null; banner = false;
+  tex: Record<string, THREE.Texture> = {}; hero: Actor | null = null; heroHome = new THREE.Vector3(); heroSpin = 0; heroX = SIDE_X; heroZ = HERO_Z; wallView = false; threat = 0; threatWarned = false; heroV = 0; heroVX = 0; heroVZ = 0; heroYaw = Math.PI; loco: "idle" | "walk" | "run" = "idle"; keys = { l: false, r: false, f: false, b: false, run: false }; moveIn = 0; moveInZ = 0; runIn = false; trebSet = false; lights: { l: THREE.PointLight; until: number; follow: THREE.Object3D | null; i0: number; t0: number }[] = []; warmed = false; perf = { acc: 0, n: 0, level: 0 }; bloom!: UnrealBloomPass; garrison: { a: Actor; cd: number }[] = []; catapult!: THREE.Group; arm!: THREE.Group; armK = 0; treb!: Treb; armMode: "ready" | "swing" | "return" = "ready"; armT = 0; armA = 2.15; pendingFire: number | null = null; embers!: Embers; menu = true; paused = false; boss: Spider | null = null; banner = false;
   spiders: Spider[] = []; engines: Engine[] = []; shots: Shot[] = []; parts: Part[] = []; bolts: Bolt[] = []; zones: Zone[] = []; flings: Fling[] = []; flames: THREE.Sprite[] = []; torchLights: THREE.PointLight[] = [];
   marker!: THREE.Mesh; aim = new THREE.Vector3(0, 0, -30); pointer = { x: 0.5, y: 0.6 }; charge = 0; charging = false; reload = 0; reloadTime = 1.2;
   state: Hud["state"] = "ready"; gateHp = 1000; gateMax = 1000; wave = 0; score = 0; kills = 0; msg: string | null = null; msgT = 0; hordeLeft = 0; spawnQueue: { at: number; fn: () => void }[] = []; waveT = 0; waveDone = false; hudT = 0; t = 0; shake = 0; rally = 0;
@@ -114,12 +114,12 @@ export class SiegeWorld {
     else { this.sun.shadow.mapSize.set(1024, 1024); this.sun.shadow.map?.dispose(); (this.sun.shadow as any).map = null; }
   }
   fitBound = () => this.fit();
-  fit() { const el = this.canvas.parentElement || this.canvas; const w = Math.max(1, el.clientWidth), h = Math.max(1, el.clientHeight); this.renderer.setSize(w, h, false); this.composer.setSize(w, h); this.camera.aspect = w / h; this.camera.fov = this.view === "pov" ? (w / h < 1.2 ? 72 : 58) : (w / h < 1.2 ? 70 : 54); this.camera.updateProjectionMatrix(); }
+  fit() { const el = this.canvas.parentElement || this.canvas; const w = Math.max(1, el.clientWidth), h = Math.max(1, el.clientHeight); this.renderer.setSize(w, h, false); this.composer.setSize(w, h); this.camera.aspect = w / h; this.camera.fov = this.wallView ? (w / h < 1.2 ? 76 : 60) : this.view === "pov" ? (w / h < 1.2 ? 72 : 58) : (w / h < 1.2 ? 70 : 54); this.camera.updateProjectionMatrix(); }
   destroy() { this.over = true; window.removeEventListener("resize", this.fitBound); window.removeEventListener("keydown", this.onKD); window.removeEventListener("keyup", this.onKU); window.removeEventListener("blur", this.onBlur); try { this.renderer?.dispose(); this.renderer?.forceContextLoss?.(); } catch {} }
 
   // ── cameras
-  camBase() { return this.view === "pov" ? new THREE.Vector3(this.heroX + 1.4, WALL_TOP + 6.4, this.heroZ + 6.3) : new THREE.Vector3(this.heroX + 2.6, WALL_TOP + 9.2, this.heroZ + 8.6); }
-  camLook() { return this.view === "pov" ? new THREE.Vector3(this.heroX + 1.4, 0.5, this.heroZ - 26) : new THREE.Vector3(this.heroX - 4, 0, this.heroZ - 28); }
+  camBase() { if (this.wallView) { let cx = this.heroX; for (const tx of TOWERS) if (Math.abs(cx - tx) < 7) cx = tx + (this.heroX >= tx ? 7 : -7); return new THREE.Vector3(cx, WALL_TOP + 4.5, FIELD_Z - 21); } return this.view === "pov" ? new THREE.Vector3(this.heroX + 1.4, WALL_TOP + 6.4, this.heroZ + 6.3) : new THREE.Vector3(this.heroX + 2.6, WALL_TOP + 9.2, this.heroZ + 8.6); }
+  camLook() { if (this.wallView) return new THREE.Vector3(this.heroX, 4.6, FIELD_Z); return this.view === "pov" ? new THREE.Vector3(this.heroX + 1.4, 0.5, this.heroZ - 26) : new THREE.Vector3(this.heroX - 4, 0, this.heroZ - 28); }
   placeCamera(snap = false) { const cp = this.camBase(), lk = this.camLook(); if (snap) { this.camera.position.copy(cp); this.camera.lookAt(lk); } }
 
   // ── the world (art lives in worldArt.ts)
@@ -232,13 +232,17 @@ export class SiegeWorld {
     const up = (e: PointerEvent) => { if (!this.charging) return; pos(e); this.charging = false; this.fire(Math.min(1, this.charge / 0.7)); this.charge = 0; };
     cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", up);
     cv.addEventListener("touchstart", (e) => e.preventDefault(), { passive: false });
-    const kd = (e: KeyboardEvent, v: boolean) => { const k = e.key.toLowerCase(); if (k === "a" || k === "arrowleft") this.keys.l = v; else if (k === "d" || k === "arrowright") this.keys.r = v; else if (k === "w" || k === "arrowup") this.keys.f = v; else if (k === "s" || k === "arrowdown") this.keys.b = v; else if (k === "shift") this.keys.run = v; else if (v && k === "e") this.placeTreb(); else return; e.preventDefault(); };
+    const kd = (e: KeyboardEvent, v: boolean) => { const k = e.key.toLowerCase(); if (k === "a" || k === "arrowleft") this.keys.l = v; else if (k === "d" || k === "arrowright") this.keys.r = v; else if (k === "w" || k === "arrowup") this.keys.f = v; else if (k === "s" || k === "arrowdown") this.keys.b = v; else if (k === "shift") this.keys.run = v; else if (v && k === "e") this.placeTreb(); else if (v && (k === "v" || k === "q")) this.toggleWallView(); else return; e.preventDefault(); };
     this.onKD = (e) => kd(e, true); this.onKU = (e) => kd(e, false); this.onBlur = () => { this.keys = { l: false, r: false, f: false, b: false, run: false }; };
     window.addEventListener("keydown", this.onKD); window.addEventListener("keyup", this.onKU); window.addEventListener("blur", this.onBlur);
   }
   onKD: (e: KeyboardEvent) => void = () => {}; onKU: (e: KeyboardEvent) => void = () => {}; onBlur = () => {};
   /** touch joystick from the HUD: x (right +), z (back +), each -1…1; a full push runs */
   setMove(dx: number, dz = 0, run?: boolean) { this.moveIn = dx; this.moveInZ = dz; if (run !== undefined) this.runIn = run; }
+  /** WALL VIEW: swing the camera out in front of the wall, looking back at its face — see (and hit) whatever is climbing it or battering the gate */
+  toggleWallView(on?: boolean) { if (this.menu || this.intro) return; this.wallView = on ?? !this.wallView; this.fit(); this.pushHud(); }
+  /** anything at the wall right now (climbers, brutes at the gate, engines that arrived) */
+  wallThreat() { let n = 0; for (const s of this.spiders) if (!s.dead && s.kind !== "wasp" && (s.arrived || s.z > FIELD_Z - 7)) n++; for (const e of this.engines) if (!e.dead && e.arrived) n++; return n; }
   needTreb() { return this.view === "side" && this.faction !== "ronin" && !this.trebSet; }
   trebFollow() { const own = this.view === "side" && this.faction !== "ronin"; const x = own ? Math.max(X_MIN + 2, Math.min(X_MAX - 2, this.heroX - 2.4)) : CATAPULT.x; this.treb.g.position.set(x, CATAPULT.y, TREB_Z); if (this.trebRing) { this.trebRing.visible = own && !this.trebSet && !this.menu && !this.intro; this.trebRing.position.set(x, WALL_TOP + 0.24, TREB_Z); } }
   placeTreb() {
@@ -263,10 +267,10 @@ export class SiegeWorld {
   /** move freely on the wall-walk and the terrace behind it (camera-relative: forward = toward the field) */
   stepHero(dt: number) {
     if (!this.hero || this.leap) return;
-    let ix = (this.keys.r ? 1 : 0) - (this.keys.l ? 1 : 0) + this.moveIn, iz = (this.keys.b ? 1 : 0) - (this.keys.f ? 1 : 0) + this.moveInZ; const mag = Math.min(1, Math.hypot(ix, iz)); if (mag > 0) { const n = Math.hypot(ix, iz); ix /= n; iz /= n; }
+    let ix = (this.keys.r ? 1 : 0) - (this.keys.l ? 1 : 0) + this.moveIn, iz = (this.keys.b ? 1 : 0) - (this.keys.f ? 1 : 0) + this.moveInZ; if (this.wallView) { ix = -ix; iz = -iz; } /* wall view looks back at the wall: screen-right is -x, 'up' is toward the keep */ const mag = Math.min(1, Math.hypot(ix, iz)); if (mag > 0) { const n = Math.hypot(ix, iz); ix /= n; iz /= n; }
     const run = this.keys.run || this.runIn || Math.hypot(this.moveIn, this.moveInZ) > 0.92; const spd = (run ? RUN : WALK) * (this.keys.l || this.keys.r || this.keys.f || this.keys.b ? 1 : Math.max(0.35, mag));
     const k = Math.min(1, dt * 8); this.heroVX += (ix * spd * (mag > 0 ? 1 : 0) - this.heroVX) * k; this.heroVZ += (iz * spd * (mag > 0 ? 1 : 0) - this.heroVZ) * k; if (!mag && Math.hypot(this.heroVX, this.heroVZ) < 0.08) { this.heroVX = 0; this.heroVZ = 0; }
-    const [nx, nz] = this.collide(this.heroX + this.heroVX * dt, this.heroZ + this.heroVZ * dt); if (dt > 0) { this.heroVX = (nx - this.heroX) / dt * 0.5 + this.heroVX * 0.5; this.heroVZ = (nz - this.heroZ) / dt * 0.5 + this.heroVZ * 0.5; } this.heroX = nx; this.heroZ = nz;
+    const [nx, nz] = this.collide(this.heroX + this.heroVX * dt, this.heroZ + this.heroVZ * dt); void 0; if (dt > 0) { this.heroVX = (nx - this.heroX) / dt * 0.5 + this.heroVX * 0.5; this.heroVZ = (nz - this.heroZ) / dt * 0.5 + this.heroVZ * 0.5; } this.heroX = nx; this.heroZ = nz;
     this.heroV = Math.hypot(this.heroVX, this.heroVZ);
     const o = this.hero.obj; o.position.x = this.heroX; o.position.z = this.heroZ; const sp = this.heroV; const loco = sp > 5.2 ? "run" : sp > 0.35 ? "walk" : "idle";
     const A = this.hero.actions; const cur = this.hero.current; const busy = !!cur && cur !== A.idle && cur !== A.walk && cur !== A.run;
@@ -279,7 +283,7 @@ export class SiegeWorld {
   updateAim() {
     const ndc = new THREE.Vector2(this.pointer.x * 2 - 1, -(this.pointer.y * 2 - 1)); const rc = new THREE.Raycaster(); rc.setFromCamera(ndc, this.camera);
     const hit = new THREE.Vector3(); const wallHit = new THREE.Vector3();
-    const onWall = rc.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 0, 1), -FIELD_Z), wallHit) && wallHit.y > 0.5 && wallHit.y < WALL_TOP - 0.4 && rc.ray.direction.z < 0;
+    const onWall = rc.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 0, 1), -FIELD_Z), wallHit) && wallHit.y > 0.5 && wallHit.y < WALL_TOP - 0.4 && (rc.ray.direction.z < 0 || this.wallView);
     const ok = rc.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hit);
     if (onWall) this.aim.lerp(new THREE.Vector3(wallHit.x, wallHit.y, FIELD_Z - 0.6), 0.4);
     else if (ok && hit.z < FIELD_Z - 2) { const h2 = new THREE.Vector3(); const th = terrainH(hit.x, hit.z); if (rc.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -th), h2) && h2.z < FIELD_Z - 2) hit.copy(h2); this.aim.lerp(new THREE.Vector3(hit.x, 0, hit.z), 0.35); }
@@ -446,14 +450,14 @@ export class SiegeWorld {
         s.x = Math.sign(s.x) * Math.max(0, Math.abs(s.x) - dt * s.speed * 0.25) + Math.sin(this.t * 0.7 + s.wob) * 0.02; s.z += s.speed * dt; s.g.position.set(s.x, terrainH(s.x, s.z), s.z); s.g.rotation.set(0, Math.PI, 0);
         this.gait(s, ph, 0.5 * 1.6);
         for (const z of this.zones) if (z.kind === "trap" && z.life > 0 && Math.hypot(s.x - z.pos.x, s.z - z.pos.z) < 1.8 + s.size * 0.6) { z.life = 0; s.pinned = 3; this.hurt(s, 120 + z.k * 60); this.puff(z.pos.clone().add(new THREE.Vector3(0, 0.6, 0)), "spark", 6, 0xb8ffb0, 0.8, 2); this.say("Bushi: pinned!", 0.5); }
-        if (s.z >= FIELD_Z - 2.6 * s.size) { s.arrived = true; s.z = FIELD_Z - 2.6 * s.size; if (s.kind === "brute") this.say("A beetle brute is at the gate!", 1.4); }
+        if (s.z >= FIELD_Z - 2.6 * s.size) { s.arrived = true; s.z = FIELD_Z - 2.6 * s.size; if (s.kind !== "brute") for (const tx of TOWERS) if (Math.abs(s.x - tx) < 4.2) s.x = tx + (s.x >= tx ? 4.2 : -4.2); if (s.kind === "brute") this.say("A beetle brute is at the gate!", 1.4); }
       } else if (s.kind === "brute") {   // too heavy to climb: batters the gate
         s.cd -= dt; this.gait(s, this.t * 6, 0.2 * 1.6); const k = Math.max(0, 0.5 - Math.abs(s.cd - 0.3)); s.g.position.set(s.x, terrainH(s.x, s.z), s.z + k * 3); if (s.cd <= 0) { s.cd = 2.2; this.hurtGate(26); this.shake = Math.max(this.shake, 0.5); this.cb.onSfx?.("gate"); this.puff(new THREE.Vector3(s.x, 2.5, FIELD_Z - 0.4), "dirt", 8, 0xb8a48a, 0.8, 2.5); }
       } else {
         const top = WALL_TOP - 0.2; const ph2 = this.t * 8 + s.ph;
         if (s.y < top) { s.y = Math.min(top, s.y + s.speed * 0.28 * dt); this.gait(s, ph2, 0.45 * 1.6); this.hurtGate(dt * 1.5 * s.size); }
         else { this.gait(s, this.t * 22, 0.25 * 1.6); this.hurtGate(dt * 9 * s.size); if (Math.random() < dt * 0.8) this.puff(new THREE.Vector3(s.x, top + 0.9, FIELD_Z + 0.2), "spark", 3, 0xffd27a, 0.6, 0.5); }
-        s.z = FIELD_Z - 0.55 * s.size; s.g.position.set(s.x, s.y, s.z); s.g.rotation.set(-Math.PI / 2 + 0.15, Math.PI, 0);
+        s.z = (Math.abs(s.x) < 5.6 ? FIELD_Z - 1.3 : FIELD_Z) - 0.55 * s.size; s.g.position.set(s.x, s.y, s.z); s.g.rotation.set(-Math.PI / 2 + 0.15, Math.PI, 0);
       }
     }
     for (const e of this.engines) {
@@ -495,14 +499,14 @@ export class SiegeWorld {
       else { const dir = sh.v.clone().normalize(); sh.m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), dir); }
       if (sh.rope) { const h = this.hand(); (sh.rope.geometry as THREE.BufferGeometry).setFromPoints([h, sh.p]); }
       if (sh.kind === "web" || sh.kind === "venom") { sh.hit.clear(); if (sh.p.z >= WALL_Z - 1.6 || sh.p.y <= terrainH(sh.p.x, sh.p.z) + 0.05) { this.hurtGate(sh.dmg); this.shake = Math.max(this.shake, 0.3); if (sh.kind === "web") { this.puff(sh.p, "smoke", 6, 0xe8e0ff, 1.2, 1, 0.9); const near = this.garrison.reduce((b, g) => (!b || g.a.obj.position.distanceTo(sh.p) < b.a.obj.position.distanceTo(sh.p) ? g : b), null as any); if (near) near.cd = Math.max(near.cd, 4); this.say("Webbed!", 0.6); } else { this.puff(sh.p, "dirt", 8, 0x9dff6a, 1, 2.5); this.puff(sh.p, "glow", 2, 0x9dff6a, 3, 0.3, 0.5); } sh.life = 0; } continue; }
-      const R = sh.kind === "orb" || sh.kind === "ward" ? 1.4 : sh.kind === "boulder" ? (sh.sub === "great" ? 1.6 : 1.2) : 1.0;
+      const R = (sh.kind === "orb" || sh.kind === "ward" ? 1.4 : sh.kind === "boulder" ? (sh.sub === "great" ? 1.6 : 1.2) : 1.0) + (sh.p.z > FIELD_Z - 3 && sh.p.y > 0.8 ? 0.6 : 0);   // a little more forgiving on climbers
       for (const tg of this.targetsNear(sh.p, R)) { const key = tg.s || tg.e!; if (sh.hit.has(key)) continue; sh.hit.add(key);
         if (sh.kind === "orb" || sh.kind === "ward" || sh.kind === "boulder" || sh.kind === "standard") { this.impact(sh); sh.life = 0; break; }
         if (sh.kind === "hook") { if (tg.s) this.fling(tg.s, sh.k); else this.hurtTarget(tg, 120); sh.life = 0; break; }
         if (sh.kind === "stake") { this.hurtTarget(tg, sh.dmg); if (tg.s) tg.s.pinned = 2; sh.life = 0; break; }
         this.hurtTarget(tg, sh.dmg); if (sh.kind === "arrow") { sh.life = 0; break; } if (sh.kind === "blade") this.slashFx(tg.pos); sh.v.multiplyScalar(sh.kind === "blade" ? 0.92 : 0.7); }
       if (sh.life <= 0) continue;
-      const gy = terrainH(sh.p.x, sh.p.z) + 0.05; const wallHit = sh.p.z > FIELD_Z - 0.2 && sh.p.y < WALL_TOP + 0.3 && sh.p.y > 0.05;
+      const gy = terrainH(sh.p.x, sh.p.z) + 0.05; const wallHit = sh.v.z > 0 && sh.p.z > FIELD_Z - 0.2 && sh.p.y < WALL_TOP + 0.3 && sh.p.y > 0.05;   // only shots coming in from the field hit the face; ours leave from the top
       if (sh.p.y <= gy || wallHit) {
         if (sh.kind === "orb" || sh.kind === "ward" || sh.kind === "boulder" || sh.kind === "standard") { if (sh.p.y <= gy) sh.p.y = gy; this.impact(sh); sh.life = 0; continue; }
         if (wallHit) { this.puff(sh.p, "spark", 3, 0xffd27a, 0.5, 1.5); sh.life = 0; continue; }
@@ -563,7 +567,7 @@ export class SiegeWorld {
     const rate = this.rally > 0 ? 3 : 1; this.rally = Math.max(0, this.rally - dt);
     for (const g of this.garrison) { g.cd -= dt * rate; if (g.cd > 0) continue; g.cd = 2.4 + Math.random() * 2.2;
       const live = this.spiders.filter((s) => !s.dead && s.z > FIELD_Z - 70 && Math.abs(s.x - g.a.obj.position.x) < 30); if (!live.length) continue; const s = live[(Math.random() * Math.min(4, live.length)) | 0];
-      this.playA(g.a, g.a.fid === "yamabushi" ? "magic" : "attack", 1.6); const from = g.a.obj.position.clone().add(new THREE.Vector3(0, 1.8, -0.6)); const to = new THREE.Vector3(s.x, 0.5, s.z + s.speed * 0.9); this.spawnSpear(from, this.ballistic(from, to, 40), 0, true); }
+      this.playA(g.a, g.a.fid === "yamabushi" ? "magic" : "attack", 1.6); const from = g.a.obj.position.clone().add(new THREE.Vector3(0, 1.8, -0.6)); const to = s.arrived && s.kind !== "brute" ? new THREE.Vector3(s.x, s.y + 0.4, FIELD_Z - 0.9) : new THREE.Vector3(s.x, 0.5, s.z + s.speed * 0.9); this.spawnSpear(from, this.ballistic(from, to, 40), 0, true); }
   }
 
   // ── gate / waves / flow
@@ -585,7 +589,7 @@ export class SiegeWorld {
   }
   end(won: boolean) { if (this.state !== "play") return; this.state = won ? "won" : "lost"; this.say(won ? "THE GATE HOLDS" : "THE GATE HAS FALLEN", 4, true); this.cb.onSfx?.(won ? "win" : "lose"); if (!won) { this.shake = 2; this.puff(new THREE.Vector3(0, 3, FIELD_Z), "smoke", 30, 0x6a5a5a, 6, 3, 2.2); } this.pushHud(); setTimeout(() => this.cb.onEnd?.({ won, score: this.score, kills: this.kills, waves: this.wave }), 1500); }
   say(m: string, t = 1.6, banner = false) { this.msg = m; this.msgT = t; this.banner = banner; this.pushHud(); }
-  pushHud() { this.cb.onHud({ gate: Math.ceil(this.gateHp), gateMax: this.gateMax, wave: this.wave, waves: WAVES.length, horde: Math.max(0, this.hordeLeft), score: this.score, kills: this.kills, reload: this.reloadTime > 0 ? Math.max(0, this.reload / (this.reloadTime * 1.3)) : 0, state: this.state, msg: this.msg, charge: this.charging ? Math.min(1, this.charge / 0.7) : 0, intro: this.intro, menu: this.menu, banner: this.banner, paused: this.paused, boss: this.boss && !this.boss.dead ? { name: "THE BROOD MOTHER", hp: Math.max(0, this.boss.hp), max: this.boss.hpMax } : null , treb: this.needTreb() }); }
+  pushHud() { this.cb.onHud({ gate: Math.ceil(this.gateHp), gateMax: this.gateMax, wave: this.wave, waves: WAVES.length, horde: Math.max(0, this.hordeLeft), score: this.score, kills: this.kills, reload: this.reloadTime > 0 ? Math.max(0, this.reload / (this.reloadTime * 1.3)) : 0, state: this.state, msg: this.msg, charge: this.charging ? Math.min(1, this.charge / 0.7) : 0, intro: this.intro, menu: this.menu, banner: this.banner, paused: this.paused, boss: this.boss && !this.boss.dead ? { name: "THE BROOD MOTHER", hp: Math.max(0, this.boss.hp), max: this.boss.hpMax } : null , treb: this.needTreb(), wallView: this.wallView, threat: this.threat }); }
 
   // ── VFX
   puff(p: THREE.Vector3, tex: string, n: number, color: number, size: number, speed: number, life = 0.6) {
@@ -612,7 +616,7 @@ export class SiegeWorld {
     while (this.spawnQueue.length && this.spawnQueue[0].at <= this.waveT) this.spawnQueue.shift()!.fn();
     this.stepHorde(dt); this.stepShots(dt); this.stepFlings(dt); this.stepZones(dt); this.stepGarrison(dt); this.stepLeap(dt); this.stepHero(dt);
     if (!this.waveDone && !this.spawnQueue.length && this.hordeLeft <= 0) { this.waveDone = true; this.score += 50 * this.wave; setTimeout(() => { if (this.state === "play") this.nextWave(); }, 1800); }
-    this.hudT += dt; if (this.hudT > 0.12) { this.hudT = 0; this.pushHud(); }
+    this.hudT += dt; if (this.hudT > 0.12) { this.hudT = 0; this.threat = this.wallThreat(); if (this.threat && !this.threatWarned && !this.wallView) { this.threatWarned = true; this.say("They are climbing the wall! Press V or WALL VIEW to see them", 2.6); } this.pushHud(); }
   }
   render(dt: number) {
     this.hero?.mixer.update(dt); for (const g of this.garrison) g.a.mixer.update(dt); for (const s of this.spiders) s.mixer?.update(dt); for (const f of this.flings) f.s.mixer?.update(dt);
@@ -629,7 +633,8 @@ export class SiegeWorld {
     for (const b of this.bolts) { b.life -= dt; (b.l.material as THREE.LineBasicMaterial).opacity = Math.max(0, b.life / 0.25); } for (const b of this.bolts) if (b.life <= 0) { this.scene.remove(b.l); b.l.geometry.dispose(); (b.l.material as THREE.Material).dispose(); } this.bolts = this.bolts.filter((b) => b.life > 0);
     // camera
     const cp = this.camBase(), look = this.camLook();
-    if (this.view === "pov") { look.x += (this.aim.x - this.heroX) * 0.12; look.z += (this.aim.z - (this.heroZ - 26)) * 0.12; cp.x += (this.aim.x - this.heroX) * 0.02 + (this.charging ? -this.charge * 0.25 : 0); }
+    if (this.wallView) { look.x += (this.aim.x - this.heroX) * 0.1; cp.x += (this.aim.x - this.heroX) * 0.04; }
+    else if (this.view === "pov") { look.x += (this.aim.x - this.heroX) * 0.12; look.z += (this.aim.z - (this.heroZ - 26)) * 0.12; cp.x += (this.aim.x - this.heroX) * 0.02 + (this.charging ? -this.charge * 0.25 : 0); }
     else { look.x += (this.aim.x - (this.heroX - 4)) * 0.14; look.z += (this.aim.z - (this.heroZ - 28)) * 0.08; cp.x += (this.aim.x - (this.heroX - 4)) * 0.02; if (this.leap && this.hero) { look.lerp(this.hero.obj.position, 0.5); } }
     if (this.shake > 0) { this.shake = Math.max(0, this.shake - dt * 2.5); cp.x += (Math.random() - 0.5) * this.shake * 0.25; cp.y += (Math.random() - 0.5) * this.shake * 0.2; }
     this.camera.position.lerp(cp, Math.min(1, dt * 4)); this.camKick.lerp(look, Math.min(1, dt * 4)); this.camera.lookAt(this.camKick); this.sky.position.copy(this.camera.position);
