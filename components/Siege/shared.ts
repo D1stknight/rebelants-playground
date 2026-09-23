@@ -1,6 +1,6 @@
 // components/Siege/shared.ts — types + tables shared by the siege engine and the React shell
 export type Hud = { gate: number; gateMax: number; wave: number; waves: number; horde: number; score: number; kills: number; reload: number; state: "ready" | "play" | "won" | "lost"; msg: string | null; charge?: number; intro?: boolean; menu?: boolean; banner?: boolean; paused?: boolean; boss?: { name: string; hp: number; max: number } | null; treb?: boolean; wallView?: boolean; threat?: number };
-export type Callbacks = { onHud: (h: Hud) => void; onSfx?: (n: "launch" | "impact" | "crash" | "squish" | "gate" | "horn" | "lose" | "win") => void; onEnd?: (r: { won: boolean; score: number; kills: number; waves: number }) => void };
+export type Callbacks = { audio?: import("./audio").SiegeAudio; onHud: (h: Hud) => void; onSfx?: (n: "launch" | "impact" | "crash" | "squish" | "gate" | "horn" | "lose" | "win") => void; onEnd?: (r: { won: boolean; score: number; kills: number; waves: number }) => void };
 export type View = "side" | "pov";
 /** every faction, in picker order: catapult crews first, then the ones who fight from the battlements in first person */
 export const FACTIONS = ["ronin", "samurai", "warrior", "buke", "shogun", "ashigaru", "yamabushi", "kenshi", "sohei", "bushi", "wokou"] as const;

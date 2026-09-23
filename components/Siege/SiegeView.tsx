@@ -1,6 +1,7 @@
 // components/Siege/SiegeView.tsx — The Siege shell: title + defender selection, souls-style HUD, banners, boss bar. The 3D engine loads on the client only.
 import React, { useEffect, useRef, useState } from "react";
 import { type Hud, FACTIONS, KIT, WAVES, viewOf } from "./shared";
+import { SiegeAudio } from "./audio";
 
 const EMPTY: Hud = { gate: 1000, gateMax: 1000, wave: 0, waves: WAVES.length, horde: 0, score: 0, kills: 0, reload: 0, state: "ready", msg: null, intro: false, menu: true };
 /** power · range · area · speed (0–10). Ronin leads every column by design. */
@@ -35,13 +36,19 @@ export default function SiegeView() {
   const [faction, setFaction] = useState<string>(() => { try { const f = localStorage.getItem("ra:siege:faction"); return f && (FACTIONS as readonly string[]).includes(f) ? f : "ronin"; } catch { return "ronin"; } });
   const factionRef = useRef(faction); factionRef.current = faction; const mode = viewOf(faction);
   const [boxH, setBoxH] = useState(600); const compact = boxH < 460;
+  // sound: one audio engine for the page; unlocked by the first tap/key (browser rule), music follows the game state
+  const audioRef = useRef<SiegeAudio | null>(null); if (!audioRef.current && typeof window !== "undefined") audioRef.current = new SiegeAudio();
+  const [muted, setMuted] = useState(() => audioRef.current?.muted ?? false);
+  useEffect(() => { const A = audioRef.current; const u = () => A?.unlock(); window.addEventListener("pointerdown", u, true); window.addEventListener("keydown", u, true); return () => { window.removeEventListener("pointerdown", u, true); window.removeEventListener("keydown", u, true); A?.destroy(); }; }, []);
+  const toggleMute = () => { const A = audioRef.current; if (!A) return; A.unlock(); A.setMuted(!A.muted); setMuted(A.muted); };
+  const click = () => audioRef.current?.play("fw-card-select", { vol: 0.4 });
   useEffect(() => { const el = wrapRef.current; if (!el || typeof ResizeObserver === "undefined") return; const ro = new ResizeObserver(() => setBoxH(el.clientHeight)); ro.observe(el); setBoxH(el.clientHeight); return () => ro.disconnect(); }, []);
 
   useEffect(() => {
     let alive = true; let eng: any = null; setHud(EMPTY); setErr(null); setLoading(true);
     (async () => {
       try {
-        const cb = { onHud: (h: Hud) => { if (alive) setHud(h); }, onEnd: (r: any) => { if (alive) setResult(r); } };
+        const cb = { audio: audioRef.current || undefined, onHud: (h: Hud) => { if (alive) setHud(h); }, onEnd: (r: any) => { if (alive) setResult(r); } };
         const mod = await import("./world3d"); if (!alive || !canvasRef.current) return; eng = new mod.SiegeWorld(canvasRef.current, cb);
         eng.faction = factionRef.current; engRef.current = eng; await eng.init(); if (!alive) return; setLoading(false);
         if (autoStart.current) { autoStart.current = false; eng.startIntro(); }
@@ -54,11 +61,14 @@ export default function SiegeView() {
   const toggleFs = async () => { try { if (!document.fullscreenElement) await goFs(); else { await document.exitFullscreen?.(); setFs(false); } } catch {} };
   useEffect(() => { const h = () => setFs(!!document.fullscreenElement); document.addEventListener("fullscreenchange", h); return () => document.removeEventListener("fullscreenchange", h); }, []);
 
-  const choose = (f: string) => { if (f === faction) return; try { localStorage.setItem("ra:siege:faction", f); } catch {} setFaction(f); engRef.current?.setFaction?.(f); };
-  const manTheWall = () => { goFs(); if (picker) { setPicker(false); engRef.current?.setPaused?.(false); return; } engRef.current?.startIntro?.(); };
-  const openPicker = () => { setPicker(true); engRef.current?.setPaused?.(true); };
+  const choose = (f: string) => { click(); if (f === faction) return; try { localStorage.setItem("ra:siege:faction", f); } catch {} setFaction(f); engRef.current?.setFaction?.(f); };
+  const manTheWall = () => { audioRef.current?.unlock(); audioRef.current?.play("drum", { vol: 0.8 }); goFs(); if (picker) { setPicker(false); engRef.current?.setPaused?.(false); return; } engRef.current?.startIntro?.(); };
+  const openPicker = () => { click(); setPicker(true); engRef.current?.setPaused?.(true); };
 
   const inMenu = !!hud.menu || picker; const playing = !hud.menu && !hud.intro && !picker;
+  // music: the Japanese war theme on the title + fly-in, the battle drums in the waves, the epic score for the last push and the Brood Mother
+  const track = hud.menu || hud.intro ? "siege-title" : hud.state === "play" ? (hud.boss || hud.wave >= WAVES.length - 1 ? "fw-battle-epic" : "hd-war") : hud.state === "ready" ? "siege-title" : null;
+  useEffect(() => { audioRef.current?.setMusic(track, track === "siege-title" ? 0.42 : track === "fw-battle-epic" ? 0.4 : 0.34); }, [track]);
   const gatePct = Math.max(0, Math.min(100, (hud.gate / hud.gateMax) * 100));
   const st = STATS[faction] || STATS.ronin;
 
@@ -80,6 +90,7 @@ export default function SiegeView() {
           </div>
           <div style={{ position: "absolute", top: 12, right: 16, display: "flex", gap: 10, alignItems: "center" }}>
             <div style={{ fontSize: 20, letterSpacing: "0.1em", color: GOLD, textShadow: "0 0 14px rgba(232,193,112,0.5), 0 2px 3px #000", pointerEvents: "none" }}>{hud.score.toLocaleString()}</div>
+            <button type="button" onClick={toggleMute} style={btn} aria-label={muted ? "unmute" : "mute"}>{muted ? "🔇" : "🔊"}</button>
             <button type="button" onClick={openPicker} style={btn}>⚔ DEFENDER</button>
             <button type="button" onClick={toggleFs} style={btn}>{fs ? "✕" : "⛶"}</button>
           </div>
@@ -142,6 +153,7 @@ export default function SiegeView() {
       {/* ── title + defender selection */}
       {inMenu && !err && (
         <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", background: "linear-gradient(180deg, rgba(12,7,3,0.55) 0%, rgba(12,7,3,0.25) 30%, rgba(12,7,3,0.55) 62%, rgba(12,7,3,0.9) 100%)", padding: "clamp(10px, 2.2vh, 24px) clamp(12px, 2.4vw, 32px)", gap: "clamp(6px, 1.4vh, 14px)", overflowY: "auto" }}>
+          <button type="button" onClick={toggleMute} aria-label={muted ? "unmute" : "mute"} style={{ ...btn, position: "absolute", top: 12, right: 14, zIndex: 2 }}>{muted ? "🔇" : "🔊"}</button>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, flex: "0 0 auto" }}>
             <Crest size={compact ? 30 : 52} />
             <div style={{ textAlign: "center" }}>

@@ -1,0 +1,4 @@
+The Siege sound effects
+- creak*, wood_heavy*, plank*, metal*, bell, punch*, soft*, rock*, slice*, draw*, step*, cloth*, click, chop, latch: Kenney "Impact Sounds" + "RPG Audio" (kenney.nl), CC0 1.0 — see LICENSE-kenney-*.txt
+- horn*, taiko, drum, whoosh*, boom*, thunder, buzz_loop, skitter_loop, wind_loop, splat, squish, spit, crunch: synthesized for Rebel Ants (tools/siege-art/synth_sfx.py)
+- siege-title: re-encode of public/audio/japan_sound.mp3
