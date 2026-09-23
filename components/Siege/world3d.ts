@@ -62,7 +62,7 @@ function loadRig(fid: string): Promise<Rig> {
 export class SiegeWorld {
   canvas: HTMLCanvasElement; cb: Callbacks; faction = "ronin"; view: View = "side"; over = false; ready = false;
   renderer!: THREE.WebGLRenderer; scene!: THREE.Scene; camera!: THREE.PerspectiveCamera; composer!: EffectComposer; clock = new THREE.Clock();
-  tex: Record<string, THREE.Texture> = {}; hero: Actor | null = null; heroHome = new THREE.Vector3(); heroSpin = 0; heroX = SIDE_X; heroZ = HERO_Z; wallView = false; threat = 0; threatWarned = false; heroV = 0; heroVX = 0; heroVZ = 0; heroYaw = Math.PI; loco: "idle" | "walk" | "run" = "idle"; keys = { l: false, r: false, f: false, b: false, run: false }; moveIn = 0; moveInZ = 0; runIn = false; trebSet = false; lights: { l: THREE.PointLight; until: number; follow: THREE.Object3D | null; i0: number; t0: number }[] = []; warmed = false; perf = { acc: 0, n: 0, level: 0 }; bloom!: UnrealBloomPass; garrison: { a: Actor; cd: number }[] = []; catapult!: THREE.Group; arm!: THREE.Group; armK = 0; treb!: Treb; armMode: "ready" | "swing" | "return" = "ready"; armT = 0; armA = 2.15; pendingFire: number | null = null; embers!: Embers; menu = true; paused = false; boss: Spider | null = null; banner = false;
+  tex: Record<string, THREE.Texture> = {}; hero: Actor | null = null; heroHome = new THREE.Vector3(); heroSpin = 0; heroX = SIDE_X; heroZ = HERO_Z; wallView = false; threat = 0; threatWarned = false; airLock: Spider | null = null; waspHint = false; heroV = 0; heroVX = 0; heroVZ = 0; heroYaw = Math.PI; loco: "idle" | "walk" | "run" = "idle"; keys = { l: false, r: false, f: false, b: false, run: false }; moveIn = 0; moveInZ = 0; runIn = false; trebSet = false; lights: { l: THREE.PointLight; until: number; follow: THREE.Object3D | null; i0: number; t0: number }[] = []; warmed = false; perf = { acc: 0, n: 0, level: 0 }; bloom!: UnrealBloomPass; garrison: { a: Actor; cd: number }[] = []; catapult!: THREE.Group; arm!: THREE.Group; armK = 0; treb!: Treb; armMode: "ready" | "swing" | "return" = "ready"; armT = 0; armA = 2.15; pendingFire: number | null = null; embers!: Embers; menu = true; paused = false; boss: Spider | null = null; banner = false;
   spiders: Spider[] = []; engines: Engine[] = []; shots: Shot[] = []; parts: Part[] = []; bolts: Bolt[] = []; zones: Zone[] = []; flings: Fling[] = []; flames: THREE.Sprite[] = []; torchLights: THREE.PointLight[] = [];
   marker!: THREE.Mesh; aim = new THREE.Vector3(0, 0, -30); pointer = { x: 0.5, y: 0.6 }; charge = 0; charging = false; reload = 0; reloadTime = 1.2;
   state: Hud["state"] = "ready"; gateHp = 1000; gateMax = 1000; wave = 0; score = 0; kills = 0; msg: string | null = null; msgT = 0; hordeLeft = 0; spawnQueue: { at: number; fn: () => void }[] = []; waveT = 0; waveDone = false; hudT = 0; t = 0; shake = 0; rally = 0;
@@ -289,10 +289,22 @@ export class SiegeWorld {
     else if (ok && hit.z < FIELD_Z - 2) { const h2 = new THREE.Vector3(); const th = terrainH(hit.x, hit.z); if (rc.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -th), h2) && h2.z < FIELD_Z - 2) hit.copy(h2); this.aim.lerp(new THREE.Vector3(hit.x, 0, hit.z), 0.35); }
     else { const far = rc.ray.at(70, new THREE.Vector3()); this.aim.lerp(new THREE.Vector3(far.x, 0, Math.min(FIELD_Z - 6, far.z)), 0.35); }
     this.aim.z = Math.min(FIELD_Z - 0.6, Math.max(-150, this.aim.z)); this.aim.x = Math.max(-80, Math.min(80, this.aim.x));
-    const gy = this.aim.y > 0.2 ? this.aim.y : terrainH(this.aim.x, this.aim.z); this.marker.position.set(this.aim.x, gy + 0.08, this.aim.z); this.marker.rotation.x = this.aim.y > 0.2 ? 0 : -Math.PI / 2;
+    const gy = this.aim.y > 0.2 ? this.aim.y : terrainH(this.aim.x, this.aim.z); this.marker.position.set(this.aim.x, gy + 0.08, this.aim.z); this.marker.rotation.set(this.aim.y > 0.2 ? 0 : -Math.PI / 2, 0, 0);
     const d = this.aim.distanceTo(this.camera.position); const ms = (0.6 + d * 0.022) * (this.view === "side" ? 1.4 : 1) + (this.charging ? this.charge * 1.4 : 0); this.marker.scale.set(ms, ms, 1);
     (this.marker.material as THREE.MeshBasicMaterial).color.setHex(this.charging && this.charge > 0.65 ? 0xff8a4a : 0xffd27a);
+    this.lockAir();
   }
+  /** aim assist for fliers: point near a wasp on screen and the aim locks onto it (with lead), so you can shoot UP */
+  lockAir() {
+    this.airLock = null; const W = this.canvas.clientWidth || 1, H = this.canvas.clientHeight || 1; const px = this.pointer.x * W, py = this.pointer.y * H; let best: Spider | null = null, bd = Math.max(48, W * 0.05);
+    for (const s of this.spiders) { if (s.dead || s.kind !== "wasp") continue; const v = this.center(s).project(this.camera); if (v.z > 1 || v.z < -1) continue; const d = Math.hypot((v.x + 1) / 2 * W - px, (1 - v.y) / 2 * H - py); if (d < bd) { bd = d; best = s; } }
+    if (!best) return; this.airLock = best; const c = this.center(best); const tz = FIELD_Z - 1.5;
+    if (best.z < tz) { const t = c.distanceTo(this.hand()) / 36; c.z = Math.min(tz, c.z + best.speed * t); }
+    this.aim.copy(c); const m = this.marker; m.position.copy(c); m.quaternion.copy(this.camera.quaternion); const d = c.distanceTo(this.camera.position); const ms = 0.5 + d * 0.03 + (this.charging ? this.charge * 0.8 : 0); m.scale.set(ms, ms, 1);
+    (m.material as THREE.MeshBasicMaterial).color.setHex(0xff5a4a);
+  }
+  /** catapult arc: a high lob at the ground, a hard flat throw at something in the air */
+  arc(p: THREE.Vector3, sp: number) { return this.airLock ? this.ballistic(p, this.aim, 44) : this.lob(p, this.aim, sp); }
   ballistic(from: THREE.Vector3, to: THREE.Vector3, sp: number) {
     const dx = to.x - from.x, dz = to.z - from.z, dy = to.y - from.y; const dist = Math.max(0.01, Math.hypot(dx, dz)); const disc = sp ** 4 - G * (G * dist * dist + 2 * dy * sp * sp);
     const ang = disc < 0 ? 0.72 : Math.atan((sp * sp - Math.sqrt(disc)) / (G * dist)); const vh = Math.cos(ang) * sp, vy = Math.sin(ang) * sp; return new THREE.Vector3((dx / dist) * vh, vy, (dz / dist) * vh);
@@ -318,17 +330,17 @@ export class SiegeWorld {
     const f = this.faction; const p = this.hand(); const big = k > 0.65;
     switch (f) {
       case "ronin": this.roninLeap(k); return;
-      case "samurai": this.spawnBoulder(p, this.lob(p, this.aim, 30), k, "blade"); this.say(big ? "Samurai: FIRST STRIKE!" : "Samurai: Blade boulder", 0.8); return;
-      case "warrior": this.spawnBoulder(p, this.lob(p, this.aim, 27), k, "great"); this.say(big ? "Warrior: BERSERKER RAGE!" : "Warrior: Greatstone", 0.8); return;
-      case "buke": this.spawnBoulder(p, this.lob(p, this.aim, 30), k, "shield"); this.say(big ? "Buke: NOBLE GUARD!" : "Buke: Shield boulder", 0.8); return;
-      case "shogun": this.spawnStandard(p, this.lob(p, this.aim, 30), k); this.say(big ? "Shogun: RALLY!" : "Shogun: War standard", 0.8); return;
+      case "samurai": this.spawnBoulder(p, this.arc(p, 30), k, "blade"); this.say(big ? "Samurai: FIRST STRIKE!" : "Samurai: Blade boulder", 0.8); return;
+      case "warrior": this.spawnBoulder(p, this.arc(p, 27), k, "great"); this.say(big ? "Warrior: BERSERKER RAGE!" : "Warrior: Greatstone", 0.8); return;
+      case "buke": this.spawnBoulder(p, this.arc(p, 30), k, "shield"); this.say(big ? "Buke: NOBLE GUARD!" : "Buke: Shield boulder", 0.8); return;
+      case "shogun": this.spawnStandard(p, this.arc(p, 30), k); this.say(big ? "Shogun: RALLY!" : "Shogun: War standard", 0.8); return;
       case "yamabushi": this.spawnOrb(p, this.ballistic(p, this.aim, 28), k, "storm"); this.say(big ? "Yamabushi: STORM CALL!" : "Yamabushi: Storm orb", 0.8); return;
       case "sohei": this.spawnOrb(p, this.ballistic(p, this.aim, 28), k, "ward"); this.say(big ? "Sohei: PRAYER!" : "Sohei: Ward stone", 0.8); return;
       case "kenshi": { const n = big ? 7 : 3; for (let i = 0; i < n; i++) { const tgt = this.aim.clone(); const spread = (i - (n - 1) / 2) * (big ? 1.6 : 2.2); tgt.x += spread; const v = this.ballistic(p, tgt, 48); this.spawnBlade(p.clone(), v, k); } this.say(big ? "Kenshi: IAIJUTSU!" : "Kenshi: Blade fan", 0.7); return; }
       case "bushi": { const n = big ? 3 : 1; for (let i = 0; i < n; i++) { const tgt = this.aim.clone(); if (n > 1) { tgt.x += (i - 1) * 2.6; tgt.z += (Math.random() - 0.5) * 2; } this.spawnStake(p.clone(), this.ballistic(p, tgt, 30), k); } this.say(big ? "Bushi: AMBUSH!" : "Bushi: Trap stake", 0.7); return; }
       case "wokou": this.spawnHook(p, this.ballistic(p, this.aim, 42), k); this.say(big ? "Wokou: BOARDING PARTY!" : "Wokou: Grapple", 0.7); return;
       case "ashigaru": { const n = big ? 5 : 1; for (let i = 0; i < n; i++) { const tgt = this.aim.clone(); if (n > 1) { tgt.x += (i - 2) * 2.2 + (Math.random() - 0.5); tgt.z += (Math.random() - 0.5) * 3; } this.spawnSpear(p.clone().add(new THREE.Vector3((i - (n - 1) / 2) * 0.15, 0, 0)), this.ballistic(p, tgt, 34), k); } this.say(big ? "Ashigaru: SPEAR VOLLEY!" : "Ashigaru: Spear!", 0.7); return; }
-      default: this.spawnBoulder(p, this.lob(p, this.aim, 30), k, "rock"); return;
+      default: this.spawnBoulder(p, this.arc(p, 30), k, "rock"); return;
     }
   }
   mkShot(m: THREE.Object3D, p: THREE.Vector3, v: THREE.Vector3, kind: ShotKind, dmg: number, k: number, extra: Partial<Shot> = {}) { m.position.copy(p); this.scene.add(m); const s: Shot = { m, p: p.clone(), v, kind, life: 7, dmg, hit: new Set(), k, ...extra }; this.shots.push(s); return s; }
@@ -385,6 +397,7 @@ export class SiegeWorld {
     const speed = kind === "brood" ? 1.3 : kind === "brute" ? 1.9 : kind === "wasp" ? 7 : (4.2 + Math.random() * 1.6) / Math.sqrt(size);
     const sp: Spider = { g, body: bug.body, lod: bug.lod, legs: bug.legs, mixer: bug.mixer, acts: bug.acts, anim: bug.acts?.Walk ? "Walk" : "Flying", wings: bug.wings, kind, x, y: kind === "wasp" ? 6 : 0, z, hp, hpMax: hp, size: size * (kind === "brood" ? 1.6 : kind === "brute" ? 1.3 : 1), speed, ph: Math.random() * 6, stun: 0, dead: false, arrived: false, wob: Math.random() * 6, pinned: 0, cd: 2 + Math.random() * 2, holdZ: kind === "slinger" ? FIELD_Z - 26 - Math.random() * 6 : kind === "brood" ? FIELD_Z - 34 : 0 };
     this.spiders.push(sp); this.hordeLeft++;
+    if (kind === "wasp" && !this.waspHint && !this.intro && !this.menu) { this.waspHint = true; this.say("Wasps! Point at one — your aim locks on (red ring) so you can shoot them down", 2.8); }
     if (kind === "brood") { this.boss = sp; this.say("THE BROOD MOTHER", 3.2, true); this.cb.onSfx?.("horn"); }
   }
   gait(s: Spider, phase: number, amp: number) { if (s.mixer) return; gait(s, phase, amp); }
@@ -499,7 +512,7 @@ export class SiegeWorld {
       else { const dir = sh.v.clone().normalize(); sh.m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), dir); }
       if (sh.rope) { const h = this.hand(); (sh.rope.geometry as THREE.BufferGeometry).setFromPoints([h, sh.p]); }
       if (sh.kind === "web" || sh.kind === "venom") { sh.hit.clear(); if (sh.p.z >= WALL_Z - 1.6 || sh.p.y <= terrainH(sh.p.x, sh.p.z) + 0.05) { this.hurtGate(sh.dmg); this.shake = Math.max(this.shake, 0.3); if (sh.kind === "web") { this.puff(sh.p, "smoke", 6, 0xe8e0ff, 1.2, 1, 0.9); const near = this.garrison.reduce((b, g) => (!b || g.a.obj.position.distanceTo(sh.p) < b.a.obj.position.distanceTo(sh.p) ? g : b), null as any); if (near) near.cd = Math.max(near.cd, 4); this.say("Webbed!", 0.6); } else { this.puff(sh.p, "dirt", 8, 0x9dff6a, 1, 2.5); this.puff(sh.p, "glow", 2, 0x9dff6a, 3, 0.3, 0.5); } sh.life = 0; } continue; }
-      const R = (sh.kind === "orb" || sh.kind === "ward" ? 1.4 : sh.kind === "boulder" ? (sh.sub === "great" ? 1.6 : 1.2) : 1.0) + (sh.p.z > FIELD_Z - 3 && sh.p.y > 0.8 ? 0.6 : 0);   // a little more forgiving on climbers
+      const R = (sh.kind === "orb" || sh.kind === "ward" ? 1.4 : sh.kind === "boulder" ? (sh.sub === "great" ? 1.6 : 1.2) : 1.0) + (sh.p.z > FIELD_Z - 3 && sh.p.y > 0.8 ? 0.6 : 0) + (sh.p.y > 3 ? 1.0 : 0);   // a little more forgiving on climbers
       for (const tg of this.targetsNear(sh.p, R)) { const key = tg.s || tg.e!; if (sh.hit.has(key)) continue; sh.hit.add(key);
         if (sh.kind === "orb" || sh.kind === "ward" || sh.kind === "boulder" || sh.kind === "standard") { this.impact(sh); sh.life = 0; break; }
         if (sh.kind === "hook") { if (tg.s) this.fling(tg.s, sh.k); else this.hurtTarget(tg, 120); sh.life = 0; break; }
@@ -567,7 +580,7 @@ export class SiegeWorld {
     const rate = this.rally > 0 ? 3 : 1; this.rally = Math.max(0, this.rally - dt);
     for (const g of this.garrison) { g.cd -= dt * rate; if (g.cd > 0) continue; g.cd = 2.4 + Math.random() * 2.2;
       const live = this.spiders.filter((s) => !s.dead && s.z > FIELD_Z - 70 && Math.abs(s.x - g.a.obj.position.x) < 30); if (!live.length) continue; const s = live[(Math.random() * Math.min(4, live.length)) | 0];
-      this.playA(g.a, g.a.fid === "yamabushi" ? "magic" : "attack", 1.6); const from = g.a.obj.position.clone().add(new THREE.Vector3(0, 1.8, -0.6)); const to = s.arrived && s.kind !== "brute" ? new THREE.Vector3(s.x, s.y + 0.4, FIELD_Z - 0.9) : new THREE.Vector3(s.x, 0.5, s.z + s.speed * 0.9); this.spawnSpear(from, this.ballistic(from, to, 40), 0, true); }
+      this.playA(g.a, g.a.fid === "yamabushi" ? "magic" : "attack", 1.6); const from = g.a.obj.position.clone().add(new THREE.Vector3(0, 1.8, -0.6)); const to = s.kind === "wasp" ? this.center(s) : s.arrived && s.kind !== "brute" ? new THREE.Vector3(s.x, s.y + 0.4, FIELD_Z - 0.9) : new THREE.Vector3(s.x, 0.5, s.z + s.speed * 0.9); this.spawnSpear(from, this.ballistic(from, to, 40), 0, true); }
   }
 
   // ── gate / waves / flow
