@@ -1,4 +1,4 @@
-// pages/siege.tsx — The Siege (phase 1: solo drill). Not on the landing page yet.
+// pages/siege.tsx — The Siege: hold the Ant Citadel against 12 waves of the spider horde.
 import React from "react";
 import type { NextPage } from "next";
 import Head from "next/head";
@@ -11,7 +11,7 @@ const SiegePage: NextPage = () => (
   <>
     <Head>
       <title>The Siege — Rebel Ants Playground</title>
-      <meta name="description" content="Hold the gate of the Ant Citadel against the spider horde. Physics catapults, toppling siege towers, beetle rams." />
+      <meta name="description" content="Hold the gate of the Ant Citadel against the spider horde. Trebuchets and battlements, 11 defenders, siege towers, beetle rams and the Brood Mother." />
       <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
     </Head>
     <style dangerouslySetInnerHTML={{ __html: "@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&display=swap');" }} />
@@ -19,7 +19,7 @@ const SiegePage: NextPage = () => (
       <div style={{ maxWidth: 1180, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, fontFamily: "'Cinzel', Georgia, serif" }}>
           <Link href="/" style={{ color: "#a29a88", textDecoration: "none", fontSize: 12, letterSpacing: "0.25em" }}>← REBEL ANTS</Link>
-          <div style={{ fontSize: 11, letterSpacing: "0.3em", color: "#f0a63a", border: "1px solid rgba(240,166,58,0.35)", borderRadius: 999, padding: "4px 12px" }}>SOLO DRILL · TESTING</div>
+          <div style={{ fontSize: 11, letterSpacing: "0.3em", color: "#f0a63a", border: "1px solid rgba(240,166,58,0.35)", borderRadius: 999, padding: "4px 12px" }}>12 WAVES · THE BROOD MOTHER</div>
         </div>
         <SiegeView />
       </div>
