@@ -247,6 +247,12 @@ export class SiegeWorld {
   toggleWallView(on?: boolean) { if (this.menu || this.intro) return; this.wallView = on ?? !this.wallView; this.fit(); this.pushHud(); }
   /** anything at the wall right now (climbers, brutes at the gate, engines that arrived) */
   wallThreat() { let n = 0; for (const s of this.spiders) if (!s.dead && s.kind !== "wasp" && (s.arrived || s.z > FIELD_Z - 7)) n++; for (const e of this.engines) if (!e.dead && e.arrived) n++; return n; }
+  /** snapshot for the HUD wall map: kind codes c=crawler s=slinger w=wasp b=brute m=brood; state 0 approaching, 1 climbing, 2 on the wall-walk */
+  radar() {
+    const bugs: [number, number, string, number, number][] = [];
+    for (const s of this.spiders) if (!s.dead) bugs.push([s.x, s.z, s.kind === "crawler" ? "c" : s.kind === "slinger" ? "s" : s.kind === "wasp" ? "w" : s.kind === "brute" ? "b" : "m", s.br ? 2 : s.arrived && s.kind !== "brute" ? 1 : 0, s.arrived ? s.y / WALL_TOP : 0]);
+    return { hx: this.heroX, hz: this.heroZ, wall: this.wallView, treb: this.trebSet || this.view === "pov" || this.faction === "ronin" ? this.treb.g.position.x : null, bugs, eng: this.engines.filter((e) => !e.dead).map((e) => [e.x, e.z, e.kind === "ram" ? 1 : 0, e.arrived ? 1 : 0] as [number, number, number, number]), gar: this.garrison.map((g) => g.a.obj.position.x), towers: TOWERS, fz: FIELD_Z };
+  }
   needTreb() { return this.view === "side" && this.faction !== "ronin" && !this.trebSet; }
   trebFollow() { const own = this.view === "side" && this.faction !== "ronin"; const x = own ? Math.max(X_MIN + 2, Math.min(X_MAX - 2, this.heroX - 2.4)) : CATAPULT.x; this.treb.g.position.set(x, CATAPULT.y, TREB_Z); if (this.trebRing) { this.trebRing.visible = own && !this.trebSet && !this.menu && !this.intro; this.trebRing.position.set(x, WALL_TOP + 0.24, TREB_Z); } }
   placeTreb() {

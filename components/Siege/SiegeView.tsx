@@ -100,6 +100,7 @@ export default function SiegeView() {
           {/* move pad: drag the stick anywhere (push all the way to run) */}
           <div style={{ position: "absolute", right: 14, bottom: 12, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5 }}>
             {!compact && <div style={{ fontFamily: "system-ui, sans-serif", fontSize: 10, color: MUTED, textShadow: "0 1px 3px #000", pointerEvents: "none" }}><b style={{ color: CREAM }}>WASD</b> move · <b style={{ color: CREAM }}>SHIFT</b> run · <b style={{ color: CREAM }}>V</b> wall view</div>}
+            <WallMap engRef={engRef} w={compact ? 176 : 236} h={compact ? 60 : 86} />
             <button type="button" onClick={() => engRef.current?.toggleWallView?.()} style={{ ...btn, fontSize: compact ? 11 : 13, letterSpacing: "0.18em", padding: compact ? "7px 12px" : "9px 16px", color: hud.wallView ? "#1a0f06" : (hud.threat ? "#fff" : CREAM), background: hud.wallView ? "linear-gradient(180deg,#f3d58f,#c9953f)" : hud.threat ? "linear-gradient(180deg,#c43a2a,#6e140e)" : btn.background, border: hud.threat && !hud.wallView ? "1px solid #ffb0a0" : btn.border, boxShadow: hud.threat && !hud.wallView ? "0 0 18px rgba(255,80,60,0.7)" : "none", animation: hud.threat && !hud.wallView ? "siegePulse 0.9s ease-in-out infinite" : undefined }}>{hud.wallView ? "⬆ BACK TO THE WALK (V)" : `⬇ WALL VIEW (V)${hud.threat ? ` · ${hud.threat} ON THE WALL` : ""}`}</button>
             <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
               <button type="button" onClick={() => { const r = !run; setRun(r); const e = engRef.current; e?.setMove?.(e.moveIn ?? 0, e.moveInZ ?? 0, r); }} style={{ ...btn, height: compact ? 34 : 38, padding: "0 10px", color: run ? "#1a0f06" : CREAM, background: run ? "linear-gradient(180deg,#f3d58f,#c9953f)" : btn.background }}>RUN</button>
@@ -196,6 +197,53 @@ export default function SiegeView() {
         @keyframes siegeIntroA { 0%,8% { opacity:0; transform:translateY(6px) } 18%,40% { opacity:.85; transform:none } 50%,100% { opacity:0 } }
         @keyframes siegeIntroB { 0%,30% { opacity:0; letter-spacing:.5em } 42%,88% { opacity:1; letter-spacing:.16em } 100% { opacity:0 } }
         @keyframes siegeIntroC { 0%,48% { opacity:0; transform:translateY(6px) } 58%,88% { opacity:.85; transform:none } 100% { opacity:0 } }`}</style>
+    </div>
+  );
+}
+/** the wall at a glance: field above, wall line, wall-walk below. Red where they climb, hot orange where they're over the top, you in gold. */
+function WallMap({ engRef, w, h }: { engRef: React.MutableRefObject<any>; w: number; h: number }) {
+  const cv = useRef<HTMLCanvasElement | null>(null); const [near, setNear] = useState<string>("");
+  useEffect(() => {
+    let raf = 0, last = 0, lastNear = "";
+    const draw = (t: number) => {
+      raf = requestAnimationFrame(draw); if (t - last < 90) return; last = t; const e = engRef.current; const c = cv.current; if (!e?.radar || !c) return;
+      const dpr = Math.min(2, window.devicePixelRatio || 1); if (c.width !== w * dpr) { c.width = w * dpr; c.height = h * dpr; } const g = c.getContext("2d")!; g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+      const R = e.radar(); const flip = R.wall ? -1 : 1; const X = (x: number) => w / 2 + flip * (x / 60) * (w / 2 - 4); const deckH = h * 0.2, wy = h - deckH; const Y = (z: number) => z > R.fz ? wy + Math.min(1, (z - R.fz) / 12) * deckH : wy * (1 - Math.min(1, (R.fz - z) / 90));
+      // backdrop: field, wall, deck
+      g.fillStyle = "rgba(60,40,22,0.55)"; g.fillRect(0, 0, w, wy); g.fillStyle = "rgba(20,14,8,0.8)"; g.fillRect(0, wy, w, deckH);
+      g.strokeStyle = "rgba(232,193,112,0.12)"; g.lineWidth = 1; for (const d of [30, 60]) { g.beginPath(); g.moveTo(0, Y(R.fz - d)); g.lineTo(w, Y(R.fz - d)); g.stroke(); }
+      // hot zones along the wall: 6 m bins with climbers / breachers
+      const bins: Record<number, number> = {}; for (const b of R.bugs) if (b[3] > 0) { const k = Math.round(b[0] / 6); bins[k] = (bins[k] || 0) + (b[3] === 2 ? 2 : 1); }
+      const pulse = 0.55 + 0.45 * Math.sin(t / 160);
+      for (const [k, n] of Object.entries(bins)) { const x = X(+k * 6); const gr = g.createRadialGradient(x, wy, 0, x, wy, 10 + n * 3); gr.addColorStop(0, `rgba(255,70,50,${0.55 * pulse})`); gr.addColorStop(1, "rgba(255,70,50,0)"); g.fillStyle = gr; g.fillRect(x - 30, wy - 30, 60, 60); }
+      g.fillStyle = "#b99a6a"; g.fillRect(2, wy - 1.5, w - 4, 3);
+      for (const tx of R.towers) { g.beginPath(); g.arc(X(tx), wy - 2, 3.2, 0, Math.PI * 2); g.fillStyle = "#d8bd8a"; g.fill(); }
+      g.fillStyle = "#3a2410"; g.fillRect(X(-4.5) < X(4.5) ? X(-4.5) : X(4.5), wy - 2.5, Math.abs(X(4.5) - X(-4.5)), 5); g.strokeStyle = "#e8c170"; g.strokeRect(Math.min(X(-4.5), X(4.5)), wy - 2.5, Math.abs(X(4.5) - X(-4.5)), 5);
+      // engines
+      for (const [x, z, ram, arr] of R.eng) { g.fillStyle = arr ? "#ff5a3a" : "#a0703a"; g.fillRect(X(x) - 3, Y(z) - 3, 6, 6); if (ram && arr) { g.strokeStyle = "#fff"; g.strokeRect(X(x) - 4, Y(z) - 4, 8, 8); } }
+      // bugs
+      for (const [x, z, k, st, cl] of R.bugs) {
+        const px = X(x); let py = st === 2 ? wy + deckH * 0.45 : st === 1 ? wy - 2 - (1 - cl) * 6 : Y(z);
+        if (k === "w") { g.fillStyle = "#ffd24a"; g.beginPath(); g.moveTo(px, py - 3); g.lineTo(px + 3, py + 2); g.lineTo(px - 3, py + 2); g.fill(); continue; }
+        const r = k === "m" ? 5 : k === "b" ? 3.4 : st ? 2.6 : 1.8; g.fillStyle = st === 2 ? "#ff8a3a" : st === 1 ? "#ff4a3a" : k === "s" || k === "m" ? "#c07ae8" : k === "b" ? "#e0503a" : "rgba(230,90,70,0.8)";
+        g.beginPath(); g.arc(px, py, r, 0, Math.PI * 2); g.fill(); if (st === 2) { g.strokeStyle = `rgba(255,220,160,${pulse})`; g.lineWidth = 1.2; g.stroke(); }
+      }
+      // defenders, trebuchet, you
+      g.fillStyle = "rgba(240,225,190,0.75)"; for (const x of R.gar) g.fillRect(X(x) - 1, wy + 2, 2, 3);
+      if (R.treb != null) { g.fillStyle = "#c9953f"; g.fillRect(X(R.treb) - 2.5, wy + deckH * 0.55, 5, 4); }
+      const hx = X(R.hx), hy = wy + Math.min(deckH - 3, Math.max(3, ((R.hz - R.fz) / 12) * deckH)); g.fillStyle = "#ffe08a"; g.beginPath(); g.moveTo(hx, hy - 5); g.lineTo(hx + 4, hy + 3); g.lineTo(hx - 4, hy + 3); g.closePath(); g.fill(); g.strokeStyle = "#1a0f06"; g.lineWidth = 1; g.stroke();
+      // nearest trouble → direction hint
+      let best: number | null = null; for (const b of R.bugs) if (b[3] > 0) if (best == null || Math.abs(b[0] - R.hx) < Math.abs(best - R.hx)) best = b[0];
+      const txt = best == null ? "" : Math.abs(best - R.hx) < 4 ? "▼ RIGHT HERE" : `${(best - R.hx) * flip < 0 ? "◀" : ""} ${Math.round(Math.abs(best - R.hx))}m ${(best - R.hx) * flip > 0 ? "▶" : ""}`.trim();
+      if (txt !== lastNear) { lastNear = txt; setNear(txt); }
+    };
+    raf = requestAnimationFrame(draw); return () => cancelAnimationFrame(raf);
+  }, [engRef, w, h]);
+  return (
+    <div style={{ position: "relative", pointerEvents: "none" }}>
+      <canvas ref={cv} style={{ width: w, height: h, display: "block", border: "1px solid rgba(232,193,112,0.45)", boxShadow: "0 4px 14px rgba(0,0,0,0.5)", backdropFilter: "blur(3px)" }} />
+      <div style={{ position: "absolute", left: 5, top: 3, fontSize: 8, letterSpacing: "0.25em", color: "rgba(243,220,168,0.7)" }}>THE WALL</div>
+      {near && <div style={{ position: "absolute", right: 5, top: 2, fontSize: 10, letterSpacing: "0.12em", color: "#ffb0a0", textShadow: "0 1px 3px #000", fontWeight: 700 }}>{near}</div>}
     </div>
   );
 }
