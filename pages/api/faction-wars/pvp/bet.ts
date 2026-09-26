@@ -1,3 +1,4 @@
+import { withPlaygroundHumanWriter } from "../../../../lib/server/raap-pvp-coordination";
 // POST /api/faction-wars/pvp/bet
 //
 // Spectator places (or tops up) a side bet on a PvP match.
@@ -25,7 +26,7 @@ import {
 import { TERRITORY_COUNT } from "../../../../lib/factionWarsCore";
 import type { PlaceBetRequest } from "../../../../lib/types/fwpvp";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") {
     return res.status(405).json({ ok: false, error: "Method not allowed" });
@@ -107,3 +108,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ ok: false, error: e?.message || "bet failed" });
   }
 }
+
+export default withPlaygroundHumanWriter(handler);

@@ -1,3 +1,4 @@
+import { raapDiscordPlayerCookie, raapDiscordPlayerSettings } from "../../../../lib/server/raap-discord-player";
 import type { NextApiRequest, NextApiResponse } from "next";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -54,7 +55,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const discordUserId = String(me.id);
   const discordName = String(me.global_name || me.username || "discord");
 
+  // Additional optional, authenticated game-learning identity. Preserve the
+  // original login/profile and redirect even when RAAP is not configured.
+  const learningCookies: string[] = [];
+  const learning = raapDiscordPlayerSettings(process.env);
+  if (learning) {
+    try { learningCookies.push(raapDiscordPlayerCookie(discordUserId, learning)); }
+    catch { /* A failed learning connection must not break Discord login. */ }
+    finally { learning.key.fill(0); }
+  }
+
   res.setHeader("Set-Cookie", [
+    ...learningCookies,
     `ra_discord_user=${encodeURIComponent(JSON.stringify({ discordUserId, discordName }))}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400`,
     `ra_discord_state=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`,
     `ra_discord_redir=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`,

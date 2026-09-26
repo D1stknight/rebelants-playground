@@ -1,3 +1,4 @@
+import { withPlaygroundMatchExperience } from "../../../../lib/server/raap-fwpvp-experience";
 // POST /api/faction-wars/pvp/create
 //
 // Creates a new PvP challenge. Returns the challengeId and shareable path.
@@ -32,7 +33,7 @@ function sanitizeTeam(raw: unknown): FactionId[] | null {
   return out;
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") {
     return res.status(405).json({ ok: false, error: "Method not allowed" });
@@ -164,3 +165,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ ok: false, error: e?.message || "Internal error" });
   }
 }
+
+export default withPlaygroundMatchExperience("create", handler);

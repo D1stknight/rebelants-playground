@@ -1,3 +1,4 @@
+import { withPlaygroundHumanTournamentWriter } from "../../../../lib/server/raap-pvp-coordination";
 // POST /api/faction-wars/tournament/seed
 //
 // Admin-only. Locks participant list, builds the bracket via Fisher-Yates,
@@ -14,7 +15,7 @@ import {
   checkAdminAuth,
 } from "../../../../lib/server/fwpvp";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).json({ ok: false, error: "POST only" });
   if (!checkAdminAuth(req)) return res.status(401).json({ ok: false, error: "unauthorized" });
 
@@ -68,3 +69,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   await saveTournament(t);
   return res.status(200).json({ ok: true, tournament: t });
 }
+
+export default withPlaygroundHumanTournamentWriter(handler);

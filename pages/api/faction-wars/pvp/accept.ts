@@ -1,3 +1,4 @@
+import { withPlaygroundMatchExperience } from "../../../../lib/server/raap-fwpvp-experience";
 // POST /api/faction-wars/pvp/accept
 //
 // Opponent accepts a pending challenge. Transitions status to "team_selection".
@@ -9,7 +10,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getMatch, saveMatch, addPlayerMatch, getPvpEconomyConfig, spendREBEL, getREBELBalance } from "../../../../lib/server/fwpvp";
 import type { AcceptChallengeRequest } from "../../../../lib/types/fwpvp";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") {
     return res.status(405).json({ ok: false, error: "Method not allowed" });
@@ -77,3 +78,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ ok: false, error: e?.message || "Internal error" });
   }
 }
+
+export default withPlaygroundMatchExperience("accept", handler);

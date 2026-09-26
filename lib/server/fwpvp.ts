@@ -1,3 +1,6 @@
+import { capturePlaygroundWriterRead, saveCoordinatedPlaygroundMatch, capturePlaygroundTournamentRead, saveCoordinatedPlaygroundTournament } from "./raap-pvp-coordination";
+import { capturePlaygroundMatchRead, recordPlaygroundMatchExperience } from "./raap-fwpvp-experience";
+import { assertPlaygroundPointsConfirmed, scopedPlaygroundPointEffect } from "./raap-pvp-point-effects";
 // PvP Faction Wars — Redis persistence helpers
 //
 // Storage strategy (Upstash Redis, follows existing ra:fw:* naming convention):
@@ -12,7 +15,9 @@
 //
 // challengeId format: 12 chars [a-z0-9], URL-safe.
 
-import { redis } from "./redis";
+import { redis as originalRedis } from "./redis";
+import { playgroundActionStore } from "./raap-pvp-action-outcome";
+const redis = playgroundActionStore(originalRedis);
 import {
   resolveByPlayerId,
   economyDebit,
@@ -42,6 +47,8 @@ export async function getMatch(challengeId: string): Promise<PvpMatch | null> {
   try {
     const raw = await redis.get<string | object>(MATCH_KEY(challengeId));
     if (!raw) return null;
+    capturePlaygroundWriterRead(challengeId, raw);
+    capturePlaygroundMatchRead(challengeId, raw);
     // Upstash auto-parses JSON when the stored value is JSON-stringifiable.
     // Defensive: handle both string and already-parsed object.
     const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
@@ -112,9 +119,13 @@ export function applySpellTick(match: PvpMatch, now: number, cfg: SpellConfig): 
 }
 
 export async function saveMatch(match: PvpMatch): Promise<void> {
+  assertPlaygroundPointsConfirmed();
   const value = JSON.stringify(match);
   // Always refresh TTL on save so active matches don't expire mid-game.
-  await redis.set(MATCH_KEY(match.challengeId), value, { ex: MATCH_TTL_SECONDS });
+  const coordinated = saveCoordinatedPlaygroundMatch(redis, match.challengeId, value, MATCH_TTL_SECONDS);
+  if (coordinated) await coordinated;
+  else await redis.set(MATCH_KEY(match.challengeId), value, { ex: MATCH_TTL_SECONDS });
+  await recordPlaygroundMatchExperience(match, originalRedis, MATCH_TTL_SECONDS);
 }
 
 export async function addPlayerMatch(playerId: string, challengeId: string): Promise<void> {
@@ -165,6 +176,7 @@ export async function markActive(challengeId: string): Promise<void> {
   await redis.sadd(ACTIVE_INDEX_KEY, challengeId);
 }
 export async function unmarkActive(challengeId: string): Promise<void> {
+  assertPlaygroundPointsConfirmed();
   await redis.srem(ACTIVE_INDEX_KEY, challengeId);
 }
 
@@ -605,6 +617,14 @@ export async function spendREBEL(
   amount: number,
   opts?: { reason?: string; idem?: string; metadata?: Record<string, unknown> },
 ): Promise<number | null> {
+  return scopedPlaygroundPointEffect("DEBIT", playerId, amount,
+    idem => spendRebelUnscoped(playerId, amount, { ...opts, idem })) ?? spendRebelUnscoped(playerId, amount, opts);
+}
+
+async function spendRebelUnscoped(
+  playerId: string, amount: number,
+  opts?: { reason?: string; idem?: string; metadata?: Record<string, unknown> },
+): Promise<number | null> {
   if (!playerId) return null;
   if (!Number.isFinite(amount) || amount <= 0) return null;
   // Routed to the central economy ledger. The economy enforces the balance
@@ -632,6 +652,14 @@ export async function spendREBEL(
 export async function creditREBEL(
   playerId: string,
   amount: number,
+  opts?: { reason?: string; idem?: string; type?: "game_reward" | "refund"; metadata?: Record<string, unknown> },
+): Promise<number | null> {
+  return scopedPlaygroundPointEffect("CREDIT", playerId, amount,
+    idem => creditRebelUnscoped(playerId, amount, { ...opts, idem })) ?? creditRebelUnscoped(playerId, amount, opts);
+}
+
+async function creditRebelUnscoped(
+  playerId: string, amount: number,
   opts?: { reason?: string; idem?: string; type?: "game_reward" | "refund"; metadata?: Record<string, unknown> },
 ): Promise<number | null> {
   if (!playerId) return null;
@@ -685,6 +713,7 @@ export async function recordPvpResult(
   loserName: string,
   rebelEarned: number,
 ): Promise<void> {
+  assertPlaygroundPointsConfirmed();
   // Tie -> no leaderboard movement (rare; needs even territories)
   if (!winnerPlayerId || !loserPlayerId) return;
   try {
@@ -870,6 +899,7 @@ export async function placeBet(params: {
 // Refund every bet at full face value. Used on cancel/decline/no-winner.
 // Idempotent: sets a "settled" flag so we don't double-refund if called twice.
 export async function refundBets(challengeId: string): Promise<{ refunded: number; bettorCount: number }> {
+  assertPlaygroundPointsConfirmed();
   const settled = await redis.get(BETS_SETTLED_KEY(challengeId)).catch(() => null);
   if (settled === "1" || settled === 1 || settled === true) {
     return { refunded: 0, bettorCount: 0 };
@@ -881,6 +911,7 @@ export async function refundBets(challengeId: string): Promise<{ refunded: numbe
   for (const b of state.bets) {
     if (b.amount <= 0) continue;
     const r = await creditREBEL(b.playerId, b.amount).catch(() => null);
+    assertPlaygroundPointsConfirmed();
     if (r !== null) {
       total += b.amount;
       count += 1;
@@ -900,6 +931,7 @@ export async function payoutBets(challengeId: string, winnerSide: PvpSide): Prom
   loserForfeited: number;
   refundedNoWinner: boolean;
 }> {
+  assertPlaygroundPointsConfirmed();
   const settled = await redis.get(BETS_SETTLED_KEY(challengeId)).catch(() => null);
   if (settled === "1" || settled === 1 || settled === true) {
     return { winnerPaid: 0, loserForfeited: 0, refundedNoWinner: false };
@@ -916,6 +948,7 @@ export async function payoutBets(challengeId: string, winnerSide: PvpSide): Prom
     let refunded = 0;
     for (const b of losers) {
       const r = await creditREBEL(b.playerId, b.amount).catch(() => null);
+      assertPlaygroundPointsConfirmed();
       if (r !== null) refunded += b.amount;
     }
     await redis.set(BETS_SETTLED_KEY(challengeId), "1", { ex: 60 * 60 * 24 * 7 }).catch(() => {});
@@ -931,6 +964,7 @@ export async function payoutBets(challengeId: string, winnerSide: PvpSide): Prom
     const shareOfLoserPool = Math.floor((w.amount / winnerPool) * loserPool);
     const total = w.amount + shareOfLoserPool;
     const r = await creditREBEL(w.playerId, total).catch(() => null);
+    assertPlaygroundPointsConfirmed();
     if (r !== null) winnerPaid += total;
   }
   await redis.set(BETS_SETTLED_KEY(challengeId), "1", { ex: 60 * 60 * 24 * 7 }).catch(() => {});
@@ -1190,6 +1224,7 @@ export async function adminClearAllChat(challengeId: string): Promise<number> {
 // Called from submit-move when match transitions to "completed", and from
 // cancel/decline. Best-effort — if the key is gone, no-op.
 export async function tightenChatTTL(challengeId: string, minutes: number): Promise<void> {
+  assertPlaygroundPointsConfirmed();
   const seconds = Math.max(60, Math.floor(minutes * 60));
   await redis.expire(CHAT_KEY(challengeId), seconds).catch(() => {});
   await redis.expire(CHAT_MUTES_KEY(challengeId), seconds).catch(() => {});
@@ -1230,6 +1265,7 @@ export async function getTournament(id: string): Promise<Tournament | null> {
   try {
     const raw: any = await redis.get(TOURNEY_KEY(id));
     if (!raw) return null;
+    capturePlaygroundTournamentRead(id,raw);
     if (typeof raw === "string") return JSON.parse(raw) as Tournament;
     return raw as Tournament;
   } catch {
@@ -1238,7 +1274,9 @@ export async function getTournament(id: string): Promise<Tournament | null> {
 }
 
 export async function saveTournament(t: Tournament): Promise<void> {
-  await redis.set(TOURNEY_KEY(t.id), JSON.stringify(t));
+  const coordinated = saveCoordinatedPlaygroundTournament(redis,t.id,JSON.stringify(t));
+  if (coordinated) await coordinated;
+  else await redis.set(TOURNEY_KEY(t.id), JSON.stringify(t));
   if (t.status === "completed" || t.status === "cancelled") {
     await redis.expire(TOURNEY_KEY(t.id), TOURNEY_TTL_DAYS * 24 * 60 * 60).catch(() => {});
     await (redis as any).srem(TOURNEY_ACTIVE_INDEX, t.id).catch(() => {});
@@ -1510,6 +1548,7 @@ export async function onTournamentMatchComplete(
   winnerPlayerId: string,
   loserPlayerId: string,
 ): Promise<void> {
+  assertPlaygroundPointsConfirmed();
   const t = await getTournament(tournamentId);
   if (!t) return;
   if (t.status === "completed" || t.status === "cancelled") return;

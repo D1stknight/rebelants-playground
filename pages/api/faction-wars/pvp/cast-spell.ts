@@ -1,3 +1,4 @@
+import { withPlaygroundMatchExperience } from "../../../../lib/server/raap-fwpvp-experience";
 // POST /api/faction-wars/pvp/cast-spell
 //
 // Allows a player to spend REBEL to cast a Death Spell on the opposing
@@ -34,7 +35,7 @@ interface CastSpellRequest {
   playerId?: string;
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") {
     return res.status(405).json({ ok: false, error: "Method not allowed" });
@@ -125,3 +126,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ ok: false, error: String(e?.message || "Server error") });
   }
 }
+
+export default withPlaygroundMatchExperience("cast-spell", handler);

@@ -1,3 +1,4 @@
+import { withPlaygroundHumanTournamentWriter } from "../../../../lib/server/raap-pvp-coordination";
 // POST /api/faction-wars/tournament/join
 //
 // Player pays entryFee REBEL and joins a draft tournament. Idempotent — if
@@ -8,7 +9,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getTournament, saveTournament, getREBELBalance, spendREBEL, seedDraftTournament } from "../../../../lib/server/fwpvp";
 import type { JoinTournamentRequest } from "../../../../lib/types/fwpvp";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).json({ ok: false, error: "POST only" });
   const body = (req.body || {}) as JoinTournamentRequest;
   const tournamentId = String(body.tournamentId || "").trim();
@@ -63,3 +64,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   return res.status(200).json({ ok: true, tournament: t, autoSeeded });
 }
+
+export default withPlaygroundHumanTournamentWriter(handler);

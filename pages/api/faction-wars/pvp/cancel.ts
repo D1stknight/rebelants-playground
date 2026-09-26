@@ -1,3 +1,4 @@
+import { withPlaygroundMatchExperience } from "../../../../lib/server/raap-fwpvp-experience";
 // POST /api/faction-wars/pvp/cancel
 //
 // Challenger cancels a pending challenge (only valid if status === "pending",
@@ -8,7 +9,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getMatch, saveMatch, creditREBEL, unmarkActive, refundBets, tightenChatTTL, getPvpEconomyConfig } from "../../../../lib/server/fwpvp";
 import type { CancelChallengeRequest } from "../../../../lib/types/fwpvp";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") {
     return res.status(405).json({ ok: false, error: "Method not allowed" });
@@ -68,3 +69,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ ok: false, error: e?.message || "Internal error" });
   }
 }
+
+export default withPlaygroundMatchExperience("cancel", handler);

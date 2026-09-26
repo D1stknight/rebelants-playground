@@ -1,3 +1,4 @@
+import { withPlaygroundMatchExperience } from "../../../../lib/server/raap-fwpvp-experience";
 // POST /api/faction-wars/pvp/select-team
 //
 // Either player submits their 5-faction team. Both players must have submitted
@@ -13,28 +14,10 @@
 
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getMatch, saveMatch } from "../../../../lib/server/fwpvp";
-import { TEAM_SIZE, FACTION_IDS } from "../../../../lib/factionWarsCore";
-import type { FactionId } from "../../../../lib/factionWarsCore";
-import type { SelectTeamRequest } from "../../../../lib/types/fwpvp";
+import {applyPvpTeam, sanitizeTeam, PvpRuleError} from "../../../../lib/server/fwpvp-rules";
+import type {SelectTeamRequest} from "../../../../lib/types/fwpvp";
 
-const VALID = new Set<string>(FACTION_IDS);
-
-function sanitizeTeam(raw: unknown): FactionId[] | null {
-  if (!Array.isArray(raw)) return null;
-  if (raw.length !== TEAM_SIZE) return null;
-  const seen = new Set<string>();
-  const out: FactionId[] = [];
-  for (const item of raw) {
-    const id = String(item).toLowerCase();
-    if (!VALID.has(id)) return null;
-    if (seen.has(id)) return null;
-    seen.add(id);
-    out.push(id as FactionId);
-  }
-  return out;
-}
-
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") {
     return res.status(405).json({ ok: false, error: "Method not allowed" });
@@ -49,39 +32,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!playerId) return res.status(400).json({ ok: false, error: "Missing playerId" });
     if (team === null) return res.status(400).json({ ok: false, error: "Invalid team (need 5 unique factions)" });
 
-    const match = await getMatch(challengeId);
-    if (!match) return res.status(404).json({ ok: false, error: "Match not found" });
+    const current = await getMatch(challengeId);
+    if (!current) return res.status(404).json({ ok: false, error: "Match not found" });
 
-    // Allow team submission during pending (challenger only) OR team_selection (either)
-    const isChallenger = playerId === match.challengerPlayerId;
-    const isOpponent = playerId === match.opponentPlayerId;
-    if (!isChallenger && !isOpponent) {
-      return res.status(403).json({ ok: false, error: "You are not a participant in this match" });
-    }
-    if (match.status !== "pending" && match.status !== "team_selection") {
-      return res.status(409).json({ ok: false, error: `Cannot select team; match is ${match.status}` });
-    }
-    if (match.status === "pending" && !isChallenger) {
-      return res.status(409).json({ ok: false, error: "Opponent has not accepted yet" });
-    }
-
-    const now = Date.now();
-    if (isChallenger) match.challengerTeam = team;
-    if (isOpponent) match.opponentTeam = team;
-    match.updatedAt = now;
-    match.lastActionAt = now;
-
-    // If both teams are locked AND we're in team_selection, transition to active.
-    const bothLocked = match.challengerTeam.length === TEAM_SIZE && match.opponentTeam.length === TEAM_SIZE;
-    if (bothLocked && match.status === "team_selection") {
-      match.status = "active";
-      match.currentTurnSide = "challenger";
-      match.currentTurnPlayerId = match.challengerPlayerId;
-    }
+    const match = applyPvpTeam(current, playerId, team, Date.now());
 
     await saveMatch(match);
     return res.status(200).json({ ok: true, match });
   } catch (e: any) {
+    if (e instanceof PvpRuleError) return res.status(e.status).json({ok:false,error:e.message});
     return res.status(500).json({ ok: false, error: e?.message || "Internal error" });
   }
 }
+
+export default withPlaygroundMatchExperience("select-team", handler);

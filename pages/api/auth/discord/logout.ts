@@ -1,3 +1,4 @@
+import { clearRaapDiscordPlayer } from "../../../../lib/server/raap-discord-player";
 // pages/api/auth/discord/logout.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { nameSessionClearCookies } from "../../../../lib/name-session";
@@ -13,6 +14,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // /api/auth/discord/session reads cookie: "ra_discord_user"
   // So logout MUST clear "ra_discord_user" (and also clear "ra_discord_session" just in case)
  const cookies = [
+  clearRaapDiscordPlayer,
   // clear main cookie
   `ra_discord_user=; Path=/; Max-Age=0`,
   `ra_discord_user=; Path=/; HttpOnly; Max-Age=0`,

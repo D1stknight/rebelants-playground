@@ -1,3 +1,4 @@
+import { withPlaygroundHumanTournamentWriter } from "../../../../lib/server/raap-pvp-coordination";
 // POST /api/faction-wars/tournament/leave
 //
 // Player withdraws from a draft tournament before it's seeded. Refunds entry fee.
@@ -5,7 +6,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getTournament, saveTournament, creditREBEL } from "../../../../lib/server/fwpvp";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).json({ ok: false, error: "POST only" });
   const body = req.body || {};
   const tournamentId = String(body.tournamentId || "").trim();
@@ -33,3 +34,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   return res.status(200).json({ ok: true, tournament: t });
 }
+
+export default withPlaygroundHumanTournamentWriter(handler);

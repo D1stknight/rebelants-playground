@@ -1,3 +1,4 @@
+import { withPlaygroundMatchExperience } from "../../../../lib/server/raap-fwpvp-experience";
 // POST /api/faction-wars/pvp/heal
 //
 // Allows a player to spend REBEL to restore HP during their turn. Mirrors
@@ -29,7 +30,7 @@ import {
   getREBELBalance,
   getHealConfig,
 } from "../../../../lib/server/fwpvp";
-import { MAX_HP } from "../../../../lib/factionWarsCore";
+import { inspectPvpHeal, quotePvpHeal, applyPvpHeal, PvpRuleError } from "../../../../lib/server/fwpvp-rules";
 import type { PvpMatch } from "../../../../lib/types/fwpvp";
 
 interface HealRequest {
@@ -37,7 +38,7 @@ interface HealRequest {
   playerId?: string;
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") {
     return res.status(405).json({ ok: false, error: "Method not allowed" });
@@ -52,37 +53,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const match: PvpMatch | null = await getMatch(challengeId);
     if (!match) return res.status(404).json({ ok: false, error: "Match not found" });
-    if (match.status !== "active") {
-      return res.status(409).json({ ok: false, error: `Cannot heal; match is ${match.status}` });
-    }
-
-    const isChallenger = match.challengerPlayerId === playerId;
-    const isOpponent = match.opponentPlayerId === playerId;
-    if (!isChallenger && !isOpponent) {
-      return res.status(403).json({ ok: false, error: "Not a participant in this match" });
-    }
-    if (match.currentTurnPlayerId !== playerId) {
-      return res.status(409).json({ ok: false, error: "Not your turn" });
-    }
-
-    const currentHp = isChallenger ? match.challengerHp : match.opponentHp;
-    const healsUsed = isChallenger
-      ? Number(match.challengerHealsUsed ?? 0)
-      : Number(match.opponentHealsUsed ?? 0);
-
-    if (currentHp >= MAX_HP) {
-      return res.status(400).json({ ok: false, error: "Already at full HP" });
-    }
-
+    inspectPvpHeal(match, playerId);
     const healCfg = await getHealConfig();
-    if (healsUsed >= healCfg.factionWarsHealMax) {
-      return res.status(400).json({
-        ok: false,
-        error: `Heal limit reached (${healCfg.factionWarsHealMax}/${healCfg.factionWarsHealMax})`,
-      });
-    }
-
-    const cost = healCfg.factionWarsHealCost;
+    const { cost } = quotePvpHeal(match, playerId, healCfg);
     if (cost > 0) {
       const bal = await getREBELBalance(playerId);
       if (bal < cost) {
@@ -99,32 +72,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    // Apply the heal.
-    const restored = Math.min(MAX_HP, currentHp + healCfg.factionWarsHealAmt);
-    const now = Date.now();
-    if (isChallenger) {
-      match.challengerHp = restored;
-      match.challengerHealsUsed = healsUsed + 1;
-    } else {
-      match.opponentHp = restored;
-      match.opponentHealsUsed = healsUsed + 1;
-    }
-    match.updatedAt = now;
-    match.lastActionAt = now;
-
-    await saveMatch(match);
+    const result = applyPvpHeal(match, playerId, healCfg, Date.now());
+    await saveMatch(result.match);
 
     const newBalance = await getREBELBalance(playerId);
     return res.status(200).json({
       ok: true,
-      match,
-      healed: restored - currentHp,
-      cost,
+      ...result,
       balance: newBalance,
-      healsUsed: healsUsed + 1,
-      healsMax: healCfg.factionWarsHealMax,
     });
   } catch (e: any) {
+    if (e instanceof PvpRuleError) return res.status(e.status).json({ ok: false, error: e.message });
     return res.status(500).json({ ok: false, error: e?.message || "Internal error" });
   }
 }
+
+export default withPlaygroundMatchExperience("heal", handler);

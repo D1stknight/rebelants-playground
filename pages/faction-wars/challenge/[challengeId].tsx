@@ -8,6 +8,7 @@ import { ChatDrawer, useChatState } from "../../../components/PvpChatPanel";
 import { FACTIONS, FACTION_IDS, TEAM_SIZE, TERRITORY_COUNT, MAX_HP, type FactionId, type Move, type RoundResult, type TerritoryResult, type Rarity } from "../../../lib/factionWarsCore";
 import FactionWarsBattleScene, { type BattleSceneState, type BattleSceneActions } from "../../../components/FactionWarsBattleScene";
 import { useFWAudio } from "../../../lib/useFWAudio";
+import { recordCompletedPlaygroundMatch } from "../../../lib/raap-completed-match";
 
 const JP = `'Noto Serif JP', 'Hiragino Mincho ProN', serif`;
 
@@ -1123,6 +1124,24 @@ export default function ChallengePage() {
   // jumps instantly and players miss the moment.
   const [completionPending, setCompletionPending] = useState(false);
   const prevStatusRef = useRef<string | null>(null);
+  const raapCompletionRequests = useRef(new Set<string>());
+
+  useEffect(() => {
+    if (process.env.NEXT_PUBLIC_RAAP_MATCH_SHARING_ENABLED !== "true" || match?.status !== "completed" || !identity ||
+      ![match.challengerPlayerId, match.opponentPlayerId].includes(identity.playerId)) return;
+    const id = match.challengeId, playerId = identity.playerId, key = `${id}:${playerId}`;
+    if (raapCompletionRequests.current.has(key)) return;
+    const abort = new AbortController();
+    let deadline: number | undefined;
+    // Schedule outside render; cancelled React setup does not consume an attempt.
+    const timer = window.setTimeout(() => {
+      raapCompletionRequests.current.add(key);
+      deadline = window.setTimeout(() => abort.abort(), 30000);
+      void recordCompletedPlaygroundMatch({ challengeId: id, playerId, signal: abort.signal })
+        .catch(() => {}).finally(() => window.clearTimeout(deadline));
+    }, 0);
+    return () => { window.clearTimeout(timer); window.clearTimeout(deadline); abort.abort(); };
+  }, [match?.challengeId, match?.status, match?.challengerPlayerId, match?.opponentPlayerId, identity?.playerId]);
 
   // Detect active→completed transition; hold on completion-pending state.
   // The 3.5s window covers: the final round's animation reset (~1.2s),
