@@ -7,6 +7,10 @@ import { loadProfile, saveProfile, getEffectivePlayerId } from "../lib/profile";
 import { addWin } from "../lib/winsStore";
 import BuyPointsModal from "./BuyPointsModal";
 import FactionWarsArena from "./FactionWarsArena";
+import { FACTIONS, FACTION_IDS, TEAM_SIZE, TERRITORY_COUNT, MAX_HP, calcDamage, calcBlock,
+  pickEnemyMove, calcPassiveBonus, calcRarity, type Phase, type Rarity, type FactionId,
+  type Move, type Faction, type RoundResult, type TerritoryResult } from "../lib/factionWarsSoloRules";
+import { useSoloCampaign, type SoloView } from "../lib/raap-solo-campaign";
 
 function useFWAudio() {
   const [muted, setMuted] = React.useState<boolean>(() => {
@@ -82,13 +86,9 @@ function useFWAudio() {
   return { muted, toggleMute, startTheme, startMusic, startEpic, stopMusic, resetLowHp, sfx };
 }
 
-type Phase = "idle" | "battle" | "territory_result" | "final_result";
-type Rarity = "none" | "common" | "rare" | "ultra";
-type FactionId = "samurai"|"ronin"|"warrior"|"ashigaru"|"shogun"|"buke"|"kenshi"|"wokou"|"sohei"|"yamabushi"|"bushi";
 
 type SamuraiAnimState = "idle" | "attack" | "magic" | "trick" | "defend" | "hit" | "win" | "lose";
 
-interface Move { id: string; label: string; emoji: string; desc: string; power: number; type: "attack"|"defend"|"magic"|"trick"; oneTime?: boolean; }
 
 function getSamuraiAnimForMove(move: Move | null): SamuraiAnimState {
   if (!move) return "idle";
@@ -114,147 +114,8 @@ function hasFaction3DCharacter(factionId: string): boolean {
     "yamabushi",
   ].includes(factionId);
 }
-interface Faction { id: FactionId; name: string; emoji: string; color: string; bgColor: string; borderColor: string; role: string; passive: string; passiveDesc: string; weapon: string; moves: Move[]; weakTo: FactionId[]; strongVs: FactionId[]; }
-interface RoundResult { round:number; playerMove:Move; enemyMove:Move; playerDmg:number; enemyDmg:number; playerHpAfter:number; enemyHpAfter:number; }
-interface TerritoryResult { territory:number; defender:FactionId; playerFaction:FactionId; rounds:RoundResult[]; playerHpFinal:number; enemyHpFinal:number; won:boolean; }
 type FWLeaderboards = { warlords: {playerId:string;playerName?:string;score:number}[]; factions:{faction:FactionId;wins:number;topPlayers?:{playerId:string;playerName?:string;wins:number}[]}[]; streaks:{playerId:string;playerName?:string;score:number}[]; rich:{playerId:string;playerName?:string;score:number}[]; perfect:{playerId:string;playerName?:string;score:number}[]; pvpWins?:{playerId:string;playerName?:string;score:number}[]; pvpStreaks?:{playerId:string;playerName?:string;score:number}[]; pvpRich?:{playerId:string;playerName?:string;score:number}[]; };
 
-const FACTIONS: Record<FactionId, Faction> = {
-  samurai: { id:"samurai", name:"Samurai", emoji:"🔴", color:"#dc2626", bgColor:"rgba(220,38,38,0.12)", borderColor:"rgba(220,38,38,0.4)", role:"Core soldiers", passive:"First Strike", passiveDesc:"1st territory: +2 bonus damage dealt per round", weapon:"Katana",
-    moves:[{id:"katana_strike",label:"Katana Strike",emoji:"⚔️",desc:"Full power slash — no reductions, straight damage",power:8,type:"attack"},{id:"honor_guard",label:"Honor Guard",emoji:"🛡️",desc:"Block stance — reduces incoming damage by 40%",power:6,type:"defend"},{id:"battle_cry",label:"Battle Cry",emoji:"📯",desc:"War cry — grants +4 damage for next 5 rounds",power:5,type:"magic"},{id:"counter_strike",label:"Counter Strike",emoji:"🔄",desc:"Counter — deal extra damage equal to enemy power",power:7,type:"trick"},{id:"iron_code",label:"Iron Code",emoji:"📜",desc:"+3 bonus damage for next 8 rounds (persists)",power:4,type:"magic"}],
-    weakTo:["ronin","yamabushi"], strongVs:["ashigaru","buke"] },
-  ronin: { id:"ronin", name:"Ronin", emoji:"⚫", color:"#9f1239", bgColor:"rgba(159,18,57,0.12)", borderColor:"rgba(159,18,57,0.45)", role:"Elite assassins", passive:"Comeback", passiveDesc:"After losing a territory: next warrior deals +15 bonus damage per round", weapon:"Twin Daggers",
-    moves:[{id:"twin_daggers",label:"Twin Daggers",emoji:"🗡️",desc:"Double hit — two strikes at lower power each",power:7,type:"attack"},{id:"shadow_step",label:"Shadow Step",emoji:"👤",desc:"Dodge — enemy misses",power:6,type:"trick"},{id:"last_stand",oneTime:true,label:"Last Stand",emoji:"💀",desc:"Massive +15 bonus damage when your HP is below 40",power:9,type:"magic"},{id:"phantom_blade",oneTime:true,label:"Phantom Blade",emoji:"🌑",desc:"Strike through defenses — enemy block reduced 70%",power:8,type:"trick"},{id:"death_mark",label:"Death Mark",emoji:"☠️",desc:"+2 bonus damage for next 4 rounds",power:5,type:"magic"}],
-    weakTo:["shogun","bushi"], strongVs:["samurai","warrior"] },
-  warrior: { id:"warrior", name:"Warrior", emoji:"🟤", color:"#b45309", bgColor:"rgba(180,83,9,0.12)", borderColor:"rgba(180,83,9,0.4)", role:"Battle veterans", passive:"Relentless", passiveDesc:"Cracked Circle & Berserker Rage deal +20 extra damage per use", weapon:"Greatsword",
-    moves:[{id:"greatsword",label:"Greatsword Slam",emoji:"🔨",desc:"Massive slam — highest base power of any attack",power:10,type:"attack"},{id:"iron_will",label:"Iron Will",emoji:"⛰️",desc:"Absorb enemy hit completely",power:7,type:"defend"},{id:"cracked_circle",label:"Cracked Circle",emoji:"💢",desc:"Sacrifice defense for +4 power",power:8,type:"magic"},{id:"berserker_rage",oneTime:true,label:"Berserker Rage",emoji:"🔥",desc:"Go berserk — max damage but all defend moves locked this territory",power:11,type:"attack"},{id:"blood_price",oneTime:true,label:"Blood Price",emoji:"🩸",desc:"Sacrifice 20 HP to deal double power damage this round",power:10,type:"attack"},
-      {id:"war_stomp",label:"War Stomp",emoji:"👊",desc:"Stagger hit — reduces enemy damage by 3 this round",power:6,type:"trick"}],
-    weakTo:["kenshi","sohei"], strongVs:["ronin","ashigaru"] },
-  ashigaru: { id:"ashigaru", name:"Ashigaru", emoji:"🟢", color:"#166534", bgColor:"rgba(22,101,52,0.12)", borderColor:"rgba(22,101,52,0.4)", role:"Infantry force", passive:"Humble Roots", passiveDesc:"Campaign costs 25 REBEL less (125 total instead of 150)", weapon:"Spear",
-    moves:[{id:"spear_thrust",label:"Spear Thrust",emoji:"🌿",desc:"Steady thrust — consistent reliable damage every round",power:6,type:"attack"},{id:"shield_wall",label:"Shield Wall",emoji:"🛡️",desc:"Blocks 60% of damage",power:7,type:"defend"},{id:"rally",label:"Rally",emoji:"📣",desc:"Rally — reduces incoming damage to 0 this round and fully blocks",power:5,type:"magic"},{id:"phalanx",label:"Phalanx",emoji:"🔰",desc:"Shield lock — 40% block with no damage penalty",power:8,type:"defend"},{id:"endure",label:"Endure",emoji:"💪",desc:"Endure — take 0 damage this round (can never finish a territory alone)",power:5,type:"defend"}],
-    weakTo:["warrior","ronin"], strongVs:["wokou","sohei"] },
-  shogun: { id:"shogun", name:"Shogun", emoji:"🟡", color:"#854d0e", bgColor:"rgba(133,77,14,0.12)", borderColor:"rgba(133,77,14,0.45)", role:"Commander", passive:"Divine Authority", passiveDesc:"Ultra victory: REBEL reward boosted by 15%", weapon:"War Staff",
-    moves:[{id:"command_strike",label:"Command Strike",emoji:"👑",desc:"Command — next round gains permanent +8 flat damage bonus",power:9,type:"magic"},{id:"strategic_ret",label:"Strategic Retreat",emoji:"🏳️",desc:"Retreat — your team gets Common reward even if campaign fails",power:5,type:"defend"},{id:"divine_auth",label:"Divine Authority",emoji:"⚡",desc:"Authority — guarantees minimum Common reward this campaign",power:7,type:"magic"},{id:"imperial_decree",oneTime:true,label:"Imperial Decree",emoji:"📋",desc:"Decree — forces enemy to use their weakest move this round",power:8,type:"trick"},{id:"final_command",oneTime:true,label:"Final Command",emoji:"📣",desc:"Epic decree — forces enemy to 1 power AND you get +6 damage",power:9,type:"magic"},
-      {id:"warlords_fury",label:"Warlord's Fury",emoji:"⚡",desc:"Fury — base power +4 per territory already won",power:7,type:"attack"}],
-    weakTo:["yamabushi","wokou"], strongVs:["ronin","bushi"] },
-  buke: { id:"buke", name:"Buke", emoji:"🪖", color:"#4d7c0f", bgColor:"rgba(77,124,15,0.12)", borderColor:"rgba(77,124,15,0.4)", role:"Noble defenders", passive:"Noble Guard", passiveDesc:"Mostly used defend moves? A campaign loss flips to Common win", weapon:"Trident",
-    moves:[{id:"trident_stab",label:"Trident Stab",emoji:"🔱",desc:"Triple strike — three fast hits, reliable damage",power:7,type:"attack"},{id:"noble_defense",label:"Noble Defense",emoji:"🏰",desc:"Noble stance — 40% block with honorable defense",power:8,type:"defend"},{id:"honor_bond",label:"Honor Bond",emoji:"🤝",desc:"+3 permanent damage bonus for rest of campaign",power:6,type:"magic"},{id:"bastion",label:"Bastion",emoji:"🏯",desc:"Fortress — 40% block + +5 bonus damage dealt",power:9,type:"defend"},{id:"noble_sacrifice",oneTime:true,label:"Noble Sacrifice",emoji:"💎",desc:"SACRIFICE: warrior dies instantly. Next warrior gets +12 permanent damage boost",power:4,type:"magic"}],
-    weakTo:["samurai","kenshi"], strongVs:["yamabushi","wokou"] },
-  kenshi: { id:"kenshi", name:"Kenshi", emoji:"🩵", color:"#0f766e", bgColor:"rgba(15,118,110,0.12)", borderColor:"rgba(15,118,110,0.4)", role:"Sword masters", passive:"Blade Harmony", passiveDesc:"Win 3 territories in a row: all moves deal +12 extra damage", weapon:"Katana",
-    moves:[{id:"precision_slash",label:"Precision Slash",emoji:"🌊",desc:"Precision cut — reduces enemy block effectiveness by 70%",power:8,type:"attack"},{id:"blade_harmony",label:"Blade Harmony",emoji:"🌀",desc:"+3 permanent damage bonus for rest of campaign",power:7,type:"magic"},{id:"meditation",label:"Meditative Focus",emoji:"🧘",desc:"Focus — stacks +2 damage per territory you use this move",power:5,type:"defend"},{id:"blade_storm",oneTime:true,label:"Blade Storm",emoji:"💨",desc:"Blade storm — rapid strikes with +7 bonus damage",power:9,type:"attack"},{id:"mirror_slash",label:"Mirror Slash",emoji:"🪞",desc:"Reflect — deals damage equal to what you just took last round",power:7,type:"trick"},
-      {id:"perfect_form",label:"Perfect Form",emoji:"✨",desc:"+3 bonus if you took 0 damage last round",power:7,type:"defend"}],
-    weakTo:["wokou","warrior"], strongVs:["buke","samurai"] },
-  wokou: { id:"wokou", name:"Wokou", emoji:"🌊", color:"#475569", bgColor:"rgba(71,85,105,0.12)", borderColor:"rgba(71,85,105,0.4)", role:"Sea raiders", passive:"Sea Raider", passiveDesc:"Win a territory: random chance to earn extra bonus REBEL", weapon:"Cutlass",
-    moves:[{id:"cutlass_raid",label:"Cutlass Raid",emoji:"🏴‍☠️",desc:"40% chance to earn +10 bonus REBEL when you win this territory",power:7,type:"trick"},{id:"sea_storm",label:"Sea Storm",emoji:"🌊",desc:"Chaos strike — random power 4-10 this round",power:7,type:"magic"},{id:"ghost_tide",label:"Ghost Tide",emoji:"👻",desc:"Disappear — enemy nullified",power:6,type:"trick"},{id:"ambush",oneTime:true,label:"Ambush",emoji:"🗺️",desc:"Ambush — deals +4 bonus damage if enemy also attacked",power:8,type:"trick"},{id:"plunder",label:"Plunder",emoji:"💰",desc:"Loot bonus — win this territory to earn extra REBEL (see reward)",power:6,type:"magic"}],
-    weakTo:["ashigaru","buke"], strongVs:["kenshi","shogun"] },
-  sohei: { id:"sohei", name:"Sohei", emoji:"🟠", color:"#c2410c", bgColor:"rgba(194,65,12,0.12)", borderColor:"rgba(194,65,12,0.4)", role:"Monk warriors", passive:"Monk Ward", passiveDesc:"Lose a territory with HP above 0: counts as a narrow escape", weapon:"War Staff",
-    moves:[{id:"staff_sweep",label:"Staff Sweep",emoji:"🌅",desc:"Wide sweep — strong consistent attack damage",power:7,type:"attack"},{id:"monks_ward",label:"Monk's Ward",emoji:"☯️",desc:"Ward — blocks 55% of enemy damage this round",power:8,type:"defend"},{id:"enlightened",label:"Enlightened Strike",emoji:"🔥",desc:"Spiritual damage bypasses armor",power:9,type:"magic"},{id:"sacred_flame",oneTime:true,label:"Sacred Flame",emoji:"🕯️",desc:"Sacred fire — +7 spiritual damage bonus",power:8,type:"magic"},{id:"iron_meditation",label:"Iron Meditation",emoji:"🧘",desc:"Meditate — heals +15 HP and gives +3 damage bonus for 4 rounds",power:6,type:"defend"}],
-    weakTo:["ashigaru","kenshi"], strongVs:["warrior","yamabushi"] },
-  yamabushi: { id:"yamabushi", name:"Yamabushi", emoji:"🔵", color:"#164e63", bgColor:"rgba(22,78,99,0.12)", borderColor:"rgba(22,78,99,0.4)", role:"Mountain mystics", passive:"Spirit Vision", passiveDesc:"One random territory this campaign: hidden +5 damage bonus", weapon:"Mystic Staff",
-    moves:[{id:"mystic_flame",label:"Mystic Flame",emoji:"🔮",desc:"Random elemental power 4-10 via chaos magic",power:7,type:"magic"},{id:"spirit_vision",label:"Spirit Vision",emoji:"👁️",desc:"Vision — +3 damage bonus activates each round you use this",power:6,type:"trick"},{id:"mountain_seal",oneTime:true,label:"Mountain Seal",emoji:"🗻",desc:"Seal — +3 damage bonus after using (mountain power)",power:8,type:"magic"},{id:"void_seal",oneTime:true,label:"Void Seal",emoji:"🌀",desc:"Erase enemy move — they get power 1",power:9,type:"magic"},{id:"mountain_echo",label:"Mountain Echo",emoji:"📣",desc:"Echo — replays 70% of last round's damage as extra bonus",power:6,type:"trick"}],
-    weakTo:["sohei","samurai"], strongVs:["shogun","buke"] },
-  bushi: { id:"bushi", name:"Bushi", emoji:"🔷", color:"#1e3a5f", bgColor:"rgba(30,58,95,0.12)", borderColor:"rgba(30,58,95,0.45)", role:"Tactical officers", passive:"Tactical Mind", passiveDesc:"Each round: see enemy faction weaknesses before choosing", weapon:"Tactical Blade",
-    moves:[{id:"tactical_blade",label:"Tactical Blade",emoji:"🗡️",desc:"Blade strike — +2 bonus damage for attack moves",power:7,type:"attack"},{id:"officers_order",label:"Officer's Order",emoji:"📋",desc:"+3 bonus damage for all attack moves this territory",power:6,type:"magic"},{id:"strategic_mind",oneTime:true,label:"Strategic Mind",emoji:"🧠",desc:"Tactical read — +2 damage per territory already won",power:8,type:"trick"},{id:"field_intel",label:"Field Intel",emoji:"🔭",desc:"Intel — +3 bonus if your move counters the enemy type",power:7,type:"trick"},{id:"tactical_strike",label:"Tactical Strike",emoji:"🎯",desc:"Calculated blow — power equals territories won",power:7,type:"attack"}],
-    weakTo:["samurai","sohei"], strongVs:["ronin","wokou"] },
-};
-
-const FACTION_IDS = Object.keys(FACTIONS) as FactionId[];
-const TEAM_SIZE = 5;
-const TERRITORY_COUNT = 5;
-
-// ── HP COMBAT ENGINE ──────────────────────────────────────────────────────────
-const MAX_HP = 100;
-
-function calcDamage(move: Move, atk: FactionId, def: FactionId, bonus: number, tWon: number, tLost: number, diff: number, isPlayer: boolean): number {
-  const af = FACTIONS[atk];
-  let dmg = move.power * 2.0 + bonus * 1.2;
-  if (af.strongVs.includes(def)) dmg += 6;
-  if (af.weakTo.includes(def))   dmg -= 5;
-  if (move.type === "defend") dmg *= 0.55;
-  if (move.type === "trick")  dmg *= 0.80;
-  if (move.type === "magic")  dmg *= 1.10;
-  if (isPlayer) {
-    if (atk === "ronin" && tLost > 0) dmg += 8;
-    if (atk === "kenshi" && tWon >= 3) dmg += 6;
-    if (atk === "warrior" && (move.id === "cracked_circle" || move.id === "berserker_rage")) dmg += 10;
-    if (move.id === "mystic_flame") dmg = (Math.floor(Math.random()*5)+5)*6.5;
-    if (move.id === "last_stand") dmg += 12;
-    if (move.id === "phantom_blade") dmg += 6;
-    if (move.id === "void_seal") dmg += 9;
-    if (move.id === "blade_storm") dmg += 7;
-    if (move.id === "enlightened" || move.id === "sacred_flame") dmg += 7;
-    if (move.id === "bastion") dmg += 5;
-    if (move.id === "warlords_fury") dmg += tWon * 4;
-    if (move.id === "tactical_strike") dmg += tWon * 3;
-  } else {
-    dmg += Math.floor(diff * 4);
-  }
-  dmg *= (0.82 + Math.random() * 0.36);
-  // AI gets slightly higher cap so fights feel dangerous
-  return Math.max(2, Math.min(Math.round(dmg), isPlayer ? 24 : 28));
-}
-
-function calcBlock(move: Move): number {
-  if (move.id === "rally") return 1.0; // Rally = full block this round
-  if (["shadow_step","ghost_tide","vanishing_cut"].includes(move.id)) return 0.40;
-  if (["monks_ward"].includes(move.id)) return 0.55;
-  if (["noble_defense","honor_guard","phalanx","bastion"].includes(move.id)) return 0.40;
-  if (["shield_wall","iron_will","endure"].includes(move.id)) return 0.35;
-  if (move.id === "bushido_stand") return 0.30;
-  if (move.type === "defend") return 0.25;
-  return 0;
-}
-
-function pickEnemyMove(def: FactionId, pm: Move, diff: number, eHp: number, pHp: number, territory: number): Move {
-  const df = FACTIONS[def];
-  // Scale difficulty by territory — AI gets progressively meaner each territory
-  const scaledDiff = Math.min(1, diff + territory * 0.06);
-
-  // === DESPERATE MODE: enemy near death → always max power ===
-  if (eHp < 25) return df.moves.reduce((a,b)=>a.power>b.power?a:b);
-
-  // === PREDATOR MODE: player near death → keep attacking, never defend ===
-  if (pHp < 35) {
-    const killers = df.moves.filter(m=>m.type==="attack"||m.type==="magic").sort((a,b)=>b.power-a.power);
-    if (killers.length && Math.random() < scaledDiff) return killers[0];
-  }
-
-  // === SMART COUNTER MODE: counter player's move type ===
-  const cm: Record<string,string[]> = { attack:["defend","trick"], defend:["magic","attack"], magic:["trick","defend"], trick:["attack","magic"] };
-  const counters = df.moves.filter(m=>(cm[pm.type]||[]).includes(m.type)).sort((a,b)=>b.power-a.power);
-
-  // Higher territory = AI counters more reliably (less random)
-  const counterThreshold = scaledDiff * (territory >= 3 ? 0.85 : 0.70);
-  if (counters.length && Math.random() < counterThreshold) {
-    // Pick from top 2 counters (weighted toward highest)
-    const topN = counters.slice(0, 2);
-    return Math.random() < 0.75 ? topN[0] : topN[topN.length-1];
-  }
-
-  // === PRESSURE MODE: at high difficulty always pick top-3 moves ===
-  if (scaledDiff > 0.75) {
-    const top3 = [...df.moves].sort((a,b)=>b.power-a.power).slice(0,3);
-    return top3[Math.floor(Math.random()*top3.length)];
-  }
-
-  // === DEFAULT: weighted toward power (never picks bottom 2 moves at high diff) ===
-  const sorted = [...df.moves].sort((a,b)=>b.power-a.power);
-  const cap = scaledDiff > 0.6 ? Math.ceil(sorted.length * 0.6) : sorted.length;
-  return sorted[Math.floor(Math.random() * cap)];
-}
-
-function calcPassiveBonus(faction: FactionId, territoriesWon: number, isT1: boolean): number {
-  if (faction === "samurai" && isT1) return 2;
-  if (faction === "shogun" || faction === "bushi") return 1;
-  return 0;
-}
-
-function calcRarity(won: number): Rarity {
-  if (won === 5) return "ultra";
-  if (won >= 3) return "rare";
-  if (won >= 1) return "common";
-  return "none";
-}
 
 function factionImgPath(fid: string, type: "symbol"|"char"): string {
   const jpgFactions: Record<string,boolean> = { "bushi-symbol": true, "bushi-char": true };
@@ -597,6 +458,7 @@ export default function FactionWars() {
   const [effectivePlayerId, setEffectivePlayerId] = useState(initialEffectiveId);
   const [playerName, setPlayerName] = useState(initialProfile?.discordName || initialProfile?.name || "");
   const playerId = effectivePlayerId;
+  const solo = useSoloCampaign(effectivePlayerId);
 
   useEffect(() => {
     const u = () => { const p = loadProfile(); const id = getEffectivePlayerId(p)||"guest"; setEffectivePlayerId(id); setPlayerName(p?.discordName||p?.name||""); };
@@ -804,12 +666,49 @@ const fightInFlightRef = useRef(false);
     setTeam(prev => { const idx=prev.indexOf(fid); if(idx>=0)return prev.filter((_,i)=>i!==idx); if(prev.length>=TEAM_SIZE)return prev; return [...prev,fid]; });
   };
 
+  const applySolo = useCallback((session: SoloView) => {
+    if (session.held || session.abandoned) return;
+    const g = session.state;
+    setTeam(g.team); setDefenders(g.defenders); setResults(g.results); setCurrentT(g.territory);
+    setCurrentFI(g.territory); setPlayerHp(g.playerHp); setEnemyHp(g.enemyHp);
+    setCurrentRound(g.rounds.length); setCurrentTerritoryRounds(g.rounds); setUsedMoves(g.usedMoves);
+    setOneTimeUsed(g.oneTimeUsed); setHealUsed(g.healUsed); setBerserkerActive(g.berserkerActive);
+    setSacrificeBonus(g.sacrificeBonus); setPowerBuffAmt(g.powerBuffAmount); setPowerBuffRounds(g.powerBuffRounds);
+    setComboBonus(g.comboBonus); setCommandActive(g.commandActive); setMeditationStacks(g.meditationStacks);
+    setStrategicRetUsed(g.strategicRetreatUsed); plunderPendingRef.current = g.plunderPending;
+    setSelectedMove(null); setFinalRarity(g.rarity); setPhase(g.phase);
+    setRoundLog([...g.rounds].reverse().slice(0, 6).map(r => ({ playerMove: r.playerMove.label,
+      enemyMove: r.enemyMove.label, playerDmg: r.playerDmg, enemyDmg: r.enemyDmg, effect: "" })));
+    setCfgState((c: any) => ({ ...c, factionWarsCost: session.config.cost,
+      factionWarsHealCost: session.config.healCost, factionWarsHealAmt: session.config.healAmount,
+      factionWarsHealMax: session.config.healMaximum, factionWarsPlunderBonus: session.config.plunder,
+      factionWarsAIDifficulty: session.config.difficulty, rewards: { ...c.rewards, ...session.config.rewards } }));
+  }, []);
+  useEffect(() => { if (solo.session) applySolo(solo.session); }, [solo.session, applySolo]);
+  const displayedSoloOwner = useRef<string | null>(null);
+  useEffect(() => {
+    if (displayedSoloOwner.current && displayedSoloOwner.current !== effectivePlayerId) {
+      setPhase("idle"); setTeam([]); setDefenders([]); setResults([]); setSelectedMove(null);
+      fightSeqRef.current++; fightInFlightRef.current = false;
+    }
+    if (solo.session) displayedSoloOwner.current = solo.session.playerId;
+  }, [effectivePlayerId, solo.session]);
+
   const startCampaign = async () => {
     if (team.length < TEAM_SIZE || busy) return;
+    if (solo.requiresSavedCheck) { setRunMessage("Check the saved campaign before starting another one."); return; }
     if (Number(totalEarnRoom||0) < fwCost) { setRunMessage("No plays left today."); return; }
     const actualCostCheck = team.includes("ashigaru") ? Math.max(0, fwCost - 25) : fwCost;
     if (balance < actualCostCheck) { setRunMessage(`Not enough ${currency} to start Faction Wars.`); return; }
     setBusy(true); setRunMessage("Assembling your forces...");
+    if (solo.enabled && solo.sharing) {
+      try {
+        const saved = await solo.start(team, actualCostCheck); applySolo(saved); startMusic();
+        setRunMessage(""); await refresh();
+      } catch (error) { setRunMessage((error as Error).message); }
+      finally { setBusy(false); }
+      return;
+    }
     try {
       const actualCost = team.includes("ashigaru") ? Math.max(0, fwCost - 25) : fwCost;
     const spendRes: any = await spend(actualCost, "faction-wars");
@@ -855,6 +754,24 @@ setPhase("battle"); startMusic(); setBusy(false);
 
  const fightTerritory = async () => {
   if (!selectedMove || busy || fightInFlightRef.current) return;
+  if (solo.session && !solo.session.abandoned) {
+    fightInFlightRef.current = true; setBusy(true); setBattleAnim("clash"); sfx.clash();
+    const chosen = selectedMove;
+    setPlayer3DAnim(getSamuraiAnimForMove(chosen));
+    try {
+      const saved = await solo.act({ kind: "MOVE", moveId: chosen.id });
+      const round = saved.state.rounds[saved.state.rounds.length - 1];
+      if (round) { setEnemy3DAnim(getSamuraiAnimForMove(round.enemyMove));
+        const fid = ++dmgFloatId.current;
+        setDmgFloats([{ id: fid, side: "player", dmg: round.enemyDmg }, { id: fid + 1, side: "enemy", dmg: round.playerDmg }]);
+        setTimeout(() => setDmgFloats(prev => prev.filter(x => x.id !== fid && x.id !== fid + 1)), 1500);
+      }
+      applySolo(saved); await refresh(); setRunMessage("");
+      setBattleAnim(saved.state.enemyHp <= 0 ? "win" : saved.state.playerHp <= 0 ? "lose" : "idle");
+    } catch (error) { setRunMessage((error as Error).message); setBattleAnim("idle"); }
+    finally { setBusy(false); fightInFlightRef.current = false; }
+    return;
+  }
 
   fightInFlightRef.current = true;
   const fightSeq = fightSeqRef.current;
@@ -1086,7 +1003,17 @@ if (over) {
     }
   };
 
-  const nextTerritory = () => {
+  const nextTerritory = async () => {
+    if (solo.session && !solo.session.abandoned) {
+      if (busy) return; setBusy(true);
+      try {
+        const saved = await solo.act({ kind: "NEXT" }); applySolo(saved); await refresh();
+        if (saved.state.phase === "final_result") await finishCampaign(saved.state.results, saved, true);
+        else { sfx.roundStart(); resetLowHp(); }
+      } catch (error) { setRunMessage((error as Error).message); }
+      finally { setBusy(false); }
+      return;
+    }
     const next = currentTerritory + 1;
     const lastResult = results[results.length - 1];
     if (lastResult?.won) sfx.territoryWin(); else sfx.territoryLose();
@@ -1095,7 +1022,7 @@ if (over) {
     else { setCurrentT(next); setCurrentFI(prev => (prev+1) % TEAM_SIZE); startTerritory(); setPhase("battle"); if (next >= 3) sfx.startEpic(); }
   };
 
-  const finishCampaign = async (allResults: TerritoryResult[]) => {
+  const finishCampaign = async (allResults: TerritoryResult[], verified?: SoloView, share = false) => {
     setBusy(true);
     const territoriesWon = allResults.filter(r=>r.won).length;
     let rarity = calcRarity(territoriesWon);
@@ -1104,18 +1031,19 @@ if (over) {
     // Strategic Retreat: guarantee at least Common reward if used
     if (strategicRetUsed && rarity==="none") { rarity="common"; pts=Number(cfg?.rewards?.common??50); }
     if (team.includes("buke") && rarity==="none") { const dc=allResults.reduce((sum,r)=>sum+(r.rounds?.filter(rnd=>rnd.playerMove.type==="defend").length||0),0); if(dc>=3){rarity="common";pts=Number(cfg?.rewards?.common??50);} }
+    if (verified) { rarity = verified.state.rarity; pts = verified.state.reward; }
     setFinalRarity(rarity);
-    if (pts>0) { const er:any=await earn(pts).catch(()=>null); if(er?.ok)await refresh().catch(()=>{}); }
+    if (!verified && pts>0) { const er:any=await earn(pts).catch(()=>null); if(er?.ok)await refresh().catch(()=>{}); }
 
           // ── Roll crate prize (exact Shuffle pattern) ──────────────────────
           if (rarity !== "none") {
             try {
-              const rollR = await fetch(`/api/prizes/roll?force=${rarity}`, {
+              const rollR = verified ? null : await fetch(`/api/prizes/roll?force=${rarity}`, {
                 method: "POST", headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ playerId: String(effectivePlayerId||"guest"), rarity, game: "faction-wars" })
               });
-              const rollJ = await rollR.json().catch(() => null);
-              if (rollR.ok && rollJ?.ok && rollJ?.prize) {
+              const rollJ = verified ? await solo.reward() : await rollR!.json().catch(() => null);
+              if ((verified || rollR!.ok) && rollJ?.ok && rollJ?.prize) {
                 const p = rollJ.prize;
                 setPrizeObj(p);
                 setPrizeLabel(p.label || (rarity === "ultra" ? "🏆 ULTRA CRATE" : rarity === "rare" ? "⚔️ RARE CRATE" : "✅ COMMON CRATE"));
@@ -1127,13 +1055,13 @@ if (over) {
                 if (String(p?.type||"").toLowerCase() === "merch") {
                   const prof2 = loadProfile();
                   const pid2 = String(effectivePlayerId||getEffectivePlayerId(prof2)||"guest").trim().slice(0,64)||"guest";
-                  const claimId2 = `${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
-                  const cr = await fetch("/api/prizes/claim", {
+                  const claimId2 = verified ? `fwsolo-${verified.id}` : `${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+                  const cr = verified ? null : await fetch("/api/prizes/claim", {
                     method: "POST", headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ claimId: claimId2, playerId: pid2, prize: p, wallet: null, shipping: null, game: "faction-wars", rarity }),
                   });
-                  const cj = await cr.json().catch(() => null);
-                  if (cr.ok && cj?.ok) {
+                  const cj = verified ? await solo.claimPrize(null) : await cr!.json().catch(() => null);
+                  if ((verified || cr!.ok) && cj?.ok) {
                     setPrizeClaimId(claimId2);
                     setPrizeNeedShipping(!!cj.needShipping);
                   } else {
@@ -1146,17 +1074,35 @@ if (over) {
                 sfx.crateOpen();
                 setTimeout(() => sfx.crateReward(), 1000);
               }
-            } catch {}
+            } catch (error) { if (verified) setRunMessage((error as Error).message); }
           }
     const prof=loadProfile(); const pid=String(effectivePlayerId||getEffectivePlayerId(prof)||"guest").trim().slice(0,64)||"guest"; const pname=(prof?.discordName||playerName||prof?.name||"guest").trim()||"guest";
+    if (verified) {
+      try {
+        const marker = `raap:solo-win:${verified.id}`;
+        if (!localStorage.getItem(marker)) {
+          // Mark before the local display update; reopening a saved prize must
+          // not inflate the browser's wins total. The server result is separate.
+          localStorage.setItem(marker, "recorded");
+          addWin({ id: `fwsolo-${verified.id}`, ts: Date.now(), game: "faction-wars", playerId: pid,
+            playerName: pname, rarity, pointsAwarded: pts });
+        }
+      } catch { /* Browser storage may be unavailable; the canonical game remains saved. */ }
+      try { await solo.recordScore(pname); } catch (error) { setRunMessage((error as Error).message); }
+    } else {
     addWin({id:`${Date.now()}-${Math.random().toString(36).slice(2,7)}`,ts:Date.now(),game:"faction-wars",playerId:pid,playerName:pname,rarity,pointsAwarded:pts});
     await fetch("/api/faction-wars/record",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({playerId:pid,playerName:pname,rarity,pointsAwarded:pts,territoriesWon,team,perfect:territoriesWon===5})}).catch(()=>{});
+    }
     window.dispatchEvent(new Event("ra:leaderboards-refresh")); void loadLB();
     if (rarity==="ultra") sfx.ultra(); else if (rarity!=="none") sfx.win(); else sfx.lose();
     setPhase("final_result"); setBusy(false);
+    if (verified && share) void solo.shareCompletion();
   };
 
- const resetGame = () => {
+ const resetGame = async () => {
+   if (solo.session) {
+     try { await solo.abandon(); } catch (error) { setRunMessage((error as Error).message); return; }
+   }
    fightSeqRef.current += 1;
    fightInFlightRef.current = false;
    stopMusic(); sfx.startTheme(); setPhase("idle"); setTeam([]); setDefenders([]); setResults([]); setCurrentT(0); setCurrentFI(0); setSelectedMove(null); setFinalRarity("none"); setRunMessage(""); setBusy(false); setBattleAnim("idle"); setPlayer3DAnim("idle"); setEnemy3DAnim("idle");
@@ -1249,12 +1195,13 @@ setPlayerHp(MAX_HP); setEnemyHp(MAX_HP); setCurrentRound(0); setRoundLog([]); se
                           const wallet3 = prof3?.walletAddress || "";
                           if (!wallet3) { alert("Please enter a wallet address first."); return; }
                           try {
-                            const cr = await fetch("/api/claims/create", {
+                            const connectedPrize = solo.session?.state.phase === "final_result";
+                            const cr = connectedPrize ? null : await fetch("/api/claims/create", {
                               method: "POST", headers: { "Content-Type": "application/json" },
                               body: JSON.stringify({ playerId: pid3, wallet: wallet3, prize: prizeObj, game: "faction-wars", rarity: finalRarity }),
                             });
-                            const cj = await cr.json().catch(() => null);
-                            if (!cr.ok || !cj?.ok) { alert("Claim failed. Please try again."); return; }
+                            const cj = connectedPrize ? await solo.claimPrize(wallet3) : await cr!.json().catch(() => null);
+                            if ((!connectedPrize && !cr!.ok) || !cj?.ok) { alert("Claim failed. Please try again."); return; }
                           } catch { alert("Claim failed. Please try again."); return; }
                         }
                         // ── Merch: submit shipping if needed ──
@@ -1284,6 +1231,16 @@ setPlayerHp(MAX_HP); setEnemyHp(MAX_HP); setCurrentRound(0); setRoundLog([]); se
               </>
             );
           })()}
+
+      {solo.enabled && solo.session && <div style={{ position: "relative", zIndex: 2, maxWidth: 900, margin: "0 auto", padding: 16,
+        background: "rgba(0,0,0,0.65)", borderBottom: "1px solid rgba(52,211,153,0.3)" }}>
+        <p role="status">{solo.message}</p>
+        <button type="button" style={{ padding: "8px 12px", border: "1px solid #64748b", borderRadius: 8, margin: "8px 8px 0 0" }} disabled={solo.busy || busy} onClick={() => void solo.status()}>Check saved campaign</button>
+        {solo.session.state.phase === "final_result" && !solo.session.held && <>
+          <button type="button" style={{ padding: "8px 12px", border: "1px solid #64748b", borderRadius: 8, margin: "8px 8px 0 0" }} disabled={solo.busy || busy} onClick={() => void finishCampaign(solo.session!.state.results, solo.session!)}>Open saved reward</button>
+          <button type="button" style={{ padding: "8px 12px", border: "1px solid #34d399", borderRadius: 8, marginTop: 8 }} disabled={solo.busy || busy} onClick={() => void solo.shareCompletion()}>Share saved completion</button>
+        </>}
+      </div>}
 
       {/* Official Rules Modal */}
       {showRules && (
@@ -1342,7 +1299,16 @@ setPlayerHp(MAX_HP); setEnemyHp(MAX_HP); setCurrentRound(0); setRoundLog([]); se
 
               {/* Primary action row */}
               <div style={{ display:'flex', gap:10, flexWrap:'wrap', alignItems:'center', justifyContent:'center', marginBottom:14 }}>
-                <button onClick={startCampaign} disabled={team.length<TEAM_SIZE||busy||balance<fwCost}
+                {solo.enabled && <div style={{ flexBasis: "100%", maxWidth: 600, padding: 16, border: "1px solid rgba(52,211,153,0.35)", background: "rgba(0,0,0,0.5)", borderRadius: 12, marginBottom: 4, textAlign: "left" }}>
+                  <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 14, fontWeight: 700 }}>
+                    <input type="checkbox" checked={solo.sharing} disabled={!solo.connected || !!solo.session || solo.busy}
+                      onChange={event => solo.setSharing(event.target.checked)} />
+                    Share this solo campaign with my connected Rebel
+                  </label>
+                  <p role="status" style={{ fontSize: 12, color: "#cbd5e1", margin: "8px 0", lineHeight: 1.5 }}>{solo.message}</p>
+                  <button type="button" style={{ padding: "7px 12px", border: "1px solid #64748b", borderRadius: 8, fontSize: 12 }} disabled={solo.busy} onClick={() => void solo.status()}>Check saved campaign</button>
+                </div>}
+                <button onClick={startCampaign} disabled={team.length<TEAM_SIZE||busy||balance<fwCost||solo.requiresSavedCheck||solo.sharing&&(solo.busy||solo.uncertain)}
                   style={{ minWidth:280, height:48, padding:'0 28px', fontSize:13, fontWeight:900, letterSpacing:'0.1em', textTransform:'uppercase',
                     display:'inline-flex', alignItems:'center', justifyContent:'center', borderRadius:24, border:'1px solid rgba(251,191,36,0.4)',
                     background:team.length<TEAM_SIZE||busy||balance<fwCost?'rgba(255,255,255,0.05)':'linear-gradient(135deg,rgba(251,191,36,0.25),rgba(248,113,113,0.25))',
@@ -1643,10 +1609,14 @@ setPlayerHp(MAX_HP); setEnemyHp(MAX_HP); setCurrentRound(0); setRoundLog([]); se
                           if (healBusy||busy||playerHp>=MAX_HP||healUsed>=maxHeals) return;
                           if (balance < healCost) return;
                           setHealBusy(true);
-                          try { await spend(healCost,"faction-wars"); const newHp=Math.min(MAX_HP,playerHp+healAmt); setPlayerHp(newHp); setHealUsed(n=>n+1); await refresh(); } catch {}
+                          try {
+                            if (solo.session && !solo.session.abandoned) applySolo(await solo.act({ kind: "HEAL" }, healCost));
+                            else { await spend(healCost,"faction-wars"); const newHp=Math.min(MAX_HP,playerHp+healAmt); setPlayerHp(newHp); setHealUsed(n=>n+1); }
+                            await refresh();
+                          } catch (error) { setRunMessage((error as Error).message); }
                           setHealBusy(false);
                         }}
-                        disabled={healBusy||busy||playerHp>=MAX_HP||balance<Number(cfg?.factionWarsHealCost??25)||healUsed>=Number(cfg?.factionWarsHealMax??2)}
+                        disabled={healBusy||busy||!!solo.session&&(solo.busy||solo.uncertain)||playerHp>=MAX_HP||balance<Number(cfg?.factionWarsHealCost??25)||healUsed>=Number(cfg?.factionWarsHealMax??2)}
                         title={`Spend ${healCost} REBEL to restore ${healAmt} HP`}
                         style={{ display:"flex", alignItems:"center", gap:6, padding:"6px 14px", borderRadius:20, border:"1px solid rgba(52,211,153,0.3)", background:"rgba(52,211,153,0.1)", color:"#34d399", fontSize:11, fontWeight:800, cursor:healBusy||busy||playerHp>=MAX_HP||balance<Number(cfg?.factionWarsHealCost??25)?"not-allowed":"pointer", opacity:healBusy||busy||playerHp>=MAX_HP||balance<Number(cfg?.factionWarsHealCost??25)?0.4:1 }}>
                         🧪 Heal +{healAmt} HP
@@ -1708,7 +1678,7 @@ setPlayerHp(MAX_HP); setEnemyHp(MAX_HP); setCurrentRound(0); setRoundLog([]); se
                   })}
                   </div>
 
-                  <button onClick={fightTerritory} disabled={!selectedMove||busy}
+                  <button onClick={fightTerritory} disabled={!selectedMove||busy||!!solo.session&&(solo.busy||solo.uncertain)}
                     style={{ marginTop:14, padding:"14px 24px", borderRadius:12, border:"none",
                       cursor:!selectedMove||busy?"not-allowed":"pointer",
                       background:selectedMove?"linear-gradient(135deg,#fbbf24,#f59e0b)":"rgba(255,255,255,0.06)",
@@ -1762,7 +1732,7 @@ setPlayerHp(MAX_HP); setEnemyHp(MAX_HP); setCurrentRound(0); setRoundLog([]); se
               <div style={{ display:"flex", gap:10, justifyContent:"center", marginBottom:20 }}>
                 {defenders.map((def,i)=>(<TerritoryBadge key={i} index={i} result={results[i]} isCurrent={false} defender={def} />))}
               </div>
-              <button onClick={nextTerritory}
+              <button onClick={nextTerritory} disabled={busy || !!solo.session && (solo.busy || solo.uncertain)}
                 style={{ padding:"12px 28px", borderRadius:12, border:"none", cursor:"pointer", background:currentTerritory+1<TERRITORY_COUNT?"linear-gradient(135deg,#fbbf24,#f59e0b)":"linear-gradient(135deg,#34d399,#059669)", color:"#000", fontWeight:900, fontSize:15 }}>
                 {currentTerritory+1<TERRITORY_COUNT?`⚔️ Next Territory (${currentTerritory+2}/${TERRITORY_COUNT})`:"🏁 See Final Results"}
               </button>

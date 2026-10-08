@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createPlaygroundPlayerConnection } from "../../../lib/server/raap-player-connection";
 import { readPlaygroundCompletedExperience } from "../../../lib/server/raap-fwpvp-experience";
+import { readSoloCompletedExperience } from "../../../lib/server/raap-fwsolo";
 import { configuredPlaygroundMatchSource, deliverPlaygroundMatchFact } from "../../../lib/server/raap-match-source";
 
 export const config = { api: { bodyParser: false } };
@@ -24,17 +25,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const chunks: Buffer[] = []; let size = 0;
     for await (const chunk of req) { size += chunk.length; if (size > 1024) return res.status(413).end(); chunks.push(Buffer.from(chunk)); }
     const body = JSON.parse(new TextDecoder("utf8", { fatal: true }).decode(Buffer.concat(chunks)));
-    if (!body || Object.keys(body).sort().join() !== "challengeId,playerId" ||
+    if (!body || (Object.keys(body).sort().join() !== "challengeId,playerId" && Object.keys(body).sort().join() !== "challengeId,mode,playerId") ||
       typeof body.challengeId !== "string" || !/^[a-z0-9]{12}$/.test(body.challengeId) || typeof body.playerId !== "string" || body.playerId.length > 64) throw Error();
+    const mode = body.mode ?? "PVP";
+    if (mode !== "PVP" && mode !== "SOLO") throw Error();
     const headers = new Headers();
     for (const [key, value] of Object.entries(req.headers)) { if (Array.isArray(value)) throw Error(); if (value !== undefined) headers.set(key, value); }
     connection = createPlaygroundPlayerConnection({ raapOrigin, playgroundOrigin, validUntil, now,
       key: Buffer.from(keys[0]!, "hex"), handoffKey: Buffer.from(keys[1]!, "hex"), cookieKey: Buffer.from(keys[2]!, "hex") });
     const selection = await connection.authenticatePlayer(new Request(playgroundOrigin + req.url, { method: "POST", headers }), body.playerId);
     const { redis } = await import("../../../lib/server/redis.js");
-    const snapshot = await readPlaygroundCompletedExperience({ challengeId: body.challengeId, playerId: body.playerId, selection, now, store: redis });
+    const snapshot = await (mode === "SOLO" ? readSoloCompletedExperience : readPlaygroundCompletedExperience)({ challengeId: body.challengeId, playerId: body.playerId, selection, now, store: redis });
     source = configuredPlaygroundMatchSource(process.env, redis, true);
-    const fact = source ? await source.issue(body.challengeId, body.playerId, selection.selectionId) : undefined;
+    const fact = source ? await source.issue(body.challengeId, body.playerId, selection.selectionId, mode) : undefined;
     let history: { status: "RECORDED" | "NOT_CONFIRMED"; lifeRecorded: boolean } | undefined;
     if (fact && source && process.env.RAAP_REBEL_MATCH_DELIVERY_ENABLED === "true") {
       try { history = await deliverPlaygroundMatchFact({ raapOrigin,

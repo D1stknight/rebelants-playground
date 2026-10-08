@@ -1,5 +1,6 @@
 import { createHash, createPrivateKey, createPublicKey, randomBytes, sign, verify } from "node:crypto";
-import { readPlaygroundCompletedExperience, type PlaygroundCompletedExperience } from "./raap-fwpvp-experience";
+import { readPlaygroundCompletedExperience } from "./raap-fwpvp-experience";
+import { readSoloCompletedExperience, soloResultKeys } from "./raap-fwsolo";
 import type { PlaygroundRebelSelection } from "./raap-rebel-selection";
 import { createPlaygroundRebelSelectionReader } from "./raap-rebel-selection";
 
@@ -9,7 +10,7 @@ export interface PlaygroundMatchFact {
   schema: "rebel.playground.completed-experience.v1";
   issuerId: "rebel.playground";
   keyId: string;
-  snapshot: PlaygroundCompletedExperience;
+  snapshot: Awaited<ReturnType<typeof readPlaygroundCompletedExperience>> | Awaited<ReturnType<typeof readSoloCompletedExperience>>;
   observedAt: number;
   signature: `0x${string}`;
 }
@@ -17,7 +18,10 @@ type Store = {
   get<T>(key: string): Promise<T | null>;
   eval(script: string, keys: string[], args: (string | number)[]): Promise<unknown>;
 };
-type Saved = { challengeId: string; playerId: string; selection: PlaygroundRebelSelection; fact: PlaygroundMatchFact };
+type Mode = "PVP" | "SOLO";
+const readerFor = (mode: Mode) => mode === "SOLO" ? readSoloCompletedExperience : readPlaygroundCompletedExperience;
+const keysFor = (id: string, mode: Mode) => mode === "SOLO" ? soloResultKeys(id) : [`ra:fwpvp:match:${id}`, `ra:raap:fwpvp:experience:${id}`];
+type Saved = { mode?: Mode; challengeId: string; playerId: string; selection: PlaygroundRebelSelection; fact: PlaygroundMatchFact };
 const deny = (): never => { throw Error("PLAYGROUND_MATCH_SOURCE_UNAVAILABLE"); };
 const factKey = (digest: string) => `ra:raap:match-fact:${digest}`;
 function canonical(value: any): string {
@@ -67,11 +71,11 @@ export function createPlaygroundMatchSource(options: {
     if (!Number.isSafeInteger(at) || at < options.activatedAt || at >= options.validUntil) deny();
     return at;
   }
-  async function observe(challengeId: string, playerId: string, selectionId: string) {
-    fresh();
+  async function observe(challengeId: string, playerId: string, selectionId: string, mode: Mode) {
+    fresh(); if (mode !== "PVP" && mode !== "SOLO") deny();
     const selection = await options.selection(selectionId);
     if (selection.selectionId !== selectionId) deny();
-    const snapshot = await readPlaygroundCompletedExperience({ challengeId, playerId, selection, now: options.now, store: options.store });
+    const snapshot = await readerFor(mode)({ challengeId, playerId, selection, now: options.now, store: options.store });
     if (snapshot.completedAt < options.activatedAt) deny();
     fresh(); return { snapshot, selection };
   }
@@ -80,6 +84,7 @@ export function createPlaygroundMatchSource(options: {
     if (!raw || Buffer.byteLength(raw) > 8192) deny();
     const result = JSON.parse(raw) as Saved, fact = result?.fact;
     if (!fact || fact.schema !== "rebel.playground.completed-experience.v1" || fact.issuerId !== "rebel.playground" ||
+      (result.mode ?? "PVP") !== fact.snapshot?.mode || !["PVP", "SOLO"].includes(fact.snapshot?.mode) ||
       fact.keyId !== options.keyId || !Number.isSafeInteger(fact.observedAt) || fact.observedAt < options.activatedAt ||
       fact.observedAt > fresh() || !/^0x[0-9a-f]{128}$/.test(fact.signature) ||
       !verify(null, signingBytes(fact), publicKey, Buffer.from(fact.signature.slice(2), "hex"))) deny();
@@ -96,15 +101,15 @@ export function createPlaygroundMatchSource(options: {
       return { request, signature: "0x" + sign(null,
         Buffer.from(canonical({ domain: "rebel.playground.experience-delivery.v1", request })), key!).toString("hex") };
     },
-    async issue(challengeId: string, playerId: string, selectionId: string) {
+    async issue(challengeId: string, playerId: string, selectionId: string, mode: Mode = "PVP") {
       if (!key) deny();
-      const { snapshot, selection } = await observe(challengeId, playerId, selectionId);
+      const { snapshot, selection } = await observe(challengeId, playerId, selectionId, mode);
       const fact: PlaygroundMatchFact = { schema: "rebel.playground.completed-experience.v1", issuerId: "rebel.playground",
         keyId: options.keyId, snapshot, observedAt: fresh(), signature: `0x${"00".repeat(64)}` };
       fact.signature = `0x${sign(null, signingBytes(fact), key!).toString("hex")}`;
       // Obtain original bytes again; a changed observation is not re-signed.
       const pair = await options.store.eval("return {redis.call('GET', KEYS[1]) or '', redis.call('GET', KEYS[2]) or ''}",
-        [`ra:fwpvp:match:${challengeId}`, `ra:raap:fwpvp:experience:${challengeId}`], []);
+        keysFor(challengeId, mode), []);
       if (!Array.isArray(pair) || pair.length !== 2) deny();
       const [game, evidence] = pair as [unknown, unknown];
       const gameRaw = typeof game === "string" ? game : JSON.stringify(game);
@@ -114,12 +119,12 @@ export function createPlaygroundMatchSource(options: {
       const record = JSON.parse(raw);
       if ("0x" + createHash("sha256").update(gameRaw).digest("hex") !== record.matchDigest) deny();
       const result = saved(await options.store.eval(SAVE_FACT,
-        [`ra:fwpvp:match:${challengeId}`, `ra:raap:fwpvp:experience:${challengeId}`, factKey(snapshot.sourceActivityDigest)],
-        [gameRaw, raw, JSON.stringify({ challengeId, playerId, selection, fact }), options.validUntil - fresh()]));
+        [...keysFor(challengeId, mode), factKey(snapshot.sourceActivityDigest)],
+        [gameRaw, raw, JSON.stringify({ mode, challengeId, playerId, selection, fact }), options.validUntil - fresh()]));
       if (result.challengeId !== challengeId || result.playerId !== playerId || canonical(result.fact.snapshot) !== canonical(snapshot)) deny();
       // Recheck the stored game result after the claim. RAAP independently checks
       // current ownership/consent before history delivery; this is only a fact.
-      if (canonical(await readPlaygroundCompletedExperience({ challengeId, playerId, selection,
+      if (canonical(await readerFor(mode)({ challengeId, playerId, selection,
         now: options.now, store: options.store })) !== canonical(snapshot)) deny();
       fresh();
       return result.fact;
@@ -130,7 +135,7 @@ export function createPlaygroundMatchSource(options: {
       if (!raw) return undefined;
       const result = saved(raw);
       if (result.fact.snapshot.sourceActivityDigest !== sourceActivityDigest ||
-        canonical(await readPlaygroundCompletedExperience({ challengeId: result.challengeId, playerId: result.playerId,
+        canonical(await readerFor(result.mode ?? "PVP")({ challengeId: result.challengeId, playerId: result.playerId,
           selection: result.selection, now: options.now, store: options.store })) !== canonical(result.fact.snapshot)) deny();
       // The retained selection is historical attribution, not current consent.
       // Reading evidence does not call back to RAAP or consume more owner RPCs.
