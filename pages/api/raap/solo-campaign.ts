@@ -10,7 +10,7 @@ export const config = { api: { bodyParser: false }, maxDuration: 60 };
 const fields = (value: object, expected: string) => Object.keys(value).sort().join() === expected.split(",").sort().join();
 const view = (session: SoloSession | null) => session && ({ id: session.id, revision: session.revision,
   playerId: session.playerId, state: session.state, config: session.config, validUntil: session.validUntil,
-  held: session.pending !== null, abandoned: session.abandoned,
+  held: session.pending !== null, abandoned: session.abandoned, raapActionCount: session.raapActionCount ?? 0,
   pointDisplayUnconfirmed: session.pointDisplayUnconfirmed === true,
   selectedRebel: session.selected.asset.tokenId });
 

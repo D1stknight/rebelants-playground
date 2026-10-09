@@ -1235,10 +1235,12 @@ setPlayerHp(MAX_HP); setEnemyHp(MAX_HP); setCurrentRound(0); setRoundLog([]); se
       {solo.enabled && solo.session && <div style={{ position: "relative", zIndex: 2, maxWidth: 900, margin: "0 auto", padding: 16,
         background: "rgba(0,0,0,0.65)", borderBottom: "1px solid rgba(52,211,153,0.3)" }}>
         <p role="status">{solo.message}</p>
+        <p>Solo campaign reference: <strong>{solo.session.id}</strong></p>
+        {!!solo.session.raapActionCount && <p>This campaign includes Rebel actions. Its saved actions are in RAAP; the human-only completion reward does not apply.</p>}
         <button type="button" style={{ padding: "8px 12px", border: "1px solid #64748b", borderRadius: 8, margin: "8px 8px 0 0" }} disabled={solo.busy || busy} onClick={() => void solo.status()}>Check saved campaign</button>
         {solo.session.state.phase === "final_result" && !solo.session.held && <>
           <button type="button" style={{ padding: "8px 12px", border: "1px solid #64748b", borderRadius: 8, margin: "8px 8px 0 0" }} disabled={solo.busy || busy} onClick={() => void finishCampaign(solo.session!.state.results, solo.session!)}>Open saved reward</button>
-          <button type="button" style={{ padding: "8px 12px", border: "1px solid #34d399", borderRadius: 8, marginTop: 8 }} disabled={solo.busy || busy} onClick={() => void solo.shareCompletion()}>Share saved completion</button>
+          <button type="button" style={{ padding: "8px 12px", border: "1px solid #34d399", borderRadius: 8, marginTop: 8 }} disabled={solo.busy || busy || !!solo.session.raapActionCount} onClick={() => void solo.shareCompletion()}>Share saved completion</button>
         </>}
       </div>}
 

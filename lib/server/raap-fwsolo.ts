@@ -5,18 +5,20 @@ import type { FactionId } from "../factionWarsSoloRules";
 import type { PlaygroundRebelSelection } from "./raap-rebel-selection";
 import { createPlaygroundPointEffects } from "./raap-pvp-point-effects";
 
+import { soloDigest, soloCommandKey, soloCanonical, soloActionRecord, parseSoloActionRecord, type SoloReviewedCommand } from "./raap-solo-protocol";
+
 type Store = { get<T>(key: string): Promise<T | null>; eval(script: string, keys: string[], args: (string | number)[]): Promise<unknown> };
 type Selected = Pick<PlaygroundRebelSelection, "selectionId" | "controller" | "controllerEpoch" | "validAfter" | "validUntil" | "asset">;
 export interface SoloSession {
   schema: "rebel.playground.solo-session.v1"; id: string; playerId: string;
   selected: Selected; createdAt: number; validUntil: number; config: SoloConfig;
   revision: number; state: SoloCampaign; abandoned: boolean;
-  pending: null | { commandId: string; requestId: string; after: SoloCampaign; effects: SoloPointEffect[] };
-  lastCommandId: string; pointDisplayUnconfirmed?: boolean;
+  pending: null | { commandId: string; requestId: string; after: SoloCampaign; effects: SoloPointEffect[]; review?: SoloReviewedCommand };
+  lastCommandId: string; pointDisplayUnconfirmed?: boolean; raapActionCount?: number;
 }
 export interface SoloExperience {
   schema: "rebel.playground.solo-experience.v1"; intact: true; matchDigest: string;
-  campaignId: string; playerId: string; selected: Selected; completedAt: number;
+  campaignId: string; playerId: string; selected: Selected; completedAt: number; raapActionCount?: number;
 }
 const hash = (value: string) => "0x" + createHash("sha256").update(value).digest("hex");
 const sessionKey = (id: string) => `ra:raap:fwsolo:session:${id}`;
@@ -37,7 +39,9 @@ redis.call('SET', KEYS[1], ARGV[2]); return 1
 `;
 const COMMIT = `
 if redis.call('GET', KEYS[1]) ~= ARGV[1] then return 0 end
+if #KEYS == 5 and redis.call('GET', KEYS[5]) ~= ARGV[8] then return 0 end
 redis.call('SET', KEYS[1], ARGV[2])
+if #KEYS == 5 then redis.call('SET', KEYS[5], ARGV[9]) end
 if ARGV[3] ~= '' then
   redis.call('SET', KEYS[3], ARGV[3], 'EX', ARGV[5])
   redis.call('SET', KEYS[4], ARGV[4], 'EX', ARGV[5])
@@ -49,7 +53,15 @@ end
 return 1
 `;
 
-/** Only the configured same-origin human route may call this service. The
+const CLAIM_REVIEW = `
+local prior = redis.call('GET', KEYS[2]); if prior then return prior end
+if redis.call('GET', KEYS[1]) ~= ARGV[1] then
+  redis.call('SET', KEYS[2], ARGV[4]); return ARGV[4]
+end
+redis.call('SET', KEYS[1], ARGV[2]); redis.call('SET', KEYS[2], ARGV[3]); return 'CLAIMED'
+`;
+
+/** Only the configured authenticated human or exact RAAP route may call this service. The
  * callback must be the existing Economy adapter, with its exact stable key.
  * No background task, auto-retry, second player or new Economy role is used. */
 export function createSoloCampaignService(input: {
@@ -95,16 +107,18 @@ export function createSoloCampaignService(input: {
     // This is the only invocation that may settle a newly claimed command.
     // A repeated POST/READ returns its saved record and never calls settle.
     const after = { ...s, state: pending.after, revision: s.revision + 1,
+      ...(pending.review ? { raapActionCount: (s.raapActionCount ?? 0) + 1 } : {}),
       pending: null, lastCommandId: pending.requestId, ...(pointDisplayUnconfirmed ? { pointDisplayUnconfirmed: true } : {}) };
     const at = fresh(), completed = after.state.phase === "final_result";
     const result = completed ? JSON.stringify({ schema: "rebel.playground.solo-result.v1", campaignId: s.id,
       playerId: s.playerId, moves: after.state.moves, results: after.state.results.map(r => ({ territory: r.territory, won: r.won })),
       rarity: after.state.rarity, completedAt: at, stateDigest: hash(JSON.stringify(after.state)) }) : "";
     const evidence: SoloExperience | undefined = completed ? { schema: "rebel.playground.solo-experience.v1",
-      intact: true, matchDigest: hash(result), campaignId: s.id, playerId: s.playerId, selected: s.selected, completedAt: at } : undefined;
+      intact: true, matchDigest: hash(result), campaignId: s.id, playerId: s.playerId, selected: s.selected, completedAt: at, ...(after.raapActionCount ? { raapActionCount: after.raapActionCount } : {}) } : undefined;
     const ttl = Math.max(1, Math.min(7 * 86400, input.validUntil - at));
-    const saved = await input.store.eval(COMMIT, [sessionKey(s.id), activeKey(s.playerId), ...soloResultKeys(s.id)],
-      [before, JSON.stringify(after), result, evidence ? JSON.stringify(evidence) : "", ttl, completed ? "1" : "0", s.id]);
+    const saved = await input.store.eval(COMMIT, [sessionKey(s.id), activeKey(s.playerId), ...soloResultKeys(s.id), ...(pending.review ? [soloCommandKey(pending.review.commandId)] : [])],
+      [before, JSON.stringify(after), result, evidence ? JSON.stringify(evidence) : "", ttl, completed ? "1" : "0", s.id,
+        ...(pending.review ? [JSON.stringify(soloActionRecord(pending.review)), JSON.stringify(soloActionRecord(pending.review, after, at * 1000))] : [])]);
     if (saved !== 1) unavailable();
     return after;
   }
@@ -139,10 +153,35 @@ export function createSoloCampaignService(input: {
       if (value !== "CLAIMED") return parse(value, request.playerId);
       return settle(session);
     },
-    async act(request: { playerId: string; id: string; revision: number; commandId: string; command: SoloCommand; maximumDebit: number }) {
+    async act(request: { playerId: string; id: string; revision: number; commandId: string; command: SoloCommand; maximumDebit: number }, review?: SoloReviewedCommand) {
       fresh(); commandId(request.commandId);
       const s = await this.read(request.playerId, request.id);
-      if (!s || s.abandoned) unavailable();
+      if (!s) unavailable();
+      if (review) {
+        const prior = await input.store.get(soloCommandKey(review.commandId));
+        if (prior) {
+          if (soloCanonical(parseSoloActionRecord(prior).request) !== soloCanonical(review)) unavailable();
+          return s;
+        }
+        if (review.commandId !== request.commandId || review.challengeId !== s.id || review.revision !== request.revision ||
+          soloCanonical(review.action) !== soloCanonical(request.command) || review.maximumAdditionalPoints !== request.maximumDebit ||
+          review.controller !== s.selected.controller || review.epoch !== s.selected.controllerEpoch ||
+          s.selected.asset.sourceChainId !== "1" || review.asset.chainId !== 1 || review.asset.collection !== s.selected.asset.collection || review.asset.tokenId !== s.selected.asset.tokenId || fresh() * 1000 < review.issuedAt || fresh() * 1000 >= review.validUntil ||
+          review.validUntil > Math.min(input.validUntil, s.validUntil, s.selected.validUntil) * 1000 || review.validUntil - review.issuedAt > 300000) unavailable();
+        // A human may win between the route's read and this second read. Save
+        // a conclusive no-effect result instead of leaving an absent receipt.
+        if (s.abandoned || s.pending || review.revision !== s.revision || review.stateCommitment !== soloDigest(s) ||
+          review.configurationCommitment !== soloDigest(s.config)) {
+          const record = soloActionRecord(review);
+          record.receipt = { ...record.receipt, status: "DECLINED", after: review.stateCommitment,
+            additionalPoints: 0, committedAt: fresh() * 1000 };
+          const saved = await input.store.eval("local old=redis.call('GET',KEYS[1]); if old then return old end; redis.call('SET',KEYS[1],ARGV[1]); return ARGV[1]",
+            [soloCommandKey(review.commandId)], [JSON.stringify(record)]);
+          if (soloCanonical(parseSoloActionRecord(saved).request) !== soloCanonical(review)) unavailable();
+          return s;
+        }
+      }
+      if (s.abandoned) unavailable();
       if (s.pending || s.lastCommandId === request.commandId) return s;
       if (fresh() >= s.validUntil || request.revision !== s.revision || s.state.phase === "final_result") unavailable();
       const { state, effects } = advanceSoloCampaign(s.state, request.command, s.config, draw);
@@ -150,10 +189,16 @@ export function createSoloCampaignService(input: {
       if (request.maximumDebit !== debit) throw Error("SOLO_PRICE_CHANGED");
       const next: SoloSession = { ...s, pending: {
         commandId: hash(JSON.stringify(["rebel.playground.solo-command.v1", s.id, s.revision, request.commandId])),
-        requestId: request.commandId, after: state, effects } };
+        requestId: request.commandId, after: state, effects, ...(review ? { review: structuredClone(review) } : {}) } };
       if (Buffer.byteLength(JSON.stringify(next)) > 524288) throw Error("SOLO_RECORD_LIMIT");
-      const claimed = await input.store.eval(CLAIM, [sessionKey(s.id)], [JSON.stringify(s), JSON.stringify(next)]);
-      if (claimed !== 1) return this.read(request.playerId, request.id);
+      const record = review && soloActionRecord(review);
+      const declined = record && { ...record, receipt: { ...record.receipt, status: "DECLINED", after: review!.stateCommitment,
+        additionalPoints: 0, committedAt: fresh() * 1000 } };
+      const claimed = review
+        ? await input.store.eval(CLAIM_REVIEW, [sessionKey(s.id), soloCommandKey(review.commandId)],
+          [JSON.stringify(s), JSON.stringify(next), JSON.stringify(record), JSON.stringify(declined)])
+        : await input.store.eval(CLAIM, [sessionKey(s.id)], [JSON.stringify(s), JSON.stringify(next)]);
+      if (claimed !== (review ? "CLAIMED" : 1)) return this.read(request.playerId, request.id);
       return settle(next);
     },
     async abandon(playerId: string, id: string, revision: number) {
@@ -201,7 +246,9 @@ export async function readSoloCompletedExperience(input: {
   if (game.schema !== "rebel.playground.solo-result.v1" || evidence.schema !== "rebel.playground.solo-experience.v1" ||
     game.campaignId !== input.challengeId || evidence.campaignId !== input.challengeId ||
     game.playerId !== input.playerId || evidence.playerId !== input.playerId ||
-    evidence.intact !== true || evidence.matchDigest !== hash(gameRaw) || game.completedAt !== evidence.completedAt ||
+    // The existing public reward rule is specifically owner-played. Never label
+    // a campaign containing RAAP actions as wholly human-played.
+    (evidence.raapActionCount ?? 0) !== 0 || evidence.intact !== true || evidence.matchDigest !== hash(gameRaw) || game.completedAt !== evidence.completedAt ||
     !Number.isSafeInteger(game.completedAt) || game.completedAt > at || game.completedAt < s.validAfter ||
     game.completedAt >= s.validUntil || at >= s.validUntil || s.status !== "ACTIVE" || s.publicExperienceConsent !== true ||
     evidence.selected.selectionId !== s.selectionId || evidence.selected.controller !== s.controller ||

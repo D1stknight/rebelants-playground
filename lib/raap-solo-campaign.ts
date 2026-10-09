@@ -3,7 +3,7 @@ import type { SoloCampaign, SoloCommand, SoloConfig } from "./factionWarsSoloCam
 import type { FactionId } from "./factionWarsSoloRules";
 
 export interface SoloView { id: string; playerId: string; revision: number; state: SoloCampaign;
-  config: SoloConfig; held: boolean; abandoned: boolean; validUntil: number; selectedRebel: string; pointDisplayUnconfirmed?: boolean }
+  config: SoloConfig; held: boolean; abandoned: boolean; validUntil: number; selectedRebel: string; pointDisplayUnconfirmed?: boolean; raapActionCount?: number }
 const enabled = process.env.NEXT_PUBLIC_RAAP_SOLO_ENABLED === "true";
 const newId = () => "0x" + Array.from(crypto.getRandomValues(new Uint8Array(32)), b => b.toString(16).padStart(2, "0")).join("");
 async function campaignId(playerId: string, commandId: string) {
@@ -126,6 +126,7 @@ export function useSoloCampaign(playerId: string) {
     async shareCompletion() {
       const s = current.current, actor = playerId;
       if (!s || s.held || s.state.phase !== "final_result") return;
+      if (s.raapActionCount) { setMessage("This campaign includes Rebel actions. Its saved actions remain available in RAAP; the human-only completion reward does not apply."); return; }
       try {
         const response = await fetch("/api/raap/match-experience", { method: "POST", headers: { "content-type": "application/json" },
           credentials: "same-origin", redirect: "error", cache: "no-store", signal: AbortSignal.timeout(55000),
