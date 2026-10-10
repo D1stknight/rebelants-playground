@@ -480,6 +480,18 @@ export default function FactionWars() {
   }, []);
 
   const { balance, spend, earn, refresh, totalEarnRoom, devGrant } = usePoints(effectivePlayerId);
+  const [checkingSavedCampaign, setCheckingSavedCampaign] = useState(false);
+  const [campaignBalanceMessage, setCampaignBalanceMessage] = useState("");
+  const checkingCampaignRef = useRef(false);
+  const checkSavedCampaign = async () => {
+    if (checkingCampaignRef.current || solo.busy || busy) return;
+    checkingCampaignRef.current = true; setCheckingSavedCampaign(true); setBusy(true); setCampaignBalanceMessage("");
+    try {
+      const saved = await solo.status();
+      if (saved) await refresh();
+    } catch { setCampaignBalanceMessage("The point balance could not be refreshed. Check saved campaign again; no action is repeated."); }
+    finally { checkingCampaignRef.current = false; setCheckingSavedCampaign(false); setBusy(false); }
+  };
   const lastPidRef = useRef<string>("");
   useEffect(() => { if (!effectivePlayerId||lastPidRef.current===effectivePlayerId) return; lastPidRef.current=effectivePlayerId; refresh().catch(()=>{}); }, [effectivePlayerId, refresh]);
 
@@ -1234,10 +1246,10 @@ setPlayerHp(MAX_HP); setEnemyHp(MAX_HP); setCurrentRound(0); setRoundLog([]); se
 
       {solo.enabled && solo.session && <div style={{ position: "relative", zIndex: 2, maxWidth: 900, margin: "0 auto", padding: 16,
         background: "rgba(0,0,0,0.65)", borderBottom: "1px solid rgba(52,211,153,0.3)" }}>
-        <p role="status">{solo.message}</p>
+        <p role="status">{campaignBalanceMessage || solo.message}</p>
         <p>Solo campaign reference: <strong>{solo.session.id}</strong></p>
         {!!solo.session.raapActionCount && <p>This campaign includes Rebel actions. Its saved actions are in RAAP; the human-only completion reward does not apply.</p>}
-        <button type="button" style={{ padding: "8px 12px", border: "1px solid #64748b", borderRadius: 8, margin: "8px 8px 0 0" }} disabled={solo.busy || busy} onClick={() => void solo.status()}>Check saved campaign</button>
+        <button type="button" style={{ padding: "8px 12px", border: "1px solid #64748b", borderRadius: 8, margin: "8px 8px 0 0" }} disabled={solo.busy || busy || checkingSavedCampaign} onClick={() => void checkSavedCampaign()}>{checkingSavedCampaign ? "Checking saved campaign…" : "Check saved campaign"}</button>
         {solo.session.state.phase === "final_result" && !solo.session.held && <>
           <button type="button" style={{ padding: "8px 12px", border: "1px solid #64748b", borderRadius: 8, margin: "8px 8px 0 0" }} disabled={solo.busy || busy} onClick={() => void finishCampaign(solo.session!.state.results, solo.session!)}>Open saved reward</button>
           <button type="button" style={{ padding: "8px 12px", border: "1px solid #34d399", borderRadius: 8, marginTop: 8 }} disabled={solo.busy || busy || !!solo.session.raapActionCount} onClick={() => void solo.shareCompletion()}>Share saved completion</button>
@@ -1307,8 +1319,8 @@ setPlayerHp(MAX_HP); setEnemyHp(MAX_HP); setCurrentRound(0); setRoundLog([]); se
                       onChange={event => solo.setSharing(event.target.checked)} />
                     Share this solo campaign with my connected Rebel
                   </label>
-                  <p role="status" style={{ fontSize: 12, color: "#cbd5e1", margin: "8px 0", lineHeight: 1.5 }}>{solo.message}</p>
-                  <button type="button" style={{ padding: "7px 12px", border: "1px solid #64748b", borderRadius: 8, fontSize: 12 }} disabled={solo.busy} onClick={() => void solo.status()}>Check saved campaign</button>
+                  <p role="status" style={{ fontSize: 12, color: "#cbd5e1", margin: "8px 0", lineHeight: 1.5 }}>{campaignBalanceMessage || solo.message}</p>
+                  <button type="button" style={{ padding: "7px 12px", border: "1px solid #64748b", borderRadius: 8, fontSize: 12 }} disabled={solo.busy || busy || checkingSavedCampaign} onClick={() => void checkSavedCampaign()}>{checkingSavedCampaign ? "Checking saved campaign…" : "Check saved campaign"}</button>
                 </div>}
                 <button onClick={startCampaign} disabled={team.length<TEAM_SIZE||busy||balance<fwCost||solo.requiresSavedCheck||solo.sharing&&(solo.busy||solo.uncertain)}
                   style={{ minWidth:280, height:48, padding:'0 28px', fontSize:13, fontWeight:900, letterSpacing:'0.1em', textTransform:'uppercase',
@@ -1405,7 +1417,7 @@ setPlayerHp(MAX_HP); setEnemyHp(MAX_HP); setCurrentRound(0); setRoundLog([]); se
                         <div style={{ minWidth:0 }}>
                           <div style={{ fontWeight:900, color:f.color, marginBottom:3, fontSize:12 }}>{f.name}</div>
                           <div style={{ opacity:0.75, marginBottom:2 }}>⚡ {f.passive}</div>
-                          <div style={{ opacity:0.55, fontSize:10 }}>{f.passiveDesc}</div>
+                          <div style={{ opacity:0.55, fontSize:10 }}>{f.id === "ashigaru" ? `Campaign costs 25 ${currency} less (${Math.max(0, fwCost - 25)} instead of ${fwCost}).` : f.passiveDesc}</div>
                         </div>
                       </div>
                     );})}
