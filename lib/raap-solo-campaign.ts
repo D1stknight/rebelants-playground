@@ -125,8 +125,9 @@ export function useSoloCampaign(playerId: string) {
     },
     async shareCompletion() {
       const s = current.current, actor = playerId;
-      if (!s || s.held || s.state.phase !== "final_result") return;
-      if (s.raapActionCount) { setMessage("This campaign includes Rebel actions. Its saved actions remain available in RAAP; the human-only completion reward does not apply."); return; }
+      if (!s || s.held || s.state.phase !== "final_result" || inFlight.current) return;
+      inFlight.current = true; setBusy(true);
+      setMessage("Saving this completed campaign to your Rebel’s history…");
       try {
         const response = await fetch("/api/raap/match-experience", { method: "POST", headers: { "content-type": "application/json" },
           credentials: "same-origin", redirect: "error", cache: "no-store", signal: AbortSignal.timeout(55000),
@@ -135,8 +136,11 @@ export function useSoloCampaign(playerId: string) {
         if (identity.current !== actor) return;
         setMessage(response.ok && value.history?.lifeRecorded === true
           ? "Your confirmed solo completion is saved in your Rebel's life."
+          : response.ok && value.history?.status === "EXPERIENCE_RECORDED" && value.history?.lifeRecorded === false
+          ? "Your shared campaign is saved in your Rebel's history with its approved actions. No additional XP or badge was awarded."
           : "Your campaign is saved. Sharing its completion with your Rebel is not confirmed yet.");
       } catch { if (identity.current === actor) setMessage("Your campaign is saved. Sharing its completion with your Rebel is not confirmed yet."); }
+      finally { inFlight.current = false; if (identity.current === actor) setBusy(false); }
     },
   };
 }

@@ -38,7 +38,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const snapshot = await (mode === "SOLO" ? readSoloCompletedExperience : readPlaygroundCompletedExperience)({ challengeId: body.challengeId, playerId: body.playerId, selection, now, store: redis });
     source = configuredPlaygroundMatchSource(process.env, redis, true);
     const fact = source ? await source.issue(body.challengeId, body.playerId, selection.selectionId, mode) : undefined;
-    let history: { status: "RECORDED" | "NOT_CONFIRMED"; lifeRecorded: boolean } | undefined;
+    let history: { status: "RECORDED" | "EXPERIENCE_RECORDED" | "NOT_CONFIRMED"; lifeRecorded: boolean } | undefined;
     if (fact && source && process.env.RAAP_REBEL_MATCH_DELIVERY_ENABLED === "true") {
       try { history = await deliverPlaygroundMatchFact({ raapOrigin,
         body: source.deliveryRequest(fact, playgroundOrigin) }); }

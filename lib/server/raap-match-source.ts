@@ -169,8 +169,8 @@ export async function deliverPlaygroundMatchFact(options: {
   if (!value || Object.keys(value).join() !== "data" || !data ||
     Object.keys(data).sort().join() !== "lifeRecorded,selectionId,sourceActivityDigest,status" ||
     data.selectionId !== p.selectionId || data.sourceActivityDigest !== p.sourceActivityDigest ||
-    data.status !== "RECORDED" && data.status !== "NOT_CONFIRMED" || data.lifeRecorded !== (data.status === "RECORDED")) deny();
-  return data as { selectionId: string; sourceActivityDigest: string; status: "RECORDED" | "NOT_CONFIRMED"; lifeRecorded: boolean };
+    data.status !== "RECORDED" && data.status !== "EXPERIENCE_RECORDED" && data.status !== "NOT_CONFIRMED" || data.lifeRecorded !== (data.status === "RECORDED")) deny();
+  return data as { selectionId: string; sourceActivityDigest: string; status: "RECORDED" | "EXPERIENCE_RECORDED" | "NOT_CONFIRMED"; lifeRecorded: boolean };
 }
 
 /** Optional production binding. No defaults and no live key is installed by

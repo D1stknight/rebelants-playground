@@ -246,9 +246,10 @@ export async function readSoloCompletedExperience(input: {
   if (game.schema !== "rebel.playground.solo-result.v1" || evidence.schema !== "rebel.playground.solo-experience.v1" ||
     game.campaignId !== input.challengeId || evidence.campaignId !== input.challengeId ||
     game.playerId !== input.playerId || evidence.playerId !== input.playerId ||
-    // The existing public reward rule is specifically owner-played. Never label
-    // a campaign containing RAAP actions as wholly human-played.
-    (evidence.raapActionCount ?? 0) !== 0 || evidence.intact !== true || evidence.matchDigest !== hash(gameRaw) || game.completedAt !== evidence.completedAt ||
+    // Attribution comes from the game's committed command count, never the
+    // browser. RAAP independently excludes shared play from owner-only rewards.
+    !Number.isSafeInteger(evidence.raapActionCount ?? 0) || (evidence.raapActionCount ?? 0) < 0 ||
+    evidence.intact !== true || evidence.matchDigest !== hash(gameRaw) || game.completedAt !== evidence.completedAt ||
     !Number.isSafeInteger(game.completedAt) || game.completedAt > at || game.completedAt < s.validAfter ||
     game.completedAt >= s.validUntil || at >= s.validUntil || s.status !== "ACTIVE" || s.publicExperienceConsent !== true ||
     evidence.selected.selectionId !== s.selectionId || evidence.selected.controller !== s.controller ||
@@ -256,10 +257,11 @@ export async function readSoloCompletedExperience(input: {
     JSON.stringify(evidence.selected.asset) !== JSON.stringify(s.asset) ||
     !Number.isSafeInteger(game.moves) || game.moves < 5 || !Array.isArray(game.results) || game.results.length !== 5 ||
     game.results.some((r: any, i: number) => r.territory !== i || typeof r.won !== "boolean")) unavailable();
+  const actor = (evidence.raapActionCount ?? 0) > 0 ? "OWNER_AND_REBEL" as const : "OWNER_PLAYED" as const;
   return { schema: "rebel.playground.completed-match-snapshot.v1" as const,
-    sourceActivityDigest: hash(JSON.stringify(["rebel.playground.solo-owner-completion.v1", input.challengeId, input.playerId])),
+    sourceActivityDigest: hash(JSON.stringify([actor === "OWNER_AND_REBEL" ? "rebel.playground.solo-shared-completion.v1" : "rebel.playground.solo-owner-completion.v1", input.challengeId, input.playerId])),
     evidenceDigest: hash(evidenceRaw), selectionId: s.selectionId, controllerEpoch: s.controllerEpoch, asset: structuredClone(s.asset),
-    gameId: "PLAYGROUND_FACTION_WARS" as const, mode: "SOLO" as const, actor: "OWNER_PLAYED" as const,
+    gameId: "PLAYGROUND_FACTION_WARS" as const, mode: "SOLO" as const, actor,
     completedAt: game.completedAt as number, completion: "PLAYED" as const,
     won: game.results.some((r: any) => r.won), lifeRecorded: false as const, rewardIssued: false as const };
 }
