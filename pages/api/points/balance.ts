@@ -3,6 +3,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
 import { pointsConfig as defaultPointsConfig } from "../../../lib/pointsConfig";
 import { resolveFromRequest, resolveByPlayerId, getVerifiedNameUser } from "../../../lib/economy";
+import { syncPurchasedPlays } from "../../../lib/server/purchasedPlays";
 
 function balKey(playerId: string) {
   return `ra:points:bal:${playerId}`;
@@ -62,6 +63,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // economy balance; guests (no Discord) see 0 until they sign in.
     const economyUser = (pid.startsWith("name:") ? await getVerifiedNameUser(req) : null) ?? (await resolveByPlayerId(pid)) ?? (await resolveFromRequest(req));
     const balance = economyUser ? economyUser.balance : 0;
+
+    // points bought in the Rebel Economy shop add bonus plays here (like the old APE packs did)
+    if (economyUser) await syncPurchasedPlays(pid, economyUser.userId).catch((e) => console.warn("bonus plays sync", e?.message || e));
 
        // ✅ Read the SAME key spend.ts writes to
     const spentRaw = await redis.get<number>(todayKey(pid));
