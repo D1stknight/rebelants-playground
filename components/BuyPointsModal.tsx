@@ -1,48 +1,13 @@
 // components/BuyPointsModal.tsx
-import React, { useMemo, useState, useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import {
-  useAccount,
-  useBalance,
-  useWriteContract,
-  useWaitForTransactionReceipt,
-  useChainId,
-  useSwitchChain,
-} from "wagmi";
-import { apeChain } from "../lib/apechain";
+import { useAccount, useSignMessage } from "wagmi";
 import { loadProfile, saveProfile } from "../lib/profile";
-import { useSignMessage } from "wagmi";
 
-const SHOP_ADDRESS = (process.env.NEXT_PUBLIC_APECHAIN_SHOP_ADDRESS || "").toLowerCase();
-
-const SHOP_ABI = [
-  {
-    type: "function",
-    name: "buyStarter",
-    stateMutability: "payable",
-    inputs: [],
-    outputs: [],
-  },
-  {
-    type: "function",
-    name: "buyValue",
-    stateMutability: "payable",
-    inputs: [],
-    outputs: [],
-  },
-  {
-    type: "function",
-    name: "buyWhale",
-    stateMutability: "payable",
-    inputs: [],
-    outputs: [],
-  },
-] as const;
-
-function toWei(ape: number) {
-  // APE has 18 decimals
-  return BigInt(Math.floor(ape * 1e6)) * 10n ** 12n; // safe-ish conversion for .xx
-}
+// Buying points (Oct 20): one shop for every Rebel Ants app, the Rebel Economy's (packs by card, in APE or
+// in ETH), opened in a new tab through /api/shop/open (signed in when we know the player). Points bought
+// there go to the Rebel account and add bonus plays here (lib/server/purchasedPlays.ts), as the old APE
+// packs did. The wallet stays here for prizes and payouts (Link Wallet).
 
 export default function BuyPointsModal({
   open,
@@ -84,118 +49,29 @@ useEffect(() => {
   );
 }, [address]);
   
-  const chainId = useChainId();
-  const { switchChainAsync } = useSwitchChain();
-  const { writeContractAsync, isPending } = useWriteContract();
-const { signMessageAsync } = useSignMessage();
+  const { signMessageAsync } = useSignMessage();
   const [status, setStatus] = useState<string>("");
-  const [lastTx, setLastTx] = useState<`0x${string}` | null>(null);
 
-  // when a tx is mined, we claim exactly once
-  const claimOnceRef = useRef<Record<string, boolean>>({});
-
-  // ✅ Live ApeChain balance
-  const {
-    data: apeBal,
-    refetch: refetchApeBal,
-    isFetching: fetchingBal,
-  } = useBalance({
-    address,
-    chainId: apeChain.id,
-    query: { enabled: !!address, refetchInterval: 15000 },
-  });
-
-  const isOnApeChain = chainId === apeChain.id;
-
-  // ✅ Track tx confirmation
-  const {
-    isLoading: confirmingTx,
-    isSuccess: txMined,
-  } = useWaitForTransactionReceipt({
-    hash: lastTx ?? undefined,
-    chainId: apeChain.id,
-    query: { enabled: !!lastTx },
-  });
-
-  // ✅ When mined, claim points (prevents “no logs yet” race)
+  // back from the shop's tab: read the balance and the bonus plays again (once per visit to the shop)
+  const shopOpened = useRef(false);
   useEffect(() => {
-    if (!lastTx) return;
-    if (!txMined) return;
-    if (!address) return;
+    if (typeof window === "undefined") return;
+    const back = () => {
+      if (!shopOpened.current || document.visibilityState === "hidden") return;
+      shopOpened.current = false;
+      setStatus("Welcome back: your points and bonus plays are up to date.");
+      void onClaimed();
+    };
+    window.addEventListener("focus", back);
+    document.addEventListener("visibilitychange", back);
+    return () => {
+      window.removeEventListener("focus", back);
+      document.removeEventListener("visibilitychange", back);
+    };
+  }, [onClaimed]);
 
-    const key = lastTx.toLowerCase();
-    if (claimOnceRef.current[key]) return;
-    claimOnceRef.current[key] = true;
-
-    (async () => {
-      try {
-        setStatus("Confirmed ✅ Claiming points…");
-
-        const r = await fetch("/api/shop/claim", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            txHash: lastTx,
-            playerId,
-            walletAddress: address,
-          }),
-        });
-
-        const j = await r.json().catch(() => null);
-
-        if (!r.ok) {
-          setStatus(`Claim failed: ${j?.error || "Unknown error"}`);
-          return;
-        }
-
-        if (j?.alreadyClaimed) {
-          setStatus("Already claimed ✅ Balance refreshed.");
-        } else {
-          setStatus("Success ✅ Points credited!");
-        }
-
-        await refetchApeBal();
-        await onClaimed();
-      } catch (e: any) {
-        setStatus(`Claim error: ${e?.message || "Unknown error"}`);
-      }
-    })();
-  }, [txMined, lastTx, address, playerId, onClaimed, refetchApeBal]);
-  const packs = useMemo(
-    () => [
-      { id: 1, name: "Starter Pack", ape: 50, points: 2500, fn: "buyStarter" as const },
-      { id: 2, name: "Value Pack", ape: 200, points: 11000, fn: "buyValue" as const },
-      { id: 3, name: "Whale Pack", ape: 1000, points: 60000, fn: "buyWhale" as const },
-    ],
-    []
-  );
-
-   async function buyPack(fnName: "buyStarter" | "buyValue" | "buyWhale", apeAmount: number) {
-    if (!SHOP_ADDRESS) {
-      setStatus("Missing NEXT_PUBLIC_APECHAIN_SHOP_ADDRESS (set it in Vercel env vars).");
-      return;
-    }
-    if (!address) {
-      setStatus("Connect a wallet first.");
-      return;
-    }
-
-    try {
-      setStatus("Sending transaction…");
-
-      const hash = await writeContractAsync({
-        address: SHOP_ADDRESS as `0x${string}`,
-        abi: SHOP_ABI,
-        functionName: fnName,
-        value: toWei(apeAmount),
-      });
-
-      setLastTx(hash);
-      setStatus("Transaction sent. Waiting for confirmation…");
-    } catch (e: any) {
-      setStatus(`Error: ${e?.shortMessage || e?.message || "Unknown error"}`);
-    }
-  }
+  const shopHref = () =>
+    typeof window === "undefined" ? "/api/shop/open" : "/api/shop/open?return=" + encodeURIComponent(location.pathname + location.search);
 
 async function linkWalletNow() {
   if (!address) {
@@ -307,127 +183,64 @@ if (typeof window !== "undefined") {
         }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-          <div style={{ fontWeight: 900, fontSize: 16 }}>Buy Points (APE → REBEL Points)</div>
+          <div style={{ fontWeight: 900, fontSize: 16 }}>Buy Rebel Points</div>
           <button className="btn" onClick={onClose} style={{ padding: "8px 12px" }}>
             Close
           </button>
         </div>
 
         <div style={{ marginTop: 10, fontSize: 13, opacity: 0.9, lineHeight: 1.5 }}>
-          Pay with APE on ApeChain. Points credit your Rebel account.<br />
-          Rate locked. No refunds. Lets you keep playing past the daily limit.
+          Packs by card, in APE or in ETH, in the Rebel Ants shop (the same one as After Dark and Rebel Universe).
+          Points go to your Rebel account and add bonus plays here: keep playing past the daily limit.
         </div>
 
-        <div style={{ marginTop: 12 }}>
-  <ConnectButton />
-</div>
+        <a
+          className="btn shop"
+          href={shopHref()}
+          target="_blank"
+          rel="noopener"
+          onClick={() => {
+            shopOpened.current = true;
+            setStatus("The shop opened in a new tab. Come back here when you are done.");
+          }}
+        >
+          Open the points shop
+        </a>
+
+        <div style={{ marginTop: 18, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,.12)", fontSize: 13, opacity: 0.9 }}>
+          <div style={{ fontWeight: 800, marginBottom: 6 }}>Wallet for prizes and payouts</div>
+          <ConnectButton />
+        </div>
 
         {isConnected && address ? (
-  <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-    <button
-      className="btn"
-      type="button"
-      onClick={linkWalletNow}
-      style={{ padding: "10px 12px", fontSize: 13 }}
-      title="One-time link: migrates guest points to wallet identity"
-    >
-      Link Wallet for Payments and Prizes
-    </button>
-
-    <span style={{ fontSize: 12, opacity: 0.85 }}>
-      This is one-time. After linking, your points follow this wallet.
-    </span>
-  </div>
-) : null}
-        
-        {/* ✅ INSERT THIS BLOCK RIGHT HERE */}
-<div style={{
-  marginTop: 10,
-  fontSize: 13,
-  opacity: 0.9,
-  display: "flex",
-  gap: 10,
-  flexWrap: "wrap",
-  alignItems: "center"
-}}>
-  <span>
-    Network:{" "}
-    {isConnected ? (
-      isOnApeChain ? (
-        <b>ApeChain ✅</b>
-      ) : (
-        <b style={{ color: "#fca5a5" }}>Wrong network ❌</b>
-      )
-    ) : (
-      <b>Not connected</b>
-    )}
-  </span>
-
-  {isConnected && !isOnApeChain && (
-    <button
-      className="btn"
-      type="button"
-      onClick={async () => {
-        setStatus("Switching to ApeChain…");
-        await switchChainAsync({ chainId: apeChain.id });
-        setStatus("");
-      }}
-      style={{ padding: "8px 12px", fontSize: 13 }}
-    >
-      Switch to ApeChain
-    </button>
-  )}
-
-  {address && (
-    <button
-      className="btn"
-      type="button"
-      onClick={async () => {
-        await navigator.clipboard.writeText(address);
-        setStatus("Wallet copied ✅");
-        setTimeout(() => setStatus(""), 1200);
-      }}
-      style={{ padding: "8px 12px", fontSize: 13 }}
-      title={address}
-    >
-      Copy Wallet
-    </button>
-  )}
-</div>        
-        
-<div style={{ marginTop: 10, fontSize: 13, opacity: 0.9 }}>
-  {address ? (
-    <>
-      APE Balance (live):{" "}
-      <b>
-        {apeBal ? Number(apeBal.formatted).toFixed(4) : "—"} {apeBal?.symbol || "APE"}
-      </b>
-      {fetchingBal ? " (updating…)" : ""}
-      {confirmingTx ? " (confirming tx…)" : ""}
-    </>
-  ) : (
-    "Connect your wallet to see your APE balance."
-  )}
-</div>
-
-        <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
-          {packs.map((p) => (
+          <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
             <button
-              key={p.id}
               className="btn"
-              disabled={!isConnected || !isOnApeChain || isPending || confirmingTx}
-              onClick={() => buyPack(p.fn, p.ape)}
-              style={{ padding: "12px 12px", textAlign: "left" }}
-              title={!isConnected ? "Connect wallet first" : ""}
+              type="button"
+              onClick={linkWalletNow}
+              style={{ padding: "10px 12px", fontSize: 13 }}
+              title="One-time link: migrates guest points to wallet identity"
             >
-              <div style={{ fontWeight: 900 }}>{p.name}</div>
-             <div style={{ fontSize: 13, opacity: 0.9 }}>
- Pay <b>{p.ape} APE</b> → get <b>{p.points.toLocaleString()} pts</b> +{" "}
-<b>more plays</b> (play past the daily limit)
-</div>
+              Link Wallet for Payments and Prizes
             </button>
-          ))}
-        </div>
+            <button
+              className="btn"
+              type="button"
+              onClick={async () => {
+                await navigator.clipboard.writeText(address);
+                setStatus("Wallet copied ✅");
+                setTimeout(() => setStatus(""), 1200);
+              }}
+              style={{ padding: "10px 12px", fontSize: 13 }}
+              title={address}
+            >
+              Copy Wallet
+            </button>
+            <span style={{ fontSize: 12, opacity: 0.85 }}>
+              This is one-time. After linking, your points follow this wallet.
+            </span>
+          </div>
+        ) : null}
 
         {status && (
           <div style={{ marginTop: 12, fontSize: 12, opacity: 0.9, whiteSpace: "pre-wrap" }}>{status}</div>
@@ -448,6 +261,20 @@ if (typeof window !== "undefined") {
           .btn:disabled {
             opacity: 0.55;
             cursor: not-allowed;
+          }
+          .shop {
+            display: block;
+            margin-top: 14px;
+            padding: 14px 12px;
+            text-align: center;
+            text-decoration: none;
+            font-size: 15px;
+            background: linear-gradient(135deg, #d4a017, #8a5e1a);
+            border-color: rgba(212, 160, 23, 0.6);
+            color: #070a12;
+          }
+          .shop:hover {
+            background: linear-gradient(135deg, #e0b02a, #9a6a1f);
           }
         `}</style>
       </div>
