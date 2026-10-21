@@ -269,3 +269,49 @@ export async function economyDebit(args: {
 export function idemKey(parts: Array<string | number>): string {
   return "pg:" + parts.join(":");
 }
+
+// ---- The Rebel Economy's points shop (Oct 20): packs by card, APE or ETH, one shop for every app ----
+
+export const ECONOMY_SHOP_URL = ECONOMY_BASE_URL + "/shop";
+
+export type EconomyPurchase = { id: string; amount: number; source: string; at: string };
+
+// Points this account bought in the shop after the cursor `after` ("<time>|<id>", from an earlier answer's
+// next), oldest first, 50 at a time. null when the economy did not answer.
+export async function economyPurchases(
+  userId: string,
+  after: string | null,
+): Promise<{ purchases: EconomyPurchase[]; next: string | null; more: boolean } | null> {
+  try {
+    const r = await fetch(ECONOMY_BASE_URL + "/api/internal/purchases", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ userId, after }),
+      cache: "no-store",
+    });
+    const j: any = await r.json().catch(() => null);
+    if (!r.ok || !j || !j.ok || !Array.isArray(j.purchases)) return null;
+    return { purchases: j.purchases, next: j.next ?? null, more: Boolean(j.more) };
+  } catch {
+    return null;
+  }
+}
+
+// A 2-minute sign-in ticket for the shop: the URL that opens it signed in to this account, with its Back
+// link to `ret`. null when the economy has no ticket route yet or did not answer.
+export async function economyShopTicket(userId: string, ret: string): Promise<string | null> {
+  try {
+    const r = await fetch(ECONOMY_BASE_URL + "/api/internal/shop-ticket", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ userId, return: ret }),
+      cache: "no-store",
+    });
+    const j: any = await r.json().catch(() => null);
+    const url = r.ok && j && j.ok ? String(j.url || "") : "";
+    // only ever the shop's own entrance
+    return url.startsWith(ECONOMY_SHOP_URL + "/enter?t=") ? url : null;
+  } catch {
+    return null;
+  }
+}
