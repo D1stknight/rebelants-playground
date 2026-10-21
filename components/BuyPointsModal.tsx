@@ -198,7 +198,8 @@ if (typeof window !== "undefined") {
           className="btn shop"
           href={shopHref()}
           target="_blank"
-          rel="noopener"
+          // with an opener: the shop's Back then closes its tab, even after a card payment, instead of opening this page again in it
+          rel="opener"
           onClick={() => {
             shopOpened.current = true;
             setStatus("The shop opened in a new tab. Come back here when you are done.");
