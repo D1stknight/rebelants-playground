@@ -17,6 +17,8 @@ export default function SignInAgain() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const dismissed = useRef(false);
+  // the kind the card shows now (the event handler below is set up once)
+  const shown = useRef<SignInKind | null>(null);
   const { address, isConnected } = useAccount();
   const { signMessageAsync } = useSignMessage();
 
@@ -27,6 +29,9 @@ export default function SignInAgain() {
       // "Not now" holds until the player tries to play with points again
       if (dismissed.current && !d.active) return;
       dismissed.current = false;
+      // already asking for this sign-in: keep what the player is typing (games keep reading the balance)
+      if (shown.current === d.kind) return;
+      shown.current = d.kind;
       const pid = getEffectivePlayerId(loadProfile());
       if (d.kind === "name" && pid.startsWith("name:")) setName((n) => n || pid.slice(5));
       setMsg("");
@@ -43,6 +48,7 @@ export default function SignInAgain() {
   const wallet = (pid.startsWith("wallet:") ? pid.slice(7) : prof.walletAddress || "").toLowerCase();
 
   const done = () => {
+    shown.current = null;
     setKind(null);
     setPin("");
     setMsg("");
@@ -147,7 +153,7 @@ export default function SignInAgain() {
 
       {msg && <div className="ra-signin-msg">{msg}</div>}
 
-      <button className="ra-signin-btn later" type="button" onClick={() => { dismissed.current = true; setKind(null); }}>Not now</button>
+      <button className="ra-signin-btn later" type="button" onClick={() => { dismissed.current = true; shown.current = null; setKind(null); }}>Not now</button>
 
       <style jsx>{`
         .ra-signin {
