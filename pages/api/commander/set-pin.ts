@@ -28,6 +28,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const name = normalize(raw);
 
   if (!name) return res.status(400).json({ ok: false, error: "Name required" });
+  // Only a name on the Playground's own list, exactly: "big-chain" (a casino / village name signed in through
+  // the economy, which always has a PIN) must not reach the list's "bigchain", someone else's name.
+  if (name !== raw.toLowerCase()) return res.status(409).json({ ok: false, error: "PIN already set for this name" });
   if (!pin || pin.length < 4 || pin.length > 6 || !/^[0-9]+$/.test(pin)) {
     return res.status(400).json({ ok: false, error: "PIN must be 4-6 digits" });
   }
@@ -43,10 +46,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (existingPin) return res.status(409).json({ ok: false, error: "PIN already set for this name" });
 
   // A name of letters and digits is also a Rebel Economy colony name: its first PIN is made there, so
-  // a name the economy (casino) already has keeps the PIN it has.
+  // a name the economy (casino) already has keeps the PIN it has. adopt: the economy account this name's
+  // points are on (made when the Playground resolved it) gets the PIN, as the Playground name does here
+  // (the first PIN set for a PIN-less name wins, as before).
   if (sharedWithEconomy(name)) {
     const display = (await redis.get<string>(`ra:commander:player:name:${name}`)) || raw;
-    const r = await economyNameAuth("register", economyName(display, name), pin, getIP(req));
+    const r = await economyNameAuth("register", economyName(display, name), pin, getIP(req), { adopt: true });
     if (!r.ok || r.identityId !== `name:${name}`) {
       if (r.code === "name_taken") {
         return res.status(409).json({ ok: false, error: "This name already has a PIN in the Rebel Economy (casino). Sign in with that PIN." });
