@@ -64,21 +64,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const wrongPin = () => res.status(403).json({ ok: false, error: "Incorrect PIN" });
   const twoPins = () => res.status(403).json({ ok: false, code: "economy_pin", error: "This name is also a Rebel Economy (casino) account with another PIN. Sign in with that PIN." });
   const unavailable = () => res.status(503).json({ ok: false, error: "Sign-in is not available right now. Try again in a minute." });
+  const notFound = () => res.status(404).json({ ok: false, error: "Commander name not found" });
 
-  // A name with _ is the Playground's own; a name of letters and digits is also the Rebel Economy's
-  // colony name (the casino, the village); one typed with spaces or symbols ("Big Chain") is the
-  // economy's account of that spelling (name:big-chain), or an old Playground name typed that way.
-  if (name.includes("_")) return signInPlaygroundOnly();
+  // A name of letters and digits is also the Rebel Economy's colony name (the casino, the village); one
+  // typed with spaces or symbols ("Big Chain") is the economy's account of that spelling (name:big-chain),
+  // or an old Playground name typed that way. An old name with _ is the Playground's own (the economy
+  // spells _ as -); a newer one is the economy's (big_chain is name:big-chain).
   const spelled = economySlug(raw);
+  if (name.includes("_")) {
+    if ((await redis.get(keys(name).nameKey)) || spelled.length < 3) return signInPlaygroundOnly();
+    return signInSpelled(spelled);
+  }
   if (sharedWithEconomy(name) && spelled !== name && spelled.length >= 3) return signInSpelled(spelled);
-  if (sharedWithEconomy(name)) return signInWithEconomy();
-  return signInPlaygroundOnly();
+  return signInWithEconomy();
 
   async function signInPlaygroundOnly() {
     const k = keys(name);
     // Check name exists
     const exists = await redis.get(k.nameKey);
-    if (!exists) return res.status(404).json({ ok: false, error: "Commander name not found" });
+    if (!exists) return notFound();
 
     // Check PIN
     const storedHash = await redis.get<string>(k.pinKey);
@@ -108,18 +112,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return signIn(slug, (await redis.get<string>(k.shownKey)) || displayName || raw);
   }
 
-  // A name typed with spaces or symbols. An old Playground name typed that way ("Big Chain" for bigchain)
-  // is recognised by its own PIN first, so the casino account of that spelling never counts its wrong PIN.
+  // A name typed with spaces or symbols: the account of that exact spelling first, so its PIN always signs in
+  // to it. An old Playground name typed that way ("Big Chain" for bigchain) comes second: when the economy has
+  // no account of that spelling, or that account's PIN is not this one and the old name's is.
   async function signInSpelled(spelledSlug: string) {
-    const stored = await redis.get<string>(keys(name).pinKey);
-    if (stored && stored === hashPin(name, pin)) return signInWithEconomy();
     if (await tooManyFails(spelledSlug)) return tooMany();
     const e = await economyNameAuth("login", raw, pin, ip);
     if (e.ok) return e.identityId === `name:${spelledSlug}` ? economySignedIn(spelledSlug, e.displayName) : unavailable();
-    if (e.code === "name_unknown") return signInWithEconomy();
     if (e.code === "rate_limited") return limited();
-    if (e.code === "locked") return locked();
-    if (e.code === "pin_wrong") {
+    if (e.code === "name_unknown") return name.includes("_") ? notFound() : signInWithEconomy();
+    if (e.code === "pin_wrong" || e.code === "locked") {
+      const stored = name.includes("_") ? null : await redis.get<string>(keys(name).pinKey);
+      if (stored && stored === hashPin(name, pin)) return signInWithEconomy();
+      if (e.code === "locked") return locked();
       await countFail(spelledSlug);
       return wrongPin();
     }
@@ -146,7 +151,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     if (e.code !== "name_unknown") return unavailable();
 
-    if (!(await redis.get(k.nameKey))) return res.status(404).json({ ok: false, error: "Commander name not found" });
+    if (!(await redis.get(k.nameKey))) return notFound();
     if (!storedHash) return res.status(403).json({ ok: false, code: "no_pin", error: "No PIN set for this name. Contact support." });
     if (hashPin(name, pin) !== storedHash) {
       await countFail(name);
