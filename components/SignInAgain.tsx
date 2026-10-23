@@ -23,6 +23,9 @@ export default function SignInAgain() {
   const dismissed = useRef(false);
   // the kind the card shows now (the event handler below is set up once)
   const shown = useRef<SignInKind | null>(null);
+  // when the player last signed in or changed who they play as: answers to requests sent before that
+  // were asked for the old sign-in (a balance read still on its way while the PIN was checked)
+  const changedAt = useRef(0);
   const { address, isConnected } = useAccount();
   const { signMessageAsync } = useSignMessage();
 
@@ -30,6 +33,7 @@ export default function SignInAgain() {
     watchSignInAnswers();
     const onNeed = (e: Event) => {
       const d = (e as CustomEvent).detail || {};
+      if (typeof d.sent === "number" && d.sent < changedAt.current) return;
       // "Not now" holds until the player tries to play with points again
       if (dismissed.current && !d.active) return;
       dismissed.current = false;
@@ -42,8 +46,13 @@ export default function SignInAgain() {
       setNoPin(false);
       setKind(d.kind);
     };
+    const onChanged = () => { changedAt.current = performance.now(); };
     window.addEventListener(SIGN_IN_EVENT, onNeed);
-    return () => window.removeEventListener(SIGN_IN_EVENT, onNeed);
+    window.addEventListener("ra:identity-changed", onChanged);
+    return () => {
+      window.removeEventListener(SIGN_IN_EVENT, onNeed);
+      window.removeEventListener("ra:identity-changed", onChanged);
+    };
   }, []);
 
   if (!kind) return null;
