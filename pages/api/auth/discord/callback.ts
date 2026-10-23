@@ -13,8 +13,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const code = String(req.query.code || "");
   const state = String(req.query.state || "");
   const stateCookie = req.cookies["ra_discord_state"] || "";
+  const clearState = [
+    `ra_discord_state=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`,
+    `ra_discord_redir=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`,
+  ];
 
-  if (!code) return res.status(400).send("Missing code");
+  // Always back to the page the sign-in started from, on the host the callback came in on
+  const backTo = (query: string) => {
+    const host = String(req.headers["x-forwarded-host"] || req.headers.host || "");
+    const proto = req.headers["x-forwarded-proto"] || "https";
+    const rawReturn = (() => { try { return decodeURIComponent(String(req.cookies?.ra_return_to || "/")); } catch { return "/"; } })();
+    const returnPath = (() => { try { return new URL(rawReturn).pathname || "/"; } catch { return rawReturn.startsWith("/") ? rawReturn : "/"; } })();
+    return res.redirect(`${proto}://${host}${returnPath}${query}`);
+  };
+
+  // Cancel on Discord's screen (?error=access_denied, no code): straight back to the page, not signed in,
+  // instead of a "Missing code" page the player has to press Back through.
+  if (!code || req.query.error) {
+    res.setHeader("Set-Cookie", clearState);
+    return backTo("");
+  }
   if (!state || !stateCookie || state !== stateCookie) {
     return res.status(400).send("Invalid state");
   }
@@ -74,15 +92,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     ...learningCookies,
     ...(signed ? [sessionSetCookie(DISCORD_SESSION_COOKIE, signed)] : []),
     `ra_discord_user=${encodeURIComponent(JSON.stringify({ discordUserId, discordName }))}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400`,
-    `ra_discord_state=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`,
-    `ra_discord_redir=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`,
+    ...clearState,
   ]);
 
-  // Always redirect back to the host the callback came in on
-  const host = String(req.headers["x-forwarded-host"] || req.headers.host || "");
-  const proto = req.headers["x-forwarded-proto"] || "https";
-  const rawReturn = (() => { try { return decodeURIComponent(String(req.cookies?.ra_return_to || "/")); } catch { return "/"; } })();
-  const returnPath = (() => { try { return new URL(rawReturn).pathname || "/"; } catch { return rawReturn.startsWith("/") ? rawReturn : "/"; } })();
-
-  res.redirect(`${proto}://${host}${returnPath}?discord=1`);
+  return backTo("?discord=1");
 }
