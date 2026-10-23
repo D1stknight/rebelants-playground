@@ -305,6 +305,12 @@ export function sharedWithEconomy(slug: string): boolean {
   return /^[a-z0-9]+$/.test(slug);
 }
 
+// A name as the economy reads it (its slugify): lowercase, every run of other characters one "-". A
+// casino or village name typed with a space ("Big Chain") is the account name:big-chain.
+export function economySlug(name: string): string {
+  return String(name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32);
+}
+
 // The spelling the economy keeps for a new name: the Playground's own one when its letters and digits
 // make the same slug, else the slug itself (the economy makes its slug from this text).
 export function economyName(displayName: string, slug: string): string {
@@ -323,19 +329,23 @@ export type EconomyNameAnswer = {
 };
 
 // The economy's name + PIN check (/api/internal/name-auth). `player` is the player's address, for
-// the economy's own limits (it never stores it). Never log the PIN.
+// the economy's own limits (it never stores it). Never log the PIN. adopt (register only): this
+// Playground has proven the player owns the name with its own PIN, so the economy account made for
+// it earlier (by resolve) may get this PIN; without it the economy answers name_taken for a name
+// that already has an account.
 export async function economyNameAuth(
   action: "login" | "register",
   name: string,
   pin: string,
   player: string,
+  opts: { adopt?: boolean } = {},
 ): Promise<EconomyNameAnswer> {
   if (!SERVICE_API_KEY) return { ok: false, code: "unavailable" };
   try {
     const r = await fetch(ECONOMY_BASE_URL + "/api/internal/name-auth", {
       method: "POST",
       headers: authHeaders(),
-      body: JSON.stringify({ action, name, pin, player: String(player || "").slice(0, 64) }),
+      body: JSON.stringify({ action, name, pin, player: String(player || "").slice(0, 64), ...(opts.adopt ? { adopt: true } : {}) }),
       cache: "no-store",
       signal: AbortSignal.timeout(8000),
     });
