@@ -66,7 +66,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const displayName = await redis.get<string>(`ra:commander:player:name:${name}`) || raw;
 
   // Issue a server-verified session cookie for this name identity.
-  // No-op until NAME_SESSION_SECRET is set (signNameSession returns null).
+  // Keyed by NAME_SESSION_SECRET, else a key derived from the Discord app secret (lib/name-session.ts).
   const sessionToken = signNameSession("name:" + name);
   if (sessionToken) res.setHeader("Set-Cookie", nameSessionSetCookie(sessionToken));
   return res.status(200).json({ ok: true, name, playerId: `name:${name}`, displayName });

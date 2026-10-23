@@ -134,7 +134,7 @@ export async function resolveByPlayerId(
 
 // Resolve a verified Commander Name/PIN identity from its signed cookie.
 // Returns the economy user only if the ra_name_session HMAC is valid.
-// If NAME_SESSION_SECRET is unset, this is always null (feature off).
+// Keyed by NAME_SESSION_SECRET, else a key derived from the Discord app secret (lib/name-session.ts).
 export async function getVerifiedNameUser(
   req: NextApiRequest,
 ): Promise<ResolvedUser | null> {
