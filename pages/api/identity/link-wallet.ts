@@ -2,6 +2,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
 import { recoverMessageAddress } from "viem";
+import { WALLET_SESSION_COOKIE, signWalletSession, sessionSetCookie } from "../../../lib/player-session";
 
 function normalizeWallet(w: any) {
   const s = String(w || "").trim().toLowerCase();
@@ -48,12 +49,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!signature) return res.status(400).json({ ok: false, error: "Missing signature" });
     if (!nonce) return res.status(400).json({ ok: false, error: "Missing nonce" });
 
-    // ✅ reject if already linked
-    const already = await redis.get(linkedKey(wallet));
-    if (already) {
-      return res.status(200).json({ ok: true, alreadyLinked: true, playerId: `wallet:${wallet}` });
-    }
-
     // ✅ validate nonce matches what we issued
     const storedNonceRaw = await redis.get<string>(nonceKey(guestId, wallet));
     const storedNonce = String(storedNonceRaw || "");
@@ -79,6 +74,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const walletPid = `wallet:${wallet}`;
 
+    // ✅ burn nonce (one signature, one use)
+    await redis.del(nonceKey(guestId, wallet));
+
+    // ✅ the wallet's signed session: the points routes only believe wallet:<address> with it
+    // (lib/server/player-auth.ts), so a wallet linked before signs again to get one
+    const session = signWalletSession(wallet);
+    if (session) res.setHeader("Set-Cookie", sessionSetCookie(WALLET_SESSION_COOKIE, session));
+
+    // ✅ already linked: signed in again, nothing to migrate
+    const already = await redis.get(linkedKey(wallet));
+    if (already) {
+      return res.status(200).json({ ok: true, alreadyLinked: true, playerId: walletPid });
+    }
+
     // ✅ migrate balance
     const guestBalRaw = await redis.get<number>(balKey(guestId));
     const guestBal = Number(guestBalRaw || 0);
@@ -102,9 +111,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // ✅ mark linked
     await redis.set(linkedKey(wallet), walletPid);
-
-    // ✅ burn nonce
-    await redis.del(nonceKey(guestId, wallet));
 
     const newBalRaw = await redis.get<number>(balKey(walletPid));
     const newBal = Number(newBalRaw || 0);
