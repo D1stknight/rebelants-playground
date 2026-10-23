@@ -1,6 +1,7 @@
 // pages/api/prizes/transfer.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
+import { isAdminRequest } from "../../../lib/server/player-auth";
 
 // NOTE: This assumes you have `ethers` installed.
 // If your build errors on ethers v6 vs v5, tell me and I’ll swap it to match.
@@ -50,6 +51,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     if (req.method !== "POST") return res.status(405).json({ ok: false, error: "Method not allowed" });
+    // Sends an NFT from the treasury: only the admin page (its key) may ask.
+    if (!isAdminRequest(req)) return res.status(401).json({ ok: false, error: "Unauthorized" });
 
     const rawBody = req.body;
 const body =
