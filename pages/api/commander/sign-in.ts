@@ -122,10 +122,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (e.code === "rate_limited") return limited();
     if (e.code === "name_unknown") return name.includes("_") ? notFound() : signInWithEconomy();
     if (e.code === "pin_wrong" || e.code === "locked") {
+      // the old name's own PIN is tried too, under the old name's own limits (another spelling of it must
+      // never be a way round them)
       const stored = name.includes("_") ? null : await redis.get<string>(keys(name).pinKey);
-      if (stored && stored === hashPin(name, pin)) return signInWithEconomy();
-      if (e.code === "locked") return locked();
-      await countFail(spelledSlug);
+      const tried = !!stored && stored !== "economy";
+      if (tried && (await tooManyFails(name))) return tooMany();
+      if (tried && stored === hashPin(name, pin)) return signInWithEconomy();
+      if (e.code === "locked") {
+        if (tried) await countFail(name);
+        return locked();
+      }
+      await Promise.all([countFail(spelledSlug), tried ? countFail(name) : null]);
       return wrongPin();
     }
     return unavailable();
