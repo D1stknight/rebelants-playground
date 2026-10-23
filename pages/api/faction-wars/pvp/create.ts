@@ -1,14 +1,13 @@
 import { withPlaygroundMatchExperience } from "../../../../lib/server/raap-fwpvp-experience";
+import { withSignedPlayer } from "../../../../lib/server/player-auth";
 // POST /api/faction-wars/pvp/create
 //
 // Creates a new PvP challenge. Returns the challengeId and shareable path.
 // Challenger may optionally lock their team at create time. If not, they pick
 // after the opponent accepts (same screen as opponent).
 //
-// Identity: we trust the supplied playerId/displayName. Step 1 doesn't verify
-// the caller against the Discord cookie or commander session — that's added
-// before this is exposed in real UI. For now, only callers from our own
-// frontend will hit this.
+// Identity: the challengerPlayerId must be the player a signed session proves
+// (withSignedPlayer, lib/server/player-auth.ts); the displayName is still the caller's.
 
 import type { NextApiRequest, NextApiResponse } from "next";
 import { generateChallengeId, saveMatch, addPlayerMatch, markActive, getPvpEconomyConfig, spendREBEL, getREBELBalance } from "../../../../lib/server/fwpvp";
@@ -166,4 +165,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withPlaygroundMatchExperience("create", handler);
+export default withSignedPlayer("challengerPlayerId", withPlaygroundMatchExperience("create", handler));

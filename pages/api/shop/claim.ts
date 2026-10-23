@@ -3,7 +3,9 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { createPublicClient, http } from "viem";
 import { redis } from "../../../lib/server/redis";
 import { rateLimit } from "../../../lib/server/ratelimit";
-import { resolveFromRequest, resolveByPlayerId, economyCredit, idemKey } from "../../../lib/economy";
+import { economyCredit, idemKey, readCookie } from "../../../lib/economy";
+import { actingPlayer } from "../../../lib/server/player-auth";
+import { WALLET_SESSION_COOKIE, verifyWalletSession } from "../../../lib/player-session";
 
 const RPC_URL = process.env.APECHAIN_RPC_URL || "";
 const SHOP_ADDRESS = (process.env.APECHAIN_SHOP_ADDRESS || "").toLowerCase();
@@ -68,12 +70,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!SHOP_ADDRESS) return res.status(500).json({ ok: false, error: "Missing APECHAIN_SHOP_ADDRESS" });
 
         const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body ?? {});
-    const playerId = cleanPlayerId(body.playerId);
+    const claimedId = cleanPlayerId(body.playerId);
     const walletAddress = cleanWallet(body.walletAddress);
     const txHash = asStr(body.txHash).trim();
 
     if (!walletAddress) return res.status(400).json({ ok: false, error: "Missing walletAddress" });
     if (!txHash || !isHexTx(txHash)) return res.status(400).json({ ok: false, error: "Invalid txHash" });
+
+    // Only the buying wallet's own signed session may claim its purchase (anyone can read a
+    // buyer's address off the chain), and only for the player a signed session proves.
+    if (verifyWalletSession(readCookie(req, WALLET_SESSION_COOKIE)) !== walletAddress) {
+      return res.status(401).json({ ok: false, error: "Sign in with the wallet that bought the pack.", signIn: "wallet" });
+    }
+    const who = await actingPlayer(req, claimedId);
+    if (!who.ok) {
+      return res.status(401).json({ ok: false, error: "Could not resolve account. Sign in and try again.", signIn: who.signIn });
+    }
+    const playerId = who.playerId;
 
     // ✅ Abuse protection: rate limit by IP + wallet
     const ip =
@@ -175,14 +188,9 @@ for (const log of matches) {
     await redis.set(playerToWalletKey(playerId), walletAddress);
 
         // --------- Credit points to the ECONOMY ledger (source of truth) ----------
-    // Resolve the buyer to their economy user: prefer the signed-in session,
-    // fall back to the supplied playerId. Purchases credit real $REBEL now,
-    // not the old Redis balance key.
-    let resolved = await resolveFromRequest(req);
-    if (!resolved) resolved = await resolveByPlayerId(playerId);
-    if (!resolved) {
-      return res.status(401).json({ ok: false, error: "Could not resolve account. Sign in and try again." });
-    }
+    // The buyer's economy user is the signed-in player (checked above). Purchases
+    // credit real $REBEL now, not the old Redis balance key.
+    const resolved = who.user;
     await economyCredit({
       userId: resolved.userId,
       amount: found.points,

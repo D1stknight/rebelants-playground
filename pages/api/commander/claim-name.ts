@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
 import { createHash } from "crypto";
+import { signNameSession, nameSessionSetCookie } from "../../../lib/name-session";
 
 function hashPin(name: string, pin: string): string {
   return createHash("sha256")
@@ -54,5 +55,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     redis.incr(ipKey).then(() => redis.expire(ipKey, 86400)),
   ]);
 
+  // Signed in with the new name at once (the points routes believe name:<slug> only with this session).
+  const sessionToken = signNameSession(playerId);
+  if (sessionToken) res.setHeader("Set-Cookie", nameSessionSetCookie(sessionToken));
   return res.status(200).json({ ok: true, name, displayName, playerId });
 }

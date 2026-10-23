@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import { DISCORD_SESSION_COOKIE, verifyDiscordSession } from "../../../../lib/player-session";
 
 function getCookie(req: NextApiRequest, name: string) {
   const raw = req.headers.cookie || "";
@@ -12,14 +13,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   res.setHeader("Pragma", "no-cache");
   res.setHeader("Expires", "0");
 
-  const raw = getCookie(req, "ra_discord_user");
-  if (!raw) return res.status(200).json({ ok: false });
-
-  try {
-    const j = JSON.parse(raw);
-    if (!j?.discordUserId) return res.status(200).json({ ok: false });
-    return res.status(200).json({ ok: true, discordUserId: j.discordUserId, discordName: j.discordName });
-  } catch {
-    return res.status(200).json({ ok: false });
-  }
+  // Signed in = the signed session (the old ra_discord_user cookie alone can be written by anyone).
+  const s = verifyDiscordSession(getCookie(req, DISCORD_SESSION_COOKIE));
+  if (!s) return res.status(200).json({ ok: false });
+  return res.status(200).json({ ok: true, discordUserId: s.discordUserId, discordName: s.discordName });
 }

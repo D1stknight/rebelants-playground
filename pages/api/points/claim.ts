@@ -2,7 +2,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
 import { pointsConfig as defaultPointsConfig } from "../../../lib/pointsConfig";
-import { resolveFromRequest, resolveByPlayerId, getVerifiedNameUser, economyCredit, idemKey } from "../../../lib/economy";
+import { economyCredit, idemKey } from "../../../lib/economy";
+import { actingPlayer } from "../../../lib/server/player-auth";
 
 function balKey(playerId: string) {
   return `ra:points:bal:${playerId}`;
@@ -41,12 +42,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   res.setHeader("Expires", "0");
 
   try {
-    const playerId =
+    const claimedId =
       String((req.method === "GET" ? req.query.playerId : (req.body ?? {}).playerId) || "guest")
         .trim()
         .slice(0, 64) || "guest";
-
-    const key = claimKey(playerId);
+    let playerId = claimedId;
+    let key = claimKey(playerId);
 
     // ✅ GET = status only (claimed today?) + next claim timer
     if (req.method === "GET") {
@@ -97,13 +98,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Daily claim now credits the central economy ledger.
-    // Requires a signed-in identity (no guest claims).
-    const economyUser = (playerId.startsWith("name:") ? await getVerifiedNameUser(req) : null) ?? (await resolveByPlayerId(playerId)) ?? (await resolveFromRequest(req));
-    if (!economyUser) {
+    // Requires a signed-in identity (no guest claims): the player a signed session
+    // proves (lib/server/player-auth.ts), and the once-a-day key is that player's.
+    const who = await actingPlayer(req, claimedId);
+    if (!who.ok) {
       return res
         .status(401)
-        .json({ ok: false, error: "Sign in with Discord to claim daily $REBEL." });
+        .json({ ok: false, error: who.signIn ? "Sign in again to claim daily $REBEL." : "Sign in with Discord to claim daily $REBEL.", signIn: who.signIn });
     }
+    const economyUser = who.user;
+    playerId = who.playerId;
+    key = claimKey(playerId);
 
     // ✅ once-per-day guard (atomic)
     // SETNX-like: only set if not exists

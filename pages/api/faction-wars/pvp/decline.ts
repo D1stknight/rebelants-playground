@@ -1,4 +1,5 @@
 import { withPlaygroundMatchExperience } from "../../../../lib/server/raap-fwpvp-experience";
+import { withSignedPlayer } from "../../../../lib/server/player-auth";
 // POST /api/faction-wars/pvp/decline
 //
 // Opponent declines a pending challenge (only valid if status === "pending"
@@ -75,4 +76,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withPlaygroundMatchExperience("decline", handler);
+export default withSignedPlayer("playerId", withPlaygroundMatchExperience("decline", handler));

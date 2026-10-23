@@ -666,7 +666,7 @@ async function saveConfig() {
 }
   async function getBalance() {
     append("Getting balance…");
-    const r = await fetch(`/api/points/balance?playerId=${encodeURIComponent(playerId)}`);
+    const r = await fetch(`/api/points/balance?playerId=${encodeURIComponent(playerId)}`, { headers });
     const j = await r.json().catch(() => null);
     append(`BALANCE status ${r.status}\n${JSON.stringify(j, null, 2)}`);
   }

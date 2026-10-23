@@ -6,8 +6,8 @@
 // in the central economy ledger (shared with After Dark + Discord).
 // This module is the ONLY place that talks to the economy API.
 //
-// Identity: the Playground already stores the signed-in Discord user in
-// the "ra_discord_user" cookie ({ discordUserId, discordName }). We turn
+// Identity: the Discord sign-in leaves a signed session (lib/player-session.ts;
+// the older "ra_discord_user" cookie is not signed and proves nothing). We turn
 // that into the canonical economy userId via /api/internal/resolve, then
 // move points with /api/internal/credit and /api/internal/debit.
 //
@@ -16,6 +16,7 @@
 // ─────────────────────────────────────────────────────────────
 import type { NextApiRequest } from "next";
 import { verifyNameSession, NAME_SESSION_COOKIE } from "./name-session";
+import { DISCORD_SESSION_COOKIE, verifyDiscordSession } from "./player-session";
 
 const ECONOMY_BASE_URL =
   process.env.ECONOMY_BASE_URL || "https://economy.rebelants.io";
@@ -37,29 +38,23 @@ export type ResolvedUser = {
 };
 
 // Read a cookie value from the incoming request.
-function readCookie(req: NextApiRequest, name: string): string {
+export function readCookie(req: NextApiRequest, name: string): string {
   const raw = req.headers.cookie || "";
   const parts = raw.split(";").map((s) => s.trim());
   const hit = parts.find((p) => p.startsWith(name + "="));
   return hit ? decodeURIComponent(hit.split("=").slice(1).join("=")) : "";
 }
 
-// Pull the signed-in Discord identity from the existing Playground cookie.
+// Pull the signed-in Discord identity from the signed Discord session.
 // Returns null if the user is not signed in with Discord (guest play).
 export function getDiscordIdentity(req: NextApiRequest): DiscordIdentity | null {
-  const raw = readCookie(req, "ra_discord_user");
-  if (!raw) return null;
-  try {
-    const j = JSON.parse(raw);
-    if (!j || !j.discordUserId) return null;
-    return {
-      discordId: String(j.discordUserId),
-      username: String(j.discordName || j.discordUserId),
-      displayName: j.discordName ? String(j.discordName) : null,
-    };
-  } catch {
-    return null;
-  }
+  const s = verifyDiscordSession(readCookie(req, DISCORD_SESSION_COOKIE));
+  if (!s) return null;
+  return {
+    discordId: s.discordUserId,
+    username: s.discordName || s.discordUserId,
+    displayName: s.discordName || null,
+  };
 }
 
 function authHeaders(): Record<string, string> {
@@ -110,32 +105,36 @@ export async function resolveEconomyUser(
 //   name:<slug>    -> economy stores name-auth identities with the prefix intact
 //   wallet:0x...   -> economy resolves/creates by this namespaced key
 //   guest-xxxxx    -> no persistent economy identity (returns null)
+//   anything else  -> null (a bare Discord id or a made-up prefix used to reach
+//                     whatever account the economy had under it)
 //
 // Used by server-side flows (e.g. PvP payouts) that only have a stored
-// playerId and no request/cookie to read.
+// playerId and no request/cookie to read. A playerId from the browser goes
+// through lib/server/player-auth.ts first, which only lets signed ones by.
 export async function resolveByPlayerId(
   playerId: string,
 ): Promise<ResolvedUser | null> {
   if (!playerId) return null;
-  if (playerId.startsWith("guest-") || playerId.startsWith("guest:")) return null;
 
   let discordId: string;
   let username: string;
   if (playerId.startsWith("discord:")) {
     discordId = playerId.slice("discord:".length);
+    if (!/^[0-9]{5,32}$/.test(discordId)) return null;
     username = discordId;
-  } else {
-    // name:<slug>, wallet:0x..., or any already-namespaced id -> pass through
+  } else if (/^(name|wallet):./.test(playerId)) {
+    // name:<slug>, wallet:0x... -> pass through
     discordId = playerId;
     username = playerId;
+  } else {
+    return null;
   }
-  if (!discordId) return null;
   return resolveEconomyUser({ discordId, username, displayName: null });
 }
 
 // Resolve a verified Commander Name/PIN identity from its signed cookie.
 // Returns the economy user only if the ra_name_session HMAC is valid.
-// If NAME_SESSION_SECRET is unset, this is always null (feature off).
+// Keyed by NAME_SESSION_SECRET, else a key derived from the Discord app secret (lib/name-session.ts).
 export async function getVerifiedNameUser(
   req: NextApiRequest,
 ): Promise<ResolvedUser | null> {
@@ -153,7 +152,7 @@ export function getSessionToken(req: NextApiRequest): string | null {
 
 // Resolve directly from the request -> economy user.
 // Prefers the shared session token (Discord OR Commander Name/PIN); falls
-// back to the legacy ra_discord_user cookie for older sessions.
+// back to the signed Discord session.
 export async function resolveFromRequest(
   req: NextApiRequest,
 ): Promise<ResolvedUser | null> {

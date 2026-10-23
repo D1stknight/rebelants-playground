@@ -6,12 +6,14 @@
 // This closes the spoofing gap for name/PIN players (who previously had no
 // server-side session at all).
 //
-// SAFETY: if NAME_SESSION_SECRET is not configured, signing and verifying are
-// inert (return null) and no cookie is issued, so the whole feature is a no-op
-// and every endpoint behaves exactly as before until the env var is set.
+// KEY: NAME_SESSION_SECRET when it is set (sessions already given out stay
+// valid), else one derived from the Discord app secret (lib/player-session.ts):
+// the points routes only believe a signed session now, so name sign-in must
+// always give one.
 import { createHmac, timingSafeEqual } from "crypto";
+import { sessionKey } from "./player-session";
 
-const SECRET = process.env.NAME_SESSION_SECRET || "";
+const SECRET: string | Buffer = process.env.NAME_SESSION_SECRET || sessionKey("name-session") || "";
 export const NAME_SESSION_COOKIE = "ra_name_session";
 const MAX_AGE_SECONDS = 60 * 60 * 24 * 30; // 30 days
 

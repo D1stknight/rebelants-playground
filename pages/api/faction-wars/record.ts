@@ -2,6 +2,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
 import { addToEarnedTotal, updateBalanceLeaderboard } from "../../../lib/server/leaderboards";
+import { actingPlayer } from "../../../lib/server/player-auth";
 
 const LB_FW_WARLORDS  = "ra:fw:lb:warlords";
 const FW_FACTION_PLAYER = (fid: string) => `ra:fw:faction:${fid}`;
@@ -48,11 +49,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     if (perfect) await redis.zincrby(LB_FW_PERFECT, 1, playerId);
     try {
-      const proto = (req.headers["x-forwarded-proto"] as string) || "http";
-      const host  = req.headers.host;
-      const balR  = await fetch(`${proto}://${host}/api/points/balance?playerId=${encodeURIComponent(playerId)}`, { cache: "no-store" });
-      const balJ: any = await balR.json().catch(() => null);
-      if (balJ?.balance != null) await updateBalanceLeaderboard(playerId, Number(balJ.balance));
+      // the balance is only read for the player a signed session proves (the balance route answers 0 for others)
+      const who = await actingPlayer(req, playerId);
+      if (who.ok && who.playerId === playerId) await updateBalanceLeaderboard(playerId, Number(who.user.balance));
     } catch {}
     return res.status(200).json({ ok: true });
   } catch (e: any) {

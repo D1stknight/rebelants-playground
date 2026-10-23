@@ -2,7 +2,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
 import { pointsConfig as defaultPointsConfig } from "../../../lib/pointsConfig";
-import { resolveFromRequest, resolveByPlayerId, getVerifiedNameUser } from "../../../lib/economy";
+import { resolveByPlayerId } from "../../../lib/economy";
+import { actingPlayer, isAdminRequest } from "../../../lib/server/player-auth";
 import { syncPurchasedPlays } from "../../../lib/server/purchasedPlays";
 
 function balKey(playerId: string) {
@@ -56,22 +57,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(405).json({ error: "Method not allowed" });
     }
 
-    const pid = String(req.query.playerId || "guest").trim().slice(0, 64) || "guest";
+    const claimed = String(req.query.playerId || "guest").trim().slice(0, 64) || "guest";
 
         // Balance now comes from the central economy ledger (shared with
     // After Dark + Discord). Signed-in Discord users get their real
     // economy balance; guests (no Discord) see 0 until they sign in.
-    const economyUser = (pid.startsWith("name:") ? await getVerifiedNameUser(req) : null) ?? (await resolveByPlayerId(pid)) ?? (await resolveFromRequest(req));
+    // Only for the player a signed session proves (the admin page may look anyone up);
+    // anyone else gets 0 and the sign-in that id needs.
+    const admin = isAdminRequest(req);
+    const who = admin ? null : await actingPlayer(req, claimed);
+    const economyUser = admin ? await resolveByPlayerId(claimed) : who && who.ok ? who.user : null;
+    const pid = who && who.ok ? who.playerId : claimed;
+    const signIn = who && !who.ok ? who.signIn : null;
     const balance = economyUser ? economyUser.balance : 0;
 
     // points bought in the Rebel Economy shop add bonus plays here (like the old APE packs did)
     if (economyUser) await syncPurchasedPlays(pid, economyUser.userId).catch((e) => console.warn("bonus plays sync", e?.message || e));
 
-       // ✅ Read the SAME key spend.ts writes to
-    const spentRaw = await redis.get<number>(todayKey(pid));
+       // ✅ Read the SAME key spend.ts writes to (nothing for a player no session proves)
+    const spentRaw = economyUser ? await redis.get<number>(todayKey(pid)) : 0;
     const spentToday = Number(spentRaw || 0);
 
-    const capBankRaw = await redis.get<number>(capBankKey(pid));
+    const capBankRaw = economyUser ? await redis.get<number>(capBankKey(pid)) : 0;
     const capBank = Number(capBankRaw || 0);
 
     const liveCfg = await getLivePointsConfig(req);
@@ -89,6 +96,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       remainingDaily,
       totalPlayRoom,
       totalEarnRoom: totalPlayRoom,
+      ...(signIn ? { signIn } : {}),
     });
   } catch (err: any) {
     console.error("balance error:", err);

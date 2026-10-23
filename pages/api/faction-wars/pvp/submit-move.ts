@@ -1,4 +1,5 @@
 import { withPlaygroundMatchExperience } from "../../../../lib/server/raap-fwpvp-experience";
+import { withSignedPlayer } from "../../../../lib/server/player-auth";
 // POST /api/faction-wars/pvp/submit-move
 //
 // The current-turn player submits ONE move. The move is applied as a direct
@@ -180,4 +181,4 @@ export async function submitPvpMove(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withPlaygroundMatchExperience("submit-move", submitPvpMove);
+export default withSignedPlayer("playerId", withPlaygroundMatchExperience("submit-move", submitPvpMove));

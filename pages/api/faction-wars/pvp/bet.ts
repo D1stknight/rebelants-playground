@@ -1,4 +1,5 @@
 import { withPlaygroundHumanWriter } from "../../../../lib/server/raap-pvp-coordination";
+import { withSignedPlayer } from "../../../../lib/server/player-auth";
 // POST /api/faction-wars/pvp/bet
 //
 // Spectator places (or tops up) a side bet on a PvP match.
@@ -109,4 +110,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withPlaygroundHumanWriter(handler);
+export default withSignedPlayer("playerId", withPlaygroundHumanWriter(handler));

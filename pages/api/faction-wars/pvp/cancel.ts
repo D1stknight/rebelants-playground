@@ -1,4 +1,5 @@
 import { withPlaygroundMatchExperience } from "../../../../lib/server/raap-fwpvp-experience";
+import { withSignedPlayer } from "../../../../lib/server/player-auth";
 // POST /api/faction-wars/pvp/cancel
 //
 // Challenger cancels a pending challenge (only valid if status === "pending",
@@ -70,4 +71,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withPlaygroundMatchExperience("cancel", handler);
+export default withSignedPlayer("playerId", withPlaygroundMatchExperience("cancel", handler));

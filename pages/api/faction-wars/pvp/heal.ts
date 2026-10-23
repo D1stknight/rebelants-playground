@@ -1,4 +1,5 @@
 import { withPlaygroundMatchExperience } from "../../../../lib/server/raap-fwpvp-experience";
+import { withSignedPlayer } from "../../../../lib/server/player-auth";
 // POST /api/faction-wars/pvp/heal
 //
 // Allows a player to spend REBEL to restore HP during their turn. Mirrors
@@ -87,4 +88,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withPlaygroundMatchExperience("heal", handler);
+export default withSignedPlayer("playerId", withPlaygroundMatchExperience("heal", handler));

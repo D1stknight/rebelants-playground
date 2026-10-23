@@ -2,7 +2,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
 import { pointsConfig as defaultPointsConfig } from "../../../lib/pointsConfig";
-import { resolveFromRequest, resolveByPlayerId, getVerifiedNameUser, economyDebit, idemKey } from "../../../lib/economy";
+import { economyDebit, idemKey } from "../../../lib/economy";
+import { actingPlayer } from "../../../lib/server/player-auth";
 
 function balKey(playerId: string) {
   return `ra:points:bal:${playerId}`;
@@ -74,7 +75,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body ?? {});
-    const playerId = String(body.playerId || "guest").trim().slice(0, 64) || "guest";
+    const claimed = String(body.playerId || "guest").trim().slice(0, 64) || "guest";
     const amountRaw = body.amount;
     const reason = String(body.reason || "").trim();
 
@@ -117,13 +118,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Current balance now comes from the central economy ledger.
-    // Spending requires a signed-in identity (no guest spends).
-    const economyUser = (playerId.startsWith("name:") ? await getVerifiedNameUser(req) : null) ?? (await resolveByPlayerId(playerId)) ?? (await resolveFromRequest(req));
-    if (!economyUser) {
+    // Spending requires a signed-in identity (no guest spends). Only a player a
+    // signed session proves can spend (lib/server/player-auth.ts).
+    const who = await actingPlayer(req, claimed);
+    if (!who.ok) {
       return res
         .status(401)
-        .json({ ok: false, error: "Sign in with Discord to play." });
+        .json({ ok: false, error: who.signIn ? "Sign in again to play." : "Sign in with Discord to play.", signIn: who.signIn });
     }
+    const economyUser = who.user;
+    const playerId = who.playerId;
     const bal = economyUser.balance;
 
     if (bal < amt) {

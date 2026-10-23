@@ -1,4 +1,5 @@
 import { withPlaygroundMatchExperience } from "../../../../lib/server/raap-fwpvp-experience";
+import { withSignedPlayer } from "../../../../lib/server/player-auth";
 // POST /api/faction-wars/pvp/cast-spell
 //
 // Allows a player to spend REBEL to cast a Death Spell on the opposing
@@ -127,4 +128,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withPlaygroundMatchExperience("cast-spell", handler);
+export default withSignedPlayer("playerId", withPlaygroundMatchExperience("cast-spell", handler));
