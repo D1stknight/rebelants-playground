@@ -174,15 +174,16 @@ export default function LandingPage() {
   // Live name availability check (debounced 500ms)
   const checkName = useCallback((val: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    // letters and numbers only: the same name then signs in on the casino and the village too
-    const clean = val.trim().toLowerCase();
-    if (/[^a-z0-9]/.test(clean)) { setNameAvail(false); setNameAvailMsg('Letters and numbers only'); return; }
-    if (!clean || clean.length < 3) { setNameAvail(null); setNameAvailMsg(clean.length > 0 ? 'Min 3 characters' : ''); return; }
-    if (clean.length > 20) { setNameAvail(false); setNameAvailMsg('Max 20 characters'); return; }
+    // the casino's and the village's rules: up to 24 characters as typed (spaces, symbols, an email),
+    // at least 3 of them letters or numbers
+    const typed = val.trim();
+    const letters = typed.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (typed.length < 3 || letters.length < 3) { setNameAvail(null); setNameAvailMsg(typed.length > 0 ? 'Min 3 letters or numbers' : ''); return; }
+    if (typed.length > 24) { setNameAvail(false); setNameAvailMsg('Max 24 characters'); return; }
     setNameAvailMsg('Checking...');
     debounceRef.current = setTimeout(async () => {
       try {
-        const r = await fetch(`/api/commander/check-name?name=${encodeURIComponent(clean)}`);
+        const r = await fetch(`/api/commander/check-name?name=${encodeURIComponent(typed)}`);
         const j = await r.json();
         setNameAvail(j.available);
         setNameAvailMsg(j.available ? '✓ AVAILABLE' : '✗ TAKEN');
@@ -191,20 +192,20 @@ export default function LandingPage() {
   }, []);
 
   const handleClaimName = useCallback(async () => {
-    const clean = nameQuery.trim().toLowerCase();
-    if (!/^[a-z0-9]{3,20}$/.test(clean) || !nameAvail) return;
+    const typed = nameQuery.trim();
+    if (typed.length < 3 || typed.length > 24 || !nameAvail) return;
     setNameClaiming(true);
     try {
       const r = await fetch('/api/commander/claim-name', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ name: clean, displayName: nameQuery.trim(), pin: pinInput.trim() })
+        body: JSON.stringify({ name: typed, displayName: typed, pin: pinInput.trim() })
       });
       const j = await r.json();
       if (!r.ok || !j.ok) { setNameAvailMsg(j.error || 'Failed — try another name'); setNameClaiming(false); return; }
-      // Save to profile
-      saveProfile({ primaryId: `name:${clean}`, name: j.displayName || clean, discordSkipLink: true });
+      // Save to profile (the server's id: "Big Chain" is name:big-chain)
+      saveProfile({ primaryId: j.playerId, name: j.displayName || typed, discordSkipLink: true });
       window.dispatchEvent(new Event('ra:identity-changed'));
-      setNameClaimed(j.displayName || clean);
+      setNameClaimed(j.displayName || typed);
       setShowNameClaim(false);
     } catch { setNameAvailMsg('Server error — try again'); }
     setNameClaiming(false);
@@ -388,7 +389,7 @@ export default function LandingPage() {
                 <div style={{ fontFamily:'inherit', fontSize:10, color:'rgba(255,255,255,0.4)', letterSpacing:'0.1em', marginBottom:24, lineHeight:1.8, textTransform:'uppercase' }}>
                   YOUR NAME IS PERMANENT · YOUR REBEL POINTS WILL BE TIED TO IT FOREVER
                 </div>
-                <input autoFocus value={nameQuery} onChange={e=>{ setNameQuery(e.target.value); checkName(e.target.value); }} onKeyDown={e=>{ if(e.key==='Enter' && nameAvail && pinInput.length>=4) handleClaimName(); }} placeholder="COMMANDER NAME" maxLength={20}
+                <input autoFocus value={nameQuery} onChange={e=>{ setNameQuery(e.target.value); checkName(e.target.value); }} onKeyDown={e=>{ if(e.key==='Enter' && nameAvail && pinInput.length>=4) handleClaimName(); }} placeholder="COMMANDER NAME" maxLength={24}
                   style={{ fontFamily:'inherit', width:'100%', padding:'12px 16px', fontSize:14, fontWeight:900, letterSpacing:'0.1em', background:'rgba(255,255,255,0.06)', border:`1px solid ${nameAvail===true?'#34d399':nameAvail===false?'#ef4444':'rgba(255,255,255,0.15)'}`, borderRadius:10, color:'white', outline:'none', marginBottom:6, textTransform:'uppercase', textAlign:'center' }} />
                 {nameAvailMsg && <div style={{ fontFamily:'inherit', fontSize:10, letterSpacing:'0.1em', color:nameAvail===true?'#34d399':nameAvail===false?'#f87171':'rgba(255,255,255,0.4)', marginBottom:10, textTransform:'uppercase' }}>{nameAvailMsg}</div>}
                 <input value={pinInput} onChange={e=>{ if(/^[0-9]*$/.test(e.target.value) && e.target.value.length<=6) setPinInput(e.target.value); }} onKeyDown={e=>{ if(e.key==='Enter' && nameAvail && pinInput.length>=4) handleClaimName(); }} placeholder="CHOOSE A 4-6 DIGIT PIN" maxLength={6} type="password" inputMode="numeric"

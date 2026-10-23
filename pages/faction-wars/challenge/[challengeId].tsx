@@ -1253,13 +1253,13 @@ export default function ChallengePage() {
   }, []);
 
   // ── Inline name claim handler (Commit G) ─────────────────────────────────
-  // Same backend as pages/index.tsx. Letters and numbers, 3-20 (the same name
-  // then signs in on the casino and the village). On success: save profile,
-  // dispatch identity event, gate flips.
+  // Same backend as pages/index.tsx, the casino's and the village's name rules:
+  // up to 24 characters as typed, at least 3 letters or numbers. On success:
+  // save profile, dispatch identity event, gate flips.
   const handleClaimName = useCallback(async () => {
-    const clean = nameInput.trim().toLowerCase();
-    if (!/^[a-z0-9]{3,20}$/.test(clean)) {
-      setSignInError("Name must be 3-20 letters and numbers");
+    const typed = nameInput.trim();
+    if (typed.length < 3 || typed.length > 24 || typed.toLowerCase().replace(/[^a-z0-9]/g, "").length < 3) {
+      setSignInError("Name must be 3-24 characters, at least 3 of them letters or numbers");
       return;
     }
     setNameClaiming(true);
@@ -1269,8 +1269,8 @@ export default function ChallengePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: clean,
-          displayName: nameInput.trim(),
+          name: typed,
+          displayName: typed,
           pin: pinInput.trim(),
         }),
       });
@@ -1280,8 +1280,8 @@ export default function ChallengePage() {
         return;
       }
       saveProfile({
-        primaryId: `name:${clean}`,
-        name: j.displayName || clean,
+        primaryId: j.playerId,
+        name: j.displayName || typed,
         discordSkipLink: false,
       });
       window.dispatchEvent(new Event("ra:identity-changed"));
@@ -1743,8 +1743,8 @@ export default function ChallengePage() {
                     value={nameInput}
                     onChange={(e) => { setNameInput(e.target.value); setSignInError(null); }}
                     onKeyDown={(e) => { if (e.key === "Enter") handleClaimName(); }}
-                    placeholder="commandername"
-                    maxLength={20}
+                    placeholder="commander name"
+                    maxLength={24}
                     disabled={nameClaiming}
                     style={{
                       flex: "1 1 180px", minWidth: 0,
