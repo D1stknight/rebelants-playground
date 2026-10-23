@@ -201,7 +201,11 @@ export default function LandingPage() {
         body: JSON.stringify({ name: typed, displayName: typed, pin: pinInput.trim() })
       });
       const j = await r.json();
-      if (!r.ok || !j.ok) { setNameAvailMsg(j.error || 'Failed — try another name'); setNameClaiming(false); return; }
+      if (!r.ok || !j.ok) {
+        // taken (here, or in the casino / the village, which the name check can't see): red, pick another
+        if (r.status === 409) setNameAvail(false);
+        setNameAvailMsg(j.error || 'Failed — try another name'); setNameClaiming(false); return;
+      }
       // Save to profile (the server's id: "Big Chain" is name:big-chain)
       saveProfile({ primaryId: j.playerId, name: j.displayName || typed, discordSkipLink: true });
       window.dispatchEvent(new Event('ra:identity-changed'));
