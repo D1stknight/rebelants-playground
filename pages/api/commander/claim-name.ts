@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
 import { createHash } from "crypto";
 import { signNameSession, nameSessionSetCookie } from "../../../lib/name-session";
+import { economyName, economyNameAuth, sharedWithEconomy } from "../../../lib/economy";
 
 function hashPin(name: string, pin: string): string {
   return createHash("sha256")
@@ -46,6 +47,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (existing) return res.status(409).json({ ok: false, error: "Name is already taken" });
 
   const playerId = `name:${name}`;
+
+  // A name of letters and digits is also a Rebel Economy colony name (the casino, the village): it is
+  // made there first, so a name someone already has in the economy is never handed out again here.
+  if (sharedWithEconomy(name)) {
+    const r = await economyNameAuth("register", economyName(displayName, name), pin, ip);
+    if (!r.ok || r.identityId !== playerId) {
+      if (r.code === "name_taken") {
+        return res.status(409).json({ ok: false, error: "That name is taken in the Rebel Economy (casino). Sign in with its PIN, or pick another." });
+      }
+      if (r.code === "rate_limited") return res.status(429).json({ ok: false, error: "Too many new names right now. Try again later." });
+      if (r.code === "name_short" || r.code === "name_chars" || r.code === "pin_format") {
+        return res.status(400).json({ ok: false, error: "Pick a name of 3-20 letters and numbers and a 4-6 digit PIN." });
+      }
+      return res.status(503).json({ ok: false, error: "Names are not available right now. Try again in a minute." });
+    }
+  }
 
   // Store name + PIN + metadata atomically
   await Promise.all([
