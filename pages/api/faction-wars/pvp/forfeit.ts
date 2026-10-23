@@ -1,4 +1,5 @@
 import { withPlaygroundMatchExperience } from "../../../../lib/server/raap-fwpvp-experience";
+import { withSignedPlayer } from "../../../../lib/server/player-auth";
 // pages/api/faction-wars/pvp/forfeit.ts
 //
 // Challenger forfeits a match they created. Effects vary by status:
@@ -148,4 +149,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withPlaygroundMatchExperience("forfeit", handler);
+export default withSignedPlayer("playerId", withPlaygroundMatchExperience("forfeit", handler));

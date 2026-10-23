@@ -1,4 +1,5 @@
 import { withPlaygroundMatchExperience } from "../../../../lib/server/raap-fwpvp-experience";
+import { withSignedPlayer } from "../../../../lib/server/player-auth";
 // POST /api/faction-wars/pvp/select-team
 //
 // Either player submits their 5-faction team. Both players must have submitted
@@ -45,4 +46,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withPlaygroundMatchExperience("select-team", handler);
+export default withSignedPlayer("playerId", withPlaygroundMatchExperience("select-team", handler));

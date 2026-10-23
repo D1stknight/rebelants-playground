@@ -1,4 +1,5 @@
 import { withPlaygroundHumanTournamentWriter } from "../../../../lib/server/raap-pvp-coordination";
+import { withSignedPlayer } from "../../../../lib/server/player-auth";
 // POST /api/faction-wars/tournament/leave
 //
 // Player withdraws from a draft tournament before it's seeded. Refunds entry fee.
@@ -35,4 +36,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   return res.status(200).json({ ok: true, tournament: t });
 }
 
-export default withPlaygroundHumanTournamentWriter(handler);
+export default withSignedPlayer("playerId", withPlaygroundHumanTournamentWriter(handler));

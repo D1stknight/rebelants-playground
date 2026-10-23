@@ -1,10 +1,11 @@
 import { withPlaygroundMatchExperience } from "../../../../lib/server/raap-fwpvp-experience";
+import { withSignedPlayer } from "../../../../lib/server/player-auth";
 // POST /api/faction-wars/pvp/accept
 //
 // Opponent accepts a pending challenge. Transitions status to "team_selection".
 // The opponent must be a different player from the challenger.
-// Identity check matches the create endpoint pattern: V1 trusts the supplied
-// identity. In production UI we'll require commander name or Discord linked.
+// Identity check matches the create endpoint pattern: the opponentPlayerId must be
+// the player a signed session proves (withSignedPlayer).
 
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getMatch, saveMatch, addPlayerMatch, getPvpEconomyConfig, spendREBEL, getREBELBalance } from "../../../../lib/server/fwpvp";
@@ -79,4 +80,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withPlaygroundMatchExperience("accept", handler);
+export default withSignedPlayer("opponentPlayerId", withPlaygroundMatchExperience("accept", handler));
