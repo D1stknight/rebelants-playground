@@ -1761,8 +1761,9 @@ export default function ChallengePage() {
                     value={pinInput}
                     onChange={(e) => setPinInput(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") handleClaimName(); }}
-                    placeholder="PIN (optional)"
-                    maxLength={20}
+                    placeholder="4-6 digit PIN"
+                    inputMode="numeric"
+                    maxLength={6}
                     disabled={nameClaiming}
                     style={{
                       width: 130,
