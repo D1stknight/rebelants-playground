@@ -155,14 +155,15 @@ export function usePoints(playerId: string) {
     [refresh, earnedToday, balance]
   );
 
+  // a game's payout: `game` is the reason its entry fee was paid with, so the run it opened goes along
   const earn = useCallback(
-    async (amount: number) => {
+    async (amount: number, game?: string) => {
       const pid = clampPid(playerIdRef.current);
 
       const r = await fetch("/api/points/earn", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerId: pid, amount }),
+        body: JSON.stringify({ playerId: pid, amount, game, runId: game ? runsRef.current[game] : undefined }),
       });
 
       const j = (await r.json().catch(() => null)) as EarnRes | null;

@@ -1,14 +1,12 @@
 // pages/api/points/earn.ts
+// A game's payout. The server decides it (lib/server/gameRuns.ts): only within a run
+// the player's account paid the entry for, never more than that run can pay.
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
-import { pointsConfig as defaultPointsConfig } from "../../../lib/pointsConfig";
 import { addToEarnedTotal, updateBalanceLeaderboard } from "../../../lib/server/leaderboards";
 import { economyCredit, idemKey } from "../../../lib/economy";
 import { actingPlayer } from "../../../lib/server/player-auth";
-
-function balKey(playerId: string) {
-  return `ra:points:bal:${playerId}`;
-}
+import { decidePayout, loadLiveConfig } from "../../../lib/server/gameRuns";
 
 function capBankKey(playerId: string) {
   return `ra:points:capbank:${playerId}`;
@@ -22,29 +20,6 @@ function spentTodayKey(playerId: string) {
   return `ra:points:spent:${playerId}:${yyyy}-${mm}-${dd}`;
 }
 
-// ✅ get LIVE config (Admin -> Redis) via /api/config, fallback to defaults
-async function getLivePointsConfig(req: NextApiRequest) {
-  try {
-    const proto = (req.headers["x-forwarded-proto"] as string) || "http";
-    const host = req.headers.host;
-    const url = `${proto}://${host}/api/config`;
-
-    const r = await fetch(url, {
-      method: "GET",
-      headers: { "Cache-Control": "no-store" },
-    });
-    const j: any = await r.json().catch(() => null);
-
-    if (r.ok && j?.pointsConfig) {
-      return { ...defaultPointsConfig, ...j.pointsConfig };
-    }
-  } catch {
-    // ignore; fallback below
-  }
-
-  return defaultPointsConfig;
-}
-
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     if (req.method !== "POST") {
@@ -52,9 +27,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(405).json({ error: "Method not allowed" });
     }
 
-    const { playerId, amount } = (req.body ?? {}) as {
+    const { playerId, amount, game, runId } = (req.body ?? {}) as {
       playerId?: string;
       amount?: number;
+      game?: string;
+      runId?: string;
     };
 
     const claimed = (playerId || "guest").trim() || "guest";
@@ -75,23 +52,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     const economyUser = who.user;
     const pid = who.playerId;
-    const credit = await economyCredit({
-      userId: economyUser.userId,
-      amount: amt,
-      reason: "Playground reward",
-      idempotencyKey: idemKey(["earn", economyUser.userId, Date.now(), amt]),
-      metadata: { playerId: pid },
-    });
-    if (!credit.ok) {
-      return res.status(502).json({ error: "Economy credit failed" });
+
+    const liveCfg = await loadLiveConfig();
+    const decision = await decidePayout({ cfg: liveCfg, game, runId, userId: economyUser.userId, playerId: pid, asked: amt });
+    if (!decision.ok) {
+      return res.status(decision.status).json({ ok: false, error: decision.error, code: decision.code });
     }
-    const newBalance = credit.balance;
 
-    // ✅ Keep lifetime earned leaderboard accurate
-    await addToEarnedTotal(pid, amt);
+    let newBalance = Number(economyUser.balance || 0);
+    if (decision.amount > 0) {
+      const credit = await economyCredit({
+        userId: economyUser.userId,
+        amount: decision.amount,
+        reason: "Playground reward",
+        idempotencyKey: idemKey([decision.key]),
+        metadata: { playerId: pid, game: decision.run?.game, runId: decision.run?.id },
+      });
+      if (!credit.ok) {
+        await decision.release();
+        return res.status(502).json({ error: "Economy credit failed" });
+      }
+      newBalance = credit.balance;
 
-    // ✅ Keep balance leaderboard accurate
-    await updateBalanceLeaderboard(pid, Number(newBalance || 0));
+      // ✅ Keep lifetime earned leaderboard accurate
+      await addToEarnedTotal(pid, decision.amount);
+
+      // ✅ Keep balance leaderboard accurate
+      await updateBalanceLeaderboard(pid, Number(newBalance || 0));
+    }
 
     // ✅ Return play-cap info WITHOUT modifying it
     const spentRaw = await redis.get<number>(spentTodayKey(pid));
@@ -100,7 +88,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const capBankRaw = await redis.get<number>(capBankKey(pid));
     const capBank = Number(capBankRaw || 0);
 
-    const liveCfg = await getLivePointsConfig(req);
     const dailyCap = Number((liveCfg as any).dailyEarnCap || 0);
     const remainingDaily = Math.max(0, dailyCap - spentToday);
     const totalPlayRoom = remainingDaily + capBank;
@@ -108,8 +95,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({
       ok: true,
       playerId: pid,
-      added: amt,
-      capped: false,
+      added: decision.amount,
+      capped: decision.cut,
       balance: Number(newBalance || 0),
       earnedToday: spentToday,
       spentToday,

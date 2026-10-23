@@ -25,7 +25,7 @@ function fmt(t: number) { const m = Math.floor(t / 60), s = t - m * 60; return `
 const RebelGP: React.FC = () => {
   const [pid, setPid] = useState("guest");
   useEffect(() => { const u = () => { try { setPid(getEffectivePlayerId(loadProfile()) || "guest"); } catch { setPid("guest"); } }; u(); window.addEventListener("ra:identity-changed", u); return () => window.removeEventListener("ra:identity-changed", u); }, []);
-  const { balance, spend, earn, refresh } = usePoints(pid);
+  const { balance, spend, earn, refresh, runOf } = usePoints(pid);
   const [cfg, setCfg] = useState<any>(defaultPointsConfig);
   useEffect(() => { (async () => { try { const r = await fetch("/api/config", { cache: "no-store" }); const j = await r.json().catch(() => null); if (r.ok && j?.pointsConfig) setCfg((p: any) => ({ ...p, ...j.pointsConfig })); } catch {} })(); }, []);
   const cost = Number(cfg?.gpCost ?? GP_DEFAULT_COST);
@@ -62,15 +62,15 @@ const RebelGP: React.FC = () => {
     setResult({ ...r, paid, trackId: track.id }); setPhase("result");
     try { if (document.fullscreenElement || (document as any).webkitFullscreenElement) (document.exitFullscreen || (document as any).webkitExitFullscreen)?.call(document); } catch {}
     const key = Date.now();
-    if (paid > 0) { try { await earn(paid); } catch {} }
+    if (paid > 0) { try { await earn(paid, "gp"); } catch {} }
     try {
       const prof = loadProfile(); const pname = (prof?.discordName || prof?.name || "guest").trim() || "guest";
-      await fetch("/api/wins/add", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: `${key}-${Math.random().toString(36).slice(2, 7)}`, ts: key, game: "gp", playerId: pid, playerName: pname, rarity: r.place === 1 ? (track.cup >= 4 ? "ultra" : "rare") : r.place <= 3 ? "common" : "none", pointsAwarded: paid, survivors: 9 - r.place, prize: null }) });
+      await fetch("/api/wins/add", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: `${key}-${Math.random().toString(36).slice(2, 7)}`, ts: key, game: "gp", runId: runOf("gp"), playerId: pid, playerName: pname, rarity: r.place === 1 ? (track.cup >= 4 ? "ultra" : "rare") : r.place <= 3 ? "common" : "none", pointsAwarded: paid, survivors: 9 - r.place, prize: null }) });
     } catch {}
     try { const b = loadBest(); const prev = b[track.id]; if (!prev || r.place < prev.place || (r.place === prev.place && r.time < prev.time)) b[track.id] = { place: r.place, time: r.time }; localStorage.setItem(BEST_KEY, JSON.stringify(b)); setBest(b); } catch {}
     window.dispatchEvent(new Event("ra:leaderboards-refresh"));
     await refresh().catch(() => {});
-  }, [cost, earn, pid, refresh, track]);
+  }, [cost, earn, pid, refresh, runOf, track]);
 
   if (phase === "race") return <RaceView trackId={track.id} faction={faction} chassis={chassis} onEnd={onEnd} onQuit={() => onEnd({ place: 8, time: 0 })} />;
 

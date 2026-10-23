@@ -479,7 +479,7 @@ export default function FactionWars() {
     document.head.appendChild(styleEl);
   }, []);
 
-  const { balance, spend, earn, refresh, totalEarnRoom, devGrant } = usePoints(effectivePlayerId);
+  const { balance, spend, earn, refresh, totalEarnRoom, devGrant, runOf } = usePoints(effectivePlayerId);
   const [checkingSavedCampaign, setCheckingSavedCampaign] = useState(false);
   const [campaignBalanceMessage, setCampaignBalanceMessage] = useState("");
   const checkingCampaignRef = useRef(false);
@@ -851,7 +851,7 @@ if (typeof window !== "undefined") {
     if (selectedMove.id === "divine_auth")   plunderPendingRef.current = true;
     if (selectedMove.id === "strategic_ret")  setStrategicRetUsed(true);
     // strategic_ret handled below
-    if (selectedMove.id === "cutlass_raid")     { if (Math.random() < 0.4) { const bonus2 = 10; earn(bonus2).catch(()=>{}); } }
+    if (selectedMove.id === "cutlass_raid")     { if (Math.random() < 0.4) { const bonus2 = 10; earn(bonus2, "faction-wars").catch(()=>{}); } }
     if (selectedMove.id === "mountain_seal")    setPowerBuffAmt(prev => prev + 3); // seal = your next moves hit harder
     if (selectedMove.id === "bushido_stand")     { /* handled via block + bonus in calcDamage */ }
     if (selectedMove.id === "blood_price")       { setPlayerHp(hp => Math.max(1, hp - 20)); } // costs 20 HP
@@ -998,7 +998,7 @@ if (over) {
       // Plunder bonus on win
       if (playerWon && plunderPendingRef.current) {
         const plunderAmt = Number(cfg?.factionWarsPlunderBonus ?? 50);
-        try { await earn(plunderAmt); await refresh(); } catch {}
+        try { await earn(plunderAmt, "faction-wars"); await refresh(); } catch {}
         plunderPendingRef.current = false;
         // Big REBEL float on screen
         const pid2 = ++dmgFloatId.current;
@@ -1045,14 +1045,14 @@ if (over) {
     if (team.includes("buke") && rarity==="none") { const dc=allResults.reduce((sum,r)=>sum+(r.rounds?.filter(rnd=>rnd.playerMove.type==="defend").length||0),0); if(dc>=3){rarity="common";pts=Number(cfg?.rewards?.common??50);} }
     if (verified) { rarity = verified.state.rarity; pts = verified.state.reward; }
     setFinalRarity(rarity);
-    if (!verified && pts>0) { const er:any=await earn(pts).catch(()=>null); if(er?.ok)await refresh().catch(()=>{}); }
+    if (!verified && pts>0) { const er:any=await earn(pts, "faction-wars").catch(()=>null); if(er?.ok)await refresh().catch(()=>{}); }
 
           // ── Roll crate prize (exact Shuffle pattern) ──────────────────────
           if (rarity !== "none") {
             try {
               const rollR = verified ? null : await fetch(`/api/prizes/roll?force=${rarity}`, {
                 method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ playerId: String(effectivePlayerId||"guest"), rarity, game: "faction-wars" })
+                body: JSON.stringify({ playerId: String(effectivePlayerId||"guest"), rarity, game: "faction-wars", runId: runOf("faction-wars") })
               });
               const rollJ = verified ? await solo.reward() : await rollR!.json().catch(() => null);
               if ((verified || rollR!.ok) && rollJ?.ok && rollJ?.prize) {
@@ -1103,7 +1103,7 @@ if (over) {
       try { await solo.recordScore(pname); } catch (error) { setRunMessage((error as Error).message); }
     } else {
     addWin({id:`${Date.now()}-${Math.random().toString(36).slice(2,7)}`,ts:Date.now(),game:"faction-wars",playerId:pid,playerName:pname,rarity,pointsAwarded:pts});
-    await fetch("/api/faction-wars/record",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({playerId:pid,playerName:pname,rarity,pointsAwarded:pts,territoriesWon,team,perfect:territoriesWon===5})}).catch(()=>{});
+    await fetch("/api/faction-wars/record",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({playerId:pid,playerName:pname,rarity,pointsAwarded:pts,territoriesWon,team,perfect:territoriesWon===5,runId:runOf("faction-wars")})}).catch(()=>{});
     }
     window.dispatchEvent(new Event("ra:leaderboards-refresh")); void loadLB();
     if (rarity==="ultra") sfx.ultra(); else if (rarity!=="none") sfx.win(); else sfx.lose();
@@ -1625,7 +1625,7 @@ setPlayerHp(MAX_HP); setEnemyHp(MAX_HP); setCurrentRound(0); setRoundLog([]); se
                           setHealBusy(true);
                           try {
                             if (solo.session && !solo.session.abandoned) applySolo(await solo.act({ kind: "HEAL" }, healCost));
-                            else { await spend(healCost,"faction-wars"); const newHp=Math.min(MAX_HP,playerHp+healAmt); setPlayerHp(newHp); setHealUsed(n=>n+1); }
+                            else { await spend(healCost,"faction-wars-heal"); const newHp=Math.min(MAX_HP,playerHp+healAmt); setPlayerHp(newHp); setHealUsed(n=>n+1); }
                             await refresh();
                           } catch (error) { setRunMessage((error as Error).message); }
                           setHealBusy(false);

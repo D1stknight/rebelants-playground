@@ -25,7 +25,7 @@ const HiveDescent: React.FC = () => {
     const u = () => { try { setPid(getEffectivePlayerId(loadProfile()) || "guest"); } catch { setPid("guest"); } };
     u(); window.addEventListener("ra:identity-changed", u); return () => window.removeEventListener("ra:identity-changed", u);
   }, []);
-  const { balance, spend, earn, refresh } = usePoints(pid);
+  const { balance, spend, earn, refresh, runOf } = usePoints(pid);
 
   const [cfg, setCfg] = useState<any>(defaultPointsConfig);
   useEffect(() => { (async () => { try { const r = await fetch("/api/config", { cache: "no-store" }); const j = await r.json().catch(() => null); if (r.ok && j?.pointsConfig) setCfg((p: any) => ({ ...p, ...j.pointsConfig })); } catch {} })(); }, []);
@@ -54,12 +54,12 @@ const HiveDescent: React.FC = () => {
   const finishRun = useCallback(async (r: Run) => {
     const key = `${r.seed}-${r.startedAt}`; if (finishedRef.current === key) return; finishedRef.current = key;
     const banked = Math.max(0, Math.round(r.banked));
-    if (banked > 0) { try { await earn(banked); } catch {} }
+    if (banked > 0) { try { await earn(banked, "descent"); } catch {} }
     const prof = loadProfile();
     const pname = (prof?.discordName || prof?.name || "guest").trim() || "guest";
     const rarity = rarityForRun(r);
     try {
-      await fetch("/api/wins/add", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, ts: Date.now(), game: "descent", playerId: pid, playerName: pname, rarity, pointsAwarded: banked, survivors: r.maxFloorReached, prize: null }) });
+      await fetch("/api/wins/add", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, ts: Date.now(), game: "descent", runId: runOf("descent"), playerId: pid, playerName: pname, rarity, pointsAwarded: banked, survivors: r.maxFloorReached, prize: null }) });
     } catch {}
     try {
       const prev = loadBest();
@@ -69,7 +69,7 @@ const HiveDescent: React.FC = () => {
     } catch {}
     window.dispatchEvent(new Event("ra:leaderboards-refresh"));
     await refresh().catch(() => {});
-  }, [earn, pid, refresh]);
+  }, [earn, pid, refresh, runOf]);
 
   const onRun = useCallback((r: Run) => {
     setRun(r);
