@@ -3,6 +3,7 @@ import { redis } from "../../../lib/server/redis";
 import { createHash } from "crypto";
 import { signNameSession, nameSessionSetCookie } from "../../../lib/name-session";
 import { rateLimit } from "../../../lib/server/ratelimit";
+import { economyName, economyNameAuth, sharedWithEconomy } from "../../../lib/economy";
 
 function hashPin(name: string, pin: string): string {
   return createHash("sha256")
@@ -39,22 +40,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!name) return res.status(400).json({ ok: false, error: "Name required" });
   if (!pin) return res.status(400).json({ ok: false, error: "PIN required" });
 
-  // Check name exists
   const nameKey = `ra:commander:name:${name}`;
+  const pinKey = `ra:commander:pin:${name}`;
+  const fails = PIN_FAILS(name, getIP(req));
+  const signIn = (displayName: string) => {
+    // Keyed by NAME_SESSION_SECRET, else a key derived from the Discord app secret (lib/name-session.ts).
+    const sessionToken = signNameSession("name:" + name);
+    if (sessionToken) res.setHeader("Set-Cookie", nameSessionSetCookie(sessionToken));
+    return res.status(200).json({ ok: true, name, playerId: `name:${name}`, displayName });
+  };
+  if (sharedWithEconomy(name)) return signInWithEconomy();
+
+  // Check name exists
   const exists = await redis.get(nameKey);
   if (!exists) return res.status(404).json({ ok: false, error: "Commander name not found" });
 
   // Check PIN
-  const pinKey = `ra:commander:pin:${name}`;
   const storedHash = await redis.get<string>(pinKey);
   // code no_pin: the sign-in card offers the device that holds this name a PIN (as the home page's SET PIN)
   if (!storedHash) return res.status(403).json({ ok: false, code: "no_pin", error: "No PIN set for this name. Contact support." });
 
-  const fails = PIN_FAILS(name, getIP(req));
-  const counts = await Promise.all(fails.map((f) => redis.get<number>(f.key)));
-  if (counts.some((c, i) => Number(c || 0) >= fails[i].limit)) {
-    return res.status(429).json({ ok: false, error: "Too many wrong PINs. Try again later." });
-  }
+  if (await tooManyFails()) return res.status(429).json({ ok: false, error: "Too many wrong PINs. Try again later." });
 
   const attemptHash = hashPin(name, pin);
   if (attemptHash !== storedHash) {
@@ -63,11 +69,62 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   // Get display name
-  const displayName = await redis.get<string>(`ra:commander:player:name:${name}`) || raw;
+  return signIn(await redis.get<string>(`ra:commander:player:name:${name}`) || raw);
 
-  // Issue a server-verified session cookie for this name identity.
-  // Keyed by NAME_SESSION_SECRET, else a key derived from the Discord app secret (lib/name-session.ts).
-  const sessionToken = signNameSession("name:" + name);
-  if (sessionToken) res.setHeader("Set-Cookie", nameSessionSetCookie(sessionToken));
-  return res.status(200).json({ ok: true, name, playerId: `name:${name}`, displayName });
+  async function tooManyFails() {
+    const counts = await Promise.all(fails.map((f) => redis.get<number>(f.key)));
+    return counts.some((c, i) => Number(c || 0) >= fails[i].limit);
+  }
+
+  // A name of letters and digits is also a Rebel Economy colony name (the casino, the village): the
+  // economy's PIN signs it in. An old Playground name the economy does not have yet is proven by its
+  // Playground PIN and then gets that PIN in the economy, so it is one name with one PIN everywhere.
+  async function signInWithEconomy() {
+    if (await tooManyFails()) return res.status(429).json({ ok: false, error: "Too many wrong PINs. Try again later." });
+    const ip = getIP(req);
+    const ours = (id?: string) => id === `name:${name}`;
+    const unavailable = () => res.status(503).json({ ok: false, error: "Sign-in is not available right now. Try again in a minute." });
+    const shown = async (fallback?: string) => (await redis.get<string>(`ra:commander:player:name:${name}`)) || fallback || raw;
+    const e = await economyNameAuth("login", name, pin, ip);
+    if (e.ok) {
+      if (!ours(e.identityId)) return unavailable();
+      // First time here for a casino / village name: on the list, its PIN kept by the economy alone
+      // ("economy" is no PIN hash, so the Playground's own PIN check never matches it).
+      await Promise.all([
+        redis.set(nameKey, `name:${name}`, { nx: true }),
+        redis.set(pinKey, "economy", { nx: true }),
+        e.displayName ? redis.set(`ra:commander:player:name:${name}`, e.displayName, { nx: true }) : null,
+      ]);
+      return signIn(await shown(e.displayName));
+    }
+    if (e.code === "rate_limited") return res.status(429).json({ ok: false, error: "Too many sign-in attempts. Try again in a few minutes." });
+    if (e.code === "locked") return res.status(429).json({ ok: false, error: "Too many wrong PINs for this name. Try again in 15 minutes." });
+    const storedHash = await redis.get<string>(pinKey);
+    if (e.code === "pin_wrong") {
+      await Promise.all(fails.map((f) => rateLimit(f)));
+      // The Playground PIN of the same name, but the economy (casino) account has another PIN.
+      if (storedHash && storedHash === hashPin(name, pin)) {
+        return res.status(403).json({ ok: false, code: "economy_pin", error: "This name is also a Rebel Economy (casino) account with another PIN. Sign in with that PIN." });
+      }
+      return res.status(403).json({ ok: false, error: "Incorrect PIN" });
+    }
+    if (e.code !== "name_unknown") return unavailable();
+
+    if (!(await redis.get(nameKey))) return res.status(404).json({ ok: false, error: "Commander name not found" });
+    if (!storedHash) return res.status(403).json({ ok: false, code: "no_pin", error: "No PIN set for this name. Contact support." });
+    if (hashPin(name, pin) !== storedHash) {
+      await Promise.all(fails.map((f) => rateLimit(f)));
+      return res.status(403).json({ ok: false, error: "Incorrect PIN" });
+    }
+    const display = await shown();
+    let r = await economyNameAuth("register", economyName(display, name), pin, ip);
+    // made in the economy a moment ago (a second tab, another app): the same PIN signs it in
+    if (r.code === "name_taken") r = await economyNameAuth("login", name, pin, ip);
+    if (r.ok && ours(r.identityId)) return signIn(display);
+    if (r.code === "rate_limited") return res.status(429).json({ ok: false, error: "Too many sign-in attempts. Try again in a few minutes." });
+    if (r.code === "pin_wrong" || r.code === "locked") {
+      return res.status(403).json({ ok: false, code: "economy_pin", error: "This name is also a Rebel Economy (casino) account with another PIN. Sign in with that PIN." });
+    }
+    return unavailable();
+  }
 }
