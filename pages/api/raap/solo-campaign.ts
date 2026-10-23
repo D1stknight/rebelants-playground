@@ -4,6 +4,7 @@ import { createPlaygroundPlayerConnection, inspectPlaygroundLearningSession } fr
 import { readRaapDiscordPlayer, raapDiscordPlayerSettings } from "../../../lib/server/raap-discord-player";
 import { soloConfig } from "../../../lib/factionWarsSoloCampaign";
 import { pointsConfig as defaults } from "../../../lib/pointsConfig";
+import { INTERNAL_CALL } from "../../../lib/server/player-auth";
 
 export const config = { api: { bodyParser: false }, maxDuration: 60 };
 
@@ -61,7 +62,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const run = async (handler: (req: NextApiRequest, res: NextApiResponse) => unknown, body: object, query: object = {}) => {
         let value: unknown, code = 200;
         const response = { setHeader() {}, status(n: number) { code = n; return this; }, json(v: unknown) { value = v; return this; } };
-        await handler({ method: "POST", body, query, headers: { host: new URL(settings.origin).host, "x-forwarded-proto": "https" } } as unknown as NextApiRequest, response as unknown as NextApiResponse);
+        await handler({ method: "POST", body, query, headers: { host: new URL(settings.origin).host, "x-forwarded-proto": "https" }, [INTERNAL_CALL]: true } as unknown as NextApiRequest, response as unknown as NextApiResponse);
         if (code !== 200 || !value) throw Error(); return value;
       };
       if (b.operation === "REPORT") {

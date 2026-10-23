@@ -14,6 +14,7 @@ type BalanceRes = {
 type SpendRes = {
   ok: boolean;
   playerId: string;
+  runId?: string;
   balance: number;
   earnedToday?: number;
   capBank?: number;
@@ -64,6 +65,8 @@ export function usePoints(playerId: string) {
   const [dailyCap, setDailyCap] = useState(0);
   const [remainingDaily, setRemainingDaily] = useState(0);
   const [totalEarnRoom, setTotalEarnRoom] = useState(0);
+  // the run each game's entry fee opened (points/spend): its payout is paid against it (lib/server/gameRuns.ts)
+  const runsRef = useRef<Record<string, string>>({});
 
   const refresh = useCallback(async () => {
     const pid = clampPid(playerIdRef.current);
@@ -134,6 +137,7 @@ export function usePoints(playerId: string) {
 
       if (pid !== clampPid(playerIdRef.current)) return (j || { ok: false, playerId: pid, balance, earnedToday }) as SpendRes;
 
+      if (r.ok && j && reason && j.runId) runsRef.current[reason] = j.runId;
       if (r.ok && j && typeof j.balance === "number") {
         setBalance(j.balance);
         setEarnedToday(Number(j.earnedToday ?? earnedToday));
@@ -216,7 +220,11 @@ export function usePoints(playerId: string) {
     setBalance(newBalance);
   }, []);
 
+  // the run a game's entry fee opened (its prize roll or payout goes with it)
+  const runOf = useCallback((game: string): string | undefined => runsRef.current[game], []);
+
   return {
+    runOf,
     balance,
     earnedToday,
     capBank,
