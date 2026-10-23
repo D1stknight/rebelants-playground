@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { NO_PIN_SUPPORT } from '../lib/commanderPins';
+import { OLD_NAME_PIN_NOTE } from '../lib/commanderPins';
 import { loadProfile, saveProfile, signOutProfile } from '../lib/profile';
 import { getEffectivePlayerId } from '../lib/profile';
 import dynamic from 'next/dynamic';
@@ -423,7 +423,7 @@ export default function LandingPage() {
                 <div style={{ fontFamily:'inherit', fontSize:17, fontWeight:900, letterSpacing:'0.2em', marginBottom:8, textTransform:'uppercase', color:'#fbbf24' }}>YOUR PIN</div>
                 <div style={{ fontFamily:'inherit', fontSize:10, color:'rgba(255,255,255,0.55)', letterSpacing:'0.1em', marginBottom:24, lineHeight:1.8, textTransform:'uppercase' }}>
                   YOUR COMMANDER NAME SIGNS IN WITH ITS PIN ON ANY DEVICE.<br/><br/>
-                  {NO_PIN_SUPPORT}
+                  {OLD_NAME_PIN_NOTE}
                 </div>
                 <div style={{ display:'flex', gap:8, justifyContent:'center' }}>
                   <button onPointerDown={e=>{e.preventDefault(); setShowNameClaim(false); setSignInMsg(''); setPinInput('');}} style={{ fontFamily:'inherit', padding:'11px 24px', fontSize:11, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background:'transparent', border:'1px solid rgba(255,255,255,0.25)', borderRadius:50, color:'rgba(255,255,255,0.7)', cursor:'pointer' }}>CLOSE</button>
