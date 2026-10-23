@@ -15,6 +15,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import { FACTIONS, MAX_HP, TEAM_SIZE, TERRITORY_COUNT } from "../../../lib/factionWarsCore";
 import type { PvpMatch, PvpRound, PvpBet, PvpBetsState, PvpSide } from "../../../lib/types/fwpvp";
+import { matchHasGuestSide, rewardsWithheldText } from "../../../lib/fwpvpRewards";
 import { ChatPanel, useChatState } from "../../../components/PvpChatPanel";
 import { loadProfile, type Profile } from "../../../lib/profile";
 
@@ -594,6 +595,20 @@ function BetPanel({
     return (
       <div style={{ padding: "16px 20px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", marginBottom: 20, fontSize: 12, color: "rgba(255,255,255,0.5)", textAlign: "center" }}>
         Side bets are open to spectators only — you can't bet on your own match.
+      </div>
+    );
+  }
+
+  // Side bets need two signed-in players (lib/fwpvpRewards.ts): else they are refunded at the end
+  const noteStyle = { padding: "16px 20px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", marginBottom: 20, fontSize: 12, color: "rgba(255,255,255,0.6)", textAlign: "center" as const };
+  if (match.status === "completed" && match.pvpRewardsWithheld && betsState && betsState.bets.length > 0) {
+    return <div style={noteStyle}>Bets refunded. {rewardsWithheldText(match.pvpRewardsWithheld)}</div>;
+  }
+  if (!matchTerminal && matchHasGuestSide(match)) {
+    return (
+      <div style={noteStyle}>
+        Side bets are only open on matches between two signed-in players.
+        {betsState && betsState.bets.length > 0 ? " Bets already placed are refunded when the match ends." : ""}
       </div>
     );
   }
