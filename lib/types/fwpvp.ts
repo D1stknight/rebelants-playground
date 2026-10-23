@@ -172,6 +172,12 @@ export interface PvpMatch {
   // checked (lib/server/fwpvp.ts matchAccounts).
   pvpRewardsWithheld?: "guest" | "same_account" | "unverified";
 
+  // Set when the winner's account had reached its daily crate cap
+  // (factionWarsPvpCrateDailyCap, per Rebel Economy account per UTC day):
+  // pvpCrateRewardPaid is what was paid, pvpCrateRewardFull what the crate was worth.
+  pvpCrateCapped?: boolean;
+  pvpCrateRewardFull?: number;
+
   // ── Tournament linkage (optional) ──────────────────────────────────────
   // If this match is part of a tournament, these are populated. Submit-move
   // calls into the tournament module on completion to advance the bracket.
