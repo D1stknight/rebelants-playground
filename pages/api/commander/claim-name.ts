@@ -29,6 +29,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const displayName = String(body.displayName || raw).trim().slice(0, 24);
   const name = normalize(raw);
 
+  // New names: letters and numbers only, so a name is the same in every Rebel Ants app (the casino and
+  // the village read a space or a symbol as "-", the Playground drops it, and _ exists only here).
+  if (/[^A-Za-z0-9]/.test(raw)) return res.status(400).json({ ok: false, error: "Use letters and numbers only (no spaces or symbols)" });
   if (!name || name.length < 3) return res.status(400).json({ ok: false, error: "Name must be at least 3 characters" });
   if (name.length > 20) return res.status(400).json({ ok: false, error: "Name must be 20 characters or less" });
   if (!pin || pin.length < 4 || pin.length > 6 || !/^[0-9]+$/.test(pin)) {
@@ -48,13 +51,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const playerId = `name:${name}`;
 
-  // A name of letters and digits is also a Rebel Economy colony name (the casino, the village): it is
-  // made there first, so a name someone already has in the economy is never handed out again here.
+  // The name is also a Rebel Economy colony name (the casino, the village): it is made there first, so a
+  // name the economy already has (a PIN there, or an account with points) is never handed out again here.
+  // The spelling shown is the economy's, the same in every app.
+  const shown = economyName(displayName, name);
   if (sharedWithEconomy(name)) {
-    const r = await economyNameAuth("register", economyName(displayName, name), pin, ip);
+    const r = await economyNameAuth("register", shown, pin, ip);
     if (!r.ok || r.identityId !== playerId) {
       if (r.code === "name_taken") {
-        return res.status(409).json({ ok: false, error: "That name is taken in the Rebel Economy (casino). Sign in with its PIN, or pick another." });
+        return res.status(409).json({ ok: false, error: "That name is already taken in Rebel Ants. If it's yours, sign in with its PIN; else pick another." });
       }
       if (r.code === "rate_limited") return res.status(429).json({ ok: false, error: "Too many new names right now. Try again later." });
       if (r.code === "name_short" || r.code === "name_chars" || r.code === "pin_format") {
@@ -68,12 +73,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   await Promise.all([
     redis.set(nameKey, playerId),
     redis.set(`ra:commander:pin:${name}`, hashPin(name, pin)),
-    redis.set(`ra:commander:player:${playerId}`, displayName),
+    redis.set(`ra:commander:player:${playerId}`, shown),
     redis.incr(ipKey).then(() => redis.expire(ipKey, 86400)),
   ]);
 
   // Signed in with the new name at once (the points routes believe name:<slug> only with this session).
   const sessionToken = signNameSession(playerId);
   if (sessionToken) res.setHeader("Set-Cookie", nameSessionSetCookie(sessionToken));
-  return res.status(200).json({ ok: true, name, displayName, playerId });
+  return res.status(200).json({ ok: true, name, displayName: shown, playerId });
 }
