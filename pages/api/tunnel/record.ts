@@ -1,14 +1,26 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
+import { actingPlayer } from "../../../lib/server/player-auth";
+import { firstRecord, readRun } from "../../../lib/server/gameRuns";
 
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") return res.status(405).json({ ok: false });
   const body = req.body || {};
-  const playerId = String(body.playerId || "guest").trim().slice(0, 64) || "guest";
+  let playerId = String(body.playerId || "guest").trim().slice(0, 64) || "guest";
   const playerName = String(body.playerName || "guest").trim().slice(0, 40) || "guest";
-  const score = Math.max(0, Number(body.score || 0));
+  let score = Math.max(0, Math.floor(Number(body.score || 0)) || 0);
   const fullClear = !!body.fullClear;
-  const clearTimeMs = Math.max(0, Number(body.clearTimeMs || 0));
+  let clearTimeMs = Math.max(0, Number(body.clearTimeMs || 0));
+
+  // ✅ A run goes on the Tunnel boards once, from a Tunnel run the player's account paid the entry for: its
+  // score no more than that run can pay, its clear time no shorter than the run itself.
+  const who = await actingPlayer(req, playerId);
+  if (!who.ok) return res.status(401).json({ ok: false, error: "Sign in again to record your run.", signIn: who.signIn });
+  const run = await readRun(body.runId);
+  if (!run || run.game !== "tunnel" || run.userId !== who.user.userId || !(await firstRecord("tunnel", run.id))) return res.status(200).json({ ok: true, recorded: false });
+  playerId = who.playerId;
+  score = Math.min(score, run.max);
+  if (clearTimeMs > 0) clearTimeMs = Math.max(clearTimeMs, Date.now() - run.startedAt - 4000);
   const crystalsCollected = Math.max(0, Number(body.crystalsCollected || 0));
   const layoutIndex = typeof body.layoutIndex === "number" ? body.layoutIndex : null;
   const layoutName = typeof body.layoutName === "string" ? String(body.layoutName) : "";

@@ -2,6 +2,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
 import { LB_WINS, LB_RECENT_WINS } from "../../../lib/server/leaderboards";
+import { actingPlayer, isAdminRequest, isInternalRequest } from "../../../lib/server/player-auth";
+import { firstRecord, runOutcome } from "../../../lib/server/gameRuns";
 
 const PLAYER_NAMES = "ra:player_names_v1"; // playerId -> last known display name
 
@@ -18,12 +20,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body ?? {});
 
-    const playerId = String(body.playerId || "guest").trim().slice(0, 64) || "guest";
+    let playerId = String(body.playerId || "guest").trim().slice(0, 64) || "guest";
     const playerName = String(body.playerName || "guest").trim().slice(0, 64) || "guest";
-    const game = String(body.game || "shuffle").trim().slice(0, 32) || "shuffle";
-    const rarity = String(body.rarity || "none").trim().slice(0, 16) || "none";
+    let game = String(body.game || "shuffle").trim().slice(0, 32) || "shuffle";
+    let rarity = String(body.rarity || "none").trim().slice(0, 16) || "none";
     const pointsAwardedRaw = Number(body.pointsAwarded || 0);
-    const pointsAwarded = Number.isFinite(pointsAwardedRaw) ? pointsAwardedRaw : 0;
+    let pointsAwarded = Number.isFinite(pointsAwardedRaw) ? pointsAwardedRaw : 0;
+
+    // ✅ A player's win comes from a run their account paid for (or a Raid), once, with the points and the
+    // prize the server paid: never the request's (lib/server/gameRuns.ts runOutcome).
+    if (!(isAdminRequest(req) || isInternalRequest(req))) {
+      const who = await actingPlayer(req, playerId);
+      if (!who.ok) return res.status(401).json({ ok: false, error: "Sign in again to record wins.", signIn: who.signIn });
+      const out = await runOutcome({ runId: body.runId, raidId: body.raidId, userId: who.user.userId });
+      if (!out || !(await firstRecord("wins", out.id))) return res.status(200).json({ ok: true, recorded: false });
+      playerId = who.playerId;
+      game = out.game;
+      pointsAwarded = out.points;
+      body.prize = out.prize;
+      if (out.rarity) rarity = out.rarity;
+    }
 
         const evt = {
       id: String(body.id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`),

@@ -2,7 +2,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
 import { addToEarnedTotal, updateBalanceLeaderboard } from "../../../lib/server/leaderboards";
-import { actingPlayer } from "../../../lib/server/player-auth";
+import { actingPlayer, isAdminRequest, isInternalRequest } from "../../../lib/server/player-auth";
+import { firstRecord, runOutcome } from "../../../lib/server/gameRuns";
 
 const LB_FW_WARLORDS  = "ra:fw:lb:warlords";
 const FW_FACTION_PLAYER = (fid: string) => `ra:fw:faction:${fid}`;
@@ -18,13 +19,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method !== "POST") return res.status(405).json({ ok: false, error: "Method not allowed" });
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body ?? {});
-    const playerId       = String(body.playerId    || "guest").trim().slice(0, 64) || "guest";
+    let playerId         = String(body.playerId    || "guest").trim().slice(0, 64) || "guest";
     const playerName     = String(body.playerName  || "").trim().slice(0, 64);
     const rarity         = String(body.rarity      || "none");
-    const pointsAwarded  = Number(body.pointsAwarded || 0);
-    const territoriesWon = Number(body.territoriesWon || 0);
-    const team: string[] = Array.isArray(body.team) ? body.team : [];
-    const perfect        = !!body.perfect;
+    let pointsAwarded    = Number(body.pointsAwarded || 0);
+    const territoriesWon = Math.max(0, Math.min(5, Math.floor(Number(body.territoriesWon || 0)) || 0));
+    const team: string[] = Array.isArray(body.team) ? body.team.slice(0, 5).map((f: unknown) => String(f).slice(0, 24)) : [];
+    const perfect        = !!body.perfect && territoriesWon === 5;
+
+    // ✅ A player's campaign goes on the boards once, from the Faction Wars run their account paid the entry
+    // for, with the points the server paid in that run (the RAAP solo campaign's verified results are trusted).
+    if (!(isAdminRequest(req) || isInternalRequest(req))) {
+      const who = await actingPlayer(req, playerId);
+      if (!who.ok) return res.status(401).json({ ok: false, error: "Sign in again to record your campaign.", signIn: who.signIn });
+      const out = await runOutcome({ runId: body.runId, userId: who.user.userId });
+      if (!out || out.game !== "faction-wars" || !(await firstRecord("fw", out.id))) return res.status(200).json({ ok: true, recorded: false });
+      playerId = who.playerId;
+      pointsAwarded = out.points;
+    }
     if (playerName) await redis.hset(FW_NAMES, { [playerId]: playerName }).catch(() => {});
     if (territoriesWon > 0) await redis.zincrby(LB_FW_WARLORDS, territoriesWon, playerId);
     if (rarity !== "none" && team.length > 0) {

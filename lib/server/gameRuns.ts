@@ -254,3 +254,32 @@ export async function decidePayout(o: {
   return { ok: true, run, amount: paid, key: `run:${run.id}:${n}`, cut: paid < asked, release };
 }
 
+// ── What a finished run (or Raid) paid, for the wins feed and the game boards ─────────────────────────────
+// A board entry comes from a run the player's account paid the entry for, once per run, with the points the
+// server paid (not the request's). The Shuffle's run keeps its roll; the Raid keeps its result.
+export type RunOutcome = { id: string; game: string; points: number; prize: any | null; rarity: string | null; run: Run | null };
+
+export async function runOutcome(o: { runId?: unknown; raidId?: unknown; userId: string }): Promise<RunOutcome | null> {
+  if (o.raidId) {
+    const raw = await redis.get(`ra:raid:result:${String(o.raidId).slice(0, 40)}`);
+    const r: any = raw ? (typeof raw === "string" ? JSON.parse(raw) : raw) : null;
+    if (!r || r.userId !== o.userId) return null;
+    const real = r.prize?.type === "nft" || r.prize?.type === "merch";
+    return { id: String(r.raidId), game: "expedition", points: r.prize?.type === "points" ? Number(r.prize.points || 0) : 0, prize: real ? r.prize : null, rarity: r.rarity || null, run: null };
+  }
+  const run = await readRun(o.runId);
+  if (!run || run.userId !== o.userId) return null;
+  if (run.game === "shuffle") {
+    const raw = await redis.get(`ra:run:${run.id}:roll`);
+    const r: any = raw ? (typeof raw === "string" ? JSON.parse(raw) : raw) : null;
+    if (!r) return null;
+    const real = r.prize?.type === "nft" || r.prize?.type === "merch";
+    return { id: run.id, game: "shuffle", points: r.prize?.type === "points" ? Number(r.prize.points || 0) : 0, prize: real ? r.prize : null, rarity: r.rarity || null, run };
+  }
+  return { id: run.id, game: run.game, points: Math.max(0, Number((await redis.get(paidKey(run.id))) || 0)), prize: null, rarity: null, run };
+}
+
+// The first board entry of a run (or Raid) for `board` (true); later ones get false.
+export async function firstRecord(board: string, id: string): Promise<boolean> {
+  return !!(await redis.set(`ra:run:${id}:board:${board}`, "1", { nx: true, ex: RUN_TTL }));
+}
