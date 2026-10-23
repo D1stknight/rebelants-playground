@@ -1253,12 +1253,13 @@ export default function ChallengePage() {
   }, []);
 
   // ── Inline name claim handler (Commit G) ─────────────────────────────────
-  // Same backend as pages/index.tsx. Allows letters/numbers/underscores, 3+
-  // chars. On success: save profile, dispatch identity event, gate flips.
+  // Same backend as pages/index.tsx. Letters and numbers, 3-20 (the same name
+  // then signs in on the casino and the village). On success: save profile,
+  // dispatch identity event, gate flips.
   const handleClaimName = useCallback(async () => {
-    const clean = nameInput.toLowerCase().replace(/[^a-z0-9_]/g, "");
-    if (!clean || clean.length < 3) {
-      setSignInError("Name must be 3+ characters (letters, numbers, _)");
+    const clean = nameInput.trim().toLowerCase();
+    if (!/^[a-z0-9]{3,20}$/.test(clean)) {
+      setSignInError("Name must be 3-20 letters and numbers");
       return;
     }
     setNameClaiming(true);
@@ -1297,8 +1298,10 @@ export default function ChallengePage() {
   // existing playerId on success so the user can resume the challenge from any
   // device where they remember their name + PIN.
   const handleSignIn = useCallback(async () => {
-    const clean = signInName.toLowerCase().replace(/[^a-z0-9_]/g, "");
-    if (!clean || clean.length < 3) {
+    // sent as typed: a casino / village name with a space is read the economy's way by the server
+    const typed = signInName.trim();
+    const clean = typed.toLowerCase().replace(/[^a-z0-9_]/g, "");
+    if (typed.length < 3) {
       setSignInExistingError("Enter your commander name (3+ chars)");
       return;
     }
@@ -1312,7 +1315,7 @@ export default function ChallengePage() {
       const r = await fetch("/api/commander/sign-in", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: clean, pin: signInPin.trim() }),
+        body: JSON.stringify({ name: typed, pin: signInPin.trim() }),
       });
       const j = await r.json();
       if (!r.ok || !j.ok) {
@@ -1740,7 +1743,7 @@ export default function ChallengePage() {
                     value={nameInput}
                     onChange={(e) => { setNameInput(e.target.value); setSignInError(null); }}
                     onKeyDown={(e) => { if (e.key === "Enter") handleClaimName(); }}
-                    placeholder="commander_name"
+                    placeholder="commandername"
                     maxLength={20}
                     disabled={nameClaiming}
                     style={{
@@ -1810,8 +1813,8 @@ export default function ChallengePage() {
                     value={signInName}
                     onChange={(e) => { setSignInName(e.target.value); setSignInExistingError(null); }}
                     onKeyDown={(e) => { if (e.key === "Enter") handleSignIn(); }}
-                    placeholder="commander_name"
-                    maxLength={20}
+                    placeholder="commander name"
+                    maxLength={24}
                     disabled={signInBusy}
                     style={{
                       flex: "1 1 180px", minWidth: 0,

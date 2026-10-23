@@ -174,7 +174,9 @@ export default function LandingPage() {
   // Live name availability check (debounced 500ms)
   const checkName = useCallback((val: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    const clean = val.toLowerCase().replace(/[^a-z0-9_]/g, '');
+    // letters and numbers only: the same name then signs in on the casino and the village too
+    const clean = val.trim().toLowerCase();
+    if (/[^a-z0-9]/.test(clean)) { setNameAvail(false); setNameAvailMsg('Letters and numbers only'); return; }
     if (!clean || clean.length < 3) { setNameAvail(null); setNameAvailMsg(clean.length > 0 ? 'Min 3 characters' : ''); return; }
     if (clean.length > 20) { setNameAvail(false); setNameAvailMsg('Max 20 characters'); return; }
     setNameAvailMsg('Checking...');
@@ -189,8 +191,8 @@ export default function LandingPage() {
   }, []);
 
   const handleClaimName = useCallback(async () => {
-    const clean = nameQuery.toLowerCase().replace(/[^a-z0-9_]/g, '');
-    if (!clean || clean.length < 3 || !nameAvail) return;
+    const clean = nameQuery.trim().toLowerCase();
+    if (!/^[a-z0-9]{3,20}$/.test(clean) || !nameAvail) return;
     setNameClaiming(true);
     try {
       const r = await fetch('/api/commander/claim-name', {
@@ -210,7 +212,8 @@ export default function LandingPage() {
 
   // Sign in with existing name + PIN
   const handleSignIn = useCallback(async () => {
-    const name = signInName.trim().toLowerCase().replace(/[^a-z0-9_]/g,'');
+    // as typed: a casino / village name with a space ("Big Chain") is read the economy's way by the server
+    const name = signInName.trim();
     const pin = pinInput.trim();
     if (!name || !pin) { setSignInMsg('Enter your name and PIN'); return; }
     setSignInLoading(true); setSignInMsg('Verifying...');
@@ -411,7 +414,7 @@ export default function LandingPage() {
                 <div style={{ fontFamily:'inherit', fontSize:10, color:'rgba(255,255,255,0.4)', letterSpacing:'0.1em', marginBottom:24, lineHeight:1.8, textTransform:'uppercase' }}>
                   ENTER YOUR COMMANDER NAME AND PIN TO RESTORE YOUR IDENTITY
                 </div>
-                <input autoFocus value={signInName} onChange={e=>setSignInName(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter') handleSignIn(); }} placeholder="YOUR COMMANDER NAME" maxLength={20}
+                <input autoFocus value={signInName} onChange={e=>setSignInName(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter') handleSignIn(); }} placeholder="YOUR COMMANDER NAME" maxLength={24}
                   style={{ fontFamily:'inherit', width:'100%', padding:'12px 16px', fontSize:14, fontWeight:900, letterSpacing:'0.1em', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:10, color:'white', outline:'none', marginBottom:8, textTransform:'uppercase', textAlign:'center' }} />
                 <input value={pinInput} onChange={e=>{ if(/^[0-9]*$/.test(e.target.value) && e.target.value.length<=6) setPinInput(e.target.value); }} onKeyDown={e=>{ if(e.key==='Enter') handleSignIn(); }} placeholder="YOUR PIN" maxLength={6} type="password" inputMode="numeric"
                   style={{ fontFamily:'inherit', width:'100%', padding:'12px 16px', fontSize:14, fontWeight:900, letterSpacing:'0.3em', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:10, color:'white', outline:'none', marginBottom:8, textAlign:'center' }} />
@@ -614,7 +617,8 @@ export default function LandingPage() {
                     <div style={{ fontFamily:'inherit', fontSize:15, fontWeight:900, color:'#34d399', letterSpacing:'0.05em' }}>{profile.name}</div>
                     <div style={{ display:'flex', gap:6, alignItems:'center' }}>
                       <div style={{ fontFamily:'inherit', fontSize:9, color:'rgba(255,255,255,0.3)', letterSpacing:'0.1em' }}>COMMANDER NAME · PERMANENT</div>
-                      <button onPointerDown={e=>{e.preventDefault(); setNameModalMode('setpin'); setPinInput(''); setSignInMsg(''); setShowNameClaim(true);}} style={{ fontFamily:'inherit', fontSize:8, padding:'2px 6px', background:'rgba(251,191,36,0.15)', border:'1px solid rgba(251,191,36,0.3)', borderRadius:4, color:'#fbbf24', cursor:'pointer', letterSpacing:'0.08em' }}>SET PIN</button>
+                      {/* names with a hyphen are casino / village names, signed in through the economy: they always have a PIN */}
+                      {!profile.primaryId.includes('-') && <button onPointerDown={e=>{e.preventDefault(); setNameModalMode('setpin'); setPinInput(''); setSignInMsg(''); setShowNameClaim(true);}} style={{ fontFamily:'inherit', fontSize:8, padding:'2px 6px', background:'rgba(251,191,36,0.15)', border:'1px solid rgba(251,191,36,0.3)', borderRadius:4, color:'#fbbf24', cursor:'pointer', letterSpacing:'0.08em' }}>SET PIN</button>}
                     </div>
                   </div>
                 ) : (
