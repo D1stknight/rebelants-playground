@@ -3,7 +3,8 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
 import { pointsConfig as defaultPointsConfig } from "../../../lib/pointsConfig";
 import { addToEarnedTotal, updateBalanceLeaderboard } from "../../../lib/server/leaderboards";
-import { resolveFromRequest, resolveByPlayerId, getVerifiedNameUser, economyCredit, idemKey } from "../../../lib/economy";
+import { economyCredit, idemKey } from "../../../lib/economy";
+import { actingPlayer } from "../../../lib/server/player-auth";
 
 function balKey(playerId: string) {
   return `ra:points:bal:${playerId}`;
@@ -56,7 +57,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       amount?: number;
     };
 
-    const pid = (playerId || "guest").trim() || "guest";
+    const claimed = (playerId || "guest").trim() || "guest";
     const amt = Number(amount || 0);
 
     if (!Number.isFinite(amt) || amt <= 0) {
@@ -64,13 +65,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Rewards now credit the central economy ledger (shared balance).
-    // Earning requires a signed-in identity; guests cannot mint points.
-    const economyUser = (pid.startsWith("name:") ? await getVerifiedNameUser(req) : null) ?? (await resolveByPlayerId(pid)) ?? (await resolveFromRequest(req));
-    if (!economyUser) {
+    // Earning requires a signed-in identity; guests cannot mint points. Only a
+    // player a signed session proves can earn (lib/server/player-auth.ts).
+    const who = await actingPlayer(req, claimed);
+    if (!who.ok) {
       return res
         .status(401)
-        .json({ error: "Sign in with Discord to earn $REBEL." });
+        .json({ error: who.signIn ? "Sign in again to earn $REBEL." : "Sign in with Discord to earn $REBEL.", signIn: who.signIn });
     }
+    const economyUser = who.user;
+    const pid = who.playerId;
     const credit = await economyCredit({
       userId: economyUser.userId,
       amount: amt,

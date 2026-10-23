@@ -1,7 +1,8 @@
 // pages/api/points/dev-grant.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
-import { resolveFromRequest, economyCredit, idemKey } from "../../../lib/economy";
+import { economyCredit, idemKey } from "../../../lib/economy";
+import { actingPlayer } from "../../../lib/server/player-auth";
 
 function balKey(playerId: string) {
   return `ra:points:bal:${playerId}`;
@@ -27,17 +28,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       amount?: number;
     };
 
-    const pid = (playerId || "guest").trim() || "guest";
+    const claimed = (playerId || "guest").trim() || "guest";
     const amt = Number(amount || 0);
 
     if (!Number.isFinite(amt) || amt <= 0) {
       return res.status(400).json({ error: "Invalid amount" });
     }
 
-    const economyUser = await resolveFromRequest(req);
-    if (!economyUser) {
-      return res.status(401).json({ error: "Sign in with Discord first." });
+    const who = await actingPlayer(req, claimed);
+    if (!who.ok) {
+      return res.status(401).json({ error: who.signIn ? "Sign in again first." : "Sign in with Discord first.", signIn: who.signIn });
     }
+    const economyUser = who.user;
+    const pid = who.playerId;
     const grant = await economyCredit({
       userId: economyUser.userId,
       amount: amt,
