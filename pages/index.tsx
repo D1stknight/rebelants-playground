@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { NO_PIN_SUPPORT } from '../lib/commanderPins';
 import { loadProfile, saveProfile, signOutProfile } from '../lib/profile';
 import { getEffectivePlayerId } from '../lib/profile';
 import dynamic from 'next/dynamic';
@@ -233,25 +234,6 @@ export default function LandingPage() {
     setSignInLoading(false);
   }, [signInName, pinInput]);
 
-  // Set PIN for existing name (one-time for names claimed without PIN)
-  const handleSetPin = useCallback(async () => {
-    const prof = loadProfile();
-    const name = prof.primaryId?.replace('name:','') || '';
-    const pin = pinInput.trim();
-    if (!name || !pin || pin.length < 4 || !/^[0-9]+$/.test(pin)) { setSignInMsg('Enter a 4-6 digit PIN'); return; }
-    setSignInLoading(true); setSignInMsg('Saving...');
-    try {
-      const r = await fetch('/api/commander/set-pin', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, pin }) });
-      const j = await r.json();
-      if (!r.ok || !j.ok) { setSignInMsg(j.error || 'Failed'); setSignInLoading(false); return; }
-      // signed in with the new PIN at once (points only move for a signed-in name)
-      const s = await fetch('/api/commander/sign-in', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, pin }) }).catch(() => null);
-      if (s?.ok) window.dispatchEvent(new Event('ra:identity-changed'));
-      setSignInMsg(''); setPinInput(''); setShowNameClaim(false);
-      setNameClaimed('PIN_SET'); // triggers success confirmation
-    } catch { setSignInMsg('Error — try again'); }
-    setSignInLoading(false);
-  }, [pinInput]);
 
   const handleMerge = useCallback(async () => {
     const prof = loadProfile();
@@ -435,23 +417,16 @@ export default function LandingPage() {
                 </button>
               </>)}
 
-              {/* ── MODE: SET PIN (existing name without PIN) ── */}
+              {/* ── MODE: PIN (names from before PINs get their first PIN from the team: lib/commanderPins.ts) ── */}
               {nameModalMode === 'setpin' && (<>
                 <div style={{ fontSize:40, marginBottom:16 }}>🔐</div>
-                <div style={{ fontFamily:'inherit', fontSize:17, fontWeight:900, letterSpacing:'0.2em', marginBottom:8, textTransform:'uppercase', color:'#fbbf24' }}>SET YOUR PIN</div>
-                <div style={{ fontFamily:'inherit', fontSize:10, color:'rgba(255,255,255,0.4)', letterSpacing:'0.1em', marginBottom:24, lineHeight:1.8, textTransform:'uppercase' }}>
-                  SECURE YOUR COMMANDER NAME SO YOU CAN SIGN IN FROM ANY DEVICE.<br/>
-                  CHOOSE A 4-6 DIGIT PIN. DO NOT FORGET IT.
+                <div style={{ fontFamily:'inherit', fontSize:17, fontWeight:900, letterSpacing:'0.2em', marginBottom:8, textTransform:'uppercase', color:'#fbbf24' }}>YOUR PIN</div>
+                <div style={{ fontFamily:'inherit', fontSize:10, color:'rgba(255,255,255,0.55)', letterSpacing:'0.1em', marginBottom:24, lineHeight:1.8, textTransform:'uppercase' }}>
+                  YOUR COMMANDER NAME SIGNS IN WITH ITS PIN ON ANY DEVICE.<br/><br/>
+                  {NO_PIN_SUPPORT}
                 </div>
-                <input autoFocus value={pinInput} onChange={e=>{ if(/^[0-9]*$/.test(e.target.value) && e.target.value.length<=6) setPinInput(e.target.value); }} onKeyDown={e=>{ if(e.key==='Enter') handleSetPin(); }} placeholder="CHOOSE YOUR PIN" maxLength={6} type="password" inputMode="numeric"
-                  style={{ fontFamily:'inherit', width:'100%', padding:'12px 16px', fontSize:14, fontWeight:900, letterSpacing:'0.3em', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(251,191,36,0.3)', borderRadius:10, color:'white', outline:'none', marginBottom:8, textAlign:'center' }} />
-                {signInMsg && <div style={{ fontFamily:'inherit', fontSize:10, color: signInMsg.startsWith('Sav')?'rgba(255,255,255,0.4)':'#f87171', letterSpacing:'0.1em', marginBottom:12, textTransform:'uppercase' }}>{signInMsg}</div>}
                 <div style={{ display:'flex', gap:8, justifyContent:'center' }}>
-                  <button onPointerDown={e=>{e.preventDefault(); if(pinInput.length>=4) handleSetPin();}} disabled={pinInput.length<4||signInLoading}
-                    style={{ fontFamily:'inherit', padding:'11px 24px', fontSize:11, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background:pinInput.length>=4?'linear-gradient(135deg,#f59e0b,#f97316)':'rgba(255,255,255,0.08)', border:'none', borderRadius:50, color:pinInput.length>=4?'white':'rgba(255,255,255,0.3)', cursor:pinInput.length>=4?'pointer':'not-allowed' }}>
-                    {signInLoading ? 'SAVING...' : 'SAVE MY PIN'}
-                  </button>
-                  <button onPointerDown={e=>{e.preventDefault(); setShowNameClaim(false); setSignInMsg(''); setPinInput('');}} style={{ fontFamily:'inherit', padding:'11px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.12em', textTransform:'uppercase', background:'transparent', border:'1px solid rgba(255,255,255,0.15)', borderRadius:50, color:'rgba(255,255,255,0.45)', cursor:'pointer' }}>LATER</button>
+                  <button onPointerDown={e=>{e.preventDefault(); setShowNameClaim(false); setSignInMsg(''); setPinInput('');}} style={{ fontFamily:'inherit', padding:'11px 24px', fontSize:11, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background:'transparent', border:'1px solid rgba(255,255,255,0.25)', borderRadius:50, color:'rgba(255,255,255,0.7)', cursor:'pointer' }}>CLOSE</button>
                 </div>
               </>)}
 
@@ -464,21 +439,13 @@ export default function LandingPage() {
           <div style={{ position:'fixed', inset:0, zIndex:10002, background:'rgba(0,0,0,0.85)', display:'flex', alignItems:'center', justifyContent:'center', padding:24 }} onPointerDown={()=>setNameClaimed('')}>
             <div style={{ background:'rgba(9,14,30,0.98)', border:'1px solid rgba(52,211,153,0.4)', borderRadius:20, padding:'40px 36px', maxWidth:420, width:'100%', textAlign:'center', boxShadow:'0 0 60px rgba(52,211,153,0.2)' }}>
               <div style={{ fontSize:52, marginBottom:16, filter:'drop-shadow(0 0 20px rgba(52,211,153,0.6))' }}>🐜</div>
-              {nameClaimed === 'PIN_SET' ? (<>
-                <div style={{ fontFamily:'inherit', fontSize:18, fontWeight:900, letterSpacing:'0.15em', color:'#fbbf24', marginBottom:12, textTransform:'uppercase' }}>🔐 PIN SAVED!</div>
-                <div style={{ fontFamily:'inherit', fontSize:12, color:'rgba(255,255,255,0.5)', letterSpacing:'0.12em', lineHeight:1.9, textTransform:'uppercase', marginBottom:28 }}>
-                  YOUR COMMANDER NAME IS NOW PROTECTED.<br/>
-                  YOU CAN SIGN IN FROM ANY DEVICE USING<br/>YOUR NAME AND PIN.
-                </div>
-              </>) : (<>
-                <div style={{ fontFamily:'inherit', fontSize:22, fontWeight:900, letterSpacing:'0.15em', color:'#34d399', marginBottom:12, textTransform:'uppercase' }}>⚔️ {nameClaimed.toUpperCase()}</div>
-                <div style={{ fontFamily:'inherit', fontSize:12, color:'rgba(255,255,255,0.5)', letterSpacing:'0.12em', lineHeight:1.9, textTransform:'uppercase', marginBottom:28 }}>
-                  IS NOW YOUR PERMANENT COMMANDER NAME.<br/>
-                  YOUR REBEL POINTS ARE TIED TO THIS NAME FOREVER.<br/>
-                  YOUR PIN LETS YOU SIGN IN FROM ANY DEVICE.<br/>
-                  GUARD BOTH WELL, COMMANDER.
-                </div>
-              </>)}
+              <div style={{ fontFamily:'inherit', fontSize:22, fontWeight:900, letterSpacing:'0.15em', color:'#34d399', marginBottom:12, textTransform:'uppercase' }}>⚔️ {nameClaimed.toUpperCase()}</div>
+              <div style={{ fontFamily:'inherit', fontSize:12, color:'rgba(255,255,255,0.5)', letterSpacing:'0.12em', lineHeight:1.9, textTransform:'uppercase', marginBottom:28 }}>
+                IS NOW YOUR PERMANENT COMMANDER NAME.<br/>
+                YOUR REBEL POINTS ARE TIED TO THIS NAME FOREVER.<br/>
+                YOUR PIN LETS YOU SIGN IN FROM ANY DEVICE.<br/>
+                GUARD BOTH WELL, COMMANDER.
+              </div>
             </div>
           </div>
         )}
@@ -623,7 +590,7 @@ export default function LandingPage() {
                     <div style={{ display:'flex', gap:6, alignItems:'center' }}>
                       <div style={{ fontFamily:'inherit', fontSize:9, color:'rgba(255,255,255,0.3)', letterSpacing:'0.1em' }}>COMMANDER NAME · PERMANENT</div>
                       {/* names with a hyphen are casino / village names, signed in through the economy: they always have a PIN */}
-                      {!profile.primaryId.includes('-') && <button onPointerDown={e=>{e.preventDefault(); setNameModalMode('setpin'); setPinInput(''); setSignInMsg(''); setShowNameClaim(true);}} style={{ fontFamily:'inherit', fontSize:8, padding:'2px 6px', background:'rgba(251,191,36,0.15)', border:'1px solid rgba(251,191,36,0.3)', borderRadius:4, color:'#fbbf24', cursor:'pointer', letterSpacing:'0.08em' }}>SET PIN</button>}
+                      {!profile.primaryId.includes('-') && <button onPointerDown={e=>{e.preventDefault(); setNameModalMode('setpin'); setPinInput(''); setSignInMsg(''); setShowNameClaim(true);}} style={{ fontFamily:'inherit', fontSize:8, padding:'2px 6px', background:'rgba(251,191,36,0.15)', border:'1px solid rgba(251,191,36,0.3)', borderRadius:4, color:'#fbbf24', cursor:'pointer', letterSpacing:'0.08em' }}>PIN</button>}
                     </div>
                   </div>
                 ) : (
