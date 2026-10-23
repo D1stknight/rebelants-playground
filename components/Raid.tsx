@@ -54,20 +54,13 @@ function useRaidAudio() {
   return { muted, toggleMute, startMarch, stopMarch, sfx };
 }
 import { addWin } from "../lib/winsStore";
+import { ROLE_COST, SQUAD_SIZE, DEFAULT_ULTRA_CARRIERS, DEFAULT_ULTRA_RATIO, DEFAULT_RARE_CARRIERS, DEFAULT_RARE_RATIO, DEFAULT_COMMON_SURVIVORS, calcSquadCost, type AntRole, type AntSlot, type Rarity } from "../lib/raidRules";
 import BuyPointsModal from "./BuyPointsModal";
 import RaidBattleCanvas from "./RaidBattleCanvas";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type Phase = "idle" | "launching" | "battling" | "revealed";
-type Rarity = "none" | "common" | "rare" | "ultra";
-type AntRole = "scout" | "soldier" | "carrier" | "guard" | "bomber";
-
-type AntSlot = {
-  role: AntRole;
-  survived: boolean | null;
-  boosted?: boolean;
-};
 
 type Prize =
   | { type: "none"; label: string }
@@ -84,27 +77,10 @@ type RaidLeaderboards = {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const SQUAD_SIZE   = 20;
 const LAST_SQUAD_KEY="ra:raid:lastSquad";
 function saveLastSquad(s:AntRole[]){if(typeof window==="undefined")return;try{localStorage.setItem(LAST_SQUAD_KEY,JSON.stringify(s));}catch{}}
 function loadLastSquad():AntRole[]|null{if(typeof window==="undefined")return null;try{const v=localStorage.getItem(LAST_SQUAD_KEY);return v?JSON.parse(v):null;}catch{return null;}}
 const REVEAL_MS    = 700; // slower = more drama
-
-// Default survival odds (can be overridden by admin via pointsConfig)
-const BASE_SURVIVAL: Record<AntRole, number> = {
-  scout:   0.62,
-  soldier: 0.48,
-  carrier: 0.20, // brutal — needs guards
-  guard:   0.58,
-  bomber:  0.08,
-};
-
-// Default crate thresholds (can be overridden by admin)
-const DEFAULT_ULTRA_CARRIERS   = 4;
-const DEFAULT_ULTRA_RATIO      = 0.65;
-const DEFAULT_RARE_CARRIERS    = 1;
-const DEFAULT_RARE_RATIO       = 0.40;
-const DEFAULT_COMMON_SURVIVORS = 5;
 
 const ROLE_META: Record<AntRole, {
   emoji: string; label: string; desc: string;
@@ -117,19 +93,6 @@ const ROLE_META: Record<AntRole, {
   bomber:  { emoji: "💥", label: "Bomber",  desc: "Dies but clears path for next 3 ants",  color: "#f472b6", bgColor: "rgba(244,114,182,0.15)",  survivalDisplay: "8%"  },
 };
 
-// Role costs (REBEL) - added to squad total before raid launch
-const ROLE_COST: Record<AntRole, number> = {
-  scout:   10,
-  soldier: 15,
-  guard:   20,
-  carrier: 30,
-  bomber:   5,
-};
-
-function calcSquadCost(squad: AntRole[]): number {
-  return squad.reduce((sum, role) => sum + ROLE_COST[role], 0);
-}
-
 const DEFAULT_SQUAD: AntRole[] = [
   "scout","scout","soldier","soldier","bomber",
   "guard","carrier","guard","carrier","soldier",
@@ -141,76 +104,6 @@ const FACTION_IDS = ['ashigaru','ronin','samurai','bushi','warrior','shogun','bu
 function pickEnemyFaction(mine: string): string {
   const pool = FACTION_IDS.filter(f => f !== mine);
   return pool[Math.floor(Math.random() * pool.length)] || 'ronin';
-}
-
-// ── Battle Engine ─────────────────────────────────────────────────────────────
-
-function simulateBattle(squad: AntRole[], cfg: any, survivalMult = 1.0): AntSlot[] {
-  const slots: AntSlot[] = squad.map(role => ({ role, survived: null, boosted: false }));
-
-  // Pull survival overrides from admin config if present
-  const carrierSurvival = Number(cfg?.raidCarrierSurvival ?? BASE_SURVIVAL.carrier);
-
-  const survival: Record<AntRole, number> = {
-    ...BASE_SURVIVAL,
-    carrier: carrierSurvival,
-  };
-
-  const frontScouts = squad.slice(0, 4).filter(r => r === "scout").length;
-  const scoutBonus = frontScouts * 0.04;
-  let bomberBoostRemaining = 0;
-
-  for (let i = 0; i < slots.length; i++) {
-    const role = slots[i].role;
-    let chance = survival[role] + scoutBonus;
-
-    if (bomberBoostRemaining > 0 && role !== "bomber") {
-      chance += 0.30;
-      slots[i].boosted = true;
-      bomberBoostRemaining--;
-    }
-
-    if (role === "carrier") {
-      if (i > 0 && squad[i - 1] === "guard") chance += 0.25;
-      if (i < squad.length - 1 && squad[i + 1] === "guard") chance += 0.25;
-    }
-
-    if (role === "bomber") {
-      slots[i].survived = false;
-      bomberBoostRemaining = 3;
-      continue;
-    }
-
-    slots[i].survived = Math.random() < Math.min(chance * survivalMult, 0.88);
-  }
-
-  return slots;
-}
-
-function calcPrize(slots: AntSlot[], cfg: any): { rarity: Rarity; prize: Prize } {
-  const currency  = cfg?.currency || "REBEL";
-  const survivors = slots.filter(s => s.survived).length;
-  const carriers  = slots.filter(s => s.role === "carrier" && s.survived).length;
-  const ratio     = survivors / slots.length;
-
-  const ultraCarriers = Number(cfg?.raidUltraCarriers ?? DEFAULT_ULTRA_CARRIERS);
-  const ultraRatio    = Number(cfg?.raidUltraRatio    ?? DEFAULT_ULTRA_RATIO);
-  const rareCarriers  = Number(cfg?.raidRareCarriers  ?? DEFAULT_RARE_CARRIERS);
-  const rareRatio     = Number(cfg?.raidRareRatio     ?? DEFAULT_RARE_RATIO);
-  const commonMin     = Number(cfg?.raidCommonSurvivors ?? DEFAULT_COMMON_SURVIVORS);
-
-  let rarity: Rarity = "none";
-  if (carriers >= ultraCarriers && ratio >= ultraRatio)    rarity = "ultra";
-  else if (carriers >= rareCarriers && ratio >= rareRatio) rarity = "rare";
-  else if (survivors >= commonMin)                          rarity = "common";
-
-  const pts =
-    rarity === "ultra"  ? Number(cfg?.rewards?.ultra  ?? 300) :
-    rarity === "rare"   ? Number(cfg?.rewards?.rare   ?? 100) :
-    rarity === "common" ? Number(cfg?.rewards?.common ?? 50)  : 0;
-
-  if (pts > 0) return { rarity, prize: { type: "points", label: `+${pts} ${currency}`, points: pts } };
-  return { rarity: "none", prize: { type: "none", label: "The colony repelled your forces." } };
 }
 
 // ── Role Picker ───────────────────────────────────────────────────────────────
@@ -855,7 +748,7 @@ export default function Raid() {
     return () => { cancelled=true; };
   }, []);
 
-  const { balance, spend, earn, devGrant, refresh, remainingDaily, capBank, dailyCap, totalEarnRoom } = usePoints(effectivePlayerId);
+  const { balance, devGrant, refresh, remainingDaily, capBank, dailyCap, totalEarnRoom } = usePoints(effectivePlayerId);
 
   const [profile, setProfile] = useState<any>(()=>{ try{return loadProfile();}catch{return {};} });
   useEffect(() => {
@@ -920,6 +813,7 @@ export default function Raid() {
     return [h, m, s].map(n => String(n).padStart(2, '0')).join(':');
   }
   const [claimStatus, setClaimStatus]   = useState("");
+  const [raidMsg, setRaidMsg]           = useState("");
   const [claimBusy, setClaimBusy]       = useState(false);
 
   useEffect(() => {
@@ -1048,18 +942,43 @@ export default function Raid() {
     return ()=>window.removeEventListener("ra:leaderboards-refresh",h);
   }, [loadLb]);
 
+  // The raid is fought on the server (pages/api/raid/launch.ts): it charges the entry, rolls the battle, picks
+  // the crate's prize and pays its REBEL. The page shows the battle it is sent.
+  async function raidOnServer(pid: string): Promise<any> {
+    const post = async (body: object) => {
+      const r = await fetch("/api/raid/launch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ playerId: pid, ...body }) }).catch(() => null);
+      const j = r ? await r.json().catch(() => null) : null;
+      return { status: r?.status || 0, j };
+    };
+    let out = await post({ squad });
+    // the crate's REBEL could not be paid yet: the raid is saved, ask again
+    for (let k = 0; k < 3 && out.status === 502 && out.j?.raidId; k++) {
+      await new Promise(r => setTimeout(r, 1500));
+      out = await post({ raidId: out.j.raidId });
+    }
+    return out.j;
+  }
+
   async function launchRaid() {
     if (busy||squad.length<SQUAD_SIZE||balance<cost) return;
-    setBusy(true); setPhase("launching"); startMarch();
+    setBusy(true); setPhase("launching"); startMarch(); setRaidMsg("");
     setSlots([]); setRevealedCount(0); setShowResult(false);
 
-  if (typeof window !== "undefined") { try { localStorage.setItem("ra:raid:lastSquad", JSON.stringify(squad)); setLastSquad([...squad]); } catch {} }
   if(typeof window!=="undefined"){try{localStorage.setItem(LAST_SQUAD_KEY,JSON.stringify(squad));setLastSquad([...squad]);}catch{}}
-  const isRepeatSquad = lastSquad !== null && JSON.stringify(squad) === JSON.stringify(lastSquad);
-    await spend(totalCost,"expedition");
+    const prof  = loadProfile();
+    const pid   = String(effectivePlayerId||getEffectivePlayerId(prof)||prof?.id||"guest").trim().slice(0,64)||"guest";
+    const pname = (prof?.discordName||playerName||prof?.name||"guest").trim()||"guest";
+
+    const out = await raidOnServer(pid);
+    if (!out?.ok) {
+      stopMarch(); setPhase("idle"); setBusy(false);
+      setRaidMsg(out?.error || "The raid could not launch. Try again.");
+      await refresh().catch(() => {});
+      return;
+    }
     await new Promise(r=>setTimeout(r,900));
 
-    const battleSlots = simulateBattle(squad, cfg, isRepeatSquad ? 0.9 : 1.0);
+    const battleSlots: AntSlot[] = out.slots;
     setSlots(battleSlots); setPhase("battling");
 
     // ── Live battle: RaidBattleCanvas drives the reveal (onUnitResolved) and resolves this promise when the war is over
@@ -1071,21 +990,9 @@ export default function Raid() {
   battleDoneRef.current = null;
   void REVEAL_MS;
 
-    const prof  = loadProfile();
-    const pid   = String(effectivePlayerId||getEffectivePlayerId(prof)||prof?.id||"guest").trim().slice(0,64)||"guest";
-    const pname = (prof?.discordName||playerName||prof?.name||"guest").trim()||"guest";
-  // ── Determine rarity locally (survivor/carrier counts) ──
-  const { rarity: r_temp } = calcPrize(battleSlots, cfg);
-
-  // ── Roll actual prize via server (Shuffle pattern — routes through NFT inventory) ──
-  const _rollR = await fetch(`/api/prizes/roll?force=${r_temp}`, {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ playerId: pid, rarity: r_temp, game: "expedition" }),
-  }).catch(() => null);
-  const _rollJ = _rollR ? await _rollR.json().catch(() => null) : null;
-  const r = r_temp as Rarity;
-  const pz: Prize = (_rollR?.ok && _rollJ?.ok && _rollJ?.prize) ? _rollJ.prize as Prize : calcPrize(battleSlots, cfg).prize;
-  const fullPrizeObj = (_rollR?.ok && _rollJ?.ok && _rollJ?.prize) ? _rollJ.prize : null;
+  const r = out.rarity as Rarity;
+  const pz: Prize = out.prize as Prize;
+  const fullPrizeObj = out.prize;
 
   // ── Merch: create claim immediately (Shuffle pattern) ──
   setPrizeNeedShipping(false); setPrizeShipMsg(""); setPrizeClaimId(undefined);
@@ -1101,15 +1008,16 @@ export default function Raid() {
   }
   setPrizeObj(fullPrizeObj);
 
-  if (pz.type==="points"&&(pz as any).points>0) { await earn((pz as any).points); await refresh(); }
+  // the crate's REBEL was paid by the server with the raid
+  await refresh();
 
   const survivors = battleSlots.filter(s=>s.survived).length;
-  const pointsAwarded = pz.type==="points" ? (pz as any).points : 0;
+  const pointsAwarded = pz.type==="points" ? Number(out.credited || 0) : 0;
     addWin({ id:`${Date.now()}-${Math.random().toString(36).slice(2,7)}`, ts:Date.now(), game:"expedition", playerId:pid, playerName:pname, rarity:r, pointsAwarded });
 
     await fetch("/api/wins/add",{
       method:"POST", headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({ id:`${Date.now()}-${Math.random().toString(36).slice(2,7)}`, ts:Date.now(), game:"expedition", playerId:effectivePlayerId||pid, playerName:prof?.discordName||prof?.name||pname, rarity:r, pointsAwarded, survivors, prize:pz.type!=="points"?pz:null }),
+      body:JSON.stringify({ id:`${Date.now()}-${Math.random().toString(36).slice(2,7)}`, ts:Date.now(), game:"expedition", raidId: out.raidId, playerId:effectivePlayerId||pid, playerName:prof?.discordName||prof?.name||pname, rarity:r, pointsAwarded, survivors, prize:pz.type!=="points"?pz:null }),
     }).catch(()=>{});
 
     window.dispatchEvent(new Event("ra:leaderboards-refresh"));
@@ -1377,6 +1285,7 @@ export default function Raid() {
 
           {needMore>0 && <span style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:11, color:'#f87171', letterSpacing:'0.1em', textTransform:'uppercase' }}>NEED {needMore} MORE</span>}
         </div>
+        {raidMsg && <div style={{ fontFamily:"'Noto Serif JP', 'Hiragino Mincho ProN', serif", fontSize:12, color:'#f87171', margin:'-4px 0 12px' }}>{raidMsg}</div>}
 
         
         {/* ── Plays & Daily Cap ── */}
