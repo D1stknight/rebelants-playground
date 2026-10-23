@@ -47,7 +47,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // Check PIN
   const pinKey = `ra:commander:pin:${name}`;
   const storedHash = await redis.get<string>(pinKey);
-  if (!storedHash) return res.status(403).json({ ok: false, error: "No PIN set for this name. Contact support." });
+  // code no_pin: the sign-in card offers the device that holds this name a PIN (as the home page's SET PIN)
+  if (!storedHash) return res.status(403).json({ ok: false, code: "no_pin", error: "No PIN set for this name. Contact support." });
 
   const fails = PIN_FAILS(name, getIP(req));
   const counts = await Promise.all(fails.map((f) => redis.get<number>(f.key)));
