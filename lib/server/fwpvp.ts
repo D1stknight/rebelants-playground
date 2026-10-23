@@ -24,6 +24,7 @@ import {
   economyCredit,
   idemKey,
 } from "../economy";
+import { signInKind } from "./player-auth";
 import type { PvpMatch, PvpBet, PvpBetsState, PvpSide, ChatMessage, ChatMute, ChatRole, Tournament, TournamentParticipant, TournamentRound, TournamentBracketSlot, TournamentStatus } from "../types/fwpvp";
 
 const MATCH_KEY = (id: string) => `ra:fwpvp:match:${id}`;
@@ -589,6 +590,27 @@ export async function getCrateRewards(): Promise<CrateRewards> {
     rare: CRATE_RARE_DEFAULT,
     ultra: CRATE_ULTRA_DEFAULT,
   };
+}
+
+// ── Matches that pay ─────────────────────────────────────────────────────────
+// A guest's turns are not proven (anyone who has a guest id can play them), and
+// two ids of one Rebel Economy account (a Discord id and a wallet linked to it)
+// are one player. So a match pays what is not the players' own antes (the
+// winner's crate, a tournament round's pot), settles spectator bets and counts
+// on the PvP boards only when both sides are signed-in players with accounts of
+// their own. Antes go back as before: they are the players' own points.
+export type RewardsWithheld = "guest" | "same_account" | "unverified";
+
+// The two sides' Rebel Economy accounts, or why the match pays nothing.
+export async function matchAccounts(match: Pick<PvpMatch, "challengerPlayerId" | "opponentPlayerId">):
+  Promise<{ withheld: RewardsWithheld; accounts: null } | { withheld: null; accounts: [string, string] }> {
+  const a = String(match.challengerPlayerId || ""), b = String(match.opponentPlayerId || "");
+  if (!signInKind(a) || !signInKind(b)) return { withheld: "guest", accounts: null };
+  if (a === b) return { withheld: "same_account", accounts: null };
+  const [ua, ub] = await Promise.all([resolveByPlayerId(a).catch(() => null), resolveByPlayerId(b).catch(() => null)]);
+  if (!ua?.userId || !ub?.userId) return { withheld: "unverified", accounts: null };
+  if (ua.userId === ub.userId) return { withheld: "same_account", accounts: null };
+  return { withheld: null, accounts: [ua.userId, ub.userId] };
 }
 
 // Reads a player's current REBEL balance.
