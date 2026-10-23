@@ -36,6 +36,15 @@ type PointsConfigShape = {
   bountyCost: number;
   gpCost: number;
 
+  // ✅ Game payouts (lib/server/gameRuns.ts)
+  payoutGuard?: "enforce" | "watch";
+  descentMaxPayout?: number;
+  bountyMaxPayout?: number;
+  tunnelMaxPayout?: number;
+  factionWarsMaxPayout?: number;
+  gameDailyCapMode?: "watch" | "enforce";
+  gameDailyCaps?: Record<string, number>;
+
   // ✅ Faction Wars settings
   factionWarsCost: number;
   factionWarsAIDifficulty: number;
@@ -123,6 +132,59 @@ function parsePercentLike(v: any, fallback: number) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+// The payout log of game runs (pages/api/admin/payouts.ts): refused, cut and over-cap payouts, and today's
+// biggest payouts per game.
+const PAYOUT_WHY: Record<string, string> = {
+  no_run: "no paid run", not_yours: "another account's run", wrong_game: "another game's run", too_soon: "too soon after the entry",
+  run_done: "run already paid", cut: "cut to the run's limit", over_cap: "cut by the daily cap", over_cap_watch: "over the daily cap (watch)",
+};
+function PayoutLog({ headers }: { headers: Record<string, string> }) {
+  const [data, setData] = useState<any>(null);
+  const [busy, setBusy] = useState(false);
+  const load = async () => {
+    setBusy(true);
+    try {
+      const r = await fetch("/api/admin/payouts", { headers });
+      setData(await r.json().catch(() => null));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const why = (e: any) => String(e.why || "").split("+").map((x) => PAYOUT_WHY[x] || x).join(", ") + (e.mode === "watch" ? " (watch: paid as asked)" : "");
+  return (
+    <div style={{ marginTop: 12 }}>
+      <button className="btn" onClick={load} disabled={busy}>{busy ? "Loading…" : "Payout log"}</button>
+      {data?.ok && (
+        <div style={{ marginTop: 10, fontSize: 12 }}>
+          <div style={{ fontWeight: 800, margin: "6px 0" }}>Today's biggest payouts (UTC)</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 8 }}>
+            {Object.entries(data.today || {}).map(([g, rows]: any) => (
+              <div key={g} style={{ border: "1px solid rgba(255,255,255,.12)", borderRadius: 10, padding: 8 }}>
+                <div style={{ fontWeight: 800, marginBottom: 4 }}>{g}</div>
+                {(rows as any[]).length ? (rows as any[]).map((r) => <div key={r.userId} style={{ display: "flex", justifyContent: "space-between", gap: 6 }}><span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.userId}</span><b>{r.paid}</b></div>) : <div style={{ opacity: 0.6 }}>none</div>}
+              </div>
+            ))}
+          </div>
+          <div style={{ fontWeight: 800, margin: "12px 0 6px" }}>Log ({data.log?.length || 0})</div>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead><tr style={{ textAlign: "left", opacity: 0.7 }}><th>When</th><th>Game</th><th>Player</th><th>Asked</th><th>Paid</th><th>Why</th></tr></thead>
+              <tbody>
+                {(data.log || []).map((e: any, i: number) => (
+                  <tr key={i} style={{ borderTop: "1px solid rgba(255,255,255,.08)" }}>
+                    <td style={{ whiteSpace: "nowrap" }}>{new Date(e.at).toLocaleString()}</td><td>{e.game}</td><td>{e.playerId}</td><td>{e.asked}</td><td>{e.paid}</td><td>{why(e)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+      {data && !data.ok && <div style={{ marginTop: 8, color: "#f87171" }}>{data.error || "Could not load the log"}</div>}
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const [token, setToken] = useState("");
   const [authed, setAuthed] = useState(false);
@@ -207,6 +269,13 @@ const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
   descentCost: (defaultConfig as any).descentCost ?? 300,
   bountyCost: (defaultConfig as any).bountyCost ?? 100,
   gpCost: (defaultConfig as any).gpCost ?? 100,
+  payoutGuard: "enforce",
+  descentMaxPayout: 5000,
+  bountyMaxPayout: 2500,
+  tunnelMaxPayout: 5000,
+  factionWarsMaxPayout: 1000,
+  gameDailyCapMode: "watch",
+  gameDailyCaps: {},
   raidCost: (defaultConfig as any).raidCost ?? 600,
     factionWarsCost: (defaultConfig as any).factionWarsCost ?? 150,
     factionWarsAIDifficulty: (defaultConfig as any).factionWarsAIDifficulty ?? 0.65,
@@ -1319,6 +1388,25 @@ String(c.status).toUpperCase()==="PENDING"
           <label style={{ fontSize: 12, opacity: 0.9 }}>Bounty Hunters<input value={cfg.bountyCost} onChange={(e) => setCfg((c) => ({ ...c, bountyCost: safeNum(e.target.value, c.bountyCost) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
           <label style={{ fontSize: 12, opacity: 0.9 }}>Grand Prix<input value={cfg.gpCost} onChange={(e) => setCfg((c) => ({ ...c, gpCost: safeNum(e.target.value, c.gpCost) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
         </div>
+        <div style={{ fontWeight: 900, fontSize: 12, margin: "12px 0 10px", color: "#60a5fa", paddingTop: 10, borderTop: "1px solid rgba(96,165,250,.2)" }}>🎯 GAME PAYOUTS</div>
+        <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 8 }}>A game pays only within a run its entry fee opened, at most what one run can pay. Watch pays what the game asks (the old way) and only logs what the checks would do. Grand Prix pays its place table (1st = 3× the entry); the Shuffle and the Raid are decided on the server.</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>Payout checks<select value={cfg.payoutGuard === "watch" ? "watch" : "enforce"} onChange={(e) => setCfg((c) => ({ ...c, payoutGuard: e.target.value === "watch" ? "watch" : "enforce" }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}><option value="enforce">Enforce</option><option value="watch">Watch only</option></select></label>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>Daily caps<select value={cfg.gameDailyCapMode === "enforce" ? "enforce" : "watch"} onChange={(e) => setCfg((c) => ({ ...c, gameDailyCapMode: e.target.value === "enforce" ? "enforce" : "watch" }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }}><option value="watch">Watch only (log)</option><option value="enforce">Enforce</option></select></label>
+        </div>
+        <div style={{ fontSize: 11, opacity: 0.7, margin: "10px 0 6px" }}>Most one run pays (REBEL)</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          {([["descentMaxPayout", "Hive Descent", 5000], ["bountyMaxPayout", "Bounty Hunters", 2500], ["tunnelMaxPayout", "Ant Tunnel", 5000], ["factionWarsMaxPayout", "Faction Wars (solo)", 1000]] as const).map(([k, label, d]) => (
+            <label key={k} style={{ fontSize: 12, opacity: 0.9 }}>{label}<input type="number" min="0" value={Number((cfg as any)[k] ?? d)} onChange={(e) => setCfg((c) => ({ ...c, [k]: Math.max(0, safeNum(e.target.value, Number((c as any)[k] ?? d))) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+          ))}
+        </div>
+        <div style={{ fontSize: 11, opacity: 0.7, margin: "10px 0 6px" }}>Daily cap per account (REBEL, 0 = none)</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+          {([["gp", "Grand Prix"], ["descent", "Hive Descent"], ["bounty", "Bounty Hunters"], ["tunnel", "Ant Tunnel"], ["faction-wars", "Faction Wars"]] as const).map(([g, label]) => (
+            <label key={g} style={{ fontSize: 12, opacity: 0.9 }}>{label}<input type="number" min="0" value={Number(cfg.gameDailyCaps?.[g] ?? 0)} onChange={(e) => setCfg((c) => ({ ...c, gameDailyCaps: { ...(c.gameDailyCaps || {}), [g]: Math.max(0, safeNum(e.target.value, 0)) } }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
+          ))}
+        </div>
+        <PayoutLog headers={headers} />
         <div style={{ fontWeight: 900, fontSize: 12, margin: "12px 0 10px", color: "#60a5fa", paddingTop: 10, borderTop: "1px solid rgba(96,165,250,.2)" }}>🃏 SHUFFLE</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           <label style={{ fontSize: 12, opacity: 0.9 }}>Shuffle Cost<input value={cfg.shuffleCost} onChange={(e) => setCfg((c) => ({ ...c, shuffleCost: safeNum(e.target.value, c.shuffleCost) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
