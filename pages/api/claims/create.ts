@@ -1,6 +1,8 @@
 // pages/api/claims/create.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
+import { actingPlayer, isAdminRequest } from "../../../lib/server/player-auth";
+import { markClaimed, readWonPrize, unmarkClaimed, wonBy } from "../../../lib/server/prizesWon";
 
 function makeId() {
   return `c_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
@@ -30,20 +32,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Optional context (nice for admin UI / debugging)
     const rarity = String(body?.rarity || "").trim();
-    const game = String(body?.game || "shuffle").trim();
-    const playerId = String(body?.playerId || "").trim();
-    const playerName = String(body?.playerName || "").trim();
+    let game = String(body?.game || "shuffle").trim().slice(0, 32);
+    let playerId = String(body?.playerId || "").trim().slice(0, 64);
+    const playerName = String(body?.playerName || "").trim().slice(0, 64);
 
     // Basic validation
     if (!prize || !prize?.type) {
       return res.status(400).json({ ok: false, error: "Missing prize" });
     }
 
+    const claimId = makeId();
+
+    // ✅ A player claims a prize the server rolled for their account (lib/server/prizesWon.ts), once: the
+    // prize is the one saved at the roll, never the request's. (The admin page is trusted.)
+    let wonId = "";
+    if (!isAdminRequest(req)) {
+      const who = await actingPlayer(req, playerId);
+      if (!who.ok) return res.status(401).json({ ok: false, error: who.signIn ? "Sign in again to claim your prize." : "Sign in to claim your prize.", signIn: who.signIn });
+      const won = await readWonPrize(prize?.wonId ?? body?.wonId);
+      if (!won || !wonBy(won, { playerId: who.playerId, userId: who.user.userId })) {
+        return res.status(403).json({ ok: false, error: "This prize was not won by this account." });
+      }
+      if (!(await markClaimed(won.wonId, claimId))) return res.status(409).json({ ok: false, error: "This prize has been claimed already." });
+      wonId = won.wonId;
+      playerId = who.playerId;
+      game = won.game;
+      prize = { ...won.prize, wonId: won.wonId };
+    }
+
    // For NFT claims, wallet is required
 if (String(prize?.type).toLowerCase() === "nft") {
-  if (!wallet) return res.status(400).json({ ok: false, error: "Missing wallet" });
-  if (!wallet.startsWith("0x") || wallet.length < 40) {
-    return res.status(400).json({ ok: false, error: "Invalid wallet" });
+  if (!wallet || !wallet.startsWith("0x") || wallet.length < 40) {
+    if (wonId) await unmarkClaimed(wonId);
+    return res.status(400).json({ ok: false, error: wallet ? "Invalid wallet" : "Missing wallet" });
   }
 
   // ✅ Consume the NFT from inventory so it cannot be claimed twice
@@ -51,6 +72,7 @@ if (String(prize?.type).toLowerCase() === "nft") {
   const invKey = String(prize?.meta?.inventoryKey || "").trim();
 
   if (!invKey) {
+    if (wonId) await unmarkClaimed(wonId);
     return res.status(400).json({ ok: false, error: "NFT prize missing meta.inventoryKey" });
   }
 
@@ -91,6 +113,7 @@ if (String(prize?.type).toLowerCase() === "nft") {
   }
 
   if (!rawMatch || !parsedMatch) {
+    if (wonId) await unmarkClaimed(wonId);
     return res.status(409).json({ ok: false, error: "No NFT inventory available" });
   }
 
@@ -112,7 +135,6 @@ if (String(prize?.type).toLowerCase() === "nft") {
   };
 }
 
-    const claimId = makeId();
     const key = `ra:claim:${claimId}`;
 
     const claim = {

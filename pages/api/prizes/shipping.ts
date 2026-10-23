@@ -1,6 +1,7 @@
 // pages/api/prizes/shipping.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
+import { actingPlayer, isAdminRequest } from "../../../lib/server/player-auth";
 
 // ===== helper: Upstash may return string OR already-parsed object =====
 function parseMaybeJson<T = any>(v: any): T | null {
@@ -56,6 +57,13 @@ if (!claim || typeof claim !== "object") {
 
     if (String(claim?.playerId || "") !== playerId) {
       return res.status(403).json({ ok: false, error: "Player mismatch" });
+    }
+    // the address a prize ships to is only the winner's to set (a signed session proves the player)
+    if (!isAdminRequest(req)) {
+      const who = await actingPlayer(req, playerId);
+      if (!who.ok || who.playerId !== playerId) {
+        return res.status(401).json({ ok: false, error: "Sign in again to save your shipping details.", signIn: who.ok ? null : who.signIn });
+      }
     }
 
     const type = String(claim?.prize?.type || "").toLowerCase();
