@@ -7,7 +7,9 @@ import { withSignedPlayer } from "../../../../lib/server/player-auth";
 // Validation:
 //   - match exists and is in a bettable state (team_selection or active before lock territory)
 //   - bets aren't locked (territory < factionWarsBetLockTerritory)
-//   - player isn't a participant (challenger or opponent)
+//   - player isn't a participant (challenger or opponent), by id or by Rebel Economy account
+//   - both sides are signed-in players with accounts of their own (a guest's
+//     turns can be played by anyone who has its id, so its match could be steered)
 //   - amount within [factionWarsBetMin, factionWarsBetMax]
 //   - new pool total stays under factionWarsBetPoolCap
 //   - if topping up, new bet must stay on the same side as existing bet
@@ -23,7 +25,9 @@ import {
   placeBet,
   getBets,
   isBetsLocked,
+  matchAccounts,
 } from "../../../../lib/server/fwpvp";
+import { resolveByPlayerId } from "../../../../lib/economy";
 import { TERRITORY_COUNT } from "../../../../lib/factionWarsCore";
 import type { PlaceBetRequest } from "../../../../lib/types/fwpvp";
 
@@ -71,6 +75,25 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Participant check
     if (match.challengerPlayerId === playerId || match.opponentPlayerId === playerId) {
+      return res.status(403).json({ ok: false, error: "Players can't bet on their own match" });
+    }
+    const { withheld, accounts } = await matchAccounts(match);
+    if (withheld === "unverified") {
+      return res.status(503).json({ ok: false, error: "Bets can't be checked right now. Try again in a minute." });
+    }
+    if (withheld) {
+      return res.status(403).json({
+        ok: false,
+        code: "bets_need_signed_players",
+        error: "Side bets are only open on matches between two signed-in players.",
+      });
+    }
+    // another id of a player's own account (a Discord id and a wallet linked to it)
+    const bettor = await resolveByPlayerId(playerId).catch(() => null);
+    if (!bettor?.userId) {
+      return res.status(503).json({ ok: false, error: "Bets can't be checked right now. Try again in a minute." });
+    }
+    if (accounts.includes(bettor.userId)) {
       return res.status(403).json({ ok: false, error: "Players can't bet on their own match" });
     }
 
