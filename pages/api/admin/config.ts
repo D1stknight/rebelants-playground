@@ -59,15 +59,6 @@ const DEFAULTS = {
   raidUltraCarriers: 4,
   raidUltraRatio: 0.65,
 
-  // Game payouts (lib/server/gameRuns.ts)
-  payoutGuard: "enforce",
-  descentMaxPayout: DEFAULT_MAX_PAYOUT.descent,
-  bountyMaxPayout: DEFAULT_MAX_PAYOUT.bounty,
-  tunnelMaxPayout: DEFAULT_MAX_PAYOUT.tunnel,
-  factionWarsMaxPayout: DEFAULT_MAX_PAYOUT["faction-wars"],
-  gameDailyCapMode: "watch",
-  gameDailyCaps: {} as Record<string, number>,
-
   // Tournaments
   factionWarsTournamentEnabled: true,
   factionWarsTournamentMaxSize: 32,
@@ -93,6 +84,15 @@ const DEFAULTS = {
 
   // ✅ Ultra min reward fallback
   ultraMinReward: 50,
+
+  // Game payouts (lib/server/gameRuns.ts)
+  payoutGuard: "enforce",
+  descentMaxPayout: DEFAULT_MAX_PAYOUT.descent,
+  bountyMaxPayout: DEFAULT_MAX_PAYOUT.bounty,
+  tunnelMaxPayout: DEFAULT_MAX_PAYOUT.tunnel,
+  factionWarsMaxPayout: DEFAULT_MAX_PAYOUT["faction-wars"],
+  gameDailyCapMode: "watch",
+  gameDailyCaps: {} as Record<string, number>,
 };
 
 function safeNum(v: any, fallback: number) {
