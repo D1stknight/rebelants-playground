@@ -236,6 +236,9 @@ export default function LandingPage() {
       const r = await fetch('/api/commander/set-pin', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, pin }) });
       const j = await r.json();
       if (!r.ok || !j.ok) { setSignInMsg(j.error || 'Failed'); setSignInLoading(false); return; }
+      // signed in with the new PIN at once (points only move for a signed-in name)
+      const s = await fetch('/api/commander/sign-in', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, pin }) }).catch(() => null);
+      if (s?.ok) window.dispatchEvent(new Event('ra:identity-changed'));
       setSignInMsg(''); setPinInput(''); setShowNameClaim(false);
       setNameClaimed('PIN_SET'); // triggers success confirmation
     } catch { setSignInMsg('Error — try again'); }
