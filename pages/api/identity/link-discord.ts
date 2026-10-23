@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
+import { DISCORD_SESSION_COOKIE, verifyDiscordSession } from "../../../lib/player-session";
 
 function balKey(playerId: string) {
   return `ra:points:bal:${playerId}`;
@@ -28,11 +29,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // ✅ server-verified Discord session
-    const raw = getCookie(req, "ra_discord_user");
+    const raw = getCookie(req, DISCORD_SESSION_COOKIE);
     if (!raw) return res.status(401).json({ ok: false, error: "Not logged into Discord" });
 
-    let session: any = null;
-    try { session = JSON.parse(raw); } catch {}
+    const session = verifyDiscordSession(raw);
     const discordUserId = String(session?.discordUserId || "");
     const discordName = String(session?.discordName || "");
     if (!discordUserId) return res.status(401).json({ ok: false, error: "Invalid Discord session" });

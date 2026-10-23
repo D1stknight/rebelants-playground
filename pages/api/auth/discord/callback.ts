@@ -1,5 +1,6 @@
 import { raapDiscordPlayerCookie, raapDiscordPlayerSettings } from "../../../../lib/server/raap-discord-player";
 import type { NextApiRequest, NextApiResponse } from "next";
+import { DISCORD_SESSION_COOKIE, sessionSetCookie, signDiscordSession } from "../../../../lib/player-session";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const clientId = process.env.DISCORD_CLIENT_ID;
@@ -65,8 +66,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     finally { learning.key.fill(0); }
   }
 
+  // The signed session is what the points routes believe (lib/server/player-auth.ts); ra_discord_user stays
+  // for anything that still only shows the name.
+  const signed = signDiscordSession(discordUserId, discordName);
+
   res.setHeader("Set-Cookie", [
     ...learningCookies,
+    ...(signed ? [sessionSetCookie(DISCORD_SESSION_COOKIE, signed)] : []),
     `ra_discord_user=${encodeURIComponent(JSON.stringify({ discordUserId, discordName }))}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400`,
     `ra_discord_state=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`,
     `ra_discord_redir=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`,

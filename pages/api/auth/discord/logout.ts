@@ -2,6 +2,7 @@ import { clearRaapDiscordPlayer } from "../../../../lib/server/raap-discord-play
 // pages/api/auth/discord/logout.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { nameSessionClearCookies } from "../../../../lib/name-session";
+import { DISCORD_SESSION_COOKIE, WALLET_SESSION_COOKIE, sessionClearCookie } from "../../../../lib/player-session";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // allow GET or POST
@@ -11,8 +12,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   // ✅ IMPORTANT:
-  // /api/auth/discord/session reads cookie: "ra_discord_user"
-  // So logout MUST clear "ra_discord_user" (and also clear "ra_discord_session" just in case)
+  // /api/auth/discord/session reads the signed "ra_discord_session"; the points routes also
+  // believe the wallet and name sessions. Logout clears them all, and the old "ra_discord_user".
  const cookies = [
   clearRaapDiscordPlayer,
   // clear main cookie
@@ -24,6 +25,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   // safety clear
   `ra_discord_session=; Path=/; Max-Age=0`,
+
+  // the signed sessions (lib/player-session.ts)
+  sessionClearCookie(DISCORD_SESSION_COOKIE),
+  sessionClearCookie(WALLET_SESSION_COOKIE),
 ];
 
   res.setHeader("Cache-Control", "no-store, max-age=0");
