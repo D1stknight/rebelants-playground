@@ -26,6 +26,7 @@ import {
   tightenChatTTL,
   getPvpEconomyConfig,
   recordPvpResult,
+  matchAccounts,
 } from "../../../../lib/server/fwpvp";
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -99,6 +100,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return res.status(200).json({ ok: true, match, outcome: "cancelled-no-opponent" });
     }
 
+    // A match against a guest (or between two ids of one account) refunds its side
+    // bets and stays off the PvP boards (lib/server/fwpvp.ts matchAccounts).
+    const { withheld } = await matchAccounts(match);
+    if (withheld) match.pvpRewardsWithheld = withheld;
+
     // Mark match completed with opponent as winner
     match.status = "completed";
     match.winnerPlayerId = match.opponentPlayerId;
@@ -122,11 +128,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     await saveMatch(match);
 
     // Settle bets toward opponent victory, then leaderboards
-    await payoutBets(challengeId, "opponent").catch(() => {});
+    if (withheld) await refundBets(challengeId).catch(() => {});
+    else await payoutBets(challengeId, "opponent").catch(() => {});
 
     const winnerName = match.opponentDisplayName || "Opponent";
     const loserName = match.challengerDisplayName || "Challenger";
-    await recordPvpResult(
+    if (!withheld) await recordPvpResult(
       match.opponentPlayerId,
       match.challengerPlayerId,
       winnerName,

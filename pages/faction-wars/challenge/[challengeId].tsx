@@ -9,6 +9,10 @@ import { FACTIONS, FACTION_IDS, TEAM_SIZE, TERRITORY_COUNT, MAX_HP, type Faction
 import FactionWarsBattleScene, { type BattleSceneState, type BattleSceneActions } from "../../../components/FactionWarsBattleScene";
 import { useFWAudio } from "../../../lib/useFWAudio";
 import { recordCompletedPlaygroundMatch } from "../../../lib/raap-completed-match";
+import { isSignedPlayerId, matchHasGuestSide, rewardsWithheldText } from "../../../lib/fwpvpRewards";
+
+// Shown before a match with a guest side (lib/fwpvpRewards.ts): it plays, but pays no crate and takes no side bets.
+const PRACTICE_NOTE = "Practice match: crates and side bets only come when both players are signed in.";
 
 const JP = `'Noto Serif JP', 'Hiragino Mincho ProN', serif`;
 
@@ -966,6 +970,20 @@ function CompletedMatchView({ match, mePlayerId, sfx, stopMusic }: { match: PvpM
               ? `Credited: ${winnings} pot + ${crateReward} ${finalRarity} crate bonus`
               : `Credited to your wallet · Both antes (${ante} × 2) won`}
           </div>
+        </div>
+      )}
+      {iWon && match.winnerCrateRarity && match.pvpRewardsWithheld && (
+        <div style={{
+          padding: "10px 16px",
+          marginBottom: 16,
+          borderRadius: 10,
+          border: "1px solid rgba(255,255,255,0.12)",
+          background: "rgba(255,255,255,0.03)",
+          textAlign: "center",
+          fontSize: 11,
+          color: "rgba(255,255,255,0.6)",
+        }}>
+          No crate this time. {rewardsWithheldText(match.pvpRewardsWithheld)}
         </div>
       )}
       {!iWon && ante > 0 && (
@@ -1951,6 +1969,11 @@ export default function ChallengePage() {
                       <div style={{ fontSize: 22, fontWeight: 900, color: "#fbbf24", marginBottom: 18, letterSpacing: "0.05em" }}>
                         {match.challengerDisplayName}
                       </div>
+                      {(!isSignedPlayerId(identity.playerId) || !isSignedPlayerId(match.challengerPlayerId)) && (
+                        <div style={{ marginBottom: 16, fontSize: 11, color: "rgba(255,255,255,0.55)", lineHeight: 1.5 }}>
+                          {PRACTICE_NOTE}
+                        </div>
+                      )}
                       {/* Wager display (Layer 2A) */}
                       {Number(match.pvpCost ?? 0) > 0 && (
                         <div style={{ marginBottom: 18, padding: "14px 16px", borderRadius: 12, border: "1px solid rgba(251,191,36,0.3)", background: "rgba(0,0,0,0.3)" }}>
@@ -1981,6 +2004,11 @@ export default function ChallengePage() {
               {/* TEAM_SELECTION — both pick teams */}
               {match.status === "team_selection" && isParticipant && (
                 <div>
+                  {matchHasGuestSide(match) && (
+                    <div style={{ marginBottom: 12, fontSize: 11, color: "rgba(255,255,255,0.55)", textAlign: "center", lineHeight: 1.5 }}>
+                      {PRACTICE_NOTE}
+                    </div>
+                  )}
                   {myTeamLocked ? (
                     <div style={{ padding: "24px 22px", borderRadius: 14, border: "1px solid rgba(251,191,36,0.3)", background: "rgba(251,191,36,0.04)", textAlign: "center" }}>
                       <div style={{ fontSize: 14, fontWeight: 900, color: "#fbbf24", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>

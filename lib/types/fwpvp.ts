@@ -166,6 +166,12 @@ export interface PvpMatch {
   // admin tweaks. Not zeroed after payout (pot does that) — kept for display.
   pvpCrateRewardPaid: number;
 
+  // Set on completion when the match paid no crate / tournament pot, settled no
+  // side bets (refunded) and was left off the PvP boards: a side was a guest,
+  // both sides were one Rebel Economy account, or the accounts could not be
+  // checked (lib/server/fwpvp.ts matchAccounts).
+  pvpRewardsWithheld?: "guest" | "same_account" | "unverified";
+
   // ── Tournament linkage (optional) ──────────────────────────────────────
   // If this match is part of a tournament, these are populated. Submit-move
   // calls into the tournament module on completion to advance the bracket.

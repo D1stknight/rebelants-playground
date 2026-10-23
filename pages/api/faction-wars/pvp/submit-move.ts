@@ -22,7 +22,7 @@ import { withSignedPlayer } from "../../../../lib/server/player-auth";
 // currently-active faction. This prevents move spoofing.
 
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getMatch, saveMatch, creditREBEL, getCrateRewards, recordPvpResult, unmarkActive, lockBets, payoutBets, refundBets, getPvpEconomyConfig, tightenChatTTL, onTournamentMatchComplete } from "../../../../lib/server/fwpvp";
+import { getMatch, saveMatch, creditREBEL, getCrateRewards, recordPvpResult, unmarkActive, lockBets, payoutBets, refundBets, getPvpEconomyConfig, tightenChatTTL, onTournamentMatchComplete, matchAccounts } from "../../../../lib/server/fwpvp";
 import {TERRITORY_COUNT} from "../../../../lib/factionWarsCore";
 import {applyPvpMove, PvpRuleError} from "../../../../lib/server/fwpvp-rules";
 import type {SubmitMoveRequest} from "../../../../lib/types/fwpvp";
@@ -59,12 +59,19 @@ export async function submitPvpMove(req: NextApiRequest, res: NextApiResponse) {
       } catch {}
     }
     if (match.status === "completed") {
+      // A match against a guest (or between two ids of one account) pays no crate
+      // or tournament pot, refunds its side bets and stays off the PvP boards
+      // (lib/server/fwpvp.ts matchAccounts). Antes still go back as below.
+      const { withheld } = await matchAccounts(match);
+      if (withheld) match.pvpRewardsWithheld = withheld;
       // ── Pot payout ──────────────────────────────────────────────────────
       // Pay the winner the full pvpPotPaid (challenger ante + opponent ante).
       // For ties (winnerPlayerId === null), refund both sides equally.
       // Defensive: only pay out if pvpPotPaid > 0 (handles legacy matches and
-      // free-mode matches where pvpCost was 0).
-      const potOnTable = Number(match.pvpPotPaid ?? 0);
+      // free-mode matches where pvpCost was 0). A tournament round's pot is no
+      // one's ante: it is paid only when the match pays rewards.
+      const potOnTable = withheld && match.tournamentId ? 0 : Number(match.pvpPotPaid ?? 0);
+      if (withheld && match.tournamentId) match.pvpPotPaid = 0;
       if (potOnTable > 0) {
         if (match.winnerPlayerId) {
           // Winner takes all. Loser gets nothing — that's the whole point.
@@ -90,7 +97,7 @@ export async function submitPvpMove(req: NextApiRequest, res: NextApiResponse) {
       // The amount is read live from cfg.rewards (admin-configurable) and
       // snapshotted to match.pvpCrateRewardPaid for client display.
       let crateReward = 0;
-      if (match.winnerPlayerId && match.winnerCrateRarity) {
+      if (match.winnerPlayerId && match.winnerCrateRarity && !withheld) {
         try {
           const rewards = await getCrateRewards();
           if (match.winnerCrateRarity === "ultra") crateReward = rewards.ultra;
@@ -111,7 +118,7 @@ export async function submitPvpMove(req: NextApiRequest, res: NextApiResponse) {
       // Record win/loss/streak/REBEL totals for the PvP leaderboards. Best-
       // effort: helper swallows its own errors so a Redis hiccup can't break
       // match completion.
-      try {
+      if (!withheld) try {
         const winnerName =
           match.winnerPlayerId === match.challengerPlayerId
             ? (match.challengerDisplayName || "")
@@ -139,7 +146,7 @@ export async function submitPvpMove(req: NextApiRequest, res: NextApiResponse) {
       // if a tie (no winnerPlayerId), refund all bets in full. Idempotent
       // via the BETS_SETTLED flag.
       try {
-        if (match.winnerPlayerId && match.loserPlayerId) {
+        if (match.winnerPlayerId && match.loserPlayerId && !withheld) {
           const winnerSide = match.winnerPlayerId === match.challengerPlayerId ? "challenger" : "opponent";
           await payoutBets(match.challengeId, winnerSide);
         } else {

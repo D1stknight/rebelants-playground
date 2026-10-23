@@ -8,6 +8,7 @@ import { withSignedPlayer } from "../../../../lib/server/player-auth";
 
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getTournament, saveTournament, getREBELBalance, spendREBEL, seedDraftTournament } from "../../../../lib/server/fwpvp";
+import { isGuestId } from "../../../../lib/server/player-auth";
 import type { JoinTournamentRequest } from "../../../../lib/types/fwpvp";
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -34,6 +35,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   if (t.participants.length >= t.size) {
     return res.status(400).json({ ok: false, error: "tournament is full" });
+  }
+
+  // A guest's turns can be played by anyone who has its id: a tournament that
+  // pays REBEL takes signed-in players only (no round pot is paid for a match
+  // with a guest side either: submit-move).
+  const pays = Number(t.entryFee || 0) > 0 || (t.potPerRound || []).some(p => Number(p || 0) > 0);
+  if (pays && isGuestId(playerId)) {
+    return res.status(403).json({ ok: false, error: "Sign in to join a tournament that pays REBEL." });
   }
 
   // Deduct entry fee
