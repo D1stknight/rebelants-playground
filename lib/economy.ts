@@ -296,6 +296,73 @@ export async function economyPurchases(
   }
 }
 
+// Commander names and the Rebel Economy's colony names (the casino, the village) are one set of
+// accounts: "name:<slug>" is the same economy user everywhere. The economy's slugs are letters,
+// digits and hyphens, ours letters, digits and underscores, so a name of letters and digits only is
+// the same id in both and must sign in with the economy's PIN (one name, one PIN). A name with an
+// underscore can never be an economy name: it stays the Playground's own.
+export function sharedWithEconomy(slug: string): boolean {
+  return /^[a-z0-9]+$/.test(slug);
+}
+
+// A name as the economy reads it (its slugify): lowercase, every run of other characters one "-". A
+// casino or village name typed with a space ("Big Chain") is the account name:big-chain.
+export function economySlug(name: string): string {
+  return String(name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32);
+}
+
+// The spelling the economy keeps for a new name: the Playground's own one when its letters and digits
+// make the same slug, else the slug itself (the economy makes its slug from this text).
+export function economyName(displayName: string, slug: string): string {
+  const letters = String(displayName || "").replace(/[^A-Za-z0-9]/g, "").slice(0, 24);
+  return letters.toLowerCase() === slug ? letters : slug;
+}
+
+export type EconomyNameAnswer = {
+  ok: boolean;
+  // the economy's code (registered, signed_in, name_taken, name_unknown, pin_wrong, locked, ...),
+  // or rate_limited / unavailable
+  code: string;
+  identityId?: string;
+  displayName?: string;
+  retryAfter?: number;
+};
+
+// The economy's name + PIN check (/api/internal/name-auth). `player` is the player's address, for
+// the economy's own limits (it never stores it). Never log the PIN. adopt (register only): this
+// Playground has proven the player owns the name with its own PIN, so the economy account made for
+// it earlier (by resolve) may get this PIN; without it the economy answers name_taken for a name
+// that already has an account.
+export async function economyNameAuth(
+  action: "login" | "register",
+  name: string,
+  pin: string,
+  player: string,
+  opts: { adopt?: boolean } = {},
+): Promise<EconomyNameAnswer> {
+  if (!SERVICE_API_KEY) return { ok: false, code: "unavailable" };
+  try {
+    const r = await fetch(ECONOMY_BASE_URL + "/api/internal/name-auth", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ action, name, pin, player: String(player || "").slice(0, 64), ...(opts.adopt ? { adopt: true } : {}) }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(8000),
+    });
+    if (r.status === 429) {
+      return { ok: false, code: "rate_limited", retryAfter: Number(r.headers.get("retry-after")) || 60 };
+    }
+    const j: any = await r.json().catch(() => null);
+    if (!r.ok || !j) return { ok: false, code: "unavailable" };
+    if (j.ok && j.identity && typeof j.identity.id === "string") {
+      return { ok: true, code: String(j.code || ""), identityId: j.identity.id, displayName: j.identity.displayName || undefined };
+    }
+    return { ok: false, code: String(j.code || "failed") };
+  } catch {
+    return { ok: false, code: "unavailable" };
+  }
+}
+
 // A 2-minute sign-in ticket for the shop: the URL that opens it signed in to this account, with its Back
 // link to `ret`. null when the economy has no ticket route yet or did not answer.
 export async function economyShopTicket(userId: string, ret: string): Promise<string | null> {

@@ -6,10 +6,14 @@
 // This closes the spoofing gap for name/PIN players (who previously had no
 // server-side session at all).
 //
-// KEY: NAME_SESSION_SECRET when it is set (sessions already given out stay
-// valid), else one derived from the Discord app secret (lib/player-session.ts):
-// the points routes only believe a signed session now, so name sign-in must
-// always give one.
+// KEY: NAME_SESSION_SECRET when it is set, else one derived from the Discord app
+// secret (lib/player-session.ts): the points routes only believe a signed session
+// now, so name sign-in must always give one.
+//
+// v2 tokens carry an expiry and are signed apart from the older ones, which are
+// no longer accepted: those were given before a name of letters and digits had to
+// sign in with the Rebel Economy's PIN (pages/api/commander/sign-in.ts), so every
+// name player signs in once more.
 import { createHmac, timingSafeEqual } from "crypto";
 import { sessionKey } from "./player-session";
 
@@ -33,13 +37,14 @@ function fromB64url(input: string): string {
 }
 
 function sign(payload: string): string {
-  return b64url(createHmac("sha256", SECRET).update(payload).digest());
+  return b64url(createHmac("sha256", SECRET).update("name-session:v2:" + payload).digest());
 }
 
-// Returns a signed token "<encodedPlayerId>.<sig>", or null if no secret set.
+// Returns a signed token "<encoded { p: playerId, e: expiry }>.<sig>", or null if no secret set.
 export function signNameSession(playerId: string): string | null {
   if (!SECRET || !playerId) return null;
-  const encoded = b64url(Buffer.from(playerId, "utf8"));
+  const e = Math.floor(Date.now() / 1000) + MAX_AGE_SECONDS;
+  const encoded = b64url(Buffer.from(JSON.stringify({ p: playerId, e }), "utf8"));
   return encoded + "." + sign(encoded);
 }
 
@@ -55,8 +60,10 @@ export function verifyNameSession(token: string): string | null {
   const b = Buffer.from(expected);
   if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
   try {
-    const playerId = fromB64url(encoded);
+    const v = JSON.parse(fromB64url(encoded));
+    const playerId = typeof v?.p === "string" ? v.p : "";
     if (!playerId.startsWith("name:")) return null;
+    if (!(Number(v.e) > Date.now() / 1000)) return null;
     return playerId;
   } catch {
     return null;
