@@ -14,7 +14,7 @@ function loadRig(): Promise<QueenRig | null> {
   rigP = (async () => { try { const cv = document.createElement("canvas"); if (!cv.getContext("webgl2") && !cv.getContext("webgl")) return null; const { QueenRig } = await import("./QueenRig"); return await QueenRig.load("/models/queen/queen_web.glb"); } catch (e) { console.warn("queen rig", e); return null; } })();
   return rigP;
 }
-const VIEW: [number, number, number, number] = [150, 0, 880, 990];   // region of the 1024 frame the live queen is drawn in (room for the raised staff)
+const VIEW: [number, number, number, number] = [-260, -220, 1284, 1000];   // region of the 1024 frame the live queen is drawn in (room for the raised staff)
 
 export type Rarity = "none" | "common" | "rare" | "ultra";
 export type StageSfx = "charge" | "bolt" | "crack1" | "crack2" | "crack3" | "hatch" | "fizzle";
@@ -56,7 +56,7 @@ const QueenStage = forwardRef<QueenStageHandle, Props>(function QueenStage({ act
     beam: null as null | { x: number; y: number; life: number; c: string },
     crack: null as null | { i: number; stage: number; rgb: string; t: number },
     eggGlow: 0, eggGlowC: "167,139,250",
-    expr: "idle", exprHold: 0, blinkAt: 2.5, blinkT: 0,
+    expr: "idle", exprHold: 0, blinkAt: 2.5, blinkT: 0, fCur: null as string | null, fPrev: null as string | null, fT: 1, vCur: null as string | null, vPrev: null as string | null, vT: 1,
     talk: [] as { v: string | null; d: number }[], talkT: 0,
   });
   const setFace = (n: string, hold = 0) => { const s = st.current; s.expr = n; s.exprHold = hold; };
@@ -81,11 +81,14 @@ const QueenStage = forwardRef<QueenStageHandle, Props>(function QueenStage({ act
   const eggCenter = (i: number) => { const r = getEggRect(i); if (!r) return null; const sr = sceneRect(); return { x: r.left - sr.left + r.width / 2, y: r.top - sr.top + r.height * 0.55, w: r.width, h: r.height }; };
   /** aim: mirror toward the egg's side, arm out, staff pointing at the egg (in the un-mirrored frame) */
   const aim = (e: { x: number; y: number }) => {
-    const s = st.current; s.faceT = e.x < s.W / 2 ? 1 : -1; s.leanT = s.faceT < 0 ? 1 : -1;
+    const s = st.current;
+    // live queen: no mirroring — the staff hand takes eggs on her right, the free hand points at eggs on her left
+    if (s.Q) { s.faceT = 1; s.leanT = 0; const g1 = geom(); s.Q.setAim(e.x - g1.cx, e.y - g1.fist0.y); pose("point"); return; }
+    s.faceT = e.x < s.W / 2 ? 1 : -1; s.leanT = s.faceT < 0 ? 1 : -1;
     const ex = s.faceT < 0 ? 2 * (s.W / 2) - e.x : e.x;                    // egg position in the un-mirrored frame
     const g0 = { ...geom() }; const fistApprox = g0.fist0; const a = Math.atan2(e.y - fistApprox.y, ex - fistApprox.x) / D; // −180..180, down-left ≈ 135
     s.armT = POSE.point.arm; s.staffT = Math.max(-265, Math.min(-160, a > 0 ? a - 360 : a));
-    s.Q?.setAim(ex - fistApprox.x, e.y - fistApprox.y); pose("point");   // staff held out toward the egg, gem leading (−180 = level)   // staff tip toward the egg (−90 = up, −225 = down-left), never through her body
+    pose("point");   // staff held out toward the egg, gem leading (−180 = level)   // staff tip toward the egg (−90 = up, −225 = down-left), never through her body
   };
 
   const burst = (x: number, y: number, c: string, n: number, sp = 3, g = 6, size = 3) => { for (let i = 0; i < n; i++) { const a = Math.random() * Math.PI * 2, v = (0.4 + Math.random()) * sp * 60; st.current.parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 60, life: 0.5 + Math.random() * 0.6, c, s: 2 + Math.random() * size, g: g * 60 }); } };
@@ -187,12 +190,25 @@ const QueenStage = forwardRef<QueenStageHandle, Props>(function QueenStage({ act
         } else ctx.drawImage(s.L.body, g.x, g.y, g.bw, g.bh);
         ctx.save(); if (Q) { const hx = g.x + (head.px - bx0) * u, hy = g.y + (head.py - by0) * u; ctx.translate(hx + head.dx * u, hy + head.dy * u); ctx.rotate(head.da); ctx.translate(-hx, -hy); }
         // expression layer over her face
-        { const fb = s.L.meta?.face?.box; const fn = s.expr === "idle" && s.blinkT > 0 ? "blink" : s.expr; const fi = fb && s.L.faces[fn] && fn !== "idle" ? s.L.faces[fn] : null; if (fi && fb) { const bx = s.L.meta.body.box[0], by = s.L.meta.body.box[1]; ctx.drawImage(fi, g.x + (fb[0] - bx) * g.sc * g.k, g.y + (fb[1] - by) * g.sc * g.k, fi.width * g.k, fi.height * g.k); }
-          // talking: the mouth of the current viseme over whatever the eyes are doing (shock keeps its own mouth)
-          const v = s.talk[0]?.v; const ti = v && s.expr !== "shock" ? s.L.faces[v] : null; const mo = s.L.meta?.face?.mouth;
-          if (ti && fb && mo) { const bx = s.L.meta.body.box[0], by = s.L.meta.body.box[1]; const T = (px: number, py: number) => ({ x: g.x + (px - bx) * g.sc * g.k, y: g.y + (py - by) * g.sc * g.k }); const c = T(mo[0], mo[1]); const r = T(mo[0] + mo[2], mo[1] + mo[3]);
-            ctx.save(); ctx.beginPath(); ctx.ellipse(c.x, c.y, Math.abs(r.x - c.x), Math.abs(r.y - c.y), 0, 0, Math.PI * 2); ctx.clip(); ctx.drawImage(ti, g.x + (fb[0] - bx) * g.sc * g.k, g.y + (fb[1] - by) * g.sc * g.k, ti.width * g.k, ti.height * g.k); ctx.restore(); } }
+        { const fb = s.L.meta?.face?.box; const mo = s.L.meta?.face?.mouth;
+          // expressions cross-fade (0.14 s, blinks 0.05 s) instead of popping; the live 3-D face shows through when no layer is up
+          const want = s.expr === "idle" ? (s.blinkT > 0 ? "blink" : null) : s.expr;
+          if (want !== s.fCur) { s.fPrev = s.fT < 0.5 ? s.fPrev : s.fCur; s.fCur = want; s.fT = 0; }
+          s.fT = Math.min(1, s.fT + dt / (want === "blink" || s.fPrev === "blink" ? 0.05 : 0.14));
+          const vWant = s.expr !== "shock" ? s.talk[0]?.v || null : null;
+          if (vWant !== s.vCur) { s.vPrev = s.vCur; s.vCur = vWant; s.vT = 0; } s.vT = Math.min(1, s.vT + dt / 0.06);
+          if (fb) {
+            const bx = s.L.meta.body.box[0], by = s.L.meta.body.box[1]; const fx = g.x + (fb[0] - bx) * g.sc * g.k, fy = g.y + (fb[1] - by) * g.sc * g.k;
+            const draw = (n: string | null, a: number) => { const fi = n && n !== "idle" ? s.L!.faces[n] : null; if (!fi || a <= 0.01) return; ctx.globalAlpha = a; ctx.drawImage(fi, fx, fy, fi.width * g.k, fi.height * g.k); ctx.globalAlpha = 1; };
+            const ease = (x: number) => x * x * (3 - 2 * x);
+            draw(s.fPrev, 1 - ease(s.fT)); draw(s.fCur, ease(s.fT));
+            // talking: the mouth of the current viseme over whatever the eyes are doing, blended between shapes
+            if (mo && (s.vCur || s.vPrev)) { const T = (px: number, py: number) => ({ x: g.x + (px - bx) * g.sc * g.k, y: g.y + (py - by) * g.sc * g.k }); const c = T(mo[0], mo[1]); const r = T(mo[0] + mo[2], mo[1] + mo[3]);
+              ctx.save(); ctx.beginPath(); ctx.ellipse(c.x, c.y, Math.abs(r.x - c.x), Math.abs(r.y - c.y), 0, 0, Math.PI * 2); ctx.clip(); draw(s.vPrev, 1 - ease(s.vT)); draw(s.vCur, ease(s.vT)); ctx.restore(); }
+          } }
         ctx.restore();
+        // the staff (and the hand holding it) goes back on top of the painted face, so it never vanishes behind it
+        if (Q && Q.renderStaff()) ctx.drawImage(Q.renderer.domElement, g.x + (VIEW[0] - bx0) * u, g.y + (VIEW[1] - by0) * u, (VIEW[2] - VIEW[0]) * u, (VIEW[3] - VIEW[1]) * u);
         // paper-doll fallback: arm swings from the shoulder; the staff is held in the fist with its own wrist angle
         if (!Q) {
         ctx.save(); ctx.translate(g.shoulder.x, g.shoulder.y); ctx.rotate(s.arm * D); ctx.translate(-g.shoulder.x, -g.shoulder.y);

@@ -9,6 +9,7 @@ import * as THREE from "three";
 import { Sky } from "three/examples/jsm/objects/Sky.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { buildCar, animateCar, mergeColored, type Car3D } from "./car3d";
+import { SpiderKit, type Spider } from "./spider3d";
 /** merge textured pieces (position / normal / uv) into one geometry */
 function mergeUV(gs: THREE.BufferGeometry[]) { const pos: number[] = [], nor: number[] = [], uv: number[] = []; for (const g0 of gs) { const g = g0.index ? g0.toNonIndexed() : g0; const P = g.getAttribute("position"), N = g.getAttribute("normal"), U = g.getAttribute("uv"); for (let i = 0; i < P.count; i++) { pos.push(P.getX(i), P.getY(i), P.getZ(i)); nor.push(N.getX(i), N.getY(i), N.getZ(i)); uv.push(U ? U.getX(i) : 0, U ? U.getY(i) : 0); } } const m = new THREE.BufferGeometry(); m.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); m.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3)); m.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2)); return m; }
 import { FACTION_PAINT } from "../../lib/rgpConfig";
@@ -49,7 +50,7 @@ export class Renderer3D {
   race: Race; renderer: THREE.WebGLRenderer; scene = new THREE.Scene(); camera: THREE.PerspectiveCamera;
   cars: Car3D[] = []; samples: Sample[] = []; biome: Biome; mobile: boolean;
   sun!: THREE.DirectionalLight; uTime = { value: 0 }; uExcite = { value: 0.3 };
-  boxIM: THREE.InstancedMesh | null = null; t = 0;
+  boxIM: THREE.InstancedMesh | null = null; spiderKit: SpiderKit | null = null; spiders: Spider[] = []; t = 0;
   pool: Record<string, THREE.Object3D[]> = {}; used: Record<string, number> = {};
   parts!: THREE.Points; partData: { x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; max: number; size: number; r: number; g: number; b: number; grow: number }[] = [];
   camPos = new THREE.Vector3(); camLook = new THREE.Vector3(); camInit = false; fov = 62; shake = 0;
@@ -63,6 +64,8 @@ export class Renderer3D {
     this.pr = Math.min(window.devicePixelRatio || 1, this.mobile ? 1.5 : 2); this.renderer.setPixelRatio(this.pr);
     this.camera = new THREE.PerspectiveCamera(this.fov, 16 / 9, 0.5, 2600);
     this.buildSamples(); this.buildSky(); this.buildGround(macro); this.buildTrack(); this.buildBarriers(); this.buildStands(); this.buildScenery(); this.buildGantry(); this.buildItems(); this.buildCars(); this.buildParticles();
+    const ns = this.race.hazards.filter((h: any) => h.kind === "spider").length;
+    if (ns) { this.spiderKit = new SpiderKit(this.scene, ns, !this.mobile); for (let i = 0; i < ns; i++) this.spiders.push(this.spiderKit.make(this.scene, !this.mobile)); }
   }
 
   // ── track centre line, smoothed and resampled every ~4 units, with curvature
@@ -426,13 +429,14 @@ export class Renderer3D {
       if (Math.random() < 0.5) this.emit(p.x, 4, p.y, 1, { spread: 1, up: 1, life: 0.4, size: 3, color: p.kind === "wrath" ? [0.8, 0.4, 1] : [1, 1, 1], grow: 1 });
     }
     for (const d of R.drops) { const o = this.get("slick", this.makeSlick); o.position.set(d.x, 0.12, d.y); }
+    let si = 0; this.spiderKit?.begin();
     for (const h of R.hazards) {
-      if (h.kind === "spider") { const o = this.get("spider", this.makeSpider); o.position.set(h.x, 0, h.y); const dx = (h.b[0] - h.a[0]), dy = (h.b[1] - h.a[1]); o.rotation.y = -Math.atan2(dy, dx) + Math.PI / 2 * Math.sign(Math.cos((this.t / h.period) * Math.PI * 2 + (h.phase || 0))); o.children.forEach((c) => { if (c.userData.leg !== undefined) c.rotation.z = Math.sin(this.t * 14 + c.userData.leg * 1.3) * 0.35; }); }
+      if (h.kind === "spider") { const sp = this.spiders[si++]; if (sp && this.spiderKit) this.spiderKit.update(sp, h.x, h.y, dt, this.t); }
       else if (h.kind === "boulder") { const o = this.get("boulder", this.makeBoulder); o.position.set(h.x, 9, h.y); o.rotation.x = this.t * 2.5; o.rotation.z = this.t * 1.1; }
       else if (h.kind === "crusher") { const o = this.get("crusher", this.makeCrusher); o.position.set(h.x, 0, h.y); const head = o.children[0]; head.position.y = 3 + (h.lift ?? 1) * 30; if (h.active && Math.random() < 0.3) { this.emit(h.x, 2, h.y, 4, { spread: 26, up: 4, life: 0.6, size: 8, grow: 3, color: [0.7, 0.68, 0.62] }); this.shake = Math.max(this.shake, 0.15); } }
       else if (h.kind === "geyser") { const o = this.get("geyser", this.makeGeyser); o.position.set(h.x, 0, h.y); o.scale.set(1, h.active ? 1 : 0.02, 1); if (h.active) this.emit(h.x, 4, h.y, 3, { spread: 8, up: 40, life: 0.9, size: 9, grow: 3, color: [1, 0.6, 0.25] }); else if (Math.random() < 0.2) this.emit(h.x, 1, h.y, 1, { spread: 3, up: 6, life: 1.2, size: 6, grow: 3, color: [0.8, 0.8, 0.8] }); }
     }
-    for (const f of R.fx) if (f.life > (f.kind === "star" ? 0.38 : 0.35) && f.life < 2) { /* new bursts */ }
+    this.spiderKit?.end();
     if (R.fx.length) for (const f of R.fx) { if ((f as any)._seen) continue; (f as any)._seen = 1; if (f.kind === "star") this.emit(f.x, 8, f.y, 14, { spread: 30, up: 14, life: 0.6, size: 4, grow: 0, color: [1, 0.85, 0.3] }); else this.emit(f.x, 3, f.y, 10, { spread: 18, up: 6, life: 0.8, size: 9, grow: 4, color: [0.9, 0.9, 0.92] }); }
     for (const kind in this.pool) { const u = this.used[kind] || 0; this.pool[kind].forEach((o, i) => { if (i >= u) o.visible = false; }); }
     // particles

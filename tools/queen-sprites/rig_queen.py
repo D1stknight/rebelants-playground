@@ -67,7 +67,8 @@ for v in o.data.vertices:
     # arm weights only near the arm chains; the rest goes back to spine/root (keeps the cape and torso still)
     for side,(Sx,Ex,Hx) in (('R',(SR,ER,HR)),('L',(SL,EL,FL))):
         d=min(segd(p,Sx,Ex),segd(p,Ex,Hx))
-        f=1.0 if d<0.045 else max(0.0,1-(d-0.045)/0.035)
+        r0,r1=(0.045,0.035) if side=='R' else (0.034,0.02)
+        f=1.0 if d<r0 else max(0.0,1-(d-r0)/r1)
         if f<1:
             moved=0.0
             for g in list(v.groups):
@@ -96,6 +97,15 @@ bpy.ops.object.modifier_apply(modifier='dec')
 [o.vertex_groups.remove(g) for g in list(o.vertex_groups) if g.name=='keep']
 mod=o.modifiers.new('arm','ARMATURE'); mod.object=ao
 print('web verts', len(o.data.vertices))
+# split the rigid staff + gripping hand into their own object, so the page can draw it again over the painted face layers
+gi=o.vertex_groups['hand.R'].index
+bpy.ops.object.select_all(action='DESELECT'); o.select_set(True); bpy.context.view_layer.objects.active=o
+bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='DESELECT'); bpy.ops.object.mode_set(mode='OBJECT')
+for v in o.data.vertices:
+    v.select = any(g.group==gi and g.weight>0.999 for g in v.groups)
+bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.separate(type='SELECTED'); bpy.ops.object.mode_set(mode='OBJECT')
+for x in bpy.data.objects:
+    if x.type=='MESH' and x is not o: x.name='QueenStaff'; print('staff verts', len(x.data.vertices))
 for im in bpy.data.images:
     if im.size[0]>1024: im.scale(1024,1024)
 bpy.ops.export_scene.gltf(filepath='/home/claude/qb/queen_web_raw.glb', export_format='GLB', export_skins=True, export_animations=False, export_yup=True, export_image_format='JPEG')

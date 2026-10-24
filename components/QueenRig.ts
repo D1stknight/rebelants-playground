@@ -26,7 +26,7 @@ type Arm = { up: THREE.Bone; fore: THREE.Bone; hand: THREE.Bone; S: V3; W0: V3; 
 
 export class QueenRig {
   renderer: THREE.WebGLRenderer; scene = new THREE.Scene(); camera: THREE.PerspectiveCamera; root: THREE.Object3D;
-  bones: Record<string, THREE.Bone> = {}; rest: Record<string, THREE.Quaternion> = {};
+  bones: Record<string, THREE.Bone> = {}; staff: THREE.Mesh | null = null; bodyMeshes: THREE.Mesh[] = []; rest: Record<string, THREE.Quaternion> = {};
   R!: Arm; L!: Arm; gemLocal = v(); headRest = { x: 0, y: 0, a: 0 };
   pose: QueenPose = "rest"; poseT = 0; t = 0; strikeKick = 0; size = v();
   spine0 = new THREE.Quaternion(); lean = 0; leanS = new Spring(v());
@@ -38,7 +38,7 @@ export class QueenRig {
     this.scene.add(new THREE.HemisphereLight(0xcfe0ff, 0x3a2a20, 0.6));
     const d1 = new THREE.DirectionalLight(0xffffff, 1.8); d1.position.set(2.5, 4, 3); this.scene.add(d1);
     const d2 = new THREE.DirectionalLight(0xffd9a0, 0.5); d2.position.set(-3, 2, -2); this.scene.add(d2);
-    root.traverse((o: any) => { if (o.isBone) { this.bones[o.name] = o; this.rest[o.name] = o.quaternion.clone(); } if (o.isMesh) o.frustumCulled = false; });
+    root.traverse((o: any) => { if (o.isBone) { this.bones[o.name] = o; this.rest[o.name] = o.quaternion.clone(); } if (o.isMesh) { o.frustumCulled = false; if (/staff/i.test(o.name)) { this.staff = o; o.material = o.material.clone(); } else this.bodyMeshes.push(o); } });
     // bind-pose bounds, skinned (positions are quantized; the bones carry the dequantization)
     const box = new THREE.Box3(); root.updateMatrixWorld(true);
     root.traverse((o: any) => { if (o.isSkinnedMesh) { o.skeleton.update(); o.computeBoundingBox(); box.union(o.boundingBox.clone().applyMatrix4(o.matrixWorld)); } else if (o.isMesh) { o.geometry.computeBoundingBox(); box.union(o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld)); } });
@@ -78,7 +78,7 @@ export class QueenRig {
     this.renderer.setPixelRatio(dpr); this.renderer.setSize(cssW, cssH, false);
   }
   aim = new THREE.Vector2(-0.8, 0.6);   // screen direction from her staff hand to the egg (x right, y down; un-mirrored frame)
-  setAim(x: number, y: number) { const l = Math.hypot(x, y) || 1; this.aim.set(-Math.abs(x / l), y / l); }
+  setAim(x: number, y: number) { const l = Math.hypot(x, y) || 1; this.aim.set(x / l, y / l); }
   /** a bolt leaves the gem: the staff kicks back and settles (spring velocity impulse) */
   recoil(power = 1) { const k = 0.9 * power; this.R.wrist.vel.add(v(0.12 * k, 0.35 * k, -0.08 * k)); this.R.dir?.vel.add(v(0.9 * k, 2.2 * k, 0)); this.leanS.vel.x += 0.25 * k; }
   setPose(p: QueenPose) { if (p !== this.pose) { this.pose = p; this.poseT = 0; if (p === "strike") this.strikeKick = 1; } }
@@ -89,12 +89,17 @@ export class QueenRig {
     const S = R.S, SL = L.S; const restDir = R.staff0!.clone();
     const sway = Math.sin(t * 1.3) * 0.05;
     switch (this.pose) {
-      case "point": { const a = this.aim; return { wR: S.clone().add(v(-0.1 + a.x * 0.03, -0.03 - a.y * 0.02, 0.09)), dR: v(a.x * 0.75, 0.62 - a.y * 0.35, 0.12).normalize(), pR: v(-0.4, -0.6, -0.4), wL: L.W0.clone().add(v(0, br, 0)), pL: L.E0.clone().sub(SL), lean: -0.03 }; }
+      case "point": { const a = this.aim;
+        // egg on her free-hand side: staff held up and leaning over, the left hand points at it (no mirroring, the face stays put)
+        if (a.x > 0) return { wR: S.clone().add(v(-0.08, 0.06 + br, 0.05)), dR: v(-0.08 + a.x * 0.08, 1, 0.03).normalize(), pR: v(-0.8, -0.3, -0.2), wL: L.W0.clone().add(v(0.004, 0.008, 0.008)), pL: L.E0.clone().sub(SL), lean: 0.03 };
+        return { wR: S.clone().add(v(-0.1 + a.x * 0.03, -0.03 - a.y * 0.02, 0.09)), dR: v(a.x * 0.75, 0.62 - a.y * 0.35, 0.12).normalize(), pR: v(-0.4, -0.6, -0.4), wL: L.W0.clone().add(v(0, br, 0)), pL: L.E0.clone().sub(SL), lean: -0.03 }; }
       case "raise": return { wR: S.clone().add(v(-0.085, 0.13, 0.05)), dR: v(-0.1 + sway * 0.4, 1, 0.02).normalize(), pR: v(-0.8, -0.3, -0.2), wL: L.W0.clone().add(v(0.01, 0.01 + br, 0.01)), pL: L.E0.clone().sub(SL), lean: 0.04 };
-      case "strike": { const a = this.aim; return { wR: S.clone().add(v(-0.1 + a.x * 0.05, -0.02 - a.y * 0.03, 0.1)), dR: v(a.x, -a.y * 0.8 + 0.1, 0.1).normalize(), pR: v(-0.3, -0.7, -0.3), wL: L.W0.clone().add(v(0.01, 0.02, 0.02)), pL: L.E0.clone().sub(SL), lean: -0.07 }; }
+      case "strike": { const a = this.aim;
+        if (a.x > 0) return { wR: S.clone().add(v(-0.085, 0.12, 0.06)), dR: v(-0.05 + a.x * 0.12, 1, 0.04).normalize(), pR: v(-0.8, -0.3, -0.2), wL: L.W0.clone().add(v(0.006, 0.012, 0.012)), pL: L.E0.clone().sub(SL), lean: 0.05 };
+        return { wR: S.clone().add(v(-0.1 + a.x * 0.05, -0.02 - a.y * 0.03, 0.1)), dR: v(a.x, -a.y * 0.8 + 0.1, 0.1).normalize(), pR: v(-0.3, -0.7, -0.3), wL: L.W0.clone().add(v(0.01, 0.02, 0.02)), pL: L.E0.clone().sub(SL), lean: -0.07 }; }
       case "droop": return { wR: R.W0.clone().add(v(-0.008, -0.03, 0.0)), dR: v(-0.48, 0.88, 0.05).normalize(), pR: R.E0.clone().sub(S), wL: L.W0.clone().add(v(-0.005, -0.01, 0)), pL: L.E0.clone().sub(SL), lean: 0.02 };
-      case "cheer": return { wR: S.clone().add(v(-0.08, 0.14, 0.06)), dR: v(-0.22 + sway, 1, 0.03).normalize(), pR: v(-0.8, -0.3, -0.2), wL: L.W0.clone().add(v(0.02, 0.07, 0.05)), pL: v(0.8, -0.4, -0.2), lean: 0.0 };
-      case "talk": return { wR: R.W0.clone().add(v(-0.006, 0.02 + br + Math.sin(t * 3.1) * 0.006, 0.02)), dR: restDir.clone().add(v(-0.12 + Math.sin(t * 2.2) * 0.05, 0, 0.05)).normalize(), pR: R.E0.clone().sub(S), wL: L.W0.clone().add(v(-0.02, 0.05 + Math.sin(t * 3.4) * 0.012, 0.04)), pL: L.E0.clone().sub(SL), lean: Math.sin(t * 1.7) * 0.01 };
+      case "cheer": return { wR: S.clone().add(v(-0.08, 0.14, 0.06)), dR: v(-0.22 + sway, 1, 0.03).normalize(), pR: v(-0.8, -0.3, -0.2), wL: L.W0.clone().add(v(0.006, 0.015, 0.012)), pL: L.E0.clone().sub(SL), lean: 0.0 };
+      case "talk": return { wR: R.W0.clone().add(v(-0.006, 0.02 + br + Math.sin(t * 3.1) * 0.006, 0.02)), dR: restDir.clone().add(v(-0.12 + Math.sin(t * 2.2) * 0.05, 0, 0.05)).normalize(), pR: R.E0.clone().sub(S), wL: L.W0.clone().add(v(-0.004, 0.01 + Math.sin(t * 3.4) * 0.004, 0.01)), pL: L.E0.clone().sub(SL), lean: Math.sin(t * 1.7) * 0.01 };
       default: return { wR: R.W0.clone().add(v(0, br, 0)), dR: restDir.clone().add(v(Math.sin(t * 0.9) * 0.025, 0, 0)).normalize(), pR: R.E0.clone().sub(S), wL: L.W0.clone().add(v(0, br * 0.8, 0)), pL: L.E0.clone().sub(SL), lean: Math.sin(t * 0.8) * 0.006 };
     }
   }
@@ -140,5 +145,11 @@ export class QueenRig {
     b.quaternion.copy(pq.invert().multiply(nq)); b.updateMatrixWorld(true);
   }
   render() { this.renderer.render(this.scene, this.camera); }
+  /** second pass: only the staff + gripping hand, depth-tested against the body (so it still hides behind her), for drawing over the face layers */
+  renderStaff() {
+    if (!this.staff) return false; const prev = this.bodyMeshes.map((m) => (m.material as THREE.Material).colorWrite);
+    this.bodyMeshes.forEach((m) => ((m.material as THREE.Material).colorWrite = false)); this.renderer.render(this.scene, this.camera);
+    this.bodyMeshes.forEach((m, i) => ((m.material as THREE.Material).colorWrite = prev[i])); return true;
+  }
   dispose() { this.renderer.dispose(); }
 }
