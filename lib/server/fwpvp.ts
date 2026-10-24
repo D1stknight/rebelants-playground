@@ -277,6 +277,9 @@ const BET_MAX_DEFAULT = 25000;
 const BET_POOL_CAP_DEFAULT = 100000;
 const BET_LOCK_TERRITORY_DEFAULT = 3;  // bets close when match enters T3 (0-indexed: territory >= 2)
 const BET_ENABLED_DEFAULT = true;
+// Crates from PvP wins pay at most this much REBEL per Rebel Economy account per
+// UTC day (0 = no cap).
+const CRATE_DAILY_CAP_DEFAULT = 1000;
 // Per-match chat (Layer 2D)
 const CHAT_ENABLED_DEFAULT = true;
 const CHAT_POST_CLEANUP_MINS_DEFAULT = 30;  // chat TTL after match completion
@@ -286,6 +289,8 @@ export interface PvpEconomyConfig {
   factionWarsPvpPayoutMode: "pot";
   factionWarsPvpEnabled: boolean;
   factionWarsPvpWagerTiers: number[];
+  // Crate REBEL a Rebel Economy account can win per UTC day (0 = no cap)
+  factionWarsPvpCrateDailyCap: number;
   // Spectator side bets (Layer 2B)
   factionWarsBetEnabled: boolean;
   factionWarsBetMin: number;
@@ -359,11 +364,13 @@ export async function getPvpEconomyConfig(): Promise<PvpEconomyConfig> {
           : undefined;
         const chatEnabled = (cfg as any).factionWarsChatEnabled;
         const chatCleanup = Number((cfg as any).factionWarsChatPostCleanupMins);
+        const crateCap = Number((cfg as any).factionWarsPvpCrateDailyCap);
         return {
           factionWarsPvpCost: Number.isFinite(cost) && cost >= 0 ? cost : PVP_COST_DEFAULT,
           factionWarsPvpPayoutMode: PVP_PAYOUT_MODE_DEFAULT,
           factionWarsPvpEnabled: enabled === false ? false : PVP_ENABLED_DEFAULT,
           factionWarsPvpWagerTiers: tiers.length > 0 ? tiers : PVP_TIERS_DEFAULT,
+          factionWarsPvpCrateDailyCap: Number.isFinite(crateCap) && crateCap >= 0 ? Math.floor(crateCap) : CRATE_DAILY_CAP_DEFAULT,
           factionWarsBetEnabled: betEnabled === false ? false : BET_ENABLED_DEFAULT,
           factionWarsBetMin: Number.isFinite(betMin) && betMin >= 0 ? betMin : BET_MIN_DEFAULT,
           factionWarsBetMax: Number.isFinite(betMax) && betMax >= 0 ? betMax : BET_MAX_DEFAULT,
@@ -390,6 +397,7 @@ export async function getPvpEconomyConfig(): Promise<PvpEconomyConfig> {
     factionWarsPvpPayoutMode: PVP_PAYOUT_MODE_DEFAULT,
     factionWarsPvpEnabled: PVP_ENABLED_DEFAULT,
     factionWarsPvpWagerTiers: PVP_TIERS_DEFAULT,
+    factionWarsPvpCrateDailyCap: CRATE_DAILY_CAP_DEFAULT,
     factionWarsBetEnabled: BET_ENABLED_DEFAULT,
     factionWarsBetMin: BET_MIN_DEFAULT,
     factionWarsBetMax: BET_MAX_DEFAULT,
@@ -590,6 +598,37 @@ export async function getCrateRewards(): Promise<CrateRewards> {
     rare: CRATE_RARE_DEFAULT,
     ultra: CRATE_ULTRA_DEFAULT,
   };
+}
+
+// ── Daily crate cap ──────────────────────────────────────────────────────────
+// Two accounts of one person can still play each other for crates, so crates
+// pay at most factionWarsPvpCrateDailyCap REBEL per Rebel Economy account per
+// UTC day. The day's total is kept per account: whichever of its ids (Discord,
+// name, wallet) wins counts toward the same allowance.
+function crateDayKey(userId: string, day: string): string {
+  return `ra:fw:pvp:crate-day:${userId}:${day}`;
+}
+
+// Takes up to `amount` from the account's allowance for today and returns what
+// the crate may pay. Concurrent wins can't pay past the cap: each one counts
+// from the total after its own increment and hands back what didn't fit.
+export async function reserveCrateAllowance(userId: string, amount: number, cap: number):
+  Promise<{ allowed: number; day: string }> {
+  const day = new Date().toISOString().slice(0, 10);
+  if (!(amount > 0)) return { allowed: 0, day };
+  if (!(cap > 0)) return { allowed: amount, day };
+  const key = crateDayKey(userId, day);
+  const total = Number(await redis.incrby(key, amount));
+  try { await redis.expire(key, 3 * 86400); } catch { /* the key is per day anyway */ }
+  const allowed = Math.max(0, Math.min(amount, cap - (total - amount)));
+  if (allowed < amount) await redis.decrby(key, amount - allowed);
+  return { allowed, day };
+}
+
+// Gives an allowance back when the credit did not go through.
+export async function releaseCrateAllowance(userId: string, day: string, amount: number): Promise<void> {
+  if (!(amount > 0)) return;
+  try { await redis.decrby(crateDayKey(userId, day), amount); } catch { /* best effort */ }
 }
 
 // ── Matches that pay ─────────────────────────────────────────────────────────

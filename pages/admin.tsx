@@ -45,6 +45,8 @@ type PointsConfigShape = {
   factionWarsPvpPayoutMode: "pot";
   // Variable wager tiers (Layer 2A) — comma-separated list of allowed wager amounts
   factionWarsPvpWagerTiers: number[];
+  // Crate REBEL per Rebel Economy account per UTC day (0 = no cap)
+  factionWarsPvpCrateDailyCap: number;
   // Spectator side bets (Layer 2B)
   factionWarsBetEnabled: boolean;
   factionWarsBetMin: number;
@@ -218,6 +220,7 @@ const [cfg, setCfg] = useState<PointsConfigShape>(() => ({
     factionWarsPvpWagerTiers: Array.isArray((defaultConfig as any).factionWarsPvpWagerTiers)
       ? (defaultConfig as any).factionWarsPvpWagerTiers
       : [100, 300, 500, 1000, 3000, 5000, 10000],
+    factionWarsPvpCrateDailyCap: (defaultConfig as any).factionWarsPvpCrateDailyCap ?? 1000,
     // Spectator side bets (Layer 2B) defaults
     factionWarsBetEnabled: (defaultConfig as any).factionWarsBetEnabled !== false,
     factionWarsBetMin: (defaultConfig as any).factionWarsBetMin ?? 50,
@@ -1348,6 +1351,7 @@ String(c.status).toUpperCase()==="PENDING"
           </label>
           <label style={{ fontSize: 12, opacity: 0.9 }}>PvP Cost / Side (REBEL)<input value={cfg.factionWarsPvpCost} onChange={e => setCfg(c => ({ ...c, factionWarsPvpCost: safeNum(e.target.value, c.factionWarsPvpCost) }))} type="number" min="0" style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /></label>
           <label style={{ fontSize: 12, opacity: 0.9 }}>PvP Payout Mode<input value={cfg.factionWarsPvpPayoutMode} disabled type="text" style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.12)", background: "rgba(0,0,0,.15)", color: "rgba(255,255,255,.5)", cursor: "not-allowed" }} /><span style={{ fontSize: 10, opacity: 0.4 }}>Winner takes pot. (Future: split / fee modes.)</span></label>
+          <label style={{ fontSize: 12, opacity: 0.9 }}>Crate Cap / Account / Day (REBEL)<input value={cfg.factionWarsPvpCrateDailyCap} onChange={e => setCfg(c => ({ ...c, factionWarsPvpCrateDailyCap: Math.max(0, Math.floor(safeNum(e.target.value, c.factionWarsPvpCrateDailyCap))) }))} type="number" min="0" style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} /><span style={{ fontSize: 10, opacity: 0.4 }}>Most crate REBEL one Rebel Economy account can win from PvP in a UTC day (all its Discord / name / wallet ids together). 0 = no cap. Default: 1000.</span></label>
 
           {/* Variable wager tiers (Layer 2A) — full-width row */}
           <label style={{ fontSize: 12, opacity: 0.9, gridColumn: "1 / -1", marginTop: 6 }}>

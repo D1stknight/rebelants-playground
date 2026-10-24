@@ -58,6 +58,9 @@ const DEFAULTS = {
   raidUltraCarriers: 4,
   raidUltraRatio: 0.65,
 
+  // PvP crates: REBEL a Rebel Economy account can win from crates per UTC day (0 = no cap)
+  factionWarsPvpCrateDailyCap: 1000,
+
   // Tournaments
   factionWarsTournamentEnabled: true,
   factionWarsTournamentMaxSize: 32,
@@ -192,6 +195,8 @@ const rareMerchDecimal = Number.isFinite(rawRareMerch)
         .filter((n: number) => Number.isFinite(n) && n >= 0)
         .map((n: number) => Math.floor(n))
     : [100, 300, 500, 1000, 3000, 5000, 10000],
+  // Crate REBEL per Rebel Economy account per UTC day (0 = no cap)
+  factionWarsPvpCrateDailyCap: Math.max(0, Math.floor(safeNum(src?.factionWarsPvpCrateDailyCap, DEFAULTS.factionWarsPvpCrateDailyCap))),
   // Spectator side bets (Layer 2B)
   factionWarsBetEnabled: src?.factionWarsBetEnabled !== false,
   factionWarsBetMin:     Math.max(0, Number(src?.factionWarsBetMin ?? 50)),

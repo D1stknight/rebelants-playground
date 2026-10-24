@@ -20,3 +20,11 @@ export function rewardsWithheldText(reason: PvpMatch["pvpRewardsWithheld"]): str
   if (reason === "unverified") return "The players' accounts could not be checked when the match ended.";
   return "Crates and side bets only come from matches between two signed-in players.";
 }
+
+// The winner's account had reached its daily crate cap (factionWarsPvpCrateDailyCap).
+export function crateCapText(match: Pick<PvpMatch, "pvpCrateRewardPaid" | "pvpCrateRewardFull">): string {
+  const paid = Number(match.pvpCrateRewardPaid ?? 0), full = Number(match.pvpCrateRewardFull ?? 0);
+  return paid > 0
+    ? `Daily crate limit: ${paid} of this crate's ${full} REBEL paid. Crates pay in full again after 00:00 UTC.`
+    : "Daily crate limit reached: no crate REBEL today. Crates pay again after 00:00 UTC.";
+}

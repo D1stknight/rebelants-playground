@@ -9,7 +9,7 @@ import { FACTIONS, FACTION_IDS, TEAM_SIZE, TERRITORY_COUNT, MAX_HP, type Faction
 import FactionWarsBattleScene, { type BattleSceneState, type BattleSceneActions } from "../../../components/FactionWarsBattleScene";
 import { useFWAudio } from "../../../lib/useFWAudio";
 import { recordCompletedPlaygroundMatch } from "../../../lib/raap-completed-match";
-import { isSignedPlayerId, matchHasGuestSide, rewardsWithheldText } from "../../../lib/fwpvpRewards";
+import { isSignedPlayerId, matchHasGuestSide, rewardsWithheldText, crateCapText } from "../../../lib/fwpvpRewards";
 
 // Shown before a match with a guest side (lib/fwpvpRewards.ts): it plays, but pays no crate and takes no side bets.
 const PRACTICE_NOTE = "Practice match: crates and side bets only come when both players are signed in.";
@@ -984,6 +984,20 @@ function CompletedMatchView({ match, mePlayerId, sfx, stopMusic }: { match: PvpM
           color: "rgba(255,255,255,0.6)",
         }}>
           No crate this time. {rewardsWithheldText(match.pvpRewardsWithheld)}
+        </div>
+      )}
+      {iWon && match.pvpCrateCapped && (
+        <div style={{
+          padding: "10px 16px",
+          marginBottom: 16,
+          borderRadius: 10,
+          border: "1px solid rgba(255,255,255,0.12)",
+          background: "rgba(255,255,255,0.03)",
+          textAlign: "center",
+          fontSize: 11,
+          color: "rgba(255,255,255,0.6)",
+        }}>
+          {crateCapText(match)}
         </div>
       )}
       {!iWon && ante > 0 && (

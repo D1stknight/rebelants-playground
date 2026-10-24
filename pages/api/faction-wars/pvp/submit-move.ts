@@ -22,7 +22,7 @@ import { withSignedPlayer } from "../../../../lib/server/player-auth";
 // currently-active faction. This prevents move spoofing.
 
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getMatch, saveMatch, creditREBEL, getCrateRewards, recordPvpResult, unmarkActive, lockBets, payoutBets, refundBets, getPvpEconomyConfig, tightenChatTTL, onTournamentMatchComplete, matchAccounts } from "../../../../lib/server/fwpvp";
+import { getMatch, saveMatch, creditREBEL, getCrateRewards, recordPvpResult, unmarkActive, lockBets, payoutBets, refundBets, getPvpEconomyConfig, tightenChatTTL, onTournamentMatchComplete, matchAccounts, reserveCrateAllowance, releaseCrateAllowance } from "../../../../lib/server/fwpvp";
 import {TERRITORY_COUNT} from "../../../../lib/factionWarsCore";
 import {applyPvpMove, PvpRuleError} from "../../../../lib/server/fwpvp-rules";
 import type {SubmitMoveRequest} from "../../../../lib/types/fwpvp";
@@ -62,7 +62,7 @@ export async function submitPvpMove(req: NextApiRequest, res: NextApiResponse) {
       // A match against a guest (or between two ids of one account) pays no crate
       // or tournament pot, refunds its side bets and stays off the PvP boards
       // (lib/server/fwpvp.ts matchAccounts). Antes still go back as below.
-      const { withheld } = await matchAccounts(match);
+      const { withheld, accounts } = await matchAccounts(match);
       if (withheld) match.pvpRewardsWithheld = withheld;
       // ── Pot payout ──────────────────────────────────────────────────────
       // Pay the winner the full pvpPotPaid (challenger ante + opponent ante).
@@ -95,16 +95,29 @@ export async function submitPvpMove(req: NextApiRequest, res: NextApiResponse) {
       // On TOP of the pot, the winner gets a crate REBEL bonus matching what
       // AI mode pays for the same rarity. Loser gets nothing. Tie gets nothing.
       // The amount is read live from cfg.rewards (admin-configurable) and
-      // snapshotted to match.pvpCrateRewardPaid for client display.
+      // snapshotted to match.pvpCrateRewardPaid for client display. Crates pay
+      // at most the daily crate cap per winner's Rebel Economy account.
       let crateReward = 0;
-      if (match.winnerPlayerId && match.winnerCrateRarity && !withheld) {
+      if (match.winnerPlayerId && match.winnerCrateRarity && !withheld && accounts) {
         try {
           const rewards = await getCrateRewards();
-          if (match.winnerCrateRarity === "ultra") crateReward = rewards.ultra;
-          else if (match.winnerCrateRarity === "rare") crateReward = rewards.rare;
-          else if (match.winnerCrateRarity === "common") crateReward = rewards.common;
-          if (crateReward > 0) {
-            await creditREBEL(match.winnerPlayerId, crateReward);
+          let full = 0;
+          if (match.winnerCrateRarity === "ultra") full = rewards.ultra;
+          else if (match.winnerCrateRarity === "rare") full = rewards.rare;
+          else if (match.winnerCrateRarity === "common") full = rewards.common;
+          if (full > 0) {
+            const winnerAccount = match.winnerPlayerId === match.challengerPlayerId ? accounts[0] : accounts[1];
+            const { factionWarsPvpCrateDailyCap } = await getPvpEconomyConfig();
+            const { allowed, day } = await reserveCrateAllowance(winnerAccount, full, factionWarsPvpCrateDailyCap);
+            if (allowed < full) {
+              match.pvpCrateCapped = true;
+              match.pvpCrateRewardFull = full;
+            }
+            if (allowed > 0) {
+              const paid = await creditREBEL(match.winnerPlayerId, allowed);
+              if (paid === null) await releaseCrateAllowance(winnerAccount, day, allowed);
+              else crateReward = allowed;
+            }
           }
         } catch {
           // If rewards lookup fails, don't crash completion. Set 0; admin
