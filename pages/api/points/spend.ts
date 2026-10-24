@@ -1,13 +1,9 @@
 // pages/api/points/spend.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
-import { pointsConfig as defaultPointsConfig } from "../../../lib/pointsConfig";
 import { economyDebit, idemKey } from "../../../lib/economy";
 import { actingPlayer } from "../../../lib/server/player-auth";
-
-function balKey(playerId: string) {
-  return `ra:points:bal:${playerId}`;
-}
+import { RUN_RULES, isRunGame, loadLiveConfig, openRun } from "../../../lib/server/gameRuns";
 
 function capBankKey(playerId: string) {
   return `ra:points:capbank:${playerId}`;
@@ -21,52 +17,6 @@ function spentTodayKey(playerId: string) {
   return `ra:points:spent:${playerId}:${yyyy}-${mm}-${dd}`;
 }
 
-// ✅ Reads the SAME live config that Admin saves, with safe fallbacks
-async function getLivePointsConfig() {
- const keysToTry = [
-  "ra:config:economy", // ✅ the key Admin actually writes
-  "ra:points:config",
-  "ra:config:points",
-  "ra:pointsConfig",
-  "ra:config",
-];
-
-  const normalize = (raw: any) => {
-    // ✅ If redis returns JSON as a string, parse it
-    if (typeof raw === "string") {
-      try {
-        return JSON.parse(raw);
-      } catch {
-        return null;
-      }
-    }
-
-    // ✅ If it's already an object, use it
-    if (raw && typeof raw === "object") return raw;
-
-    return null;
-  };
-
-  for (const k of keysToTry) {
-    const raw = await redis.get<any>(k);
-    const v = normalize(raw);
-    if (!v) continue;
-
-    // ✅ If stored as wrapper: { ok:true, pointsConfig:{...} }
-    const cfg =
-      (v as any).pointsConfig && typeof (v as any).pointsConfig === "object"
-        ? (v as any).pointsConfig
-        : v;
-
-    const merged = { ...defaultPointsConfig, ...cfg };
-
-    const sc = Number((merged as any).shuffleCost);
-    if (Number.isFinite(sc) && sc > 0) return merged;
-  }
-
-  return defaultPointsConfig;
-}
-
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     if (req.method !== "POST") {
@@ -77,44 +27,45 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body ?? {});
     const claimed = String(body.playerId || "guest").trim().slice(0, 64) || "guest";
     const amountRaw = body.amount;
-    const reason = String(body.reason || "").trim();
+    let reason = String(body.reason || "").trim();
 
-        const liveCfg = await getLivePointsConfig();
-    const expectedShuffleCost = Number(liveCfg.shuffleCost || 0);
-       const expectedTunnelCost = Number((liveCfg as any).tunnelCost || 50);
+    // ✅ the live config the admin page saves (ra:config:economy), over the defaults
+    const liveCfg = await loadLiveConfig();
 
-    // ✅ Shuffle uses live configured cost
-    if (reason === "shuffle") {
-      const got = Number(amountRaw || 0);
-      if (!Number.isFinite(expectedShuffleCost) || expectedShuffleCost <= 0) {
-        return res.status(500).json({ ok: false, error: "Invalid server shuffleCost config" });
-      }
-      if (!Number.isFinite(got) || got !== expectedShuffleCost) {
-        return res.status(400).json({
-          ok: false,
-          error: `Invalid shuffle cost. Expected ${expectedShuffleCost}, got ${got}`,
-          expected: expectedShuffleCost,
-          got,
-        });
-      }
-    }
-
-    // ✅ Tunnel uses fixed cost for now
-    if (reason === "tunnel") {
-      const got = Number(amountRaw || 0);
-      if (!Number.isFinite(got) || got !== expectedTunnelCost) {
-        return res.status(400).json({
-          ok: false,
-          error: `Invalid tunnel cost. Expected ${expectedTunnelCost}, got ${got}`,
-          expected: expectedTunnelCost,
-          got,
-        });
-      }
-    }
-
-        const amt = Number(amountRaw || 0);
+    const amt = Number(amountRaw || 0);
     if (!Number.isFinite(amt) || amt <= 0) {
       return res.status(400).json({ ok: false, error: "Invalid amount" });
+    }
+
+    // The Raid is played on the server now (pages/api/raid/launch.ts): an older page that still pays here would
+    // pay and win nothing.
+    if (reason === "expedition") {
+      return res.status(409).json({ ok: false, code: "reload", error: "The Raid has been updated: reload the page to play." });
+    }
+
+    // ✅ A game's entry fee: only the fee the game takes (the live config), and it opens the game's run
+    // (lib/server/gameRuns.ts), so the game's payout is the server's to decide.
+    const healCost = Number(liveCfg.factionWarsHealCost ?? 25);
+    let game = isRunGame(reason) ? reason : null;
+    if (game) {
+      const entries = RUN_RULES[game].entries(liveCfg);
+      if (!entries.includes(amt)) {
+        // a Faction Wars heal from an older page (newer pages say "faction-wars-heal")
+        if (game === "faction-wars" && amt === healCost) {
+          game = null;
+          reason = "faction-wars-heal";
+        } else {
+          return res.status(400).json({
+            ok: false,
+            error: `Invalid ${RUN_RULES[game].label} cost. Expected ${entries[0]}, got ${amt}`,
+            expected: entries[0],
+            got: amt,
+          });
+        }
+      }
+    }
+    if (reason === "faction-wars-heal" && amt !== healCost) {
+      return res.status(400).json({ ok: false, error: `Invalid heal cost. Expected ${healCost}, got ${amt}`, expected: healCost, got: amt });
     }
 
     // Current balance now comes from the central economy ledger.
@@ -134,7 +85,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ ok: false, error: "Insufficient balance", balance: bal });
     }
 
-       // ✅ Shared play-cap enforcement for all gameplay spends
+    // ✅ Shared play-cap enforcement for all gameplay spends
     let spentToday = 0;
     let capBank = 0;
     let dailyCap = Number(liveCfg.dailyEarnCap || 0);
@@ -201,11 +152,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     const newBal = debit.balance;
 
-       return res.status(200).json({
+    // the entry is paid: the run the game's payout (or the Shuffle's prize roll) is decided against
+    const run = game ? await openRun({ game, userId: economyUser.userId, playerId, entry: amt, cfg: liveCfg }) : null;
+
+    return res.status(200).json({
       ok: true,
       playerId,
       spent: amt,
       reason: reason || undefined,
+      runId: run?.id,
+      runMax: run ? run.max : undefined,
       balance: Number(newBal || 0),
       spentToday,
       dailyCap,

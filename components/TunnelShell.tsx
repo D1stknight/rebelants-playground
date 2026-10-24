@@ -503,6 +503,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     refresh,
     earn,
     spend,
+    runOf,
   } = usePoints(effectivePlayerId);
     const theme = themeMap[boardTheme];
   const brokenWallSet = useMemo(() => new Set(brokenWalls), [brokenWalls]);
@@ -577,6 +578,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           playerId: effectivePlayerId,
+          runId: runOf("tunnel"),
           playerName,
           score: params.score,
           fullClear: params.fullClear,
@@ -994,7 +996,7 @@ const [runCrystalTarget, setRunCrystalTarget] = useState(0);
     if (r.score <= 0) { setRunMessage(`${label} No points earned this time.`); scrollBackToBoardHeader(); return; }
     setRunMessage(`${label} Claiming ${r.score} REBEL Points...${r.fullClear ? " 👑" : ""}`);
     try {
-      const earnRes: any = await earn(r.score);
+      const earnRes: any = await earn(r.score, "tunnel");
       if (!earnRes?.ok) { setRunMessage(earnRes?.error || `${label} Reward claim failed.`); return; }
       setRunMessage(`${label} +${earnRes?.added ?? r.score} REBEL Points credited ${r.fullClear ? "👑" : "✅"}`);
       await refresh(); scrollBackToBoardHeader();

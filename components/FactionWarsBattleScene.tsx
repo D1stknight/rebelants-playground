@@ -419,7 +419,7 @@ export function FactionWarsBattleScene({ state, actions, enableHealing = true, s
                       if (healBusy||busy||playerHp>=MAX_HP||healUsed>=maxHeals) return;
                       if (balance < healCost) return;
                       setHealBusy(true);
-                      try { await spend(healCost,"faction-wars"); const newHp=Math.min(MAX_HP,playerHp+healAmt); setPlayerHp(newHp); setHealUsed(n=>n+1); await refresh(); } catch {}
+                      try { await spend(healCost,"faction-wars-heal"); const newHp=Math.min(MAX_HP,playerHp+healAmt); setPlayerHp(newHp); setHealUsed(n=>n+1); await refresh(); } catch {}
                       setHealBusy(false);
                     }}
                     disabled={healBusy||busy||playerHp>=MAX_HP||balance<Number(cfg?.factionWarsHealCost??25)||healUsed>=Number(cfg?.factionWarsHealMax??2)}

@@ -704,7 +704,7 @@ const {
   remainingDaily,
   totalEarnRoom,
   spend,
-  earn,
+  runOf,
   claimDaily,
   devGrant,
   refresh,
@@ -1046,7 +1046,8 @@ setTimeout(async () => {
   const rollRes = await fetch("/api/prizes/roll", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ playerId: pid, roundId: round?.roundId || "", pick: eggIdx }),
+    // the run this round's entry fee opened: the roll is paid for, and pays its points itself
+    body: JSON.stringify({ playerId: pid, roundId: round?.roundId || "", pick: eggIdx, runId: runOf("shuffle") }),
   });
 
   const rollJson = await rollRes.json().catch(() => null);
@@ -1093,26 +1094,9 @@ if (String(pz?.type || "").toLowerCase() === "merch") {
   }
 }  
 
-  // ✅ If prize is points, credit them via /api/points/earn (respects daily cap)
+  // ✅ Points prizes are paid by the roll itself (the server credits them to the run's account)
   if (pz?.type === "points" && Number(pz?.points || 0) > 0) {
-    const earnRes: any = await earn(Number(pz.points || 0));
-
-    if (earnRes?.ok === false) {
-      console.warn("EARN failed:", earnRes);
-    }
-
-    const applied = Number(earnRes?.added ?? earnRes?.applied ?? pz.points);
-
-    // If daily cap limited the reward
-    if (Number.isFinite(applied) && applied < Number(pz.points || 0)) {
-      pz = {
-        ...pz,
-        label: `Daily cap reached — prize rolled, but only ${applied} ${
-          pointsConfig.currency || "REBEL"
-        } could be credited today.`,
-      };
-    }
-
+    if (!(Number(rollJson?.credited || 0) > 0)) console.warn("Prize roll paid nothing:", rollJson);
     await refresh();
   }
 
@@ -1141,6 +1125,7 @@ await fetch("/api/wins/add", {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     ts: Date.now(),
     game: "shuffle",
+    runId: runOf("shuffle"),
 
     // ✅ IMPORTANT: record wins to the same identity used for points
     playerId: effectivePlayerId || pid,

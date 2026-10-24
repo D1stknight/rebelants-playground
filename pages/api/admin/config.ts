@@ -1,6 +1,7 @@
 // pages/api/admin/config.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
+import { DEFAULT_MAX_PAYOUT, RUN_RULES } from "../../../lib/server/gameRuns";
 
 const KEY = "ra:config:economy";
 
@@ -86,6 +87,15 @@ const DEFAULTS = {
 
   // ✅ Ultra min reward fallback
   ultraMinReward: 50,
+
+  // Game payouts (lib/server/gameRuns.ts)
+  payoutGuard: "enforce",
+  descentMaxPayout: DEFAULT_MAX_PAYOUT.descent,
+  bountyMaxPayout: DEFAULT_MAX_PAYOUT.bounty,
+  tunnelMaxPayout: DEFAULT_MAX_PAYOUT.tunnel,
+  factionWarsMaxPayout: DEFAULT_MAX_PAYOUT["faction-wars"],
+  gameDailyCapMode: "watch",
+  gameDailyCaps: {} as Record<string, number>,
 };
 
 function safeNum(v: any, fallback: number) {
@@ -179,6 +189,17 @@ const rareMerchDecimal = Number.isFinite(rawRareMerch)
   raidCarrierSurvival: Number(src?.raidCarrierSurvival ?? DEFAULTS.raidCarrierSurvival),
   raidUltraCarriers:   Number(src?.raidUltraCarriers   ?? DEFAULTS.raidUltraCarriers),
   raidUltraRatio:      Number(src?.raidUltraRatio      ?? DEFAULTS.raidUltraRatio),
+
+  // ── Game payouts (lib/server/gameRuns.ts): the most a run pays, the daily caps per account ──
+  payoutGuard: src?.payoutGuard === "watch" ? "watch" : "enforce",
+  descentMaxPayout:     Math.max(0, Math.floor(safeNum(src?.descentMaxPayout, DEFAULTS.descentMaxPayout))),
+  bountyMaxPayout:      Math.max(0, Math.floor(safeNum(src?.bountyMaxPayout, DEFAULTS.bountyMaxPayout))),
+  tunnelMaxPayout:      Math.max(0, Math.floor(safeNum(src?.tunnelMaxPayout, DEFAULTS.tunnelMaxPayout))),
+  factionWarsMaxPayout: Math.max(0, Math.floor(safeNum(src?.factionWarsMaxPayout, DEFAULTS.factionWarsMaxPayout))),
+  gameDailyCapMode: src?.gameDailyCapMode === "enforce" ? "enforce" : "watch",
+  gameDailyCaps: Object.fromEntries(
+    Object.keys(RUN_RULES).filter((g) => g !== "shuffle").map((g) => [g, Math.max(0, Math.floor(safeNum(src?.gameDailyCaps?.[g], 0)))])
+  ),
 
   // ── Faction Wars (AI mode) ──────────────────────────────────────────────
   factionWarsCost:          Number(src?.factionWarsCost          ?? 150),

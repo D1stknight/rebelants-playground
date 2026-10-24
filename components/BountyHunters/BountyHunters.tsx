@@ -28,7 +28,7 @@ function loadBest(): Best { try { return JSON.parse(localStorage.getItem(BEST_KE
 const BountyHunters: React.FC = () => {
   const [pid, setPid] = useState("guest");
   useEffect(() => { const u = () => { try { setPid(getEffectivePlayerId(loadProfile()) || "guest"); } catch { setPid("guest"); } }; u(); window.addEventListener("ra:identity-changed", u); return () => window.removeEventListener("ra:identity-changed", u); }, []);
-  const { balance, spend, earn, refresh } = usePoints(pid);
+  const { balance, spend, earn, refresh, runOf } = usePoints(pid);
   const [cfg, setCfg] = useState<any>(defaultPointsConfig);
   useEffect(() => { (async () => { try { const r = await fetch("/api/config", { cache: "no-store" }); const j = await r.json().catch(() => null); if (r.ok && j?.pointsConfig) setCfg((p: any) => ({ ...p, ...j.pointsConfig })); } catch {} })(); }, []);
   const cost = Number(cfg?.bountyCost ?? BOUNTY_DEFAULT_COST);
@@ -73,15 +73,15 @@ const BountyHunters: React.FC = () => {
     setResult({ ...r, paid }); setPhase("result");
     try { if (document.fullscreenElement || (document as any).webkitFullscreenElement) (document.exitFullscreen || (document as any).webkitExitFullscreen)?.call(document); } catch {}
     const key = Date.now(); finishedRef.current = key;
-    if (paid > 0) { try { await earn(paid); } catch {} }
+    if (paid > 0) { try { await earn(paid, "bounty"); } catch {} }
     try {
       const prof = loadProfile(); const pname = (prof?.discordName || prof?.name || "guest").trim() || "guest";
-      await fetch("/api/wins/add", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: `${key}-${Math.random().toString(36).slice(2, 7)}`, ts: key, game: "bounty", playerId: pid, playerName: pname, rarity: r.cleared ? (r.boardN >= 4 ? "ultra" : r.boardN >= 2 ? "rare" : "common") : "none", pointsAwarded: paid, survivors: r.kills, prize: null }) });
+      await fetch("/api/wins/add", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: `${key}-${Math.random().toString(36).slice(2, 7)}`, ts: key, game: "bounty", runId: runOf("bounty"), playerId: pid, playerName: pname, rarity: r.cleared ? (r.boardN >= 4 ? "ultra" : r.boardN >= 2 ? "rare" : "common") : "none", pointsAwarded: paid, survivors: r.kills, prize: null }) });
     } catch {}
     try { const b = loadBest(); const prev = b[r.boardN]; b[r.boardN] = { cleared: (prev?.cleared || false) || r.cleared, bounty: Math.max(prev?.bounty || 0, paid) }; localStorage.setItem(BEST_KEY, JSON.stringify(b)); setBest(b); } catch {}
     window.dispatchEvent(new Event("ra:leaderboards-refresh"));
     await refresh().catch(() => {});
-  }, [earn, pid, refresh]);
+  }, [earn, pid, refresh, runOf]);
 
   if (phase === "playing") return <BountyGameView board={board} faction={faction} onEnd={onEnd} onQuit={() => onEnd({ cleared: false, bounty: 0, kills: 0, boardN: board.n })} />;
 

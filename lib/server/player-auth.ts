@@ -23,6 +23,14 @@ export function isAdminRequest(req: NextApiRequest): boolean {
   return !!expected && provided === expected;
 }
 
+// A route handler called from the server's own code (the RAAP solo campaign, pages/api/raap/solo-campaign.ts)
+// instead of over HTTP: that caller marks the request object with this symbol, which nothing a browser
+// sends can carry. Such a call has already done its own checks.
+export const INTERNAL_CALL = Symbol.for("rebelants.internal-call");
+export function isInternalRequest(req: NextApiRequest): boolean {
+  return (req as any)?.[INTERNAL_CALL] === true;
+}
+
 const clean = (v: unknown) => String(v || "").trim().slice(0, 64);
 
 // A guest id moves no points: resolveByPlayerId has no account for it.

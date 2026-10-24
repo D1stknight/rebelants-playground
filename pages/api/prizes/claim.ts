@@ -1,6 +1,8 @@
 // pages/api/prizes/claim.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
+import { actingPlayer, isAdminRequest, isInternalRequest } from "../../../lib/server/player-auth";
+import { markClaimed, readWonPrize, unmarkClaimed, wonBy } from "../../../lib/server/prizesWon";
 
 const ULTRA_NFT_INVENTORY_KEY = "ra:inv:ultra:nft";
 
@@ -22,8 +24,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ? (rawBody.trim() ? JSON.parse(rawBody) : {})
         : (rawBody ?? {});
 
-    const claimId = String(body.claimId || "").trim();
-    const playerId = String(body.playerId || "").trim().slice(0, 64);
+    const claimId = String(body.claimId || "").trim().slice(0, 80);
+    let playerId = String(body.playerId || "").trim().slice(0, 64);
     let prize = body.prize ?? null;
 
     const wallet = String(body.wallet || "").trim();
@@ -39,16 +41,35 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ ok: true, already: true });
     }
 
+    // ✅ A player claims a prize the server rolled for their account (lib/server/prizesWon.ts): the prize is
+    // the one saved at the roll, never the request's. (The admin page and the RAAP solo campaign, which
+    // checked its own result, are trusted.)
+    let wonId = "";
+    if (!(isAdminRequest(req) || isInternalRequest(req))) {
+      const who = await actingPlayer(req, playerId);
+      if (!who.ok) return res.status(401).json({ ok: false, error: who.signIn ? "Sign in again to claim your prize." : "Sign in to claim your prize.", signIn: who.signIn });
+      const won = await readWonPrize(prize?.wonId ?? body.wonId);
+      if (!won || !wonBy(won, { playerId: who.playerId, userId: who.user.userId })) {
+        return res.status(403).json({ ok: false, error: "This prize was not won by this account." });
+      }
+      if (!(await markClaimed(won.wonId, claimId))) return res.status(409).json({ ok: false, error: "This prize has been claimed already." });
+      wonId = won.wonId;
+      playerId = who.playerId;
+      prize = { ...won.prize, wonId: won.wonId };
+    }
+
   // ✅ If NFT prize: consume EXACTLY the rolled inventory item from ra:inv:ultra:nft
 if (String(prize?.type || "").toLowerCase() === "nft") {
   const invKey = String(prize?.meta?.inventoryKey || "").trim();
 
   if (!invKey) {
+    if (wonId) await unmarkClaimed(wonId);
     return res.status(400).json({ ok: false, error: "NFT prize missing meta.inventoryKey" });
   }
 
   // require wallet for NFT claims
   if (!wallet || !wallet.startsWith("0x") || wallet.length < 10) {
+    if (wonId) await unmarkClaimed(wonId);
     return res.status(400).json({ ok: false, error: "Missing/invalid recipient wallet" });
   }
 
@@ -91,6 +112,7 @@ if (String(prize?.type || "").toLowerCase() === "nft") {
   }
 
   if (!rawMatch || !parsedMatch) {
+    if (wonId) await unmarkClaimed(wonId);
     return res.status(409).json({ ok: false, error: "No NFT inventory available" });
   }
 
