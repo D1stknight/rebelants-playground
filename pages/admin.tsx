@@ -614,7 +614,7 @@ async function saveConfig() {
     append(`Transferring NFT for ${claimId}…`);
     const r = await fetch("/api/prizes/transfer", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ claimId }),
     });
 
