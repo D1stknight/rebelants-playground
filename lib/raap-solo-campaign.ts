@@ -23,6 +23,12 @@ export async function soloRequest(body: object) {
   return value;
 }
 
+export function isMissingSoloStatus(value: any, requestedId: string | undefined): boolean {
+  return typeof requestedId === "string" && /^[a-z0-9]{12}$/.test(requestedId) &&
+    value?.session === null && value?.lookup?.status === "NO_ACTIVE_CAMPAIGN" &&
+    value.lookup.requestedId === requestedId;
+}
+
 /** Human actions only. A lost response disables writes until an explicit saved
  * status read. The saved locator survives reload; no stored wallet credential. */
 export function useSoloCampaign(playerId: string) {
@@ -57,7 +63,14 @@ export function useSoloCampaign(playerId: string) {
     try {
       const id = locator.current;
       const value = await soloRequest({ operation: "STATUS", playerId: actor, ...(id ? { id } : {}) });
-      return accept(value, actor);
+      if (identity.current !== actor) return;
+      const missing = locator.current === id && isMissingSoloStatus(value, id);
+      // Keep the old browser shortcut intact. Only stop treating it as an active
+      // game after the server confirms that neither it nor an active game exists.
+      if (missing) locator.current = undefined;
+      const result = accept(value, actor);
+      if (missing) setMessage("No campaign is active. The older game record is no longer available here. Your saved Rebel history is unchanged.");
+      return result;
     } catch (error) { if (identity.current === actor) { setMessage((error as Error).message); setUncertain(true); blocked.current = true; } }
     finally { inFlight.current = false; if (identity.current === actor) setBusy(false); }
   }, [playerId, accept]);

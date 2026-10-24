@@ -7,7 +7,8 @@ import { createPlaygroundPointEffects } from "./raap-pvp-point-effects";
 
 import { soloDigest, soloCommandKey, soloCanonical, soloActionRecord, parseSoloActionRecord, type SoloReviewedCommand } from "./raap-solo-protocol";
 
-type Store = { get<T>(key: string): Promise<T | null>; eval(script: string, keys: string[], args: (string | number)[]): Promise<unknown> };
+type Store = { get<T>(key: string): Promise<T | null>; eval(script: string, keys: string[], args: (string | number)[]): Promise<unknown>;
+  evalRo?(script: string, keys: string[], args: (string | number)[]): Promise<unknown> };
 type Selected = Pick<PlaygroundRebelSelection, "selectionId" | "controller" | "controllerEpoch" | "validAfter" | "validUntil" | "asset">;
 export interface SoloSession {
   schema: "rebel.playground.solo-session.v1"; id: string; playerId: string;
@@ -27,6 +28,15 @@ export const soloResultKeys = (id: string) => [`ra:fwsolo:match:${id}`, `ra:raap
 function unavailable(): never { throw Error("SOLO_SAVED_STATUS_REQUIRED"); }
 const raw = (value: unknown): string => typeof value === "string" ? value : JSON.stringify(value);
 const random = () => randomInt(0, 0x100000000) / 0x100000000;
+// Observe the requested record and canonical active pointer together. This script
+// never changes a game, expires a record or settles a point effect.
+const READ_STATUS = `
+local saved = redis.call('GET', KEYS[1])
+if saved then return {'SAVED', saved} end
+local active = redis.call('GET', KEYS[2])
+if not active then return {'NONE', ''} end
+return {'ACTIVE', active}
+`;
 const CREATE = `
 local active = redis.call('GET', KEYS[2])
 if active then return redis.call('GET', 'ra:raap:fwsolo:session:' .. active) or '' end
@@ -123,6 +133,24 @@ export function createSoloCampaignService(input: {
     return after;
   }
   return {
+    async readStatus(playerId: string, id?: string) {
+      if (id === undefined) return { session: await this.read(playerId), lookup: { status: "CURRENT", requestedId: null } };
+      if (typeof id !== "string" || !/^[a-z0-9]{12}$/.test(id)) unavailable();
+      if (!input.store.evalRo) unavailable();
+      const result = await input.store.evalRo(READ_STATUS, [sessionKey(id), activeKey(playerId)], []);
+      if (!Array.isArray(result)) unavailable();
+      if (result.length === 2 && result[0] === "NONE" && result[1] === "")
+        return { session: null, lookup: { status: "NO_ACTIVE_CAMPAIGN", requestedId: id } };
+      const active = result[0] === "ACTIVE" && result.length === 2;
+      const selected = active ? result[1] : id;
+      if ((!active && (result[0] !== "SAVED" || result.length !== 2)) ||
+        typeof selected !== "string" || !/^[a-z0-9]{12}$/.test(selected)) unavailable();
+      const value = active ? await input.store.get(sessionKey(selected)) : result[1];
+      if (!value) unavailable();
+      const session = parse(value, playerId);
+      if (session.id !== selected) unavailable();
+      return { session, lookup: { status: active ? "ACTIVE" : "SAVED", requestedId: id } };
+    },
     async read(playerId: string, id?: string) {
       if (id && !/^[a-z0-9]{12}$/.test(id)) unavailable();
       const selected = id ?? await input.store.get<string>(activeKey(playerId));

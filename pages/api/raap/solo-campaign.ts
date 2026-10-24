@@ -52,7 +52,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } });
     if (b.operation === "STATUS") {
       if (!fields(b, b.id === undefined ? "operation,playerId" : "operation,playerId,id")) throw Error();
-      return res.json({ connected: !!learning, session: view(await service.read(b.playerId, b.id)) });
+      const result = await service.readStatus(b.playerId, b.id);
+      return res.json({ connected: !!learning, session: view(result.session), lookup: result.lookup });
     }
     if (b.operation === "REWARD" || b.operation === "CLAIM_PRIZE" || b.operation === "REPORT") {
       if (!fields(b, b.operation === "REWARD" ? "operation,playerId,id" : b.operation === "REPORT" ? "operation,playerId,id,playerName" : "operation,playerId,id,wallet") ||
