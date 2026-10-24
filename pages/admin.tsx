@@ -1285,6 +1285,7 @@ String(c.status).toUpperCase()==="PENDING"
     Tip: Type a Discord name, click the correct result, then hit Grant.
   </div>
 </div>
+  <NamesWithoutPin headers={headers} />
   {/* Config */}
   <div style={{ padding: 14, border: "1px solid rgba(255,255,255,.14)", borderRadius: 14, background: "rgba(15,23,42,.55)", gridColumn: "1/-1" }}>
     <div style={{ fontWeight: 900, marginBottom: 14, fontSize: 16 }}>⚙️ Game Settings</div>
@@ -2100,5 +2101,75 @@ String(c.status).toUpperCase()==="PENDING"
 `}</style>
     </div>
   </>
+  );
+}
+
+// Commander names from before PINs (lib/commanderPins.ts): list them, and set a name's first PIN once the
+// team has checked who asks (pages/api/commander/set-pin.ts takes the admin key).
+function NamesWithoutPin({ headers }: { headers: Record<string, string> }) {
+  const [list, setList] = useState<{ name: string; shown: string | null }[] | null>(null);
+  const [total, setTotal] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [name, setName] = useState("");
+  const [pin, setPin] = useState("");
+  const [msg, setMsg] = useState("");
+  const load = async () => {
+    setBusy(true);
+    setMsg("");
+    try {
+      const r = await fetch("/api/admin/commander-names", { headers });
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j?.ok) return setMsg(j?.error || `List failed (${r.status})`);
+      setList(j.withoutPin || []);
+      setTotal(Number(j.names || 0));
+      if (j.truncated) setMsg("Only the first 20,000 names were checked.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const setFirstPin = async () => {
+    const n = name.trim().toLowerCase();
+    if (!n || !/^[0-9]{4,6}$/.test(pin)) return setMsg("Pick a name from the list and a PIN of 4-6 digits.");
+    setBusy(true);
+    setMsg("");
+    try {
+      const r = await fetch("/api/commander/set-pin", { method: "POST", headers, body: JSON.stringify({ name: n, pin }) });
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j?.ok) return setMsg(j?.error || `Failed (${r.status})`);
+      setMsg(`PIN set for ${j.name}. Give the player their PIN privately.`);
+      setPin("");
+      setName("");
+      setList((l) => (l || []).filter((x) => x.name !== j.name));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div style={{ padding: 14, border: "1px solid rgba(255,255,255,.14)", borderRadius: 14, background: "rgba(15,23,42,.55)" }}>
+      <div style={{ fontWeight: 900, marginBottom: 6 }}>Names without a PIN</div>
+      <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 10 }}>
+        Commander names from before PINs. Nothing proves who claimed one, so players can&apos;t set its first PIN themselves:
+        check who asks (their device, balance, Discord), then set it here.
+      </div>
+      <button className="btn" onClick={load} disabled={busy}>{busy && !list ? "Checking…" : list ? "Refresh" : "List them"}</button>
+      {list && <div style={{ marginTop: 10, fontSize: 12 }}>{list.length} of {total} names have no PIN.</div>}
+      {list && list.length > 0 && (
+        <div style={{ marginTop: 8, maxHeight: 180, overflowY: "auto", display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {list.map((x) => (
+            <button key={x.name} type="button" className="btn" onClick={() => setName(x.name)}
+              style={{ padding: "4px 8px", fontSize: 12, opacity: name === x.name ? 1 : 0.75 }}>
+              {x.name}{x.shown && x.shown.toLowerCase() !== x.name ? ` (${x.shown})` : ""}
+            </button>
+          ))}
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+        <input className="admin-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" style={{ flex: "1 1 140px" }} />
+        <input className="admin-input" value={pin} onChange={(e) => setPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
+          placeholder="New PIN" inputMode="numeric" style={{ flex: "0 1 110px" }} />
+        <button className="btn" onClick={setFirstPin} disabled={busy}>Set first PIN</button>
+      </div>
+      {msg && <div style={{ marginTop: 8, fontSize: 12, opacity: 0.9 }}>{msg}</div>}
+    </div>
   );
 }

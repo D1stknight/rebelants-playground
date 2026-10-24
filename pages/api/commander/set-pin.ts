@@ -2,6 +2,8 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
 import { createHash } from "crypto";
 import { economyName, economyNameAuth, sharedWithEconomy } from "../../../lib/economy";
+import { isAdminRequest } from "../../../lib/server/player-auth";
+import { NO_PIN_SUPPORT } from "../../../lib/commanderPins";
 
 function hashPin(name: string, pin: string): string {
   return createHash("sha256")
@@ -45,10 +47,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const existingPin = await redis.get(pinKey);
   if (existingPin) return res.status(409).json({ ok: false, error: "PIN already set for this name" });
 
+  // A name from before PINs: the list kept only the name, so nothing proves who asks. Its first PIN is set
+  // by the team (the admin page, with the admin key) once they have checked, never by whoever asks first.
+  if (!isAdminRequest(req)) return res.status(403).json({ ok: false, code: "pin_by_support", error: NO_PIN_SUPPORT });
+
   // A name of letters and digits is also a Rebel Economy colony name: its first PIN is made there, so
   // a name the economy (casino) already has keeps the PIN it has. adopt: the economy account this name's
-  // points are on (made when the Playground resolved it) gets the PIN, as the Playground name does here
-  // (the first PIN set for a PIN-less name wins, as before).
+  // points are on (made when the Playground resolved it) gets the PIN, as the Playground name does here.
   if (sharedWithEconomy(name)) {
     const display = (await redis.get<string>(`ra:commander:player:name:${name}`)) || raw;
     const r = await economyNameAuth("register", economyName(display, name), pin, getIP(req), { adopt: true });

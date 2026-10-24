@@ -4,6 +4,7 @@ import { createHash } from "crypto";
 import { signNameSession, nameSessionSetCookie } from "../../../lib/name-session";
 import { rateLimit } from "../../../lib/server/ratelimit";
 import { economyName, economyNameAuth, economySlug, sharedWithEconomy } from "../../../lib/economy";
+import { NO_PIN_SUPPORT } from "../../../lib/commanderPins";
 
 function hashPin(name: string, pin: string): string {
   return createHash("sha256")
@@ -65,6 +66,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const twoPins = () => res.status(403).json({ ok: false, code: "economy_pin", error: "This name is also a Rebel Economy (casino) account with another PIN. Sign in with that PIN." });
   const unavailable = () => res.status(503).json({ ok: false, error: "Sign-in is not available right now. Try again in a minute." });
   const notFound = () => res.status(404).json({ ok: false, error: "Commander name not found" });
+  // a name from before PINs (lib/commanderPins.ts): its first PIN comes from the team
+  const noPin = () => res.status(403).json({ ok: false, code: "no_pin", error: NO_PIN_SUPPORT });
 
   // A name of letters and digits is also the Rebel Economy's colony name (the casino, the village); one
   // typed with spaces or symbols ("Big Chain") is the economy's account of that spelling (name:big-chain),
@@ -86,8 +89,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Check PIN
     const storedHash = await redis.get<string>(k.pinKey);
-    // code no_pin: the sign-in card offers the device that holds this name a PIN (as the home page's SET PIN)
-    if (!storedHash) return res.status(403).json({ ok: false, code: "no_pin", error: "No PIN set for this name. Contact support." });
+    if (!storedHash) return noPin();
 
     if (await tooManyFails(name)) return tooMany();
 
@@ -104,6 +106,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // is no PIN hash, so the Playground's own PIN check and set-pin never match or replace it).
   async function economySignedIn(slug: string, displayName?: string) {
     const k = keys(slug);
+    // An old Playground name from before PINs is not proven by an economy account of the same spelling:
+    // anyone could have made that one in the casino. Its first PIN comes from the team.
+    const [listed, pinSet] = await Promise.all([redis.get(k.nameKey), redis.get(k.pinKey)]);
+    if (listed && !pinSet) return noPin();
     await Promise.all([
       redis.set(k.nameKey, `name:${slug}`, { nx: true }),
       redis.set(k.pinKey, "economy", { nx: true }),
@@ -159,7 +165,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (e.code !== "name_unknown") return unavailable();
 
     if (!(await redis.get(k.nameKey))) return notFound();
-    if (!storedHash) return res.status(403).json({ ok: false, code: "no_pin", error: "No PIN set for this name. Contact support." });
+    if (!storedHash) return noPin();
     if (hashPin(name, pin) !== storedHash) {
       await countFail(name);
       return wrongPin();

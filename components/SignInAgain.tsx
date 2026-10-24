@@ -9,8 +9,6 @@ import { getEffectivePlayerId, loadProfile, saveProfile } from "../lib/profile";
 import { SIGN_IN_EVENT, watchSignInAnswers, type SignInKind } from "../lib/signInWatch";
 
 const short = (w: string) => (w.length > 12 ? `${w.slice(0, 6)}…${w.slice(-4)}` : w);
-// as the commander routes normalize a name
-const slug = (n: string) => n.toLowerCase().replace(/[^a-z0-9_]/g, "");
 
 export default function SignInAgain() {
   const [kind, setKind] = useState<SignInKind | null>(null);
@@ -18,8 +16,6 @@ export default function SignInAgain() {
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
-  // the name has no PIN yet (claimed before PINs): this device, which holds it, may choose one
-  const [noPin, setNoPin] = useState(false);
   const dismissed = useRef(false);
   // the kind the card shows now (the event handler below is set up once)
   const shown = useRef<SignInKind | null>(null);
@@ -43,7 +39,6 @@ export default function SignInAgain() {
       const pid = getEffectivePlayerId(loadProfile());
       if (d.kind === "name" && pid.startsWith("name:")) setName((n) => n || pid.slice(5));
       setMsg("");
-      setNoPin(false);
       setKind(d.kind);
     };
     const onChanged = () => { changedAt.current = performance.now(); };
@@ -66,7 +61,6 @@ export default function SignInAgain() {
     setKind(null);
     setPin("");
     setMsg("");
-    setNoPin(false);
     window.dispatchEvent(new Event("ra:identity-changed"));
   };
 
@@ -91,37 +85,8 @@ export default function SignInAgain() {
         return done();
       }
       setPin("");
-      // only for the name this device plays as, like the home page's SET PIN
-      if (j?.code === "no_pin" && pid.startsWith("name:") && slug(name) === pid.slice(5)) return setNoPin(true);
+      // a name from before PINs gets its first PIN from the team (lib/commanderPins.ts): the answer says so
       setMsg(j?.error || "Could not sign in. Try again.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const setNamePin = async () => {
-    if (!/^[0-9]{4,6}$/.test(pin)) return setMsg("Choose a PIN of 4-6 digits.");
-    setBusy(true);
-    setMsg("");
-    try {
-      const body = JSON.stringify({ name: slug(name), pin });
-      const r = await fetch("/api/commander/set-pin", { method: "POST", headers: { "Content-Type": "application/json" }, body });
-      const j = await r.json().catch(() => null);
-      if (r.status === 409) {
-        setNoPin(false);
-        setPin("");
-        return setMsg("This name already has a PIN. Sign in with it.");
-      }
-      if (!r.ok || !j?.ok) return setMsg(j?.error || "Could not save the PIN. Try again.");
-      const s = await fetch("/api/commander/sign-in", { method: "POST", headers: { "Content-Type": "application/json" }, body });
-      const sj = await s.json().catch(() => null);
-      if (s.ok && sj?.ok) {
-        saveProfile({ primaryId: sj.playerId, name: sj.displayName || sj.name, discordSkipLink: true });
-        return done();
-      }
-      setNoPin(false);
-      setPin("");
-      setMsg("PIN saved. Sign in with it.");
     } finally {
       setBusy(false);
     }
@@ -174,20 +139,7 @@ export default function SignInAgain() {
         </div>
       )}
 
-      {kind === "name" && noPin && (
-        <>
-          <div className="ra-signin-text">
-            <b>{slug(name)}</b> has no PIN yet. Choose a PIN of 4-6 digits: it keeps the name yours on every device.
-          </div>
-          <form className="ra-signin-row" onSubmit={(e) => { e.preventDefault(); void setNamePin(); }}>
-            <input className="ra-signin-in pin" value={pin} onChange={(e) => setPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
-              placeholder="New PIN" inputMode="numeric" type="password" autoComplete="new-password" autoFocus />
-            <button className="ra-signin-btn main" type="submit" disabled={busy || pin.length < 4}>{busy ? "Saving…" : "Set PIN"}</button>
-          </form>
-        </>
-      )}
-
-      {kind === "name" && !noPin && (
+      {kind === "name" && (
         <form className="ra-signin-row" onSubmit={(e) => { e.preventDefault(); void signInName(); }}>
           <input className="ra-signin-in" value={name} onChange={(e) => setName(e.target.value)} placeholder="Commander name" autoComplete="username" />
           <input className="ra-signin-in pin" value={pin} onChange={(e) => setPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
