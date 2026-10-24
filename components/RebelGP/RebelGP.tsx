@@ -8,6 +8,7 @@ import { pointsConfig as defaultPointsConfig } from "../../lib/pointsConfig";
 import { CHASSIS, CUPS, GP_DEFAULT_COST, GP_PAYOUT, GP_PLACE_POINTS, ITEMS, TRACKS, type ChassisId, type TrackMeta } from "../../lib/rgpConfig";
 import { DESCENT_FACTIONS } from "../../lib/descentConfig";
 import { preloadTrack, ord } from "./engine";
+import GameBoards, { recordBoardRun } from "../GameBoards";
 
 function retryChunk(e: any): never {
   try { const key = "ra:gp:chunkRetry"; const last = Number(sessionStorage.getItem(key) || 0); if (Date.now() - last > 30000) { sessionStorage.setItem(key, String(Date.now())); const u = new URL(location.href); u.searchParams.set("r", String(Date.now())); location.replace(u.toString()); } } catch {}
@@ -65,6 +66,7 @@ const RebelGP: React.FC = () => {
     if (paid > 0) { try { await earn(paid, "gp"); } catch {} }
     try {
       const prof = loadProfile(); const pname = (prof?.discordName || prof?.name || "guest").trim() || "guest";
+      await recordBoardRun({ game: "gp", playerId: pid, playerName: pname, runId: runOf("gp"), stats: { place: r.place, timeMs: Math.round((r.time || 0) * 1000), trackId: track.id } });
       await fetch("/api/wins/add", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: `${key}-${Math.random().toString(36).slice(2, 7)}`, ts: key, game: "gp", runId: runOf("gp"), playerId: pid, playerName: pname, rarity: r.place === 1 ? (track.cup >= 4 ? "ultra" : "rare") : r.place <= 3 ? "common" : "none", pointsAwarded: paid, survivors: 9 - r.place, prize: null }) });
     } catch {}
     try { const b = loadBest(); const prev = b[track.id]; if (!prev || r.place < prev.place || (r.place === prev.place && r.time < prev.time)) b[track.id] = { place: r.place, time: r.time }; localStorage.setItem(BEST_KEY, JSON.stringify(b)); setBest(b); } catch {}
@@ -91,6 +93,7 @@ const RebelGP: React.FC = () => {
           <button type="button" onClick={() => { setPhase("lobby"); setTimeout(() => start(), 50); }} disabled={balance < cost} style={{ fontFamily: FONT, padding: "14px 28px", border: "none", borderRadius: 12, background: "linear-gradient(180deg, #a78bfa 0%, #5b3fb0 100%)", color: "#fff", fontWeight: 900, fontSize: 13, letterSpacing: "0.15em", cursor: "pointer", opacity: balance < cost ? 0.5 : 1 }}>🏁 RACE AGAIN · {cost}</button>
           {next && next.cup === t.cup && <button type="button" onClick={() => { setTrack(next); setPhase("lobby"); }} style={{ fontFamily: FONT, padding: "14px 28px", border: "none", borderRadius: 12, background: "linear-gradient(180deg, #ffd700 0%, #aa6600 100%)", color: "#000", fontWeight: 900, fontSize: 13, letterSpacing: "0.15em", cursor: "pointer" }}>NEXT: {next.name.toUpperCase()} →</button>}
         </div>
+        <div style={{ width: "100%", maxWidth: 520, marginTop: 26, textAlign: "left" }}><GameBoards game="gp" playerId={pid} accent={podium ? "#ffd700" : "#a78bfa"} font={FONT} compact /></div>
       </div>
     );
   }
@@ -104,10 +107,10 @@ const RebelGP: React.FC = () => {
         <div style={{ background: "rgba(0,0,0,0.5)", border: "1px solid rgba(251,191,36,0.35)", borderRadius: 999, padding: "6px 14px", fontSize: 13, fontWeight: 800, color: "#fbbf24" }}>⚡ {(balance || 0).toLocaleString()} <span style={{ fontSize: 10, opacity: 0.7 }}>REBEL</span></div>
       </div>
       <div style={{ textAlign: "center", padding: "20px 16px 8px" }}>
-        <div style={{ fontSize: 11, color: "#ffd166", letterSpacing: "0.45em", fontWeight: 700 }}>◆ KART RACING ◆</div>
+        <div style={{ fontSize: 11, color: "#ffd166", letterSpacing: "0.45em", fontWeight: 700 }}>◆ FORMULA REBEL ◆</div>
         <h1 style={{ fontSize: "clamp(40px, 8vw, 88px)", margin: "8px 0 0", fontWeight: 900, letterSpacing: "0.04em", lineHeight: 0.95, background: "linear-gradient(180deg, #fff 0%, #ffd166 55%, #c0392b 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>REBEL<br />GRAND PRIX</h1>
         <div style={{ fontSize: "clamp(13px, 1.8vw, 16px)", color: "rgba(255,255,255,0.75)", marginTop: 16, maxWidth: 560, marginLeft: "auto", marginRight: "auto", lineHeight: 1.55 }}>
-          Five cups, fifteen tracks, eight karts on the grid. Drift the corners, grab the boxes, and put a Homing Wasp in whoever is ahead of you. Finishing place pays out in REBEL.
+          Five cups, fifteen circuits, eight cars on the grid. Lights out, drift the corners, grab the boxes, and put a Homing Wasp in whoever is ahead of you. Finishing place pays out in REBEL.
         </div>
       </div>
 
@@ -125,11 +128,11 @@ const RebelGP: React.FC = () => {
 
       {/* kart */}
       <div style={{ maxWidth: 1000, margin: "24px auto 0", padding: "0 16px" }}>
-        <div style={{ fontSize: 11, color: "#a78bfa", letterSpacing: "0.4em", textAlign: "center", marginBottom: 10 }}>◆ YOUR KART · 5 CHASSIS ◆</div>
+        <div style={{ fontSize: 11, color: "#a78bfa", letterSpacing: "0.4em", textAlign: "center", marginBottom: 10 }}>◆ YOUR CAR · 5 CHASSIS ◆</div>
         <div style={{ display: "grid", gridTemplateColumns: narrow ? "1fr" : "repeat(auto-fit, minmax(230px, 1fr))", gap: 8 }}>
           {CHASSIS.map((k) => { const on = k.id === chassis; return (
             <button key={k.id} type="button" onClick={() => setChassis(k.id)} style={{ fontFamily: FONT, textAlign: "left", padding: "10px 12px", borderRadius: 12, border: on ? "2px solid #ffd166" : "1px solid rgba(255,255,255,0.12)", background: on ? "linear-gradient(180deg, rgba(255,209,102,0.15), rgba(10,8,16,0.9))" : "rgba(10,8,16,0.8)", color: "#fff", cursor: "pointer", boxShadow: on ? "0 0 22px rgba(255,209,102,0.3)" : "none", display: "flex", gap: 12, alignItems: "center" }}>
-              <div style={{ width: 128, height: 64, flex: "0 0 auto", backgroundImage: `url(/rgp/karts/kart_${faction}_${k.id}.png)`, backgroundPosition: `-${4 * 128}px -58px`, backgroundRepeat: "no-repeat", imageRendering: "pixelated", filter: on ? "none" : "brightness(0.7)" }} />
+              <div style={{ width: 128, height: 66, flex: "0 0 auto", backgroundImage: `url(/rgp/cars/car_${faction}_${k.id}.webp)`, backgroundSize: `${16 * 200}px 103px`, backgroundPosition: `-${6 * 200 + 36}px -26px`, backgroundRepeat: "no-repeat", filter: on ? "drop-shadow(0 6px 10px rgba(0,0,0,.6))" : "brightness(0.7)" }} />
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: "0.08em", color: on ? "#ffd166" : "#fff" }}>{k.name.toUpperCase()}</div>
                 <div style={{ fontSize: 9, opacity: 0.6, fontStyle: "italic", marginTop: 2 }}>{k.blurb}</div>
@@ -185,6 +188,7 @@ const RebelGP: React.FC = () => {
           { t: "THE GRID", c: "#7ad27a", d: "You start last. Seven rival factions race you, and they get faster when you pull ahead. Finish top 3 on all three tracks of a cup to open the next one." },
         ].map((x) => (<div key={x.t} style={{ background: "rgba(0,0,0,0.4)", border: `1px solid ${x.c}33`, borderRadius: 12, padding: "12px 14px" }}><div style={{ fontSize: 10, letterSpacing: "0.25em", color: x.c, fontWeight: 700 }}>{x.t}</div><div style={{ fontSize: 12, opacity: 0.8, marginTop: 6, lineHeight: 1.5 }}>{x.d}</div></div>))}
       </div>
+      <GameBoards game="gp" playerId={pid} accent="#ffd166" font={FONT} title="CHAMPIONSHIP STANDINGS" tracks={TRACKS.map((t) => ({ id: t.id, name: t.name, cup: t.cup }))} />
       <div style={{ textAlign: "center", padding: "30px 16px", fontSize: 10, color: "rgba(255,255,255,0.25)", letterSpacing: "0.1em" }}>© 2026 Rebel Ants Playground · Rebel Grand Prix</div>
     </div>
   );

@@ -1,10 +1,16 @@
 // components/RebelGP/engine.ts
 // Rebel Grand Prix — SNES-style Mode 7 kart racer on a 2D canvas. Everything is a sprite; the ground is one painted
 // 1024×1024 map per track sampled per scanline. No WebGL, no framework in the hot loop.
+import { buildPanorama, buildTrackside, drawPanorama, type Panorama, type Side } from "./trackside";
 import { CHASSIS, GP_LAPS, GP_RACERS, ITEM_TABLE, type ChassisId, type ItemId } from "../../lib/rgpConfig";
 
 export const VW = 480, VW_MAX = 800, VH = 270, HORIZON = 96;
-const MAP = 1024, MMASK = MAP - 1, FOCAL = 230, CAM_H = 20, CAM_BACK = 60;
+/** device pixels per logical pixel: the ground is sampled and the sprites drawn at 2× (the HUD maths stay in 480×270) */
+export const RES = 2;
+const MAP = 1024, FOCAL = 230, CAM_H = 17, CAM_BACK = 52;
+/** HD car sheets (public/rgp/cars): 16 frames, frame width = CAR_W world units, the ground point 64.2% down the frame */
+const CAR_W = 41, CAR_GROUND = 0.642;
+export const carSheet = (f: string, k: string) => `/rgp/cars/car_${f}_${k}.webp`;
 const SURF = { grass: 0, road: 1, shoulder: 2, boost: 3, wall: 4, liquid: 5, sand: 6, slick: 7 };
 export const PROP = { tree: 0, rock: 1, mushroom: 2, pipe: 3, barrel: 4, torch: 5, pillar: 6, crystal: 7, egg: 8, flower: 9, fence: 10, itembox: 11, slick: 12, shell: 13, spider: 14, boulder: 15, crusher: 16, geyser: 17, wasp: 18, wrath: 19, spore: 20, shield: 21, star: 22, puff: 23, tree2: 24, rock2: 25, lawnmower: 26, crystal2: 27 } as const;
 
@@ -22,28 +28,39 @@ export type Kart = {
   cp: number; lap: number; prog: number; rank: number; finished: boolean; finishT: number;
   respawn: number; lane: number; aiSkill: number; aiNoise: number; hop: number; wobble: number;
   prevInputItem: boolean;
+  lapStart: number; lastLap: number; bestLap: number;
 };
 type Proj = { kind: "shell" | "wasp" | "wrath"; x: number; y: number; h: number; speed: number; life: number; owner: number; target: number; bounces: number };
 type Drop = { kind: "slick"; x: number; y: number; life: number };
 type Fx = { kind: "star" | "puff"; x: number; y: number; life: number; z?: number };
-export type Hud = { lap: number; laps: number; rank: number; item: ItemId | null; roulette: boolean; speed: number; t: number; state: RaceState; countdown: number; blind: number; boostLeft: number; standings: { name: string; faction: string; rank: number; finished: boolean; you: boolean }[]; minimap: { x: number; y: number; you: boolean }[]; msg: string | null };
+export type TowerRow = { rank: number; name: string; code: string; faction: string; gap: number; finished: boolean; you: boolean; pit: boolean };
+export type LapFlash = { n: number; time: number; delta: number | null; kind: "purple" | "green" | "yellow"; id: number };
+export type Hud = { raceT: number; curLap: number; lastLap: number; bestLap: number; fastest: { name: string; time: number; you: boolean } | null; lights: number; tower: TowerRow[]; kmh: number; gear: number; rpm: number; ers: number; drs: boolean; lapFlash: LapFlash | null; lap: number; laps: number; rank: number; item: ItemId | null; roulette: boolean; speed: number; t: number; state: RaceState; countdown: number; blind: number; boostLeft: number; standings: { name: string; faction: string; rank: number; finished: boolean; you: boolean }[]; minimap: { x: number; y: number; you: boolean; faction: string }[]; msg: string | null };
 export type RaceState = "intro" | "countdown" | "race" | "finished";
 export type Callbacks = { onHud: (h: Hud) => void; onSfx: (n: string) => void; onEnd: (r: { place: number; time: number; laps: number }) => void };
 
 const sheets: Record<string, HTMLImageElement> = {};
-function img(src: string) { if (sheets[src]) return sheets[src]; const i = new Image(); i.src = src; sheets[src] = i; return i; }
+function img(src: string, fallback?: string) { if (sheets[src]) return sheets[src]; const i = new Image(); if (fallback) i.onerror = () => { i.onerror = null; i.src = fallback; }; i.src = src; sheets[src] = i; return i; }
 export function preloadTrack(t: string, factions: string[], chassis: ChassisId[]) {
-  img(`/rgp/tracks/${t}/map.png`); img(`/rgp/tracks/${t}/surf.png`); img("/rgp/props.png"); factions.forEach((f, i) => img(`/rgp/karts/kart_${f}_${chassis[i] || "soldier"}.png`));
+  img(`/rgp/tracks/${t}/map.png`); img(`/rgp/tracks/${t}/surf.png`); img("/rgp/props.png"); factions.forEach((f, i) => img(carSheet(f, chassis[i] || "soldier"), `/rgp/karts/kart_${f}_${chassis[i] || "soldier"}.png`));
 }
-export async function loadTrack(id: string): Promise<{ data: TrackData; map: Uint32Array; surf: Uint8Array }> {
+/** ground texture mip chain: level 0 is the 2048² broadcast map (2 texels per world unit), each next level half the size */
+export type Mips = { tex: Uint32Array[]; shift: number[] };
+export async function loadTrack(id: string): Promise<{ data: TrackData; mips: Mips; surf: Uint8Array }> {
   const data: TrackData = await (await fetch(`/rgp/tracks/${id}/track.json`, { cache: "force-cache" })).json();
   const load = (src: string) => new Promise<HTMLImageElement>((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
-  const [mi, si] = await Promise.all([load(`/rgp/tracks/${id}/map.png`), load(`/rgp/tracks/${id}/surf.png`)]);
+  const [mi, si] = await Promise.all([load(`/rgp/tracks/${id}/map_hd.webp`).catch(() => load(`/rgp/tracks/${id}/map.png`)), load(`/rgp/tracks/${id}/surf.png`)]);
+  const tex: Uint32Array[] = [], shift: number[] = [];
+  let size = mi.naturalWidth >= 2048 ? 2048 : 1024; let src: CanvasImageSource = mi;
+  while (size >= 256) {
+    const cv = document.createElement("canvas"); cv.width = size; cv.height = size; const c = cv.getContext("2d", { willReadFrequently: true })!;
+    c.imageSmoothingEnabled = true; c.imageSmoothingQuality = "high"; c.drawImage(src, 0, 0, size, size);
+    tex.push(new Uint32Array(c.getImageData(0, 0, size, size).data.buffer)); shift.push(Math.round(Math.log2(size))); src = cv; size >>= 1;
+  }
   const cv = document.createElement("canvas"); cv.width = MAP; cv.height = MAP; const c = cv.getContext("2d", { willReadFrequently: true })!;
-  c.drawImage(mi, 0, 0); const map = new Uint32Array(c.getImageData(0, 0, MAP, MAP).data.buffer);
-  c.clearRect(0, 0, MAP, MAP); c.drawImage(si, 0, 0); const sd = c.getImageData(0, 0, MAP, MAP).data; const surf = new Uint8Array(MAP * MAP);
+  c.drawImage(si, 0, 0); const sd = c.getImageData(0, 0, MAP, MAP).data; const surf = new Uint8Array(MAP * MAP);
   for (let i = 0; i < MAP * MAP; i++) surf[i] = sd[i * 4];
-  return { data, map, surf };
+  return { data, mips: { tex, shift }, surf };
 }
 
 const AI_NAMES = ["Mandible", "Thorax", "Chitin", "Pheromone", "Antenna", "Grub", "Larva", "Drone", "Forager", "Soldier", "Nectar", "Tunnel"];
@@ -51,21 +68,25 @@ const ITEM_KEYS = Object.keys(ITEM_TABLE);
 
 export class Race {
   ctx: CanvasRenderingContext2D; buf: ImageData; buf32: Uint32Array; vw = VW;
-  track: TrackData; map: Uint32Array; surf: Uint8Array; cb: Callbacks;
+  track: TrackData; mips: Mips; surf: Uint8Array; cb: Callbacks;
   karts: Kart[] = []; me: Kart; projs: Proj[] = []; drops: Drop[] = []; fx: Fx[] = []; boxes: { x: number; y: number; t: number }[];
   hazards: any[]; t = 0; state: RaceState = "intro"; stateT = 0; countdown = 3; over = false; raf = 0; last = 0; acc = 0;
   input: Input = { left: false, right: false, accel: false, brake: false, drift: false, item: false };
   camX = 0; camY = 0; camH = 0; hudT = 0; msg: string | null = null; msgT = 0; shake = 0;
+  pano: Panorama | null = null; side: Side[] = []; res = RES; perf: number[] = [];
   props: HTMLImageElement; sky: HTMLImageElement; skyMid: HTMLImageElement; kartImg: Record<string, HTMLImageElement> = {};
+  lightsOn = 0; lightsHold = Math.random() * 0.6; raceT = 0; fastest: { name: string; time: number; you: boolean } | null = null; lapFlash: LapFlash | null = null; flashId = 0;
   N: number; cpStep: number; finishedCount = 0; errCount = 0; autopilot = false; itemHintShown = false; touch = false;
 
-  constructor(canvas: HTMLCanvasElement, loaded: { data: TrackData; map: Uint32Array; surf: Uint8Array }, cb: Callbacks, faction: string, chassis: ChassisId, rivals?: { faction: string; chassis: ChassisId }[]) {
-    this.ctx = canvas.getContext("2d")!; this.ctx.imageSmoothingEnabled = false;
-    this.buf = this.ctx.createImageData(this.vw, VH); this.buf32 = new Uint32Array(this.buf.data.buffer);
-    this.track = loaded.data; this.map = loaded.map; this.surf = loaded.surf; this.cb = cb;
+  constructor(canvas: HTMLCanvasElement, loaded: { data: TrackData; mips: Mips; surf: Uint8Array }, cb: Callbacks, faction: string, chassis: ChassisId, rivals?: { faction: string; chassis: ChassisId }[]) {
+    this.ctx = canvas.getContext("2d")!;
+    canvas.width = this.vw * this.res; canvas.height = VH * this.res;
+    this.buf = this.ctx.createImageData(this.vw * this.res, (VH - HORIZON) * this.res); this.buf32 = new Uint32Array(this.buf.data.buffer);
+    this.track = loaded.data; this.mips = loaded.mips; this.surf = loaded.surf; this.cb = cb;
     this.N = this.track.center.length; this.cpStep = this.track.length / this.N;
     this.props = img("/rgp/props.png"); const sb = this.track.biome === "garden" ? "jungle" : this.track.biome; this.sky = img(`/bounty/bg_${sb}_far.png`); this.skyMid = img(`/bounty/bg_${sb}_mid.png`);
     this.boxes = this.track.boxes.map(([x, y]) => ({ x, y, t: 0 }));
+    try { this.pano = buildPanorama(this.track.biome, HORIZON, RES, this.track.diff * 13 + 5); this.side = buildTrackside(this.track.center, this.track.width, (x, y) => this.surfAt(x, y) === SURF.grass, RES, this.track.diff); } catch (e) { console.warn("RGP trackside", e); }
     this.hazards = this.track.hazards.map((h) => ({ ...h, x: h.x ?? h.a[0], y: h.y ?? h.a[1], phase: h.phase || 0 }));
     // racers: player + 7 rivals from the other factions
     const allF = ["ashigaru", "ronin", "samurai", "bushi", "warrior", "shogun", "buke", "kenshi", "wokou", "sohei", "yamabushi"].filter((f) => f !== faction);
@@ -78,7 +99,7 @@ export class Race {
       const [gx, gy] = this.track.grid[i]; const k = this.mk(i, r.faction, r.chassis, r.ai, gx, gy);
       k.aiSkill = 0.75 + (this.track.diff / 15) * 0.25 + rng() * 0.08; k.lane = (rng() - 0.5) * 0.9; k.aiNoise = rng() * 10;
       k.name = r.ai ? AI_NAMES[(i * 5 + this.track.diff) % AI_NAMES.length] : "YOU";
-      this.kartImg[k.faction + k.chassis] = img(`/rgp/karts/kart_${k.faction}_${k.chassis}.png`);
+      this.kartImg[k.faction + k.chassis] = img(carSheet(k.faction, k.chassis), `/rgp/karts/kart_${k.faction}_${k.chassis}.png`);
       this.karts.push(k);
     });
     this.me = this.karts.find((k) => !k.ai)!;
@@ -87,13 +108,13 @@ export class Race {
   }
   /** widen the view for phone landscape (480–800 px); the canvas backing store and scanline buffer follow */
   setView(w: number) {
-    const nw = Math.max(VW, Math.min(VW_MAX, Math.round(w))); if (nw === this.vw && this.ctx.canvas.width === nw) return;
-    this.vw = nw; this.ctx.canvas.width = nw; this.ctx.canvas.height = VH; this.ctx.imageSmoothingEnabled = false;
-    this.buf = this.ctx.createImageData(nw, VH); this.buf32 = new Uint32Array(this.buf.data.buffer);
+    const nw = Math.max(VW, Math.min(VW_MAX, Math.round(w))); if (nw === this.vw && this.ctx.canvas.width === Math.round(nw * this.res)) return;
+    this.vw = nw; this.ctx.canvas.width = Math.round(nw * this.res); this.ctx.canvas.height = Math.round(VH * this.res);
+    this.buf = this.ctx.createImageData(Math.round(nw * this.res), Math.round((VH - HORIZON) * this.res)); this.buf32 = new Uint32Array(this.buf.data.buffer);
   }
   mk(id: number, faction: string, chassis: ChassisId, ai: boolean, x: number, y: number): Kart {
     const cp = this.nearestCp(x, y, 0);
-    return { id, faction, chassis, ai, name: "", x, y, h: this.track.heading, speed: 0, steer: 0, drift: 0, driftT: 0, boost: 0, spin: 0, blind: 0, shield: 0, invuln: 0, item: null, roulette: 0, itemCd: 0, cp, lap: -1, prog: 0, rank: id + 1, finished: false, finishT: 0, respawn: 0, lane: 0, aiSkill: 1, aiNoise: 0, hop: 0, wobble: 0, prevInputItem: false };
+    return { id, faction, chassis, ai, name: "", x, y, h: this.track.heading, speed: 0, steer: 0, drift: 0, driftT: 0, boost: 0, spin: 0, blind: 0, shield: 0, invuln: 0, item: null, roulette: 0, itemCd: 0, cp, lap: -1, prog: 0, rank: id + 1, finished: false, finishT: 0, respawn: 0, lane: 0, aiSkill: 1, aiNoise: 0, hop: 0, wobble: 0, prevInputItem: false, lapStart: 0, lastLap: 0, bestLap: 0 };
   }
 
   // ── loop
@@ -102,13 +123,19 @@ export class Race {
     const loop = (now: number) => {
       if (this.over) return;
       const dt = Math.min(0.05, (now - this.last) / 1000); this.last = now; this.acc += dt;
-      try { let n = 0; while (this.acc >= 1 / 60 && n++ < 4) { this.step(1 / 60); this.acc -= 1 / 60; } if (n >= 4) this.acc = 0; this.camera(dt); this.render(); this.errCount = 0; }
+      try { let n = 0; while (this.acc >= 1 / 60 && n++ < 4) { this.step(1 / 60); this.acc -= 1 / 60; } if (n >= 4) this.acc = 0; this.camera(dt); this.render(); this.adapt(dt * 1000); this.errCount = 0; }
       catch (e) { console.error("RGP frame error", e); this.acc = 0; if (++this.errCount > 90) { this.over = true; return; } }
       this.raf = requestAnimationFrame(loop);
     };
     this.raf = requestAnimationFrame(loop);
   }
   stop() { this.over = true; cancelAnimationFrame(this.raf); }
+  /** slow device: if frames come slower than ~45 fps at 2× ground, drop to 1.5× then 1× (measured during the race) */
+  adapt(ms: number) {
+    if (this.res <= 1 || this.state !== "race") return; this.perf.push(ms); if (this.perf.length < 90) return;
+    const avg = this.perf.reduce((a, b) => a + b, 0) / this.perf.length; this.perf = [];
+    if (avg > 22) { this.res = this.res > 1.5 ? 1.5 : 1; const w = this.vw; this.vw = 0; this.setView(w); }
+  }
   setState(s: RaceState, msg: string | null = null) { this.state = s; this.stateT = 0; if (msg) { this.msg = msg; this.msgT = 2.2; } this.pushHud(); }
   sfx(n: string) { this.cb.onSfx(n); }
 
@@ -125,15 +152,17 @@ export class Race {
   step(dt: number) {
     this.t += dt; this.stateT += dt; if (this.msgT > 0) this.msgT -= dt; else this.msg = null;
     if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 5);
-    if (this.state === "intro" && this.stateT > 1.6) { this.setState("countdown"); this.countdown = 3; this.sfx("count"); }
-    if (this.state === "countdown") { const c = 3 - Math.floor(this.stateT); if (c !== this.countdown && c > 0) { this.countdown = c; this.sfx("count"); } if (this.stateT >= 3) { this.setState("race", "GO!"); this.countdown = 0; this.sfx("go"); } }
+    if (this.state === "intro" && this.stateT > 1.6) { this.setState("countdown"); this.countdown = 3; this.lightsOn = 0; }
+    // F1 start: five red lights come on one by one, then all go out together
+    if (this.state === "countdown") { const c = 3 - Math.floor(this.stateT); if (c !== this.countdown && c > 0) this.countdown = c; const lt = Math.min(5, Math.floor(this.stateT / 0.5)); if (lt !== this.lightsOn) { this.lightsOn = lt; if (lt > 0) this.sfx("count"); } if (this.stateT >= 3 + this.lightsHold) { this.setState("race", "LIGHTS OUT"); this.countdown = 0; this.sfx("go"); } }
     const racing = this.state === "race" || this.state === "finished";
+    if (racing) this.raceT += dt;
     for (const k of this.karts) this.stepKart(k, dt, racing);
     this.collideKarts();
     if (racing) { this.stepProjs(dt); this.stepDrops(dt); this.stepHazards(dt); this.stepBoxes(dt); }
     for (const f of this.fx) f.life -= dt; this.fx = this.fx.filter((f) => f.life > 0);
     this.rank();
-    this.hudT += dt; if (this.hudT > 0.1) { this.hudT = 0; this.pushHud(); }
+    this.hudT += dt; if (this.hudT > 0.066) { this.hudT = 0; this.pushHud(); }
   }
 
   stepKart(k: Kart, dt: number, racing: boolean) {
@@ -156,6 +185,7 @@ export class Race {
       // drift: hold while steering → hop, then tighter turn and charge
       if (inp.drift && k.drift === 0 && Math.abs(want) > 0 && k.speed > 60) { k.drift = want as 1 | -1; k.driftT = 0; k.hop = 1; this.sfx("hop"); }
       if (k.drift !== 0) { if (!inp.drift || k.speed < 40) { if (k.driftT > 0.9) { k.boost = Math.max(k.boost, Math.min(1.1, 0.35 + k.driftT * 0.35)); this.sfx("turbo"); this.puff(k); } k.drift = 0; k.driftT = 0; } else k.driftT += dt; }
+      if (k.drift !== 0 && k.speed > 60 && Math.floor(this.t * 12) !== Math.floor((this.t - dt) * 12) && (k === this.me || Math.hypot(k.x - this.me.x, k.y - this.me.y) < 260)) this.fx.push({ kind: "puff", x: k.x - Math.cos(k.h) * 11 + (Math.random() - 0.5) * 6, y: k.y - Math.sin(k.h) * 11 + (Math.random() - 0.5) * 6, life: 0.32 });   // tyre smoke
       const turn = (k.drift !== 0 ? 2.9 : 2.1) * ch.handling * Math.min(1, k.speed / 90 + 0.25);
       const steerIn = k.drift !== 0 ? k.drift * 0.65 + k.steer * 0.55 : k.steer;
       k.h += steerIn * turn * dt;
@@ -183,13 +213,21 @@ export class Race {
     const raw = k.cp + frac;
     // lap crossing: from the end of the loop to the start
     const prevRaw = prevProg - k.lap * this.N;
-    if (prevRaw > this.N * 0.85 && raw < this.N * 0.15) { k.lap++; if (k === this.me) { if (k.lap >= this.track.laps) this.finish(k); else if (k.lap > 0) { this.msg = k.lap === this.track.laps - 1 ? "FINAL LAP" : `LAP ${k.lap + 1}`; this.msgT = 1.8; this.sfx("lap"); } } else if (k.lap >= this.track.laps) this.finish(k); }
+    if (prevRaw > this.N * 0.85 && raw < this.N * 0.15) { k.lap++; this.lapTimed(k); if (k === this.me) { if (k.lap >= this.track.laps) this.finish(k); else if (k.lap > 0) { this.msg = k.lap === this.track.laps - 1 ? "FINAL LAP" : `LAP ${k.lap + 1}`; this.msgT = 1.8; this.sfx("lap"); } } else if (k.lap >= this.track.laps) this.finish(k); }
     else if (prevRaw < this.N * 0.15 && raw > this.N * 0.85 && k.lap > -1) k.lap--;
     k.prog = k.lap * this.N + raw;
     // item use
     if (inp.item && !k.prevInputItem && k.item && k.roulette <= 0 && racing && !k.finished) this.useItem(k);
     k.prevInputItem = inp.item;
     if (k.roulette > 0) { k.roulette -= dt; if (k.roulette <= 0) { k.item = this.rollItem(k.rank); if (k === this.me) { this.sfx("item"); if (!this.itemHintShown) { this.itemHintShown = true; this.msg = this.touch ? "★ TO FIRE" : "X TO FIRE"; this.msgT = 2; } } } }
+  }
+  /** lap timing at the line: lap 0 starts the clock, every later crossing closes a lap (F1 colours: purple = fastest of the race, green = personal best) */
+  lapTimed(k: Kart) {
+    if (k.lap <= 0) { k.lapStart = this.raceT; return; }
+    const t = this.raceT - k.lapStart; k.lapStart = this.raceT; if (t < 5) return;
+    const prevBest = k.bestLap; k.lastLap = t; const pb = !prevBest || t < prevBest; if (pb) k.bestLap = t;
+    const fastest = !this.fastest || t < this.fastest.time; if (fastest) this.fastest = { name: k === this.me ? "YOU" : k.name, time: t, you: k === this.me };
+    if (k === this.me) this.lapFlash = { n: k.lap, time: t, delta: prevBest ? t - prevBest : null, kind: fastest ? "purple" : pb ? "green" : "yellow", id: ++this.flashId };
   }
   rubber(k: Kart) {
     // rubber band: rivals behind the player get faster, rivals far ahead ease off
@@ -283,11 +321,21 @@ export class Race {
 
   pushHud() {
     const me = this.me; const rel = this.track.width;
+    const order = [...this.karts].sort((a, b) => a.rank - b.rank); const lead = order[0];
+    const pace = 118;   // world units per second, for turning track distance into a broadcast-style gap
+    const tower: TowerRow[] = order.map((k) => ({ rank: k.rank, name: k === me ? "YOU" : k.name, code: (k === me ? "YOU" : k.name.slice(0, 3)).toUpperCase(), faction: k.faction, gap: k === lead ? 0 : k.finished && lead.finished ? k.finishT - lead.finishT : ((lead.prog - k.prog) * this.cpStep) / pace, finished: k.finished, you: k === me, pit: k.respawn > 0 }));
+    const ch = CHASSIS.find((c) => c.id === me.chassis)!; const vmax = 122 * ch.top;
+    const sp = Math.max(0, me.speed); const norm = Math.min(1.45, sp / vmax);
+    const gear = sp < 4 ? 0 : Math.min(8, 1 + Math.floor(Math.min(0.999, norm / 1.02) * 8)); const rpm = gear === 0 ? 0.12 : Math.min(1, ((norm / 1.02) * 8) % 1 * 0.75 + 0.25 + (norm > 1.02 ? 0.25 : 0));
+    const racingNow = this.state === "race" || this.state === "finished";
+    const lights = this.state === "countdown" ? this.lightsOn : this.state === "intro" ? 0 : -1;
     this.cb.onHud({
+      raceT: racingNow ? this.raceT : 0, curLap: me.lap >= 0 && racingNow ? this.raceT - me.lapStart : 0, lastLap: me.lastLap, bestLap: me.bestLap, fastest: this.fastest, lights, tower,
+      kmh: Math.round(norm <= 1 ? norm * 335 : 335 + (norm - 1) * 110), gear, rpm, ers: me.boost > 0 ? Math.min(1, me.boost / 1.5) : me.drift !== 0 ? Math.min(1, me.driftT / 0.9) * 0.999 : 0, drs: me.boost > 0, lapFlash: this.lapFlash,
       lap: Math.max(1, Math.min(this.track.laps, me.lap + 1)), laps: this.track.laps, rank: me.rank, item: me.item, roulette: me.roulette > 0, speed: me.speed, t: this.state === "race" || this.state === "finished" ? this.stateT : 0,
       state: this.state, countdown: this.countdown, blind: me.blind, boostLeft: me.boost,
       standings: [...this.karts].sort((a, b) => a.rank - b.rank).map((k) => ({ name: k.name, faction: k.faction, rank: k.rank, finished: k.finished, you: k === me })),
-      minimap: this.karts.map((k) => ({ x: k.x / MAP, y: k.y / MAP, you: k === me })), msg: this.msg,
+      minimap: this.karts.map((k) => ({ x: k.x / MAP, y: k.y / MAP, you: k === me, faction: k.faction })), msg: this.msg,
     });
     void rel;
   }
@@ -302,24 +350,38 @@ export class Race {
   }
   render() {
     const c = this.ctx; const b = this.buf32; const cosH = Math.cos(this.camH), sinH = Math.sin(this.camH);
+    c.setTransform(this.res, 0, 0, this.res, 0, 0); c.imageSmoothingEnabled = true; c.imageSmoothingQuality = "high";
     const sx = this.shake > 0 ? (Math.random() - 0.5) * this.shake * 5 : 0, sy = this.shake > 0 ? (Math.random() - 0.5) * this.shake * 3 : 0;
     // sky (parallax by heading)
     c.fillStyle = "#0a0f1c"; c.fillRect(0, 0, this.vw, HORIZON);
-    if (this.sky.complete && this.sky.naturalWidth) { const off = ((Math.floor((this.camH / (Math.PI * 2)) * 960) % 480) + 480) % 480; for (let k = -1; k * 480 - off < this.vw; k++) c.drawImage(this.sky, 0, 0, 480, 225, k * 480 - off, HORIZON + 12 - 225, 480, 225); }
-    if (this.skyMid.complete && this.skyMid.naturalWidth) { const off = ((Math.floor((this.camH / (Math.PI * 2)) * 1920) % 480) + 480) % 480; for (let k = -1; k * 480 - off < this.vw; k++) c.drawImage(this.skyMid, 0, 105, 480, 120, k * 480 - off, HORIZON + 6 - 120, 480, 120); }
-    // ground: one scanline at a time
-    const map = this.map, MASKB = MMASK;
-    for (let y = HORIZON; y < VH; y++) {
-      const z = (CAM_H * FOCAL) / (y - HORIZON + 1);            // distance of this row
-      const wx = this.camX + cosH * z, wy = this.camY + sinH * z;  // world point at screen centre
-      const step = z / FOCAL;                                     // world units per screen pixel
-      const dxs = -sinH * step, dys = cosH * step;               // "right" vector on screen → world
-      let fx = wx - dxs * (this.vw / 2), fy = wy - dys * (this.vw / 2); let o = y * this.vw;
-      for (let x = 0; x < this.vw; x++) { b[o++] = map[(((fy | 0) & MASKB) << 10) | ((fx | 0) & MASKB)]; fx += dxs; fy += dys; }
+    if (this.pano) drawPanorama(c, this.pano, this.camH, this.vw, HORIZON, sy);
+    else if (this.sky.complete && this.sky.naturalWidth) { const off = ((Math.floor((this.camH / (Math.PI * 2)) * 960) % 480) + 480) % 480; for (let k = -1; k * 480 - off < this.vw; k++) c.drawImage(this.sky, 0, 0, 480, 225, k * 480 - off, HORIZON + 12 - 225, 480, 225); }
+    if (!this.pano && this.skyMid.complete && this.skyMid.naturalWidth) { const off = ((Math.floor((this.camH / (Math.PI * 2)) * 1920) % 480) + 480) % 480; for (let k = -1; k * 480 - off < this.vw; k++) c.drawImage(this.skyMid, 0, 105, 480, 120, k * 480 - off, HORIZON + 6 - 120, 480, 120); }
+    // ground: one device scanline at a time, bilinear-filtered from the mip level that matches the row's footprint
+    const { tex, shift } = this.mips; const W = Math.round(this.vw * this.res), rows = Math.round((VH - HORIZON) * this.res); const top = tex[0].length === 2048 * 2048 ? 2 : 1;
+    for (let r = 0; r < rows; r++) {
+      const y = HORIZON + (r + 0.5) / this.res;
+      const z = (CAM_H * FOCAL) / (y - HORIZON);                  // distance of this row
+      const step = z / FOCAL / this.res;                               // world units per device pixel
+      let lv = 0; let tpp = step * top; while (tpp > 1.6 && lv < tex.length - 1) { tpp *= 0.5; lv++; }
+      const T = tex[lv], sh = shift[lv], M = (1 << sh) - 1, k = (top / (1 << lv)) * 256;   // texels per world unit ×256 (fixed point)
+      const wx = this.camX + cosH * z, wy = this.camY + sinH * z;
+      const dxs = -sinH * step, dys = cosH * step;
+      let u = ((wx - dxs * (W / 2)) * k - 128) | 0, v = ((wy - dys * (W / 2)) * k - 128) | 0; const du = (dxs * k) | 0, dv = (dys * k) | 0;
+      let o = r * W;
+      for (let x = 0; x < W; x++) {
+        const ui = u >> 8, vi = v >> 8, fu = u & 255, fv = v & 255, gu = 256 - fu, gv = 256 - fv;
+        const r0 = (vi & M) << sh, r1 = ((vi + 1) & M) << sh, c0 = ui & M, c1 = (ui + 1) & M;
+        const a = T[r0 | c0], bb = T[r0 | c1], cc = T[r1 | c0], d = T[r1 | c1];
+        const rbT = (((a & 0xff00ff) * gu + (bb & 0xff00ff) * fu) >>> 8) & 0xff00ff, gT = (((a & 0xff00) * gu + (bb & 0xff00) * fu) >>> 8) & 0xff00;
+        const rbB = (((cc & 0xff00ff) * gu + (d & 0xff00ff) * fu) >>> 8) & 0xff00ff, gB = (((cc & 0xff00) * gu + (d & 0xff00) * fu) >>> 8) & 0xff00;
+        b[o++] = 0xff000000 | ((((rbT * gv + rbB * fv) >>> 8) & 0xff00ff) | (((gT * gv + gB * fv) >>> 8) & 0xff00));
+        u += du; v += dv;
+      }
     }
-    c.putImageData(this.buf, Math.round(sx), Math.round(sy), 0, HORIZON, this.vw, VH - HORIZON);
+    c.putImageData(this.buf, Math.round(sx * this.res), Math.round((HORIZON + sy) * this.res));
     // horizon haze
-    const g = c.createLinearGradient(0, HORIZON, 0, HORIZON + 26); g.addColorStop(0, "rgba(10,15,28,0.85)"); g.addColorStop(1, "rgba(10,15,28,0)"); c.fillStyle = g; c.fillRect(0, HORIZON, this.vw, 26);
+    const hz = this.pano ? this.pano.haze : "rgba(10,15,28,"; const g = c.createLinearGradient(0, HORIZON, 0, HORIZON + 30); g.addColorStop(0, hz + "0.85)"); g.addColorStop(1, hz + "0)"); c.fillStyle = g; c.fillRect(0, HORIZON, this.vw, 30);
     // sprites, far → near
     type S = { z: number; draw: () => void };
     const S: S[] = [];
@@ -334,6 +396,12 @@ export class Race {
     const prop = (x: number, y: number, id: number, worldH: number, lift = 0, alpha = 1) => { if (ok) put(x, y, P, (id % 8) * 64, Math.floor(id / 8) * 64, 64, 64, worldH, lift, alpha); };
     const DEC: Record<string, number> = { tree: this.track.biome === "garden" ? PROP.tree2 : PROP.tree, rock: this.track.biome === "fortress" ? PROP.rock2 : PROP.rock, mushroom: PROP.mushroom, pipe: PROP.pipe, barrel: PROP.barrel, torch: PROP.torch, pillar: PROP.pillar, crystal: this.track.biome === "throne" ? PROP.crystal : PROP.crystal2, egg: PROP.egg, flower: PROP.flower, fence: PROP.fence };
     for (const [x, y, kind] of this.track.decor) prop(x, y, DEC[kind] ?? PROP.rock, kind === "tree" ? 46 : kind === "pillar" || kind === "pipe" ? 40 : kind === "flower" || kind === "mushroom" ? 18 : 24);
+    // trackside: start gantry (its lights follow the start sequence), grandstands, sponsor boards
+    for (const sd of this.side) {
+      const im = Array.isArray(sd.img) ? sd.img[this.state === "countdown" ? this.lightsOn : 0] : sd.img; const { z, lat } = proj(sd.x, sd.y); if (z < 5 || z > 950) continue;
+      const sc = FOCAL / z; const w = sd.w * sc, h = sd.h * sc; const px = this.vw / 2 + lat * sc + sx, base = HORIZON + CAM_H * sc + sy; if (px < -w || px > this.vw + w) continue;
+      S.push({ z: z + (sd.kind === "gantry" ? 0.5 : 0), draw: () => c.drawImage(im, px - w / 2, base - h, w, h) });
+    }
     for (const bx of this.boxes) if (bx.t <= 0) prop(bx.x, bx.y, PROP.itembox, 16, 6 + Math.sin(this.t * 3) * 2);
     for (const d of this.drops) prop(d.x, d.y, PROP.slick, 7);
     for (const h of this.hazards) {
@@ -349,9 +417,17 @@ export class Race {
       const sh = this.kartImg[k.faction + k.chassis]; if (!sh || !sh.complete || !sh.naturalWidth) continue;
       let rel = k.h - this.camH; if (k.spin > 0) rel += k.spin * 6; let fi = Math.round((rel / (Math.PI * 2)) * 16); fi = ((fi % 16) + 16) % 16;
       const flicker = k.invuln > 0 && k.spin <= 0 && Math.floor(this.t * 16) % 2 === 0;
-      // ground shadow, then the kart
-      { const { z, lat } = proj(k.x, k.y); if (z > 6 && z < 900) { const sc = FOCAL / z; const px = this.vw / 2 + lat * sc + sx, base = HORIZON + CAM_H * sc + sy; S.push({ z: z + 0.01, draw: () => { c.fillStyle = "rgba(0,0,0,0.35)"; c.beginPath(); c.ellipse(px, base - 1 * sc, 11 * sc, 3.5 * sc, 0, 0, Math.PI * 2); c.fill(); } }); } }
-      if (!flicker) put(k.x, k.y, sh, fi * 128, 0, 128, 128, 40, k.hop > 0 ? Math.sin(k.hop * Math.PI) * 6 : 0);
+      // ground shadow (long and thin side-on, short from behind), then the car
+      const hd = sh.naturalWidth / sh.naturalHeight > 20;
+      { const { z, lat } = proj(k.x, k.y); if (z > 6 && z < 900) { const sc = FOCAL / z; const px = this.vw / 2 + lat * sc + sx, base = HORIZON + CAM_H * sc + sy; const sa = Math.abs(Math.sin(rel)), ca = Math.abs(Math.cos(rel));
+        S.push({ z: z + 0.01, draw: () => { const g2 = c.createRadialGradient(px, base, 0, px, base, (hd ? 6 + 9 * sa : 11) * sc); g2.addColorStop(0, "rgba(0,0,0,0.5)"); g2.addColorStop(1, "rgba(0,0,0,0)"); c.fillStyle = g2; c.beginPath(); c.ellipse(px, base - 0.5 * sc, (hd ? 6 + 9 * sa : 11) * sc, (hd ? 2 + 2.2 * ca : 3.5) * sc, 0, 0, Math.PI * 2); c.fill(); } }); } }
+      if (!flicker) {
+        const lift = k.hop > 0 ? Math.sin(k.hop * Math.PI) * 6 : 0;
+        if (hd) { const fw = sh.naturalWidth / 16, fh = sh.naturalHeight; const { z, lat } = proj(k.x, k.y);
+          if (z > 4 && z < 900) { const sc = FOCAL / z; const px = this.vw / 2 + lat * sc + sx, base = HORIZON + CAM_H * sc + sy; const w = CAR_W * sc, h = w * (fh / fw);
+            if (px > -w && px < this.vw + w) S.push({ z, draw: () => c.drawImage(sh, fi * fw, 0, fw, fh, px - w / 2, base - h * CAR_GROUND - lift * sc, w, h) }); }
+        } else put(k.x, k.y, sh, fi * sh.naturalHeight, 0, sh.naturalHeight, sh.naturalHeight, 40, lift);
+      }
       if (k.shield > 0) prop(k.x, k.y, PROP.shield, 26, -1, 0.55);
       if (k.drift !== 0 && k.driftT > 0.9) prop(k.x - Math.cos(k.h) * 10, k.y - Math.sin(k.h) * 10, PROP.star, 7 + Math.sin(this.t * 30) * 2, 1, 0.9);
     }

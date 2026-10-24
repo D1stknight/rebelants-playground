@@ -344,8 +344,22 @@ export default function LandingPage() {
         if (lb.richest?.[0])   e.push({ label:'RICHEST COMMANDER',  icon:'💰', player: lb.richest[0].playerName,   value: lb.richest[0].score   + ' REBEL'       });
         if (lb.perfect?.[0])   e.push({ label:'PERFECT CAMPAIGNS',  icon:'👑', player: lb.perfect[0].playerName,   value: lb.perfect[0].score   + ' PERFECT'     });
         if (lb.pvpWins?.[0])   e.push({ label:'PVP CHAMPION',       icon:'⚔️', player: lb.pvpWins[0].playerName,   value: lb.pvpWins[0].score   + ' WINS'        });
-        setLegends(e);
+        setLegends((prev) => [...e, ...prev.filter((x) => !e.some((y) => y.label === x.label))]);
       }).catch(() => {});
+    // the newer games' boards (/api/boards/[game]): their #1 on the headline board
+    const tops: [string, string, string, string, (v: number) => string][] = [
+      ['descent', 'floor', 'DEEPEST DELVER',      '🕳️', (v) => 'FLOOR ' + v],
+      ['bounty',  'board', 'MOST WANTED',         '🎯', (v) => 'BOARD ' + v],
+      ['gp',      'wins',  'GRAND PRIX CHAMPION', '🏁', (v) => v + ' WINS'],
+      ['siege',   'score', 'SIEGE HIGH SCORE',    '🏰', (v) => v.toLocaleString() + ' PTS'],
+    ];
+    tops.forEach(([game, board, label, icon, fmt]) => {
+      fetch('/api/boards/' + game + '?n=3', { cache: 'no-store' }).then(r => r.json()).then(d => {
+        const row = d?.boards?.find((x: any) => x.id === board)?.rows?.[0];
+        if (!row) return;
+        setLegends((prev) => [...prev.filter((x) => x.label !== label), { label, icon, player: row.playerName, value: fmt(Number(row.value)) }]);
+      }).catch(() => {});
+    });
   }, []);
 
   return (

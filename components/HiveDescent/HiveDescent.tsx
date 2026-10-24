@@ -8,6 +8,7 @@ import { pointsConfig as defaultPointsConfig } from "../../lib/pointsConfig";
 import { DESCENT_DEFAULT_COST, DESCENT_TOTAL_FLOORS, DESCENT_FACTIONS, DESCENT_DEATH_PENALTY, todaySeed } from "../../lib/descentConfig";
 import { BIOMES } from "./biomes";
 import { newRun, rarityForRun, totalPossibleRebel, type Run } from "./descentEngine";
+import GameBoards, { recordBoardRun } from "../GameBoards";
 
 const FactionPicker = dynamic(() => import("./FactionPicker"), { ssr: false });
 const DescentBattle = dynamic(() => import("./DescentBattle"), { ssr: false });
@@ -59,6 +60,7 @@ const HiveDescent: React.FC = () => {
     const pname = (prof?.discordName || prof?.name || "guest").trim() || "guest";
     const rarity = rarityForRun(r);
     try {
+      await recordBoardRun({ game: "descent", playerId: pid, playerName: pname, runId: runOf("descent"), stats: { floor: r.maxFloorReached, victory: r.phase === "victory", kills: r.kills } });
       await fetch("/api/wins/add", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, ts: Date.now(), game: "descent", runId: runOf("descent"), playerId: pid, playerName: pname, rarity, pointsAwarded: banked, survivors: r.maxFloorReached, prize: null }) });
     } catch {}
     try {
@@ -116,6 +118,7 @@ const HiveDescent: React.FC = () => {
           <button type="button" onClick={() => { setRunState("lobby"); setRun(null); }} style={{ fontFamily: FONT, padding: "14px 28px", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 12, background: "rgba(255,255,255,0.06)", color: "#fff", fontWeight: 900, fontSize: 13, letterSpacing: "0.15em", cursor: "pointer" }}>↻ LOBBY</button>
           <button type="button" onClick={() => { setRun(null); setRunState("picking"); }} style={{ fontFamily: FONT, padding: "14px 28px", border: "none", borderRadius: 12, background: `linear-gradient(180deg, ${color} 0%, ${victory ? "#aa6600" : cashed ? "#9a5a00" : "#770022"} 100%)`, color: victory || cashed ? "#000" : "#fff", fontWeight: 900, fontSize: 13, letterSpacing: "0.15em", cursor: "pointer" }}>⚔ DESCEND AGAIN · {cost} REBEL</button>
         </div>
+        <div style={{ width: "100%", maxWidth: 520, marginTop: 26, textAlign: "left" }}><GameBoards game="descent" playerId={pid} accent={color} font={FONT} compact /></div>
       </div>
     );
   }
@@ -195,6 +198,7 @@ const HiveDescent: React.FC = () => {
         <div style={{ textAlign: "center", fontSize: 11, opacity: 0.5, marginTop: 12, letterSpacing: "0.08em" }}>Enemies get tougher every floor · 2 enemies early, 3 on the deep floors · the Queen fights with her Royal Guard</div>
       </div>
 
+      <GameBoards game="descent" playerId={pid} accent="#ff66cc" font={FONT} title="HALL OF THE DEEP" />
       <div style={{ textAlign: "center", padding: "40px 16px 30px", fontSize: 10, color: "rgba(255,255,255,0.25)", letterSpacing: "0.1em", position: "relative", zIndex: 2 }}>© 2026 Rebel Ants Playground · Hive Descent</div>
     </div>
   );

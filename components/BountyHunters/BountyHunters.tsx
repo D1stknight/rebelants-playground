@@ -7,6 +7,7 @@ import { loadProfile, getEffectivePlayerId } from "../../lib/profile";
 import { pointsConfig as defaultPointsConfig } from "../../lib/pointsConfig";
 import { BOARDS, BOUNTY_DEATH_KEEP, BOUNTY_DEFAULT_COST, BOUNTY_HP, BOUNTY_LIVES, KILL_BOUNTY, type Board } from "../../lib/bountyConfig";
 import { preloadBoard } from "./game";
+import GameBoards, { recordBoardRun } from "../GameBoards";
 import { DESCENT_FACTIONS } from "../../lib/descentConfig";
 
 // If the game chunk fails to load (stale HTML referencing an old build, flaky in-app browsers), reload once with a cache-buster instead of crashing to a blank page.
@@ -76,6 +77,7 @@ const BountyHunters: React.FC = () => {
     if (paid > 0) { try { await earn(paid, "bounty"); } catch {} }
     try {
       const prof = loadProfile(); const pname = (prof?.discordName || prof?.name || "guest").trim() || "guest";
+      await recordBoardRun({ game: "bounty", playerId: pid, playerName: pname, runId: runOf("bounty"), stats: { boardN: r.boardN, cleared: r.cleared, kills: r.kills } });
       await fetch("/api/wins/add", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: `${key}-${Math.random().toString(36).slice(2, 7)}`, ts: key, game: "bounty", runId: runOf("bounty"), playerId: pid, playerName: pname, rarity: r.cleared ? (r.boardN >= 4 ? "ultra" : r.boardN >= 2 ? "rare" : "common") : "none", pointsAwarded: paid, survivors: r.kills, prize: null }) });
     } catch {}
     try { const b = loadBest(); const prev = b[r.boardN]; b[r.boardN] = { cleared: (prev?.cleared || false) || r.cleared, bounty: Math.max(prev?.bounty || 0, paid) }; localStorage.setItem(BEST_KEY, JSON.stringify(b)); setBest(b); } catch {}
@@ -100,6 +102,7 @@ const BountyHunters: React.FC = () => {
           {result.cleared && next && <button type="button" onClick={() => { setBoard(next); setPhase("lobby"); }} style={{ fontFamily: FONT, padding: "14px 28px", border: "none", borderRadius: 12, background: "linear-gradient(180deg, #ffd700 0%, #aa6600 100%)", color: "#000", fontWeight: 900, fontSize: 13, letterSpacing: "0.15em", cursor: "pointer" }}>NEXT: {next.world}-{next.stage} {next.name.split(": ")[1].toUpperCase()} →</button>}
           {!result.cleared && <button type="button" onClick={() => setPhase("lobby")} style={{ fontFamily: FONT, padding: "14px 28px", border: "none", borderRadius: 12, background: "linear-gradient(180deg, #a78bfa 0%, #5b3fb0 100%)", color: "#fff", fontWeight: 900, fontSize: 13, letterSpacing: "0.15em", cursor: "pointer" }}>⚔ HUNT AGAIN</button>}
         </div>
+        <div style={{ width: "100%", maxWidth: 520, marginTop: 26, textAlign: "left" }}><GameBoards game="bounty" playerId={pid} accent={result.cleared ? "#fbbf24" : "#ff3366"} font={FONT} compact /></div>
       </div>
     );
   }
@@ -203,6 +206,7 @@ const BountyHunters: React.FC = () => {
           { t: "THE HIVE FIGHTS BACK", c: "#a78bfa", d: "Deeper boards add moving and crumbling platforms, crushers, timed spikes, cannons, springs, brick walls and hopping spiders. Watch the rhythm, then go." },
         ].map((x) => (<div key={x.t} style={{ background: "rgba(0,0,0,0.4)", border: `1px solid ${x.c}33`, borderRadius: 12, padding: "12px 14px" }}><div style={{ fontSize: 10, letterSpacing: "0.25em", color: x.c, fontWeight: 700 }}>{x.t}</div><div style={{ fontSize: 12, opacity: 0.8, marginTop: 6, lineHeight: 1.5 }}>{x.d}</div></div>))}
       </div>
+      <GameBoards game="bounty" playerId={pid} accent="#a78bfa" font={FONT} title="WANTED · HALL OF FAME" />
       <div style={{ textAlign: "center", padding: "30px 16px", fontSize: 10, color: "rgba(255,255,255,0.25)", letterSpacing: "0.1em" }}>© 2026 Rebel Ants Playground · Bounty Hunters</div>
     </div>
   );

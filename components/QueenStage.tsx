@@ -7,7 +7,7 @@ import React, { forwardRef, useEffect, useImperativeHandle, useRef } from "react
 
 export type Rarity = "none" | "common" | "rare" | "ultra";
 export type StageSfx = "charge" | "bolt" | "crack1" | "crack2" | "crack3" | "hatch" | "fizzle";
-export type QueenStageHandle = { point: (i: number) => void; cast: (i: number, rarity: Rarity) => Promise<void>; idle: () => void };
+export type QueenStageHandle = { point: (i: number) => void; cast: (i: number, rarity: Rarity) => Promise<void>; idle: () => void; talk: (line: string) => void };
 type Props = { active?: boolean; apiRef?: React.MutableRefObject<QueenStageHandle | null>; getEggRect: (i: number) => DOMRect | null; onHatch?: (i: number) => void; onCrack?: (i: number, stage: number) => void; onSfx?: (n: StageSfx) => void };
 
 type Layers = { body: HTMLImageElement; staff: HTMLImageElement; arm: HTMLImageElement; faces: Record<string, HTMLImageElement>; meta: any };
@@ -46,6 +46,7 @@ const QueenStage = forwardRef<QueenStageHandle, Props>(function QueenStage({ act
     crack: null as null | { i: number; stage: number; rgb: string; t: number },
     eggGlow: 0, eggGlowC: "167,139,250",
     expr: "idle", exprHold: 0, blinkAt: 2.5, blinkT: 0,
+    talk: [] as { v: string | null; d: number }[], talkT: 0,
   });
   const setFace = (n: string, hold = 0) => { const s = st.current; s.expr = n; s.exprHold = hold; };
 
@@ -115,7 +116,18 @@ const QueenStage = forwardRef<QueenStageHandle, Props>(function QueenStage({ act
       if (rarity === "ultra") { for (let k = 0; k < 48; k++) s.parts.push({ x: Math.random() * s.W, y: -10, vx: (Math.random() - 0.5) * 30, vy: 60 + Math.random() * 120, life: 1.6 + Math.random(), c: k % 2 ? "#fbbf24" : "#fff3c4", s: 2 + Math.random() * 3, g: 40 }); }
       await wait(1000); s.armT = 0; s.staffT = -90; s.leanT = 0; s.gemT = 0.2;
     },
-    idle() { const s = st.current; s.armT = 0; s.staffT = -90; s.leanT = 0; s.faceT = 1; s.gemT = 0; s.crack = null; s.eggGlow = 0; setFace("idle"); },
+    // lip-sync a line: vowels open the mouth (a / o / e shapes), m-b-p close it, spaces and punctuation rest
+    talk(line) {
+      const s = st.current; const seq: { v: string | null; d: number }[] = [];
+      for (const ch of String(line || "").toLowerCase()) {
+        if ("a".includes(ch)) seq.push({ v: "talk_a", d: 0.1 }); else if ("ou".includes(ch)) seq.push({ v: "talk_o", d: 0.1 }); else if ("eiy".includes(ch)) seq.push({ v: "talk_e", d: 0.09 });
+        else if ("mbp".includes(ch)) seq.push({ v: "talk_m", d: 0.07 }); else if (/[a-z]/.test(ch)) { if (seq.length && seq[seq.length - 1].v === "talk_m") seq.push({ v: "talk_e", d: 0.04 }); else if (seq.length) seq[seq.length - 1].d += 0.035; }
+        else if (/[.,!?…—-]/.test(ch)) seq.push({ v: null, d: 0.22 }); else if (ch === " ") seq.push({ v: "talk_m", d: 0.05 });
+      }
+      const total = seq.reduce((a, x) => a + x.d, 0); const f = total > 4 ? 4 / total : 1; seq.forEach((x) => (x.d *= f));
+      s.talk = seq; s.talkT = 0;
+    },
+    idle() { const s = st.current; s.talk = []; s.armT = 0; s.staffT = -90; s.leanT = 0; s.faceT = 1; s.gemT = 0; s.crack = null; s.eggGlow = 0; setFace("idle"); },
   });
   useImperativeHandle(ref, () => api); useEffect(() => { if (apiRef) apiRef.current = api; return () => { if (apiRef) apiRef.current = null; }; });
 
@@ -129,6 +141,7 @@ const QueenStage = forwardRef<QueenStageHandle, Props>(function QueenStage({ act
       // pose easing (arm slower than the wrist; the flip is a quick snap)
       s.arm += (s.armT - s.arm) * Math.min(1, dt * 7); s.staff += (s.staffT - s.staff) * Math.min(1, dt * 9); s.lean += (s.leanT - s.lean) * Math.min(1, dt * 6); s.gem += (s.gemT - s.gem) * Math.min(1, dt * 8);
       s.face += (s.faceT - s.face) * Math.min(1, dt * 12); if (Math.abs(s.face) < 0.08) s.face = s.faceT * 0.08;
+      if (s.talk.length) { s.talkT += dt; while (s.talk.length && s.talkT >= s.talk[0].d) { s.talkT -= s.talk[0].d; s.talk.shift(); } }
       if (s.exprHold > 0) { s.exprHold -= dt; if (s.exprHold <= 0) s.expr = "idle"; }
       if (s.expr === "idle") { s.blinkAt -= dt; if (s.blinkAt <= 0) { s.blinkT = 0.13; s.blinkAt = 2.2 + Math.random() * 3; } } if (s.blinkT > 0) s.blinkT -= dt;
       if (s.shake > 0) s.shake = Math.max(0, s.shake - dt * 3); if (s.flash > 0) s.flash = Math.max(0, s.flash - dt * 2.4); if (s.crack) s.crack.t += dt;
@@ -148,7 +161,11 @@ const QueenStage = forwardRef<QueenStageHandle, Props>(function QueenStage({ act
         ctx.translate(g.cx + sx, g.y + g.bh + bob + sy); ctx.rotate(s.lean * 0.05); ctx.scale(s.face < 0 ? -1 : 1, 1); ctx.translate(-g.cx, -(g.y + g.bh));   // lean + mirror about her centre line
         ctx.drawImage(s.L.body, g.x, g.y, g.bw, g.bh);
         // expression layer over her face
-        { const fb = s.L.meta?.face?.box; const fn = s.expr === "idle" && s.blinkT > 0 ? "blink" : s.expr; const fi = fb && s.L.faces[fn] && fn !== "idle" ? s.L.faces[fn] : null; if (fi && fb) { const bx = s.L.meta.body.box[0], by = s.L.meta.body.box[1]; ctx.drawImage(fi, g.x + (fb[0] - bx) * g.sc * g.k, g.y + (fb[1] - by) * g.sc * g.k, fi.width * g.k, fi.height * g.k); } }
+        { const fb = s.L.meta?.face?.box; const fn = s.expr === "idle" && s.blinkT > 0 ? "blink" : s.expr; const fi = fb && s.L.faces[fn] && fn !== "idle" ? s.L.faces[fn] : null; if (fi && fb) { const bx = s.L.meta.body.box[0], by = s.L.meta.body.box[1]; ctx.drawImage(fi, g.x + (fb[0] - bx) * g.sc * g.k, g.y + (fb[1] - by) * g.sc * g.k, fi.width * g.k, fi.height * g.k); }
+          // talking: the mouth of the current viseme over whatever the eyes are doing (shock keeps its own mouth)
+          const v = s.talk[0]?.v; const ti = v && s.expr !== "shock" ? s.L.faces[v] : null; const mo = s.L.meta?.face?.mouth;
+          if (ti && fb && mo) { const bx = s.L.meta.body.box[0], by = s.L.meta.body.box[1]; const T = (px: number, py: number) => ({ x: g.x + (px - bx) * g.sc * g.k, y: g.y + (py - by) * g.sc * g.k }); const c = T(mo[0], mo[1]); const r = T(mo[0] + mo[2], mo[1] + mo[3]);
+            ctx.save(); ctx.beginPath(); ctx.ellipse(c.x, c.y, Math.abs(r.x - c.x), Math.abs(r.y - c.y), 0, 0, Math.PI * 2); ctx.clip(); ctx.drawImage(ti, g.x + (fb[0] - bx) * g.sc * g.k, g.y + (fb[1] - by) * g.sc * g.k, ti.width * g.k, ti.height * g.k); ctx.restore(); } }
         // arm swings from the shoulder; the staff is held in the fist with its own wrist angle
         ctx.save(); ctx.translate(g.shoulder.x, g.shoulder.y); ctx.rotate(s.arm * D); ctx.translate(-g.shoulder.x, -g.shoulder.y);
         ctx.save(); ctx.translate(g.fist0.x, g.fist0.y); ctx.rotate(g.staffRot - s.arm * D); ctx.translate(-g.fist0.x, -g.fist0.y);

@@ -2,6 +2,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { type Hud, FACTIONS, KIT, WAVES, viewOf } from "./shared";
 import { SiegeAudio } from "./audio";
+import GameBoards, { recordBoardRun } from "../GameBoards";
+import { loadProfile, getEffectivePlayerId } from "../../lib/profile";
 
 const EMPTY: Hud = { gate: 1000, gateMax: 1000, wave: 0, waves: WAVES.length, horde: 0, score: 0, kills: 0, reload: 0, state: "ready", msg: null, intro: false, menu: true };
 /** power · range · area · speed (0–10). Ronin leads every column by design. */
@@ -36,6 +38,11 @@ export default function SiegeView() {
   const [faction, setFaction] = useState<string>(() => { try { const f = localStorage.getItem("ra:siege:faction"); return f && (FACTIONS as readonly string[]).includes(f) ? f : "ronin"; } catch { return "ronin"; } });
   const factionRef = useRef(faction); factionRef.current = faction; const mode = viewOf(faction);
   const [boxH, setBoxH] = useState(600); const compact = boxH < 460;
+  // who is defending (for the boards) + the server session that lets this defence onto them
+  const [pid, setPid] = useState("guest"); const pidRef = useRef("guest"); pidRef.current = pid; const sessRef = useRef<string | null>(null); const [boardsOpen, setBoardsOpen] = useState(false);
+  useEffect(() => { const u = () => { try { setPid(getEffectivePlayerId(loadProfile()) || "guest"); } catch { setPid("guest"); } }; u(); window.addEventListener("ra:identity-changed", u); return () => window.removeEventListener("ra:identity-changed", u); }, []);
+  const beginSiege = () => { sessRef.current = null; void fetch("/api/boards/siege-start", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ playerId: pidRef.current, faction: factionRef.current }) }).then((r) => r.json()).then((j) => { sessRef.current = j?.session || null; }).catch(() => {}); };
+  const finishSiege = (r: { won: boolean; score: number; kills: number; waves: number }) => { const s = sessRef.current; sessRef.current = null; if (!s) return; let name = "defender"; try { const p = loadProfile(); name = (p?.discordName || p?.name || "defender").trim() || "defender"; } catch {} void recordBoardRun({ game: "siege", playerId: pidRef.current, playerName: name, session: s, stats: { wave: r.waves, score: r.score, kills: r.kills, won: r.won } }); };
   // sound: one audio engine for the page; unlocked by the first tap/key (browser rule), music follows the game state
   const audioRef = useRef<SiegeAudio | null>(null); if (!audioRef.current && typeof window !== "undefined") audioRef.current = new SiegeAudio();
   const [muted, setMuted] = useState(() => audioRef.current?.muted ?? false);
@@ -48,10 +55,10 @@ export default function SiegeView() {
     let alive = true; let eng: any = null; setHud(EMPTY); setErr(null); setLoading(true);
     (async () => {
       try {
-        const cb = { audio: audioRef.current || undefined, onLost: () => { if (alive) setErr("lost"); }, onHud: (h: Hud) => { if (alive) setHud(h); }, onEnd: (r: any) => { if (alive) setResult(r); } };
+        const cb = { audio: audioRef.current || undefined, onLost: () => { if (alive) setErr("lost"); }, onHud: (h: Hud) => { if (alive) setHud(h); }, onEnd: (r: any) => { if (alive) { setResult(r); finishSiege(r); } } };
         const mod = await import("./world3d"); if (!alive || !canvasRef.current) return; eng = new mod.SiegeWorld(canvasRef.current, cb);
         eng.faction = factionRef.current; engRef.current = eng; await eng.init(); if (!alive) return; setLoading(false);
-        if (autoStart.current) { autoStart.current = false; eng.startIntro(); }
+        if (autoStart.current) { autoStart.current = false; beginSiege(); eng.startIntro(); }
       } catch (e: any) { console.error(e); if (alive) setErr(e?.message || String(e)); }
     })();
     return () => { alive = false; try { eng?.destroy(); } catch {} engRef.current = null; };
@@ -68,7 +75,7 @@ export default function SiegeView() {
   useEffect(() => { const h = () => setFs(!!document.fullscreenElement); document.addEventListener("fullscreenchange", h); return () => document.removeEventListener("fullscreenchange", h); }, []);
 
   const choose = (f: string) => { click(); if (f === faction) return; try { localStorage.setItem("ra:siege:faction", f); } catch {} setFaction(f); engRef.current?.setFaction?.(f); };
-  const manTheWall = () => { audioRef.current?.unlock(); audioRef.current?.play("drum", { vol: 0.8 }); goFs(); if (picker) { setPicker(false); engRef.current?.setPaused?.(false); return; } engRef.current?.startIntro?.(); };
+  const manTheWall = () => { audioRef.current?.unlock(); audioRef.current?.play("drum", { vol: 0.8 }); goFs(); if (picker) { setPicker(false); engRef.current?.setPaused?.(false); return; } beginSiege(); engRef.current?.startIntro?.(); };
   const openPicker = () => { click(); setPicker(true); engRef.current?.setPaused?.(true); };
 
   const inMenu = !!hud.menu || picker; const playing = !hud.menu && !hud.intro && !picker;
@@ -163,6 +170,7 @@ export default function SiegeView() {
       {inMenu && !err && (
         <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", background: "linear-gradient(180deg, rgba(12,7,3,0.55) 0%, rgba(12,7,3,0.25) 30%, rgba(12,7,3,0.55) 62%, rgba(12,7,3,0.9) 100%)", padding: "clamp(10px, 2.2vh, 24px) clamp(12px, 2.4vw, 32px)", gap: "clamp(6px, 1.4vh, 14px)", overflowY: "auto" }}>
           <button type="button" onClick={toggleMute} aria-label={muted ? "unmute" : "mute"} style={{ ...btn, position: "absolute", top: 12, right: 14, zIndex: 2 }}>{muted ? "🔇" : "🔊"}</button>
+          <button type="button" onClick={() => { click(); setBoardsOpen(true); }} style={{ ...btn, position: "absolute", top: 12, right: 62, zIndex: 2 }}>🏆{compact ? "" : " HALL OF FAME"}</button>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, flex: "0 0 auto" }}>
             <Crest size={compact ? 30 : 52} />
             <div style={{ textAlign: "center" }}>
@@ -206,8 +214,15 @@ export default function SiegeView() {
             <div style={{ fontSize: "clamp(28px, 5vw, 52px)", letterSpacing: "0.2em", color: result.won ? "#f3dca8" : "#e0533a", textShadow: "0 0 30px rgba(255,150,60,0.5), 0 3px 0 #000" }}>{result.won ? "THE GATE HOLDS" : "THE GATE HAS FALLEN"}</div>
             <div style={{ marginTop: 10, color: CREAM, fontSize: 14, letterSpacing: "0.18em" }}>SCORE <b style={{ color: GOLD }}>{result.score}</b> · KILLS <b>{result.kills}</b> · WAVES <b>{result.waves}</b></div>
             <div style={{ width: 420, maxWidth: "80vw", height: 1, margin: "14px auto 18px", background: `linear-gradient(90deg, transparent, ${GOLD}, transparent)` }} />
+            <button type="button" onClick={() => setBoardsOpen(true)} style={{ ...btn, fontSize: 12, padding: "9px 18px", marginRight: 10 }}>🏆 HALL OF FAME</button>
             <button type="button" onClick={() => { setResult(null); setHud(EMPTY); autoStart.current = true; setGen((g) => g + 1); }} style={{ ...btn, fontSize: 14, padding: "10px 26px", color: "#1e1206", background: "linear-gradient(180deg, #f6d68a, #d49a3e 60%, #a8682a)", border: "1px solid #ffe3a3" }}>MAN THE WALL AGAIN</button>
           </div>
+        </div>
+      )}
+      {boardsOpen && (
+        <div style={{ position: "absolute", inset: 0, zIndex: 30, background: "rgba(10,6,2,0.88)", overflowY: "auto", padding: compact ? "10px 8px" : "18px 16px", backdropFilter: "blur(4px)" }}>
+          <button type="button" onClick={() => setBoardsOpen(false)} style={{ ...btn, position: "sticky", top: 0, float: "right", zIndex: 3 }}>✕</button>
+          <GameBoards game="siege" playerId={pid} accent={GOLD} font={cinzel} title="HALL OF THE GATE" />
         </div>
       )}
       {err && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#e0533a", background: "rgba(0,0,0,0.7)", padding: 20, textAlign: "center", fontSize: 13, fontFamily: "system-ui, sans-serif" }}>{err === "lost" ? <div>Your phone ran out of graphics memory.<br /><button type="button" onClick={() => { setErr(null); setGen((g) => g + 1); }} style={{ ...btn, marginTop: 12, fontSize: 13 }}>↻ RELOAD THE SIEGE</button></div> : <>The siege engine could not start on this device ({err}). WebGL is required.</>}</div>}

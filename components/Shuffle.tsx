@@ -845,6 +845,7 @@ const [order, setOrder] = useState<number[]>(() => Array.from({ length: EGG_COUN
 const stageRef = React.useRef<import("./QueenStage").QueenStageHandle | null>(null); const eggRefs = React.useRef<(HTMLButtonElement | null)[]>([]); const [hatched, setHatched] = useState<number | null>(null); const [crackHit, setCrackHit] = useState(0);
 const [round, setRound] = useState<{ roundId: string; marked: number; royal: boolean } | null>(null); const [markedShow, setMarkedShow] = useState<number | null>(null); const [swapMs, setSwapMs] = useState(300);
 const [favor, setFavor] = useState<{ n: number; max: number }>({ n: 0, max: 5 }); const [domOrder, setDomOrder] = useState<number[]>(() => Array.from({ length: EGG_COUNT }, (_, i) => i)); const [royalReady, setRoyalReady] = useState(false); const [queenLine, setQueenLine] = useState<string>(""); const [lastRoll, setLastRoll] = useState<{ tracked?: boolean; blessed?: boolean; pity?: boolean; royal?: boolean } | null>(null); const [pickedEgg, setPickedEgg] = useState<number | null>(null);
+React.useEffect(() => { if (queenLine) stageRef.current?.talk(queenLine); }, [queenLine]); // the Queen lip-syncs her line
 const [progress, setProgress] = useState(0);
 const [busy, setBusy] = useState(false);
 const [rarity, setRarity] = useState<Rarity>("none");
