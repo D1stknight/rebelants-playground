@@ -1,9 +1,20 @@
 // components/QueenStage.tsx
-// The queen as a 2-D paper doll on a canvas over the shuffle scene: body · arm (swings from the shoulder) · staff (held in
-// the fist, small wrist tilt) — rendered from the real queen GLB by tools/queen-sprites (~260 KB vs the 20 MB model).
+// The queen over the shuffle scene: a skinned 3-D model (components/QueenRig, ~1.2 MB) whose arms move by IK with springs, drawn
+// into this 2-D canvas, with the painted face expressions + lip-sync layered over her head. The old paper doll (body · arm ·
+// staff layers from tools/queen-sprites) is the fallback while the model loads or where WebGL is missing.
 // She faces the chosen lane (mirrored when the egg is on her other side), points, raises the staff, strikes the egg with
 // rarity-coloured lightning; the egg cracks with light leaking out, then bursts. Sounds are requested through onSfx.
 import React, { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
+import type { QueenRig, QueenPose } from "./QueenRig";
+
+// the real-time rigged queen (three.js); the paper doll below stays as the fallback while it loads or without WebGL
+let rigP: Promise<QueenRig | null> | null = null;
+function loadRig(): Promise<QueenRig | null> {
+  if (rigP) return rigP;
+  rigP = (async () => { try { const cv = document.createElement("canvas"); if (!cv.getContext("webgl2") && !cv.getContext("webgl")) return null; const { QueenRig } = await import("./QueenRig"); return await QueenRig.load("/models/queen/queen_web.glb"); } catch (e) { console.warn("queen rig", e); return null; } })();
+  return rigP;
+}
+const VIEW: [number, number, number, number] = [150, 0, 880, 990];   // region of the 1024 frame the live queen is drawn in (room for the raised staff)
 
 export type Rarity = "none" | "common" | "rare" | "ultra";
 export type StageSfx = "charge" | "bolt" | "crack1" | "crack2" | "crack3" | "hatch" | "fizzle";
@@ -38,7 +49,7 @@ const POSE = { rest: { arm: 0, staff: -90 }, point: { arm: 34, staff: -140 }, ra
 const QueenStage = forwardRef<QueenStageHandle, Props>(function QueenStage({ active = false, apiRef, getEggRect, onHatch, onCrack, onSfx }, ref) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const st = useRef({
-    L: null as Layers | null, t: 0, raf: 0, last: 0, W: 0, H: 0, dpr: 1,
+    L: null as Layers | null, Q: null as QueenRig | null, qPose: "rest" as QueenPose, qSize: "", t: 0, raf: 0, last: 0, W: 0, H: 0, dpr: 1,
     arm: 0, armT: 0, staff: -90, staffT: -90, face: 1, faceT: 1, lean: 0, leanT: 0, hop: 0, gem: 0, gemT: 0, shake: 0, flash: 0, flashC: "#fff",
     bolts: [] as { pts: { x: number; y: number }[]; life: number; w: number; c: string; core: string }[],
     parts: [] as { x: number; y: number; vx: number; vy: number; life: number; c: string; s: number; g: number }[],
@@ -49,6 +60,7 @@ const QueenStage = forwardRef<QueenStageHandle, Props>(function QueenStage({ act
     talk: [] as { v: string | null; d: number }[], talkT: 0,
   });
   const setFace = (n: string, hold = 0) => { const s = st.current; s.expr = n; s.exprHold = hold; };
+  const pose = (p: QueenPose) => { const s = st.current; s.qPose = p; s.Q?.setPose(p); };
 
   // ── geometry (css px). face = −1 mirrors her around her own centre line so the staff hand is on the egg's side
   const geom = () => {
@@ -60,7 +72,8 @@ const QueenStage = forwardRef<QueenStageHandle, Props>(function QueenStage({ act
     const fist = rot(fist0, shoulder, s.arm * D);                          // the fist rides on the arm
     const staffBase = Math.atan2(gem0.y - fist0.y, gem0.x - fist0.x);      // staff direction at rest (≈ straight up)
     const staffRot = s.staff * D - staffBase;                              // rotation to apply to the staff layer about the fist
-    const gem = rot({ x: fist.x + (gem0.x - fist0.x), y: fist.y + (gem0.y - fist0.y) }, fist, staffRot);
+    let gem = rot({ x: fist.x + (gem0.x - fist0.x), y: fist.y + (gem0.y - fist0.y) }, fist, staffRot);
+    if (s.Q) { const gp = s.Q.gemPx(); gem = P(gp); }
     const mirror = (p: { x: number; y: number }) => (s.face < 0 ? { x: 2 * cx - p.x, y: p.y } : p);
     return { k, sc, x, y, bw, bh, cx, shoulder, fist0, fist, gem0, gem, staffRot, gemWorld: mirror(gem), armOff: { x: (m.arm.box[0] - bx) * sc * k, y: (m.arm.box[1] - by) * sc * k }, staffOff: { x: (m.staff.box[0] - bx) * sc * k, y: (m.staff.box[1] - by) * sc * k } };
   };
@@ -71,7 +84,8 @@ const QueenStage = forwardRef<QueenStageHandle, Props>(function QueenStage({ act
     const s = st.current; s.faceT = e.x < s.W / 2 ? 1 : -1; s.leanT = s.faceT < 0 ? 1 : -1;
     const ex = s.faceT < 0 ? 2 * (s.W / 2) - e.x : e.x;                    // egg position in the un-mirrored frame
     const g0 = { ...geom() }; const fistApprox = g0.fist0; const a = Math.atan2(e.y - fistApprox.y, ex - fistApprox.x) / D; // −180..180, down-left ≈ 135
-    s.armT = POSE.point.arm; s.staffT = Math.max(-265, Math.min(-160, a > 0 ? a - 360 : a));   // staff held out toward the egg, gem leading (−180 = level)   // staff tip toward the egg (−90 = up, −225 = down-left), never through her body
+    s.armT = POSE.point.arm; s.staffT = Math.max(-265, Math.min(-160, a > 0 ? a - 360 : a));
+    s.Q?.setAim(ex - fistApprox.x, e.y - fistApprox.y); pose("point");   // staff held out toward the egg, gem leading (−180 = level)   // staff tip toward the egg (−90 = up, −225 = down-left), never through her body
   };
 
   const burst = (x: number, y: number, c: string, n: number, sp = 3, g = 6, size = 3) => { for (let i = 0; i < n; i++) { const a = Math.random() * Math.PI * 2, v = (0.4 + Math.random()) * sp * 60; st.current.parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 60, life: 0.5 + Math.random() * 0.6, c, s: 2 + Math.random() * size, g: g * 60 }); } };
@@ -92,29 +106,30 @@ const QueenStage = forwardRef<QueenStageHandle, Props>(function QueenStage({ act
       // 1. point at the egg
       aim(e); s.gemT = 0.6; setFace("focus"); await wait(500);
       if (rarity === "none") {
-        onSfx?.("charge"); s.gemT = 1; await wait(300); const g = geom().gemWorld; burst(g.x, g.y, "#cbd5e1", 20, 2, 3); onSfx?.("fizzle"); s.gemT = 0; s.armT = POSE.droop.arm; s.staffT = POSE.droop.staff; setFace("shock"); await wait(350); setFace("sad");
+        onSfx?.("charge"); s.gemT = 1; await wait(300); const g = geom().gemWorld; burst(g.x, g.y, "#cbd5e1", 20, 2, 3); onSfx?.("fizzle"); s.gemT = 0; s.armT = POSE.droop.arm; s.staffT = POSE.droop.staff; pose("droop"); setFace("shock"); await wait(350); setFace("sad");
         for (let k = 1; k <= 3; k++) { setCrack(i, k, col.rgb); s.shake = 0.5; await wait(260); }
-        burst(e.x, e.y, "#d6c9a8", 18, 2.5, 5); s.crack = null; s.eggGlow = 0; onHatch?.(i); await wait(400); s.armT = 0; s.staffT = -90; s.leanT = 0; setFace("sad", 2.5); return;
+        burst(e.x, e.y, "#d6c9a8", 18, 2.5, 5); s.crack = null; s.eggGlow = 0; onHatch?.(i); await wait(400); s.armT = 0; s.staffT = -90; s.leanT = 0; pose("rest"); setFace("sad", 2.5); return;
       }
       // 2. raise the staff and charge the gem
       const power = rarity === "ultra" ? 3 : rarity === "rare" ? 2 : 1;
-      s.armT = POSE.raise.arm; s.staffT = POSE.raise.staff; s.hop = 10; s.gemT = 1; onSfx?.("charge"); setFace("intense");
+      s.armT = POSE.raise.arm; s.staffT = POSE.raise.staff; s.hop = s.Q ? 4 : 10; s.gemT = 1; pose("raise"); onSfx?.("charge"); setFace("intense");
       for (let k = 0; k < 12; k++) { const g = geom().gemWorld; const a = Math.random() * Math.PI * 2, r = 40 + Math.random() * 60; s.parts.push({ x: g.x + Math.cos(a) * r, y: g.y + Math.sin(a) * r, vx: -Math.cos(a) * r * 2.2, vy: -Math.sin(a) * r * 2.2, life: 0.45, c: col.bolt, s: 2 + power, g: 0 }); await wait(45); }
       s.hop = 0; await wait(100);
       // 3. strikes — each one deepens the cracks, light leaks out
-      const strikes = 3 + power * 2; let stage = 0; setFace("shock");
+      const strikes = 3 + power * 2; let stage = 0; setFace("shock"); pose("strike"); await wait(s.Q ? 110 : 0);
       for (let k = 0; k < strikes; k++) {
         const g = geom().gemWorld; bolt(g, { x: e.x, y: e.y - e.h * 0.25 }, col, 2 + power, true); if (power >= 2) bolt({ x: g.x + (Math.random() - 0.5) * 20, y: g.y }, { x: e.x + (Math.random() - 0.5) * 16, y: e.y - e.h * 0.2 }, col, 1.5, false);
         if (k === 0 || k === strikes - 1 || Math.random() < 0.5) onSfx?.("bolt");
+        s.Q?.recoil(0.6 + power * 0.25);
         s.flash = 0.35 + power * 0.15; s.flashC = col.glow; s.shake = 0.6 + power * 0.3; burst(e.x, e.y - e.h * 0.2, col.bolt, 8 + power * 4, 3, 4);
         const ns = Math.min(3, 1 + Math.floor((k / strikes) * 3)); if (ns !== stage) { stage = ns; setCrack(i, ns, col.rgb); } else if (s.crack) s.crack.t = 0;
         await wait(120 + Math.random() * 60);
       }
       await wait(120);
       // 4. hatch: shell bursts, light column in the rarity colour
-      s.crack = null; s.eggGlow = 0; onSfx?.("hatch"); setFace(rarity === "common" ? "smirk" : "happy", 3); burst(e.x, e.y, "#f3e2b0", 34, 4.5, 6, 4); burst(e.x, e.y, col.bolt, 36 + power * 14, 4 + power, 2); s.beam = { x: e.x, y: e.y, life: 1.3 + power * 0.3, c: col.bolt }; s.flash = 0.6 + power * 0.15; s.flashC = col.glow; onHatch?.(i);
+      s.crack = null; s.eggGlow = 0; onSfx?.("hatch"); setFace(rarity === "common" ? "smirk" : "happy", 3); pose(rarity === "common" ? "rest" : "cheer"); burst(e.x, e.y, "#f3e2b0", 34, 4.5, 6, 4); burst(e.x, e.y, col.bolt, 36 + power * 14, 4 + power, 2); s.beam = { x: e.x, y: e.y, life: 1.3 + power * 0.3, c: col.bolt }; s.flash = 0.6 + power * 0.15; s.flashC = col.glow; onHatch?.(i);
       if (rarity === "ultra") { for (let k = 0; k < 48; k++) s.parts.push({ x: Math.random() * s.W, y: -10, vx: (Math.random() - 0.5) * 30, vy: 60 + Math.random() * 120, life: 1.6 + Math.random(), c: k % 2 ? "#fbbf24" : "#fff3c4", s: 2 + Math.random() * 3, g: 40 }); }
-      await wait(1000); s.armT = 0; s.staffT = -90; s.leanT = 0; s.gemT = 0.2;
+      await wait(1000); s.armT = 0; s.staffT = -90; s.leanT = 0; s.gemT = 0.2; await wait(s.Q && rarity !== "common" ? 900 : 0); pose("rest");
     },
     // lip-sync a line: vowels open the mouth (a / o / e shapes), m-b-p close it, spaces and punctuation rest
     talk(line) {
@@ -127,12 +142,13 @@ const QueenStage = forwardRef<QueenStageHandle, Props>(function QueenStage({ act
       const total = seq.reduce((a, x) => a + x.d, 0); const f = total > 4 ? 4 / total : 1; seq.forEach((x) => (x.d *= f));
       s.talk = seq; s.talkT = 0;
     },
-    idle() { const s = st.current; s.talk = []; s.armT = 0; s.staffT = -90; s.leanT = 0; s.faceT = 1; s.gemT = 0; s.crack = null; s.eggGlow = 0; setFace("idle"); },
+    idle() { const s = st.current; s.talk = []; pose("rest"); s.armT = 0; s.staffT = -90; s.leanT = 0; s.faceT = 1; s.gemT = 0; s.crack = null; s.eggGlow = 0; setFace("idle"); },
   });
   useImperativeHandle(ref, () => api); useEffect(() => { if (apiRef) apiRef.current = api; return () => { if (apiRef) apiRef.current = null; }; });
 
   useEffect(() => {
     let alive = true; loadLayers().then((L) => { if (alive) st.current.L = L; }).catch(() => {});
+    loadRig().then((Q) => { if (alive && Q) { st.current.Q = Q; Q.setPose(st.current.qPose); } });
     const cv = canvasRef.current!; const ctx = cv.getContext("2d")!;
     const fit = () => { const r = cv.getBoundingClientRect(); const s = st.current; s.dpr = Math.min(2, window.devicePixelRatio || 1); s.W = r.width; s.H = r.height; cv.width = Math.round(r.width * s.dpr); cv.height = Math.round(r.height * s.dpr); };
     fit(); window.addEventListener("resize", fit);
@@ -159,19 +175,32 @@ const QueenStage = forwardRef<QueenStageHandle, Props>(function QueenStage({ act
         ctx.fillStyle = "rgba(0,0,0,0.35)"; ctx.beginPath(); ctx.ellipse(g.cx, g.y + g.bh - 2 + s.hop, g.bw * 0.34, 9, 0, 0, Math.PI * 2); ctx.fill();
         ctx.save();
         ctx.translate(g.cx + sx, g.y + g.bh + bob + sy); ctx.rotate(s.lean * 0.05); ctx.scale(s.face < 0 ? -1 : 1, 1); ctx.translate(-g.cx, -(g.y + g.bh));   // lean + mirror about her centre line
-        ctx.drawImage(s.L.body, g.x, g.y, g.bw, g.bh);
+        const Q = s.Q; const bx0 = s.L.meta.body.box[0], by0 = s.L.meta.body.box[1]; const u = g.sc * g.k;
+        let head = { dx: 0, dy: 0, da: 0, px: 0, py: 0 };
+        if (Q) {
+          // live queen: talk gestures while a line plays, then render the crop of her 1024 frame and lay it where the doll stood
+          Q.setPose(s.talk.length && s.qPose === "rest" ? "talk" : s.qPose); Q.update(dt);
+          const vw = (VIEW[2] - VIEW[0]) * u, vh = (VIEW[3] - VIEW[1]) * u; const key = `${Math.round(vw)}x${Math.round(vh)}@${s.dpr}`;
+          if (key !== s.qSize) { s.qSize = key; Q.setView(VIEW, vw, vh, s.dpr); }
+          Q.render(); ctx.drawImage(Q.renderer.domElement, g.x + (VIEW[0] - bx0) * u, g.y + (VIEW[1] - by0) * u, vw, vh);
+          head = Q.headPx();
+        } else ctx.drawImage(s.L.body, g.x, g.y, g.bw, g.bh);
+        ctx.save(); if (Q) { const hx = g.x + (head.px - bx0) * u, hy = g.y + (head.py - by0) * u; ctx.translate(hx + head.dx * u, hy + head.dy * u); ctx.rotate(head.da); ctx.translate(-hx, -hy); }
         // expression layer over her face
         { const fb = s.L.meta?.face?.box; const fn = s.expr === "idle" && s.blinkT > 0 ? "blink" : s.expr; const fi = fb && s.L.faces[fn] && fn !== "idle" ? s.L.faces[fn] : null; if (fi && fb) { const bx = s.L.meta.body.box[0], by = s.L.meta.body.box[1]; ctx.drawImage(fi, g.x + (fb[0] - bx) * g.sc * g.k, g.y + (fb[1] - by) * g.sc * g.k, fi.width * g.k, fi.height * g.k); }
           // talking: the mouth of the current viseme over whatever the eyes are doing (shock keeps its own mouth)
           const v = s.talk[0]?.v; const ti = v && s.expr !== "shock" ? s.L.faces[v] : null; const mo = s.L.meta?.face?.mouth;
           if (ti && fb && mo) { const bx = s.L.meta.body.box[0], by = s.L.meta.body.box[1]; const T = (px: number, py: number) => ({ x: g.x + (px - bx) * g.sc * g.k, y: g.y + (py - by) * g.sc * g.k }); const c = T(mo[0], mo[1]); const r = T(mo[0] + mo[2], mo[1] + mo[3]);
             ctx.save(); ctx.beginPath(); ctx.ellipse(c.x, c.y, Math.abs(r.x - c.x), Math.abs(r.y - c.y), 0, 0, Math.PI * 2); ctx.clip(); ctx.drawImage(ti, g.x + (fb[0] - bx) * g.sc * g.k, g.y + (fb[1] - by) * g.sc * g.k, ti.width * g.k, ti.height * g.k); ctx.restore(); } }
-        // arm swings from the shoulder; the staff is held in the fist with its own wrist angle
+        ctx.restore();
+        // paper-doll fallback: arm swings from the shoulder; the staff is held in the fist with its own wrist angle
+        if (!Q) {
         ctx.save(); ctx.translate(g.shoulder.x, g.shoulder.y); ctx.rotate(s.arm * D); ctx.translate(-g.shoulder.x, -g.shoulder.y);
         ctx.save(); ctx.translate(g.fist0.x, g.fist0.y); ctx.rotate(g.staffRot - s.arm * D); ctx.translate(-g.fist0.x, -g.fist0.y);
         ctx.drawImage(s.L.staff, g.x + g.staffOff.x, g.y + g.staffOff.y, s.L.staff.width * g.k, s.L.staff.height * g.k); ctx.restore();
         ctx.drawImage(s.L.arm, g.x + g.armOff.x, g.y + g.armOff.y, s.L.arm.width * g.k, s.L.arm.height * g.k);
-        ctx.restore(); ctx.restore();
+        ctx.restore(); }
+        ctx.restore();
         // gem glow follows the staff tip
         if (s.gem > 0.02) { const gp = g.gemWorld; gp.y += bob; const rr = 14 + s.gem * 28 + Math.sin(s.t * 14) * 3; const gg = ctx.createRadialGradient(gp.x, gp.y, 1, gp.x, gp.y, rr); gg.addColorStop(0, `rgba(255,120,150,${0.9 * s.gem})`); gg.addColorStop(0.4, `rgba(255,60,90,${0.45 * s.gem})`); gg.addColorStop(1, "rgba(255,60,90,0)"); ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(gp.x, gp.y, rr, 0, Math.PI * 2); ctx.fill(); }
       }

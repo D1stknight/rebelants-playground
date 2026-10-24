@@ -46,7 +46,7 @@ export function preloadTrack(t: string, factions: string[], chassis: ChassisId[]
 }
 /** ground texture mip chain: level 0 is the 2048² broadcast map (2 texels per world unit), each next level half the size */
 export type Mips = { tex: Uint32Array[]; shift: number[] };
-export async function loadTrack(id: string): Promise<{ data: TrackData; mips: Mips; surf: Uint8Array }> {
+export async function loadTrack(id: string): Promise<{ data: TrackData; mips: Mips; surf: Uint8Array; img: HTMLImageElement }> {
   const data: TrackData = await (await fetch(`/rgp/tracks/${id}/track.json`, { cache: "force-cache" })).json();
   const load = (src: string) => new Promise<HTMLImageElement>((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
   const [mi, si] = await Promise.all([load(`/rgp/tracks/${id}/map_hd.webp`).catch(() => load(`/rgp/tracks/${id}/map.png`)), load(`/rgp/tracks/${id}/surf.png`)]);
@@ -60,7 +60,7 @@ export async function loadTrack(id: string): Promise<{ data: TrackData; mips: Mi
   const cv = document.createElement("canvas"); cv.width = MAP; cv.height = MAP; const c = cv.getContext("2d", { willReadFrequently: true })!;
   c.drawImage(si, 0, 0); const sd = c.getImageData(0, 0, MAP, MAP).data; const surf = new Uint8Array(MAP * MAP);
   for (let i = 0; i < MAP * MAP; i++) surf[i] = sd[i * 4];
-  return { data, mips: { tex, shift }, surf };
+  return { data, mips: { tex, shift }, surf, img: mi };
 }
 
 const AI_NAMES = ["Mandible", "Thorax", "Chitin", "Pheromone", "Antenna", "Grub", "Larva", "Drone", "Forager", "Soldier", "Nectar", "Tunnel"];
@@ -74,6 +74,8 @@ export class Race {
   input: Input = { left: false, right: false, accel: false, brake: false, drift: false, item: false };
   camX = 0; camY = 0; camH = 0; hudT = 0; msg: string | null = null; msgT = 0; shake = 0;
   pano: Panorama | null = null; side: Side[] = []; res = RES; perf: number[] = [];
+  /** the 3-D view (render3d.ts) when WebGL is there; otherwise the Mode-7 canvas renderer below draws the race */
+  r3d: { render: (dt: number) => void } | null = null;
   props: HTMLImageElement; sky: HTMLImageElement; skyMid: HTMLImageElement; kartImg: Record<string, HTMLImageElement> = {};
   lightsOn = 0; lightsHold = Math.random() * 0.6; raceT = 0; fastest: { name: string; time: number; you: boolean } | null = null; lapFlash: LapFlash | null = null; flashId = 0;
   N: number; cpStep: number; finishedCount = 0; errCount = 0; autopilot = false; itemHintShown = false; touch = false;
@@ -123,7 +125,7 @@ export class Race {
     const loop = (now: number) => {
       if (this.over) return;
       const dt = Math.min(0.05, (now - this.last) / 1000); this.last = now; this.acc += dt;
-      try { let n = 0; while (this.acc >= 1 / 60 && n++ < 4) { this.step(1 / 60); this.acc -= 1 / 60; } if (n >= 4) this.acc = 0; this.camera(dt); this.render(); this.adapt(dt * 1000); this.errCount = 0; }
+      try { let n = 0; while (this.acc >= 1 / 60 && n++ < 4) { this.step(1 / 60); this.acc -= 1 / 60; } if (n >= 4) this.acc = 0; this.camera(dt); if (this.r3d) this.r3d.render(dt); else { this.render(); this.adapt(dt * 1000); } this.errCount = 0; }
       catch (e) { console.error("RGP frame error", e); this.acc = 0; if (++this.errCount > 90) { this.over = true; return; } }
       this.raf = requestAnimationFrame(loop);
     };

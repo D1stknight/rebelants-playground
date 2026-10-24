@@ -14,11 +14,15 @@ type Props = { trackId: string; faction: string; chassis: ChassisId; onEnd: (r: 
 
 export default function RaceView({ trackId, faction, chassis, onEnd, onQuit }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const canvas3dRef = useRef<HTMLCanvasElement | null>(null);
+  const r3dRef = useRef<{ resize: (w: number, h: number) => void; dispose: () => void } | null>(null);
+  const [is3d, setIs3d] = useState(false);
   const raceRef = useRef<Race | null>(null);
   const [hud, setHud] = useState<Hud | null>(null);
   const [scale, setScale] = useState(2);
   const [vw, setVw] = useState(VW); const vwRef = useRef(VW); vwRef.current = vw;
   useEffect(() => { raceRef.current?.setView(vw); }, [vw]);
+  useEffect(() => { r3dRef.current?.resize(vw * scale, VH * scale); }, [vw, scale, is3d]);
   const [isTouch, setIsTouch] = useState(false);
   const [portrait, setPortrait] = useState(false);
   const [vh, setVh] = useState<number | string>("100vh");
@@ -47,20 +51,24 @@ export default function RaceView({ trackId, faction, chassis, onEnd, onQuit }: P
 
   useEffect(() => {
     const cv = canvasRef.current; if (!cv) return; let dead = false; let r: Race | null = null;
-    loadTrack(trackId).then((loaded) => {
+    const want3d = (() => { try { if (new URLSearchParams(window.location.search).get("view") === "2d") return false; const t = document.createElement("canvas"); return !!(t.getContext("webgl2") || t.getContext("webgl")); } catch { return false; } })();
+    Promise.all([loadTrack(trackId), want3d ? import("./render3d").catch(() => null) : Promise.resolve(null)]).then(([loaded, mod3d]) => {
       if (dead) return;
-      r = new Race(cv, loaded, {
+      const use3d = !!(mod3d && canvas3dRef.current);
+      r = new Race(use3d ? document.createElement("canvas") : cv, loaded, {
         onHud: (h) => setHud({ ...h }),
         onSfx: (n) => { const s = (SFX as any)[n]; if (s) s(audioRef.current); },
         onEnd: (res) => { audioRef.current.music(null); onEnd(res); },
       }, faction, chassis);
-      r.setView(vwRef.current); r.touch = "ontouchstart" in window || navigator.maxTouchPoints > 0; raceRef.current = r; (window as any).__gp = r; r.start(); setReady(true);
+      r.setView(vwRef.current); r.touch = "ontouchstart" in window || navigator.maxTouchPoints > 0; raceRef.current = r; (window as any).__gp = r;
+      if (use3d) { try { const v = new mod3d!.Renderer3D(canvas3dRef.current!, r, loaded.img); r.r3d = v; r3dRef.current = v; const c3 = canvas3dRef.current!.getBoundingClientRect(); v.resize(c3.width, c3.height); (window as any).__r3d = v; setIs3d(true); } catch (e) { console.error("RGP 3D", e); r.r3d = null; } }
+      r.start(); setReady(true);
       audioRef.current.music(track.cup >= 3 ? "fw-battle-epic" : "hd-war", 0.3);
     }).catch((e) => { console.error(e); setLoadErr(String(e?.message || e)); });
     const kd = (e: KeyboardEvent) => { const k = KEYS[e.key]; const g = raceRef.current; if (k && g) { g.input[k] = true; e.preventDefault(); } if (e.key === "Escape") onQuit(); };
     const ku = (e: KeyboardEvent) => { const k = KEYS[e.key]; const g = raceRef.current; if (k && g) { g.input[k] = false; e.preventDefault(); } };
     window.addEventListener("keydown", kd); window.addEventListener("keyup", ku);
-    return () => { dead = true; r?.stop(); window.removeEventListener("keydown", kd); window.removeEventListener("keyup", ku); audioRef.current.music(null); };
+    return () => { dead = true; r?.stop(); r3dRef.current?.dispose(); r3dRef.current = null; window.removeEventListener("keydown", kd); window.removeEventListener("keyup", ku); audioRef.current.music(null); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trackId]);
 
@@ -78,7 +86,10 @@ export default function RaceView({ trackId, faction, chassis, onEnd, onQuit }: P
     <div style={{ position: "absolute", top: 0, left: 0, width: "100%", height: vh, zIndex: 50, background: "#000", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: isTouch && portrait ? "flex-start" : "center", paddingTop: isTouch && portrait ? "env(safe-area-inset-top)" : 0, fontFamily: FONT, color: "#fff", overflow: "hidden", touchAction: "none", WebkitUserSelect: "none", userSelect: "none" }}>
       {loadErr && <div style={{ position: "absolute", inset: 0, zIndex: 20, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, textAlign: "center", background: "rgba(0,0,0,0.85)" }}><div style={{ fontSize: 14, color: "#ff5566", letterSpacing: "0.3em", fontWeight: 800 }}>☠ THE TRACK COULDN'T LOAD</div><div style={{ fontSize: 11, opacity: 0.6, marginTop: 10, maxWidth: 420, wordBreak: "break-word" }}>{loadErr}</div><button type="button" onClick={onQuit} style={{ marginTop: 18, fontFamily: FONT, padding: "12px 22px", border: "1px solid rgba(255,255,255,0.25)", borderRadius: 12, background: "rgba(255,255,255,0.08)", color: "#fff", fontWeight: 800, letterSpacing: "0.15em" }}>BACK TO PADDOCK</button></div>}
       <div style={{ position: "relative", width: vw * scale, height: VH * scale, flex: "0 0 auto" }}>
-        <canvas ref={canvasRef} width={vw * RES} height={VH * RES} style={{ width: vw * scale, height: VH * scale, display: "block" }} />
+        <canvas ref={canvasRef} width={vw * RES} height={VH * RES} style={{ width: vw * scale, height: VH * scale, display: is3d ? "none" : "block" }} />
+        <canvas ref={canvas3dRef} style={{ width: vw * scale, height: VH * scale, display: is3d ? "block" : "none", position: is3d ? "relative" : "absolute", top: 0, left: 0 }} />
+        {is3d && hud && hud.blind > 0 && <div style={{ position: "absolute", inset: 0, background: `rgba(120,70,160,${Math.min(0.85, hud.blind * 0.5)})`, pointerEvents: "none" }} />}
+        {is3d && hud && hud.state === "intro" && <div style={{ position: "absolute", inset: 0, background: "#000", pointerEvents: "none", animation: "gpFade .9s ease-out both" }} />}
         {!ready && !loadErr && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#a78bfa", letterSpacing: "0.3em", fontSize: 12 }}>LOADING {track.name.toUpperCase()}…</div>}
         {hud && <Broadcast hud={hud} S={S} vw={vw * scale} h={VH * scale} touch={isTouch} portrait={portrait} track={track} centre={raceRef.current?.track.center || null} />}
         <button type="button" onClick={audio.toggleMute} style={{ position: "absolute", right: 76, top: 8, background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 999, width: 26, height: 26, color: "#fff", fontSize: 12, cursor: "pointer" }}>{audio.muted ? "🔇" : "🔊"}</button>
@@ -92,7 +103,7 @@ export default function RaceView({ trackId, faction, chassis, onEnd, onQuit }: P
         </div>
       )}
       {isTouch && portrait && hud && hud.state === "intro" && <div style={{ position: "absolute", left: 0, right: 0, top: VH * scale + 240, textAlign: "center", fontSize: 10, letterSpacing: "0.25em", color: "rgba(255,255,255,0.45)", pointerEvents: "none" }}>⟳ ROTATE FOR THE FULL TRACK · GAS IS AUTOMATIC</div>}
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Titillium+Web:ital,wght@0,400;0,600;0,700;0,900;1,700;1,900&display=swap');@keyframes gpIn{0%{opacity:0;transform:translateX(-14px)}100%{opacity:1;transform:none}}@keyframes gpFlash{0%{opacity:0;transform:translateY(-8px)}10%{opacity:1;transform:none}85%{opacity:1}100%{opacity:0}}@keyframes gpBlink{50%{opacity:.35}}@keyframes gpMsg{0%{opacity:0;transform:scale(1.15)}12%{opacity:1;transform:scale(1)}80%{opacity:1}100%{opacity:0}}@keyframes gpPop{0%{opacity:0;transform:scale(1.6)}20%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(0.9)}}`}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Titillium+Web:ital,wght@0,400;0,600;0,700;0,900;1,700;1,900&display=swap');@keyframes gpFade{0%{opacity:1}100%{opacity:0}}@keyframes gpIn{0%{opacity:0;transform:translateX(-14px)}100%{opacity:1;transform:none}}@keyframes gpFlash{0%{opacity:0;transform:translateY(-8px)}10%{opacity:1;transform:none}85%{opacity:1}100%{opacity:0}}@keyframes gpBlink{50%{opacity:.35}}@keyframes gpMsg{0%{opacity:0;transform:scale(1.15)}12%{opacity:1;transform:scale(1)}80%{opacity:1}100%{opacity:0}}@keyframes gpPop{0%{opacity:0;transform:scale(1.6)}20%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(0.9)}}`}</style>
     </div>
   );
 }
