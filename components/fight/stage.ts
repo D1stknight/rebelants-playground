@@ -33,13 +33,16 @@ export class Fighter {
   look: "none" | "stone" | "gold" | "char" | "glow" = "none"; lookK = 0; lookColor = "#fff"; opacity = 1;
   extra = new THREE.Group();     // props that move with the fighter
   gloves: Record<"R" | "L", Glove>;
+  poleK: Record<"R" | "L", number | null> = { R: null, L: null };   // where a support hand holds a long shaft (smoothed)
   constructor(rig: Rig, side: Side, faction: string, color: string, props: THREE.Object3D) {
     this.rig = rig; this.side = side; this.faction = faction; this.color = color; this.mirrored = side === "enemy";
     rig.root.add(this.extra);
     // Universe gloves: the sculpted hands shrink into the cuffs, five-finger gloves grip the weapons
-    const [gc, cc] = GLOVE_COLORS[faction] || ["#2a2a30", color];
-    const L = 0.2 * rig.cal.armK;
-    this.gloves = { R: new Glove("R", L, gc, cc), L: new Glove("L", L, gc, cc) };
+    // the glove keeps the colour of the hand that was sculpted for this fighter (so it never melts into the armour), the cuff the faction's trim
+    const [gc0, cc] = GLOVE_COLORS[faction] || ["#2a2a30", color]; const gc = rig.cal.handColor || gc0;
+    // sized like the model's own sculpted hands (wrist → middle fingertip ≈ .95 L), cuff as thick as its wrist
+    const L = Math.min(0.31, Math.max(0.19, rig.cal.handLen / 0.95)); const cuffK = Math.min(1.2, Math.max(0.9, rig.cal.wristR / (0.16 * L)));
+    this.gloves = { R: new Glove("R", L, gc, cc, cuffK), L: new Glove("L", L, gc, cc, cuffK) };
     props.add(this.gloves.R.root, this.gloves.L.root);
     rig.hideHands();
     rig.strikeInset = (this.gloves.R.knuckles.x) * L;
@@ -100,12 +103,23 @@ export class Fighter {
       const grips = Number(h === "L" ? P.gripL : P.gripR) > 0.5;
       if (!grips || !wp) continue;
       const g = this.gloves[h]; const w = W(o);
-      const handle = wp.obj.position.clone().addScaledVector(w, R.gripOff[o]);
+      // long shafts (spear, naginata, staff, teppo) can be held anywhere: slide the support hand to where this arm reaches
+      let k = R.gripOff[o];
+      if (Math.abs(k) >= 0.3) {
+        const sh = R.b[(h === "R" ? "Right" : "Left") + "Arm"].getWorldPosition(new THREE.Vector3()); const reachLen = R.cal.arm * 0.95;
+        let best = Infinity; const k0 = k, sgn = Math.sign(k0);
+        for (let kk = 0.15; kk <= 1.05; kk += 0.05) { const pt = wp.obj.position.clone().addScaledVector(w, sgn * kk); const d = pt.distanceTo(sh);
+          const sc = Math.max(0, d - reachLen) * 10 + Math.max(0, 0.25 - d) * 10 + Math.abs(sgn * kk - k0) * 0.4; if (sc < best) { best = sc; k = sgn * kk; } }
+        this.poleK[h] = this.poleK[h] == null ? k : this.poleK[h]! + (k - this.poleK[h]!) * 0.35; k = this.poleK[h]!;
+      } else this.poleK[h] = null;
+      const handle = wp.obj.position.clone().addScaledVector(w, k);
       let f = R.handFrame(h); g.setCurl(0, true); g.place(f.wrist, perp(f.fa, w, f.F), w);
       const off = g.world(g.gripCenter).sub(f.wrist);
       R.reach(h, handle.clone().sub(off), h === "R" ? P.eR : P.eL);
       f = R.handFrame(h); g.place(f.wrist, perp(f.fa, w, f.F), w);
-      g.root.position.add(handle.sub(g.world(g.gripCenter))); g.root.updateMatrixWorld(true);
+      // close the last few cm onto the handle, but never pull the glove off the wrist
+      const gap = handle.sub(g.world(g.gripCenter)); const gl = gap.length(); if (gl > 0.035) gap.multiplyScalar(0.035 / gl);
+      g.root.position.add(gap); g.root.updateMatrixWorld(true);
       done[h] = true;
     }
     for (const h of ["R", "L"] as const) { if (done[h]) continue; const g = this.gloves[h]; const f = R.handFrame(h); g.setCurl(P.fist, false); g.place(f.wrist, f.F, f.T); }

@@ -138,9 +138,11 @@ function scroll() {
     ["勅", "命", "令"].forEach((ch, i) => x.fillText(ch, 200 - i * 70, 110)); x.fillStyle = "#b3121a"; x.fillRect(22, 132, 34, 34);
     scrollTex = new THREE.CanvasTexture(c); scrollTex.colorSpace = THREE.SRGBColorSpace;
   }
-  const paper = mesh(new THREE.PlaneGeometry(0.42, 0.3), std("#ffffff", 0, 0.9, { side: THREE.DoubleSide, map: scrollTex || undefined })); paper.position.y = 0.15; paper.rotation.y = Math.PI / 2; g.add(paper);
-  for (const y of [0, 0.3]) { const r = mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.48, 8), WOOD("#3a1f12")); r.rotation.x = Math.PI / 2; r.position.y = y; g.add(r); }
-  g.userData.paper = paper; g.userData.tip = 0.3; return g;
+  // a handscroll held open by its near rod: the rods run along the handle axis (Y), the paper opens out along +X facing +Z
+  const paper = mesh(new THREE.PlaneGeometry(0.42, 0.3), std("#ffffff", 0, 0.9, { side: THREE.DoubleSide, map: scrollTex || undefined })); paper.position.x = 0.24; g.add(paper);
+  for (const x of [0.02, 0.46]) { const r = mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.38, 8), WOOD("#3a1f12")); r.position.x = x; g.add(r);
+    for (const y of [-0.2, 0.2]) { const cap = mesh(new THREE.SphereGeometry(0.024, 8, 6), GOLD()); cap.position.set(x, y, 0); g.add(cap); } }
+  g.userData.paper = paper; g.userData.tip = 0.2; return g;
 }
 function cutlass() {
   const g = new THREE.Group();

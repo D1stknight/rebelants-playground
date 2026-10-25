@@ -240,6 +240,16 @@ function ActiveMatchView({
   const prevRoundCountRef = useRef(match.roundHistory.length);
   const prevTerritoryCountRef = useRef(match.territoryResults.length);
 
+  // the fight scene stays on screen: picking a move or a new round brings it back into view
+  const sceneRef = useRef<HTMLDivElement>(null);
+  const showScene = useCallback(() => {
+    const el = sceneRef.current; if (!el || typeof window === "undefined") return;
+    // the arena sits under the territory bar inside the scene: align the arena itself when we can find it
+    const arena = (el.querySelector("canvas")?.closest("div[style*='position: relative']") as HTMLElement | null) || el;
+    const r = arena.getBoundingClientRect(); if (r.top >= -4 && r.bottom <= window.innerHeight + 4) return;
+    window.scrollTo({ top: Math.max(0, window.scrollY + r.top - 12), behavior: "smooth" });
+  }, []);
+
   // ── Watch for new rounds → fire SFX + 3D anims ────────────────────────────
   useEffect(() => {
     const prevCount = prevRoundCountRef.current;
@@ -251,6 +261,7 @@ function ActiveMatchView({
     // One or more new rounds since last render. Process the most recent one.
     const newest = match.roundHistory[currCount - 1];
     if (newest) {
+      showScene();
       const wasMine = newest.attackerSide === mySide;
       const moveObj = findMove(newest.attackerFaction, newest.moveId);
       const animForAction = moveToAnim(moveObj);
@@ -517,7 +528,7 @@ function ActiveMatchView({
       {/* Wrap BattleScene so we can shake + red-pulse the entire fight area
           when the local player is bled. The .fw-spelled-me class is injected
           via the keyframe useEffect above. */}
-      <div className={theySpelledMe ? "fw-spelled-me" : undefined}>
+      <div ref={sceneRef} className={theySpelledMe ? "fw-spelled-me" : undefined}>
         <FactionWarsBattleScene
           state={battleSceneState}
           actions={inertActions}
@@ -612,14 +623,14 @@ function ActiveMatchView({
                 </button>
               )}
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))", gap: 8, marginBottom: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 150px), 1fr))", gap: 6, marginBottom: 12 }}>
               {myMoves.map((mv) => {
                 const tColor = moveTypeColor[mv.type] || "rgba(255,255,255,0.6)";
                 const disabled = !isMyTurn || busy;
                 return (
                   <button
                     key={mv.id}
-                    onClick={() => { try { sfx.cardSelect(); } catch {} onSubmitMove(mv.id); }}
+                    onClick={() => { try { sfx.cardSelect(); } catch {} onSubmitMove(mv.id); showScene(); }}
                     disabled={disabled}
                     style={{
                       background: "rgba(0,0,0,0.4)",

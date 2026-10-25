@@ -218,7 +218,7 @@ export function FactionWarsBattleScene({ state, actions, enableHealing = true, s
     if (document.getElementById(id)) return;
     const styleEl = document.createElement("style");
     styleEl.id = id;
-    styleEl.textContent = "@media (max-width: 600px) { .fw-move-grid { grid-template-columns: 1fr !important; } }";
+    styleEl.textContent = "@media (max-width: 600px) { .fw-move-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }";
     document.head.appendChild(styleEl);
   }, []);
 
@@ -298,7 +298,7 @@ export function FactionWarsBattleScene({ state, actions, enableHealing = true, s
           {battleAnim==="win" && <div style={{ position:"absolute", inset:0, background:"rgba(52,211,153,0.08)", zIndex:2, pointerEvents:"none" }} />}
           {battleAnim==="lose" && <div style={{ position:"absolute", inset:0, background:"rgba(239,68,68,0.08)", zIndex:2, pointerEvents:"none" }} />}
 
-          <div style={{ position:"relative", zIndex:1, padding:"24px 20px 20px" }}>
+          <div style={{ position:"relative", zIndex:1, padding:"12px 12px 14px" }}>
 
             {/* Characters — shared 3D arena (presentation only; see components/FactionWarsArena.tsx) */}
             <FactionWarsArena
@@ -307,6 +307,7 @@ export function FactionWarsBattleScene({ state, actions, enableHealing = true, s
               battleAnim={battleAnim}
               preload={[...team, ...defenders]}
               title={`TERRITORY ${currentTerritory+1} · ${currentDefenderFD.name.toUpperCase()}\u2019S HOLD`}
+              height="clamp(220px, min(44vw, calc(100vh - 360px)), 420px)"
             />
 
             {/* ── HP BARS ── MK Style ───────────────────────── */}

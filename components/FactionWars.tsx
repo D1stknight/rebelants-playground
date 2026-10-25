@@ -484,7 +484,7 @@ export default function FactionWars() {
     if (document.getElementById(id)) return;
     const styleEl = document.createElement("style");
     styleEl.id = id;
-    styleEl.textContent = "@media (max-width: 600px) { .fw-move-grid { grid-template-columns: 1fr !important; } }";
+    styleEl.textContent = "@media (max-width: 600px) { .fw-move-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }";
     document.head.appendChild(styleEl);
   }, []);
 
@@ -624,6 +624,13 @@ const [player3DAnim, setPlayer3DAnim] = useState<SamuraiAnimState>("idle");
 const plunderPendingRef = useRef(false);
 const fightSeqRef = useRef(0);
 const fightInFlightRef = useRef(false);
+// the arena + moves block: kept on screen while a round plays (no scrolling between picking a move and watching it)
+const stageRef = useRef<HTMLDivElement>(null);
+const showStage = useCallback(() => {
+  const el = stageRef.current; if (!el || typeof window === "undefined") return;
+  const r = el.getBoundingClientRect(); if (r.top >= -4 && r.top <= Math.max(80, window.innerHeight * 0.2)) return;
+  window.scrollTo({ top: Math.max(0, window.scrollY + r.top - 8), behavior: "smooth" });
+}, []);
   const [usedMoves, setUsedMoves] = useState<Record<string,number>>({});
   const [sacrificeBonus, setSacrificeBonus] = useState(0);
   const [berserkerActive, setBerserkerActive] = useState(false);
@@ -776,6 +783,7 @@ setPhase("battle"); startMusic(); setBusy(false);
 
  const fightTerritory = async () => {
   if (!selectedMove || busy || fightInFlightRef.current) return;
+  showStage();
   if (solo.session && !solo.session.abandoned) {
     fightInFlightRef.current = true; setBusy(true); setBattleAnim("clash"); sfx.clash();
     const chosen = selectedMove;
@@ -1504,7 +1512,7 @@ setPlayerHp(MAX_HP); setEnemyHp(MAX_HP); setCurrentRound(0); setRoundLog([]); se
             </div>
 
             {/* MAIN BATTLE ARENA */}
-            <div style={{ position:"relative", borderRadius:18, overflow:"hidden", marginBottom:16, border:"1px solid rgba(255,255,255,0.1)" }}>
+            <div ref={stageRef} style={{ position:"relative", borderRadius:18, overflow:"hidden", marginBottom:16, border:"1px solid rgba(255,255,255,0.1)", scrollMarginTop:8 }}>
 
               {/* Plunder REBEL float — centered over arena */}
               {dmgFloats.filter(f=>f.side==="plunder").map(f=>(
@@ -1520,7 +1528,7 @@ setPlayerHp(MAX_HP); setEnemyHp(MAX_HP); setCurrentRound(0); setRoundLog([]); se
               {battleAnim==="win" && <div style={{ position:"absolute", inset:0, background:"rgba(52,211,153,0.08)", zIndex:2, pointerEvents:"none" }} />}
               {battleAnim==="lose" && <div style={{ position:"absolute", inset:0, background:"rgba(239,68,68,0.08)", zIndex:2, pointerEvents:"none" }} />}
 
-              <div style={{ position:"relative", zIndex:1, padding:"24px 20px 20px" }}>
+              <div style={{ position:"relative", zIndex:1, padding:"12px 12px 14px" }}>
 
                 {/* Characters — shared 3D arena (presentation only; see components/FactionWarsArena.tsx) */}
                 <FactionWarsArena
@@ -1531,6 +1539,7 @@ setPlayerHp(MAX_HP); setEnemyHp(MAX_HP); setCurrentRound(0); setRoundLog([]); se
                   title={`TERRITORY ${currentTerritory+1} · ${currentDefenderFD.name.toUpperCase()}\u2019S HOLD`}
                   finisherChoice
                   sfx={sfx}
+                  height="clamp(220px, min(44vw, calc(100vh - 360px)), 420px)"
                 />
 
                 {/* ── HP BARS ── MK Style ───────────────────────── */}
@@ -1577,6 +1586,102 @@ setPlayerHp(MAX_HP); setEnemyHp(MAX_HP); setCurrentRound(0); setRoundLog([]); se
                   </div>
                 </div>
 
+                {/* Move selector */}
+                <div style={{ borderTop:"1px solid rgba(255,255,255,0.08)", paddingTop:10, marginBottom:12 }}>
+                  <div style={{ fontSize:11, fontWeight:800, marginBottom:7, opacity:0.7, letterSpacing:"0.04em" }}>
+                    ⚔️ CHOOSE {currentPlayerFD.name.toUpperCase()}'S MOVE
+                  </div>
+                  <div className="fw-move-grid" style={{ display:"grid", gridTemplateColumns: "repeat(auto-fit, minmax(128px, 1fr))", gap:6 }}>
+                  {currentPlayerFD.moves.map(m=>{
+                    const tc: Record<string,string> = { attack:"#f87171", defend:"#34d399", magic:"#c084fc", trick:"#fbbf24" };
+                    const isSel = selectedMove?.id===m.id;
+                    const timesUsedM = usedMoves[m.id] || 0;
+                    const degradedPow = Math.max(1, m.power - timesUsedM);
+                    const isExhausted = (m.oneTime && oneTimeUsed.includes(m.id)) || (berserkerActive && m.type === "defend");
+                    return (
+                      <button key={m.id} title={m.id === "plunder" ? `+${fwPlunderBonus} REBEL if win` : m.desc} onClick={()=>!busy&&!isExhausted&&setSelectedMove(m)} disabled={busy||isExhausted}
+                        style={{ display:"flex", flexDirection:"column", gap:3, padding:"8px 9px", borderRadius:10, textAlign:"left",
+                          border:`2px solid ${isExhausted?"rgba(255,255,255,0.04)":isSel ? currentPlayerFD.borderColor : "rgba(255,255,255,0.08)"}`,
+                          background: isExhausted ? "rgba(0,0,0,0.2)" : isSel ? currentPlayerFD.bgColor : "rgba(255,255,255,0.03)",
+                          cursor: busy||isExhausted?"not-allowed":"pointer", opacity: isExhausted ? 0.4 : 1,
+                          boxShadow: isSel ? `0 0 16px ${currentPlayerFD.color}44` : "none",
+                          transform: isSel ? "scale(1.01)" : "scale(1)", transition:"all 0.18s" }}>
+                        {/* Row 1: emoji + name · Row 2: type + power */}
+                        <div style={{ display:"flex", alignItems:"center", gap:5, minWidth:0 }}>
+                          <span style={{ fontSize:15, flexShrink:0 }}>{m.emoji}</span>
+                          <span style={{ fontWeight:900, fontSize:11, lineHeight:1.15, overflow:"hidden", display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical", flex:1, minWidth:0 }}>{m.label}</span>
+                        </div>
+                        <div style={{ display:"flex", alignItems:"center", gap:5, minWidth:0 }}>
+                          <span style={{ fontSize:8, background:tc[m.type], color:"#000", borderRadius:3, padding:"1px 4px", fontWeight:900, flexShrink:0 }}>{m.type.toUpperCase()}</span>
+                          <span style={{ flex:1 }} />
+                          <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:2, flexShrink:0 }}>
+                            <span style={{ fontSize:11, fontWeight:900, color: isExhausted?"#666": isSel ? currentPlayerFD.color : "rgba(255,255,255,0.7)", lineHeight:1 }}>
+                              {isExhausted ? "✗" : <>{degradedPow}<span style={{fontSize:8,opacity:0.45}}>/{m.power}</span>{timesUsedM > 0 && <span style={{fontSize:8,color:"#f87171"}}>↓</span>}</>}
+                            </span>
+                            <div style={{ width:28, height:3, borderRadius:2, background:"rgba(255,255,255,0.1)", overflow:"hidden" }}>
+                              <div style={{ height:"100%", borderRadius:2, background:tc[m.type], width:`${Math.round(degradedPow/m.power*100)}%`, transition:"width 0.3s" }} />
+                            </div>
+                          </div>
+                        </div>
+                        {/* Badges */}
+                        {(m.oneTime || isExhausted) && (
+                          <div style={{ display:"flex", gap:3 }}>
+                            {m.oneTime && !isExhausted && <span style={{ fontSize:8, background:"rgba(251,191,36,0.2)", color:"#fbbf24", borderRadius:3, padding:"1px 4px", fontWeight:900, border:"1px solid rgba(251,191,36,0.3)" }}>1× ONLY</span>}
+                            {isExhausted && !berserkerActive && <span style={{ fontSize:8, background:"rgba(255,255,255,0.1)", color:"#666", borderRadius:3, padding:"1px 4px", fontWeight:900 }}>USED</span>}
+                            {isExhausted && berserkerActive && m.type==="defend" && <span style={{ fontSize:8, background:"rgba(251,100,36,0.25)", color:"#f87171", borderRadius:3, padding:"1px 4px", fontWeight:900 }}>🔥BERSERK</span>}
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                  </div>
+
+                  <div style={{ fontSize:10, opacity:0.6, margin:"7px 2px 0", minHeight:13, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                    {selectedMove ? <><b style={{ opacity:0.9 }}>{selectedMove.label}:</b> {selectedMove.id === "plunder" ? `+${fwPlunderBonus} REBEL if win` : selectedMove.desc}</> : "Pick a move, then strike. The fight plays out above."}
+                  </div>
+                  <div style={{ display:"flex", gap:8, marginTop:8, alignItems:"stretch", flexWrap:"wrap" }}>
+                  <button onClick={fightTerritory} disabled={!selectedMove||busy||!!solo.session&&(solo.busy||solo.uncertain)}
+                    style={{ flex:"1 1 220px", minWidth:0, padding:"12px 18px", borderRadius:12, border:"none",
+                      cursor:!selectedMove||busy?"not-allowed":"pointer",
+                      background:selectedMove?"linear-gradient(135deg,#fbbf24,#f59e0b)":"rgba(255,255,255,0.06)",
+                      color:selectedMove?"#000":"white", fontWeight:900, fontSize:15,
+                      opacity:!selectedMove?0.45:1, transition:"all 0.2s",
+                      boxShadow:selectedMove?"0 4px 24px rgba(251,191,36,0.4)":"none",
+                      transform:selectedMove?"translateY(-1px)":"none" }}>
+                    {busy?"⚔️ Fighting...":selectedMove?`⚔️ Strike with ${selectedMove.label}!`:"← Select a move above"}
+                  </button>
+                {/* Healing Potion button */}
+                {(() => {
+                  const healCost = Number(cfg?.factionWarsHealCost ?? 25);
+                  const healAmt  = Number(cfg?.factionWarsHealAmt  ?? 30);
+                  return (
+                    <div style={{ display:"flex", flex:"0 1 auto", marginLeft:"auto" }}>
+                      <button
+                        onClick={async()=>{
+                          const maxHeals = Number(cfg?.factionWarsHealMax??2);
+                          if (healBusy||busy||playerHp>=MAX_HP||healUsed>=maxHeals) return;
+                          if (balance < healCost) return;
+                          setHealBusy(true);
+                          try {
+                            if (solo.session && !solo.session.abandoned) applySolo(await solo.act({ kind: "HEAL" }, healCost));
+                            else { await spend(healCost,"faction-wars-heal"); const newHp=Math.min(MAX_HP,playerHp+healAmt); setPlayerHp(newHp); setHealUsed(n=>n+1); }
+                            await refresh();
+                          } catch (error) { setRunMessage((error as Error).message); }
+                          setHealBusy(false);
+                        }}
+                        disabled={healBusy||busy||!!solo.session&&(solo.busy||solo.uncertain)||playerHp>=MAX_HP||balance<Number(cfg?.factionWarsHealCost??25)||healUsed>=Number(cfg?.factionWarsHealMax??2)}
+                        title={`Spend ${healCost} REBEL to restore ${healAmt} HP`}
+                        style={{ display:"flex", alignItems:"center", gap:6, padding:"6px 12px", height:"100%", borderRadius:12, border:"1px solid rgba(52,211,153,0.3)", background:"rgba(52,211,153,0.1)", color:"#34d399", fontSize:11, fontWeight:800, cursor:healBusy||busy||playerHp>=MAX_HP||balance<Number(cfg?.factionWarsHealCost??25)?"not-allowed":"pointer", opacity:healBusy||busy||playerHp>=MAX_HP||balance<Number(cfg?.factionWarsHealCost??25)?0.4:1 }}>
+                        🧪 Heal +{healAmt} HP
+                        <span style={{opacity:0.6,fontSize:10}}>(-{healCost} {currency})</span>
+                        <span style={{opacity:0.5,fontSize:9,marginLeft:4}}>({Math.max(0,Number(cfg?.factionWarsHealMax??2)-healUsed)} left)</span>
+                      </button>
+                    </div>
+                  );
+                })()}
+
+                  </div>
+                </div>
                 {/* Active buff indicators */}
                 {(powerBuffRounds > 0 || comboBonus > 0 || commandActive || meditationStacks > 0) && (
                   <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:8, justifyContent:"center" }}>
@@ -1631,98 +1736,6 @@ setPlayerHp(MAX_HP); setEnemyHp(MAX_HP); setCurrentRound(0); setRoundLog([]); se
                   )}
                 </div>
 
-                {/* Healing Potion button */}
-                {(() => {
-                  const healCost = Number(cfg?.factionWarsHealCost ?? 25);
-                  const healAmt  = Number(cfg?.factionWarsHealAmt  ?? 30);
-                  return (
-                    <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:8 }}>
-                      <button
-                        onClick={async()=>{
-                          const maxHeals = Number(cfg?.factionWarsHealMax??2);
-                          if (healBusy||busy||playerHp>=MAX_HP||healUsed>=maxHeals) return;
-                          if (balance < healCost) return;
-                          setHealBusy(true);
-                          try {
-                            if (solo.session && !solo.session.abandoned) applySolo(await solo.act({ kind: "HEAL" }, healCost));
-                            else { await spend(healCost,"faction-wars-heal"); const newHp=Math.min(MAX_HP,playerHp+healAmt); setPlayerHp(newHp); setHealUsed(n=>n+1); }
-                            await refresh();
-                          } catch (error) { setRunMessage((error as Error).message); }
-                          setHealBusy(false);
-                        }}
-                        disabled={healBusy||busy||!!solo.session&&(solo.busy||solo.uncertain)||playerHp>=MAX_HP||balance<Number(cfg?.factionWarsHealCost??25)||healUsed>=Number(cfg?.factionWarsHealMax??2)}
-                        title={`Spend ${healCost} REBEL to restore ${healAmt} HP`}
-                        style={{ display:"flex", alignItems:"center", gap:6, padding:"6px 14px", borderRadius:20, border:"1px solid rgba(52,211,153,0.3)", background:"rgba(52,211,153,0.1)", color:"#34d399", fontSize:11, fontWeight:800, cursor:healBusy||busy||playerHp>=MAX_HP||balance<Number(cfg?.factionWarsHealCost??25)?"not-allowed":"pointer", opacity:healBusy||busy||playerHp>=MAX_HP||balance<Number(cfg?.factionWarsHealCost??25)?0.4:1 }}>
-                        🧪 Heal +{healAmt} HP
-                        <span style={{opacity:0.6,fontSize:10}}>(-{healCost} {currency})</span>
-                        <span style={{opacity:0.5,fontSize:9,marginLeft:4}}>({Math.max(0,Number(cfg?.factionWarsHealMax??2)-healUsed)} left)</span>
-                      </button>
-                    </div>
-                  );
-                })()}
-
-                {/* Move selector */}
-                <div style={{ borderTop:"1px solid rgba(255,255,255,0.08)", paddingTop:16 }}>
-                  <div style={{ fontSize:12, fontWeight:800, marginBottom:10, opacity:0.7, letterSpacing:"0.04em" }}>
-                    ⚔️ CHOOSE {currentPlayerFD.name.toUpperCase()}'S MOVE
-                  </div>
-                  <div className="fw-move-grid" style={{ display:"grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap:8 }}>
-                  {currentPlayerFD.moves.map(m=>{
-                    const tc: Record<string,string> = { attack:"#f87171", defend:"#34d399", magic:"#c084fc", trick:"#fbbf24" };
-                    const isSel = selectedMove?.id===m.id;
-                    const timesUsedM = usedMoves[m.id] || 0;
-                    const degradedPow = Math.max(1, m.power - timesUsedM);
-                    const isExhausted = (m.oneTime && oneTimeUsed.includes(m.id)) || (berserkerActive && m.type === "defend");
-                    return (
-                      <button key={m.id} onClick={()=>!busy&&!isExhausted&&setSelectedMove(m)} disabled={busy||isExhausted}
-                        style={{ display:"flex", flexDirection:"column", gap:4, padding:"10px 10px", borderRadius:10, textAlign:"left",
-                          border:`2px solid ${isExhausted?"rgba(255,255,255,0.04)":isSel ? currentPlayerFD.borderColor : "rgba(255,255,255,0.08)"}`,
-                          background: isExhausted ? "rgba(0,0,0,0.2)" : isSel ? currentPlayerFD.bgColor : "rgba(255,255,255,0.03)",
-                          cursor: busy||isExhausted?"not-allowed":"pointer", opacity: isExhausted ? 0.4 : 1,
-                          boxShadow: isSel ? `0 0 16px ${currentPlayerFD.color}44` : "none",
-                          transform: isSel ? "scale(1.01)" : "scale(1)", transition:"all 0.18s" }}>
-                        {/* Top row: emoji + name + type + power */}
-                        <div style={{ display:"flex", alignItems:"center", gap:5, minWidth:0 }}>
-                          <span style={{ fontSize:15, flexShrink:0 }}>{m.emoji}</span>
-                          <span style={{ fontWeight:900, fontSize:11, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", flex:1, minWidth:0 }}>{m.label}</span>
-                          <span style={{ fontSize:8, background:tc[m.type], color:"#000", borderRadius:3, padding:"1px 4px", fontWeight:900, flexShrink:0 }}>{m.type.toUpperCase()}</span>
-                          <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:2, flexShrink:0 }}>
-                            <span style={{ fontSize:11, fontWeight:900, color: isExhausted?"#666": isSel ? currentPlayerFD.color : "rgba(255,255,255,0.7)", lineHeight:1 }}>
-                              {isExhausted ? "✗" : <>{degradedPow}<span style={{fontSize:8,opacity:0.45}}>/{m.power}</span>{timesUsedM > 0 && <span style={{fontSize:8,color:"#f87171"}}>↓</span>}</>}
-                            </span>
-                            <div style={{ width:28, height:3, borderRadius:2, background:"rgba(255,255,255,0.1)", overflow:"hidden" }}>
-                              <div style={{ height:"100%", borderRadius:2, background:tc[m.type], width:`${Math.round(degradedPow/m.power*100)}%`, transition:"width 0.3s" }} />
-                            </div>
-                          </div>
-                        </div>
-                        {/* Badges */}
-                        {(m.oneTime || isExhausted) && (
-                          <div style={{ display:"flex", gap:3 }}>
-                            {m.oneTime && !isExhausted && <span style={{ fontSize:8, background:"rgba(251,191,36,0.2)", color:"#fbbf24", borderRadius:3, padding:"1px 4px", fontWeight:900, border:"1px solid rgba(251,191,36,0.3)" }}>1× ONLY</span>}
-                            {isExhausted && !berserkerActive && <span style={{ fontSize:8, background:"rgba(255,255,255,0.1)", color:"#666", borderRadius:3, padding:"1px 4px", fontWeight:900 }}>USED</span>}
-                            {isExhausted && berserkerActive && m.type==="defend" && <span style={{ fontSize:8, background:"rgba(251,100,36,0.25)", color:"#f87171", borderRadius:3, padding:"1px 4px", fontWeight:900 }}>🔥BERSERK</span>}
-                          </div>
-                        )}
-                        {/* Description */}
-                        <div style={{ fontSize:10, opacity:0.55, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                          {m.id === "plunder" ? `+${fwPlunderBonus} REBEL if win` : m.desc}
-                        </div>
-                      </button>
-                    );
-                  })}
-                  </div>
-
-                  <button onClick={fightTerritory} disabled={!selectedMove||busy||!!solo.session&&(solo.busy||solo.uncertain)}
-                    style={{ marginTop:14, padding:"14px 24px", borderRadius:12, border:"none",
-                      cursor:!selectedMove||busy?"not-allowed":"pointer",
-                      background:selectedMove?"linear-gradient(135deg,#fbbf24,#f59e0b)":"rgba(255,255,255,0.06)",
-                      color:selectedMove?"#000":"white", fontWeight:900, fontSize:15,
-                      opacity:!selectedMove?0.45:1, width:"100%", transition:"all 0.2s",
-                      boxShadow:selectedMove?"0 4px 24px rgba(251,191,36,0.4)":"none",
-                      transform:selectedMove?"translateY(-1px)":"none" }}>
-                    {busy?"⚔️ Fighting...":selectedMove?`⚔️ Strike with ${selectedMove.label}!`:"← Select a move above"}
-                  </button>
-                </div>
               </div>
             </div>
           </div>

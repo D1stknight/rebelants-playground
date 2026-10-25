@@ -18,10 +18,17 @@ type PoseName = "open" | "relaxed" | "fist" | "grip";
 const POSE: Record<PoseName, Record<F5, [number, number, number]>> = {
   open: { Index: [4, 6, 4], Middle: [4, 6, 4], Ring: [4, 6, 4], Pinky: [4, 6, 4], Thumb: [0, 4, 4] },
   relaxed: { Index: [14, 22, 14], Middle: [18, 26, 16], Ring: [22, 30, 18], Pinky: [26, 34, 20], Thumb: [10, 10, 10] },
-  fist: { Index: [88, 95, 50], Middle: [90, 95, 50], Ring: [90, 95, 50], Pinky: [90, 95, 50], Thumb: [37, 25, 30] },
-  grip: { Index: [62, 78, 40], Middle: [68, 80, 42], Ring: [72, 82, 42], Pinky: [76, 84, 42], Thumb: [30, 20, 24] },
+  fist: { Index: [88, 95, 50], Middle: [90, 95, 50], Ring: [90, 95, 50], Pinky: [90, 95, 50], Thumb: [0, 38, 30] },
+  grip: { Index: [62, 78, 40], Middle: [68, 80, 42], Ring: [72, 82, 42], Pinky: [76, 84, 42], Thumb: [0, 30, 25] },
 };
 const D2R = Math.PI / 180;
+// the thumb's knuckle direction per pose (right hand): a fist lays it across the index finger's middle segment,
+// a grip wraps it round the handle opposite the fingers (Universe glove: same idea as handswap's thumb opposition)
+const THUMB_DIR: Record<PoseName, [number, number, number]> = {
+  open: [0.85, 0.48, -0.4], relaxed: [0.85, 0.36, -0.42], fist: [0.88, 0.04, -0.48], grip: [0.75, -0.02, -0.66],
+};
+// which way the thumb's outer segments curl (toward the palm when open, across the fingers in a fist)
+const THUMB_BEND: Record<PoseName, [number, number, number]> = { open: [0, -0.3, -1], relaxed: [0, -0.4, -1], fist: [0, -1, -0.35], grip: [0, -1, -0.25] };
 
 /** glove + cuff colours per faction (the armour palettes) */
 export const GLOVE_COLORS: Record<string, [string, string]> = {
@@ -44,7 +51,7 @@ export class Glove {
   knuckles = new THREE.Vector3();
   private mats: THREE.Material[] = [];
 
-  constructor(side: "L" | "R", L: number, gloveColor: string, cuffColor: string) {
+  constructor(side: "L" | "R", L: number, gloveColor: string, cuffColor: string, cuffK = 1) {
     this.side = side; this.L = L;
     const my = side === "L" ? -1 : 1;
     const gm = new THREE.MeshStandardMaterial({ color: gloveColor, roughness: 0.62, metalness: 0.05 });
@@ -56,8 +63,8 @@ export class Glove {
       const g = new THREE.SphereGeometry(1, 20, 14); g.scale(s[0], s[1], s[2]); g.translate(c[0], c[1] * my, c[2]); add(g, gm, this.root);
     }
     // cuff: an oval tube reaching back into the sleeve
-    { const g = new THREE.CapsuleGeometry(0.13, 0.17, 6, 18); g.rotateZ(Math.PI / 2); g.scale(1, 0.17 / 0.13, 1); g.translate(-0.135, 0, 0); add(g, cm, this.root);
-      const band = new THREE.TorusGeometry(0.15, 0.025, 8, 24); band.rotateY(Math.PI / 2); band.scale(1, 0.19 / 0.15, 0.15 / 0.15); band.translate(-0.01, 0, 0); add(band, cm, this.root); }
+    { const g = new THREE.CapsuleGeometry(0.13, 0.17, 6, 18); g.rotateZ(Math.PI / 2); g.scale(1, (0.17 / 0.13) * cuffK, cuffK); g.translate(-0.135, 0, 0); add(g, cm, this.root);
+      const band = new THREE.TorusGeometry(0.138, 0.02, 8, 24); band.rotateY(Math.PI / 2); band.scale(1, (0.172 / 0.138) * cuffK, cuffK); band.translate(-0.01, 0, 0); add(band, cm, this.root); }
     // fingers: three capsule segments on a joint chain
     for (const f of Object.keys(FINGERS) as F5[]) {
       const d = FINGERS[f]; const dir = new THREE.Vector3(d.d[0], d.d[1] * my, d.d[2]).normalize();
@@ -93,21 +100,31 @@ export class Glove {
     this.knuckles.copy(loc(mid[1])).lerp(loc(idx[1]), 0.5); this.knuckles.x += 0.04;
     this.setPose("relaxed");
   }
-  private apply(a: Record<F5, [number, number, number]>) {
+  private apply(a: Record<F5, [number, number, number]>, thumb?: [number, number, number], bend?: [number, number, number]) {
     for (const f of Object.keys(FINGERS) as F5[]) {
       const ch = this.joints[f]; const ax = this.axes[f];
+      if (f === "Thumb" && thumb) {
+        // aim the thumb's knuckle, then curl its two outer segments about the axis across its nail
+        const my = this.side === "L" ? -1 : 1; const d = new THREE.Vector3(thumb[0], thumb[1] * my, thumb[2]).normalize();
+        ch[0].quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), d);
+        const bd = new THREE.Vector3(bend![0], bend![1] * my, bend![2]); const axW = d.clone().cross(bd).normalize(); const axL = axW.applyQuaternion(ch[0].quaternion.clone().invert());
+        for (let i = 1; i < 3; i++) ch[i].quaternion.setFromAxisAngle(axL, a[f][i] * D2R);
+        continue;
+      }
       ch[0].quaternion.copy(this.base[f]).multiply(new THREE.Quaternion().setFromAxisAngle(ax, a[f][0] * D2R));
       for (let i = 1; i < 3; i++) ch[i].quaternion.setFromAxisAngle(ax, a[f][i] * D2R);
     }
   }
-  setPose(p: PoseName) { this.apply(POSE[p]); }
+  setPose(p: PoseName) { this.apply(POSE[p], THUMB_DIR[p], THUMB_BEND[p]); }
   /** 0 open … 0.5 relaxed … 1 fist; grip overrides */
   setCurl(fist: number, grip: boolean) {
-    if (grip) { this.apply(POSE.grip); return; }
-    const f = Math.max(0, Math.min(1, fist)); const [A, B, u] = f < 0.5 ? [POSE.open, POSE.relaxed, f * 2] : [POSE.relaxed, POSE.fist, (f - 0.5) * 2];
+    if (grip) { this.setPose("grip"); return; }
+    const f = Math.max(0, Math.min(1, fist)); const [pa, pb, u] = (f < 0.5 ? ["open", "relaxed", f * 2] : ["relaxed", "fist", (f - 0.5) * 2]) as [PoseName, PoseName, number];
+    const A = POSE[pa], B = POSE[pb], ta = THUMB_DIR[pa], tb = THUMB_DIR[pb], ba = THUMB_BEND[pa], bb = THUMB_BEND[pb];
     const out = {} as Record<F5, [number, number, number]>;
     for (const k of Object.keys(A) as F5[]) out[k] = [0, 1, 2].map((i) => A[k][i] + (B[k][i] - A[k][i]) * u) as [number, number, number];
-    this.apply(out);
+    const L3 = (x: number[], y: number[]) => [0, 1, 2].map((i) => x[i] + (y[i] - x[i]) * u) as [number, number, number];
+    this.apply(out, L3(ta, tb), L3(ba, bb));
   }
   /** put the wrist at `wrist`, fingers along X, thumb toward `thumb` (world vectors) */
   place(wrist: THREE.Vector3, X: THREE.Vector3, thumb: THREE.Vector3) {

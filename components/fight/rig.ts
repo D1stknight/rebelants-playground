@@ -18,6 +18,7 @@ export interface Pose {
   hL: Target; eL: Vec3; hR: Target; eR: Vec3;    // hand targets + elbow pole directions
   fL: Target; kL: Vec3; fR: Target; kR: Vec3;    // ankle targets + knee pole directions
   ftLy: number; ftLp: number; ftRy: number; ftRp: number; // foot yaw / toe point
+  kick?: "instep" | "ball";                       // a striking foot: instep (toes pointed along the shin, top of the foot to the target) or ball (toes pulled back, sole to the target)
   fist: number;                                   // 0 open … 1 closed
   wR: Vec3; uR: Vec3; wL: Vec3; uL: Vec3;        // weapon blade direction + edge-up direction per hand (fighter space)
   look: number;                                   // 0 … 1: the head turns to face the opponent's head
@@ -36,6 +37,14 @@ const _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion();
 
 function wpos(o: THREE.Object3D, out = V()) { return o.getWorldPosition(out); }
 function wquat(o: THREE.Object3D, out = new THREE.Quaternion()) { return o.getWorldQuaternion(out); }
+/** world rotation that turns bone-local axes a (main) / b (secondary) onto world directions A / B */
+function basisQuat(a: THREE.Vector3, b: THREE.Vector3, A: THREE.Vector3, B: THREE.Vector3) {
+  const m1 = new THREE.Matrix4(), m2 = new THREE.Matrix4();
+  const x1 = a.clone().normalize(), z1 = x1.clone().cross(b).normalize(), y1 = z1.clone().cross(x1);
+  const x2 = A.clone().normalize(), z2 = x2.clone().cross(B).normalize(), y2 = z2.clone().cross(x2);
+  m1.makeBasis(x1, y1, z1); m2.makeBasis(x2, y2, z2);
+  return new THREE.Quaternion().setFromRotationMatrix(m2.multiply(m1.transpose()));
+}
 function setWorldQuat(bone: THREE.Object3D, qw: THREE.Quaternion) {
   bone.parent!.updateWorldMatrix(true, false);
   const pinv = wquat(bone.parent!, _qa).invert();
@@ -74,7 +83,7 @@ function ik2(A: THREE.Object3D, B: THREE.Object3D, C: THREE.Object3D, t: THREE.V
 // reference proportions (Kenshi, in body space after grounding) that every pose is authored against
 const REF = { hipY: 1.144, shY: 1.585, shZ: -0.08, arm: 0.546, leg: 0.94, ankleY: 0.15, headY: 1.74 };
 
-export interface Calib { hipY: number; hipZ: number; shX: number; shY: number; shZ: number; hipX: number; arm: number; leg: number; ankleY: number; headY: number; armK: number; legK: number }
+export interface Calib { hipY: number; hipZ: number; shX: number; shY: number; shZ: number; hipX: number; arm: number; leg: number; ankleY: number; headY: number; armK: number; legK: number; handLen: number; handW: number; wristR: number; handColor?: string }
 
 export class Rig {
   side: -1 | 1;
@@ -86,6 +95,7 @@ export class Rig {
   mats: THREE.MeshStandardMaterial[] = [];
   cal!: Calib;
   footRest!: { L: THREE.Quaternion; R: THREE.Quaternion };
+  footAxes: Record<"L" | "R", { toe: THREE.Vector3; top: THREE.Vector3 }> = { L: { toe: V(0, 0, 1), top: V(0, 1, 0) }, R: { toe: V(0, 0, 1), top: V(0, 1, 0) } };
   opp: Rig | null = null;
   baseX: number;
   faceYaw: number;
@@ -127,19 +137,29 @@ export class Rig {
     const p = (n: string) => this.body.worldToLocal(wpos(this.b[n]));
     const hips = p("Hips"), sh = p("LeftArm"), fa = p("LeftForeArm"), hand = p("LeftHand"), ul = p("LeftUpLeg"), lg = p("LeftLeg"), ft = p("LeftFoot"), hd = p("Head");
     const arm = sh.distanceTo(fa) + fa.distanceTo(hand), leg = ul.distanceTo(lg) + lg.distanceTo(ft);
-    this.cal = { hipY: hips.y, hipZ: hips.z, shX: Math.abs(sh.x), shY: sh.y, shZ: sh.z, hipX: Math.abs(ul.x), arm, leg, ankleY: ft.y, headY: hd.y, armK: arm / REF.arm, legK: leg / REF.leg };
+    this.cal = { hipY: hips.y, hipZ: hips.z, shX: Math.abs(sh.x), shY: sh.y, shZ: sh.z, hipX: Math.abs(ul.x), arm, leg, ankleY: ft.y, headY: hd.y, armK: arm / REF.arm, legK: leg / REF.leg, handLen: 0, handW: 0, wristR: 0 };
     // the hand's own frame (fingers / thumb) in the Hand bone's space, and the face's forward in the Head's
     for (const s of ["L", "R"] as const) {
       const n = s === "L" ? "Left" : "Right"; const hb = this.b[n + "Hand"]; if (!hb) continue;
       const inv = wquat(hb).invert(); const w = wpos(hb);
       const idx = this.b[n + "HandIndex1"], th = this.b[n + "HandThumb1"];
       const F = idx ? wpos(idx).sub(w) : w.clone().sub(wpos(this.b[n + "ForeArm"]));
-      const T = th ? wpos(th).sub(w) : V(0, 1, 0);
-      this.handLocal[s] = { F: F.normalize().applyQuaternion(inv), T: T.normalize().applyQuaternion(inv) };
+      const T = th ? wpos(th).sub(w) : null;
+      // no thumb bone (Ashigaru): Mixamo hands keep the thumb on the Hand bone's -X (left) / +X (right)
+      this.handLocal[s] = { F: F.normalize().applyQuaternion(inv), T: T ? T.normalize().applyQuaternion(inv) : V(s === "L" ? -1 : 1, 0, 0) };
     }
+    this.measureHands();
     this.headFwd = V(0, 0, 1).applyQuaternion(wquat(this.b.Head).invert());
     const rq = wquat(this.root).invert();
     this.footRest = { L: rq.clone().multiply(wquat(this.b.LeftFoot)), R: rq.clone().multiply(wquat(this.b.RightFoot)) };
+    // the foot's toe and top directions in its own bone space (toe base if the rig has one, else straight ahead)
+    for (const s of ["L", "R"] as const) {
+      const n = s === "L" ? "Left" : "Right"; const fb = this.b[n + "Foot"], tb = this.b[n + "ToeBase"]; if (!fb) continue;
+      const inv = wquat(fb).invert(); const fwd = this.body.localToWorld(V(0, 0, 1)).sub(this.body.localToWorld(V()));
+      const toe = tb ? wpos(tb).sub(wpos(fb)) : fwd.clone(); toe.y *= 0.3; toe.normalize();
+      const top = V(0, 1, 0).addScaledVector(toe, -toe.y).normalize();
+      this.footAxes[s] = { toe: toe.applyQuaternion(inv.clone()), top: top.applyQuaternion(inv) };
+    }
     r.rotation.y = saveR; r.position.copy(saveP); r.updateMatrixWorld(true);
   }
 
@@ -276,6 +296,21 @@ export class Rig {
     ik2(b.RightUpLeg, b.RightLeg, b.RightFoot, footT.R, BD(P.kR));
     setWorldQuat(b.LeftFoot, bq.clone().multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(P.ftLp, P.ftLy, 0, "YXZ"))).multiply(this.footRest.L));
     setWorldQuat(b.RightFoot, bq.clone().multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(P.ftRp, P.ftRy, 0, "YXZ"))).multiply(this.footRest.R));
+    // feet off the floor point along the shin (no flat "standing" foot on a kicking or chambered leg); a striking foot is shaped by
+    // its kick: instep (toes along the shin, top of the foot to the target) or ball (toes pulled back, sole to the target)
+    for (const s of ["L", "R"] as const) {
+      const n = s === "L" ? "Left" : "Right"; const fb = b[n + "Foot"]; const ank = wpos(fb), knee = wpos(b[n + "Leg"]);
+      const ws = P.kick ? Math.min(1, s === "L" ? P.sFL : P.sFR) : 0; const part = s === "L" ? P.pFL : P.pFR;
+      const raise = Math.min(1, Math.max(0, (ank.y - this.cal.ankleY - 0.12) / 0.25)) * (Math.abs(P.tumble) < 0.5 ? 0.85 : 0.6);
+      const w = Math.max(ws > 0.01 && part ? ws : 0, raise); if (!(w > 0.01)) continue;
+      const shin = ank.clone().sub(knee).normalize();
+      const to = o2 ? o2.part(((ws > 0.01 && part) || "CHEST") as "HEAD").sub(ank).normalize() : V(0, 0, 1).applyQuaternion(bq);
+      let D: THREE.Vector3, U: THREE.Vector3;
+      if (P.kick === "ball" && ws > 0.01) { U = to.clone().negate(); D = V(0, 1, 0).addScaledVector(U, -U.y).normalize(); }
+      else { D = shin; U = to.clone().addScaledVector(D, -to.dot(D)); if (U.lengthSq() < 1e-4) U = V(0, 1, 0).addScaledVector(D, -D.y); U.normalize(); }
+      const ax = this.footAxes[s]; const qWant = basisQuat(ax.toe, ax.top, D, U);
+      setWorldQuat(fb, wquat(fb).slerp(qWant, w));
+    }
   }
 
   private fists(amount: number) {
@@ -294,6 +329,52 @@ export class Rig {
     }
   }
 
+  private texCache = new Map<any, { d: Uint8ClampedArray; w: number; h: number } | null>();
+  /** the sculpted texture's colour under one vertex (sRGB 0..255), read from a small copy of the material's map */
+  private texel(o: any, i: number): number[] | null {
+    const m = Array.isArray(o.material) ? o.material[0] : o.material; const map = m?.map, uv = o.geometry.attributes.uv; if (!map || !uv || typeof document === "undefined") return null;
+    let t = this.texCache.get(map);
+    if (t === undefined) {
+      t = null;
+      try { const img = map.image; if (img && (img.width || img.naturalWidth)) { const c = document.createElement("canvas"); c.width = 128; c.height = 128; const x = c.getContext("2d", { willReadFrequently: true })!; x.drawImage(img, 0, 0, 128, 128); t = { d: x.getImageData(0, 0, 128, 128).data, w: 128, h: 128 }; } } catch { t = null; }
+      this.texCache.set(map, t);
+    }
+    if (!t) return null;
+    let u = uv.getX(i), v = uv.getY(i); u -= Math.floor(u); v -= Math.floor(v); if (map.flipY) v = 1 - v;
+    const px = Math.min(t.w - 1, Math.floor(u * t.w)), py = Math.min(t.h - 1, Math.floor(v * t.h)); const k = (py * t.w + px) * 4;
+    return [t.d[k], t.d[k + 1], t.d[k + 2]];
+  }
+  /** the sculpted hands' size (wrist → fingertips, across the knuckles) and the wrist's radius, from the skinned vertices */
+  private measureHands() {
+    const ext = { len: [] as number[], w: [] as number[], r: [] as number[] };
+    const v = new THREE.Vector3();
+    for (const s of ["L", "R"] as const) {
+      const n = s === "L" ? "Left" : "Right"; const hb = this.b[n + "Hand"], fb = this.b[n + "ForeArm"]; if (!hb || !fb) continue;
+      const w = wpos(hb), q = wquat(hb), F = this.handLocal[s].F.clone().applyQuaternion(q).normalize();
+      const T = this.handLocal[s].T.clone().applyQuaternion(q); T.addScaledVector(F, -T.dot(F)).normalize();
+      let len = 0, tmin = 0, tmax = 0; const rr: number[] = [];
+      const cols: number[][] = [];
+      this.model.traverse((o: any) => {
+        if (!o.isSkinnedMesh) return; const sk = o.skeleton, si = o.geometry.attributes.skinIndex, sw = o.geometry.attributes.skinWeight, pos = o.geometry.attributes.position; if (!si || !pos) return;
+        const handIdx = new Set<number>(), faIdx = sk.bones.indexOf(fb);
+        sk.bones.forEach((bn: THREE.Bone, i: number) => { if (bn === hb || bn.name.replace(/^mixamorig[_:]?/, "").startsWith(n + "Hand")) handIdx.add(i); });
+        for (let i = 0; i < pos.count; i++) {
+          const ws = [sw.getX(i), sw.getY(i), sw.getZ(i), sw.getW(i)], is = [si.getX(i), si.getY(i), si.getZ(i), si.getW(i)]; let best = -1, bw = 0; for (let k = 0; k < 4; k++) if (ws[k] > bw) { bw = ws[k]; best = is[k]; }
+          if (!handIdx.has(best) && best !== faIdx) continue;
+          o.getVertexPosition(i, v); o.localToWorld(v); const d = v.clone().sub(w); const a = d.dot(F);
+          if (handIdx.has(best) && a > 0.04 && i % 3 === 0) { const px = this.texel(o, i); if (px) cols.push(px); }
+          if (handIdx.has(best)) { if (a > len) len = a; const t = d.dot(T); if (a > 0.02) { tmin = Math.min(tmin, t); tmax = Math.max(tmax, t); } }
+          else if (a > -0.06 && a < -0.01) rr.push(d.addScaledVector(F, -a).length());
+        }
+      });
+      if (len > 0.05) { ext.len.push(len); ext.w.push(tmax - tmin); }
+      if (cols.length > 20) { for (const c of [0, 1, 2]) { const v2 = cols.map((x) => x[c]).sort((x, y) => x - y); (ext as any)["c" + c] = ((ext as any)["c" + c] || []).concat([v2[v2.length >> 1]]); } }
+      if (rr.length) { rr.sort((x, y) => x - y); ext.r.push(rr[Math.floor(rr.length * 0.8)]); }
+    }
+    const avg = (a: number[], d: number) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : d);
+    const e2 = ext as any; if (e2.c0) this.cal.handColor = "#" + [e2.c0, e2.c1, e2.c2].map((a: number[]) => Math.round(avg(a, 0)).toString(16).padStart(2, "0")).join("");
+    this.cal.handLen = avg(ext.len, 0.19 * this.cal.armK); this.cal.handW = avg(ext.w, 0.09 * this.cal.armK); this.cal.wristR = avg(ext.r, 0.045 * this.cal.armK);
+  }
   hand(s: "L" | "R") { return wpos(this.b[s === "L" ? "LeftHand" : "RightHand"]); }
   gloved = false;
   feet: Record<"L" | "R", { plant: THREE.Vector3 | null; step: { from: THREE.Vector3; to: THREE.Vector3; t: number; dur: number } | null }> = { L: { plant: null, step: null }, R: { plant: null, step: null } };
