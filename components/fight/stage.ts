@@ -6,6 +6,7 @@ import { Rig, type Pose, type ResolvedPose, type Vec3 } from "./rig";
 import { ACTIONS, ATTACKS, EASE, POSES, P, TRICKS, mirror, mirrorLimb, type ActionDef, type Ev, type Key, type Limb, type WeaponId } from "./moves";
 import { FxSystem } from "./fx";
 import { makeWeapon, placeWeapon, weaponTip } from "./weapons";
+import { Glove, GLOVE_COLORS } from "./glove";
 
 export type Side = "player" | "enemy";
 export type FWAnim = "idle" | "attack" | "magic" | "trick" | "defend" | "hit" | "win" | "lose";
@@ -13,7 +14,12 @@ const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 
 function lerpR(a: ResolvedPose, b: ResolvedPose, u: number): ResolvedPose {
   const o: any = {};
-  for (const k in a) { const x = (a as any)[k], y = (b as any)[k]; o[k] = Array.isArray(x) ? x.map((v: number, i: number) => v + (y[i] - v) * u) : x + (y - x) * u; }
+  for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
+    const x = (a as any)[k], y = (b as any)[k];
+    if (typeof x === "number" && typeof y === "number") o[k] = x + (y - x) * u;
+    else if (Array.isArray(x) && Array.isArray(y)) o[k] = x.map((v: number, i: number) => v + (y[i] - v) * u);
+    else o[k] = u < 0.5 ? (x ?? y) : (y ?? x);   // strings / booleans / missing: the nearer key's, else whichever exists
+  }
   return o;
 }
 const poseOf = (p: Key["p"]): Pose => (typeof p === "string" ? POSES[p] || POSES.stance : P(p));
@@ -26,10 +32,19 @@ export class Fighter {
   flash = 0; shake = 0; state: "fight" | "ko" | "finishing" | "done" = "fight";
   look: "none" | "stone" | "gold" | "char" | "glow" = "none"; lookK = 0; lookColor = "#fff"; opacity = 1;
   extra = new THREE.Group();     // props that move with the fighter
-  constructor(rig: Rig, side: Side, faction: string, color: string) {
+  gloves: Record<"R" | "L", Glove>;
+  constructor(rig: Rig, side: Side, faction: string, color: string, props: THREE.Object3D) {
     this.rig = rig; this.side = side; this.faction = faction; this.color = color; this.mirrored = side === "enemy";
     rig.root.add(this.extra);
+    // Universe gloves: the sculpted hands shrink into the cuffs, five-finger gloves grip the weapons
+    const [gc, cc] = GLOVE_COLORS[faction] || ["#2a2a30", color];
+    const L = 0.2 * rig.cal.armK;
+    this.gloves = { R: new Glove("R", L, gc, cc), L: new Glove("L", L, gc, cc) };
+    props.add(this.gloves.R.root, this.gloves.L.root);
+    rig.hideHands();
+    rig.strikeInset = (this.gloves.R.knuckles.x) * L;
   }
+  disposeGloves(props: THREE.Object3D) { for (const g of [this.gloves.R, this.gloves.L]) { props.remove(g.root); g.dispose(); } }
   get acting() { return this.act?.def.name; }
   get offensive() { return !!this.act?.def.offensive && this.act.t < this.lastKeyT(this.act.def); }
   lastKeyT(d: ActionDef) { return d.keys[d.keys.length - 1].t; }
@@ -64,17 +79,71 @@ export class Fighter {
     const h = this.mirrored ? (hand === "R" ? "L" : "R") : hand;
     const cur = this.weapons[h]; if (cur) { parent.remove(cur.obj); disposeTree(cur.obj); delete this.weapons[h]; }
     if (id) { const obj = makeWeapon(id, this.color); parent.add(obj); this.weapons[h] = { id, obj }; }
+    this.rig.gripOff[h] = id ? ((this.weapons[h]!.obj.userData.grip2 as number) ?? -0.14) : -0.14;
   }
-  placeWeapons() {
-    const P = this.rig.last; if (!P) return;
+  /** gloves on the wrists; a weapon hand closes round its handle, a support hand finds the same handle, free hands follow the fist value */
+  placeHands() {
+    const R = this.rig, P = R.last; if (!P) return; const vis = R.model.visible;
+    const W = (h: "R" | "L") => R.dirW(h === "R" ? P.wR : P.wL), U = (h: "R" | "L") => R.dirW(h === "R" ? P.uR : P.uL);
+    const perp = (fa: THREE.Vector3, w: THREE.Vector3, F: THREE.Vector3) => { const x = fa.clone().addScaledVector(w, -fa.dot(w)); if (x.lengthSq() < 1e-4) x.copy(F).addScaledVector(w, -F.dot(w)); return x.normalize(); };
+    const done = { R: false, L: false };
     for (const h of ["R", "L"] as const) {
-      const w = this.weapons[h]; if (!w) continue;
-      w.obj.visible = this.rig.model.visible;
-      const dir = this.rig.dirW(h === "R" ? P.wR : P.wL), up = this.rig.dirW(h === "R" ? P.uR : P.uL);
-      placeWeapon(w.obj, this.rig.hand(h), dir, up);
+      const wp = this.weapons[h]; if (!wp) continue; const g = this.gloves[h];
+      const f = R.handFrame(h); const w = W(h);
+      g.setCurl(0, true); g.place(f.wrist, perp(f.fa, w, f.F), w);
+      placeWeapon(wp.obj, g.world(g.gripCenter), w, U(h)); wp.obj.visible = vis;
+      const saya = wp.obj.userData.saya as THREE.Object3D | undefined; if (saya) saya.visible = (P.sh ?? 0) > 0.5;
+      done[h] = true;
     }
+    for (const h of ["R", "L"] as const) {
+      if (done[h]) continue; const o = h === "R" ? "L" : "R"; const wp = this.weapons[o];
+      const grips = Number(h === "L" ? P.gripL : P.gripR) > 0.5;
+      if (!grips || !wp) continue;
+      const g = this.gloves[h]; const w = W(o);
+      const handle = wp.obj.position.clone().addScaledVector(w, R.gripOff[o]);
+      let f = R.handFrame(h); g.setCurl(0, true); g.place(f.wrist, perp(f.fa, w, f.F), w);
+      const off = g.world(g.gripCenter).sub(f.wrist);
+      R.reach(h, handle.clone().sub(off), h === "R" ? P.eR : P.eL);
+      f = R.handFrame(h); g.place(f.wrist, perp(f.fa, w, f.F), w);
+      g.root.position.add(handle.sub(g.world(g.gripCenter))); g.root.updateMatrixWorld(true);
+      done[h] = true;
+    }
+    for (const h of ["R", "L"] as const) { if (done[h]) continue; const g = this.gloves[h]; const f = R.handFrame(h); g.setCurl(P.fist, false); g.place(f.wrist, f.F, f.T); }
+    // weapon strikes: the tip stops on the target's surface (no blade / staff through the body); corrects next frame through rig.assistX
+    { const tw = Math.min(1, Number(P.tipW) || 0), opp = R.opp, wp = this.weapons[this.mirrored ? "L" : "R"]; let goal = 0;
+      if (tw > 0.01 && P.tipAt && opp && wp) {
+        const tip = weaponTip(wp.obj), dir = tip.clone().sub(wp.obj.position).normalize();
+        const surf = ({ HEAD: 0.11, CHEST: 0.15, BELLY: 0.15, LEGS: 0.1 } as Record<string, number>)[P.tipAt] ?? 0.12;
+        const want = opp.part(P.tipAt).addScaledVector(dir, -surf); const fx = Math.sign(opp.root.position.x - R.root.position.x) || 1;
+        goal = Math.max(-0.5, Math.min(0.5, R.assistX - (tip.x - want.x) * fx)) * tw;
+      }
+      const prev = R.assistX; R.assistX += (goal - R.assistX) * (tw > 0.01 ? 1 : 0.25); if (Math.abs(R.assistX) < 1e-4) R.assistX = 0;
+      // this frame too: move the fighter, gloves and weapons together (the next pose already includes it)
+      const dx = (R.assistX - prev) * (R.opp ? Math.sign(R.opp.root.position.x - R.root.position.x) || -R.side : 0);
+      if (dx) { R.root.position.x += dx; R.root.updateMatrixWorld(true);
+        for (const h of ["R", "L"] as const) { this.gloves[h].root.position.x += dx; this.gloves[h].root.updateMatrixWorld(true); const w = this.weapons[h]; if (w) w.obj.position.x += dx; } } }
+    // bow + arrow: the arrow lies from the nock (draw hand) across the bow grip, and the string follows the nock when drawn
+    for (const h of ["R", "L"] as const) {
+      const bow = this.weapons[h], arr = this.weapons[h === "R" ? "L" : "R"];
+      const ends = bow?.obj.userData.stringEnds as THREE.Vector3[] | undefined; if (!bow || !ends) continue;
+      const str = bow.obj.userData.string as THREE.Line; const pos = str.geometry.getAttribute("position") as THREE.BufferAttribute;
+      let mid = ends[0].clone().lerp(ends[1], 0.5);
+      if (arr && arr.id === "arrow" && arr.obj.visible) {
+        const nock = arr.obj.position.clone(), grip = bow.obj.position.clone(); const d = grip.clone().sub(nock); const len = d.length();
+        if (len > 0.12 && len < 1.0) {
+          placeWeapon(arr.obj, nock, d.normalize(), R.dirW([0, 1, 0]));
+          bow.obj.updateMatrixWorld(true); const l = bow.obj.worldToLocal(nock.clone());
+          if (l.z < mid.z + 0.02 && Math.abs(l.y) < 0.5) mid = l;
+        }
+      }
+      pos.setXYZ(1, mid.x, mid.y, mid.z); pos.needsUpdate = true; str.geometry.computeBoundingSphere();
+    }
+    this.gloves.R.root.visible = vis; this.gloves.L.root.visible = vis;
   }
-  tip(h: "R" | "L") { const w = this.weapons[this.mirrored ? (h === "R" ? "L" : "R") : h]; return w ? weaponTip(w.obj) : this.rig.hand(h); }
+  /** the business end of a hand: the weapon's tip, else the glove's knuckles */
+  tip(h: "R" | "L") { const a = this.mirrored ? (h === "R" ? "L" : "R") : h; const w = this.weapons[a]; return w ? weaponTip(w.obj) : this.gloves[a].world(this.gloves[a].knuckles); }
+  fistAt(actual: "R" | "L") { return this.gloves[actual].world(this.gloves[actual].knuckles); }
+  gripAt(actual: "R" | "L") { return this.gloves[actual].world(this.gloves[actual].gripCenter); }
   /** world points spread over the body (for shards / particles) */
   bodyPoints(): THREE.Vector3[] {
     const b = this.rig.b; const names = ["Hips", "Spine", "Spine1", "Spine2", "Neck", "Head", "LeftArm", "LeftForeArm", "LeftHand", "RightArm", "RightForeArm", "RightHand", "LeftUpLeg", "LeftLeg", "LeftFoot", "RightUpLeg", "RightLeg", "RightFoot"];
@@ -87,7 +156,7 @@ export class Fighter {
 }
 
 export type StageEvent =
-  | { type: "impact"; target: Side; blocked: boolean; power: number }
+  | { type: "impact"; target: Side; blocked: boolean; power: number; gap?: number }
   | { type: "shake"; amount: number }
   | { type: "screenFlash"; color: string; strength: number }
   | { type: "title"; text: string; color: string; sub?: string }
@@ -117,9 +186,9 @@ export class FightStage {
 
   setFighter(side: Side, model: THREE.Object3D, faction: string, color: string, baseX = 0.78) {
     const old = this.f[side];
-    if (old) { this.group.remove(old.rig.root); for (const w of Object.values(old.weapons)) if (w) { this.props.remove(w.obj); disposeTree(w.obj); } old.rig.mats.forEach((m) => m.dispose()); }
+    if (old) { this.group.remove(old.rig.root); for (const w of Object.values(old.weapons)) if (w) { this.props.remove(w.obj); disposeTree(w.obj); } old.rig.mats.forEach((m) => m.dispose()); old.disposeGloves(this.props); }
     const rig = new Rig(model, side === "player" ? -1 : 1, baseX);
-    const fi = new Fighter(rig, side, faction, color); this.f[side] = fi; this.group.add(rig.root);
+    const fi = new Fighter(rig, side, faction, color, this.props); this.f[side] = fi; this.group.add(rig.root);
     const o = this.f[this.other(side)]; if (o) { rig.opp = o.rig; o.rig.opp = rig; }
     fi.play("stance"); fi.act!.t = this.rand() * 0.6; fi.act!.from = null;
     this.koSide = null; this.fin = null; this.cam = null; this.timeScale = 1; this.hitstop = 0;
@@ -160,8 +229,8 @@ export class FightStage {
   // ── contacts ───────────────────────────────────────────────────────────────
   limbPos(F: Fighter, l: Limb): THREE.Vector3 {
     const m = F.limb(l);
-    if (m === "wR" || m === "wL") return F.tip(m === "wR" ? "R" : "L");
-    return m[0] === "h" ? F.rig.hand(m[1] as "L" | "R") : F.rig.foot(m[1] as "L" | "R");
+    if (m === "wR" || m === "wL") { const a = m === "wR" ? "R" : "L"; const w = F.weapons[a]; return w ? weaponTip(w.obj) : F.fistAt(a); }
+    return m[0] === "h" ? F.fistAt(m[1] as "L" | "R") : F.rig.foot(m[1] as "L" | "R");
   }
   contact(attacker: Side, at: THREE.Vector3, power: 1 | 2 | 3, part: "HEAD" | "CHEST" | "BELLY" = "HEAD", opts: { noReact?: boolean; color?: string } = {}) {
     const A = this.f[attacker], D = this.f[this.other(attacker)]; if (!A || !D) return;
@@ -176,7 +245,7 @@ export class FightStage {
       const trading = D.offensive && D.act && D.act.t < 0.35;
       if (!trading) D.play(part === "CHEST" || part === "BELLY" ? "hitBody" : power >= 2 ? "hitHeavy" : "hitLight");
     }
-    this.emit({ type: "impact", target: D.side, blocked: false, power });
+    this.emit({ type: "impact", target: D.side, blocked: false, power, gap: +at.distanceTo(target).toFixed(3) });
     this.emit({ type: "shake", amount: 0.4 + power * 0.35 });
   }
 
@@ -207,7 +276,7 @@ export class FightStage {
       case "weapon": if (e.R !== undefined) F.setWeapon("R", e.R, this.props); if (e.L !== undefined) F.setWeapon("L", e.L, this.props); break;
       case "vis": F.rig.model.visible = e.on; F.rig.visible = e.on; break;
       case "smoke": this.fx.smoke(F.center(), "#7d8496", 10, 0.5); break;
-      case "charge": this.follow(this.glowAt(F.color, 0.5), () => F.rig.hand("R").lerp(F.rig.hand("L"), 0.5), 0.45); break;
+      case "charge": this.follow(this.glowAt(F.color, 0.5), () => F.gripAt("R").lerp(F.gripAt("L"), 0.5), 0.45); break;
       case "whoosh": break;
     }
   }
@@ -233,8 +302,8 @@ export class FightStage {
     for (const s of ["player", "enemy"] as Side[]) {
       const F = this.f[s]; if (!F) continue;
       const pose = F.sample();
-      F.rig.apply(pose, this.hitstop > 0 ? F.shake : 0);
-      F.placeWeapons();
+      F.rig.apply(pose, this.hitstop > 0 ? F.shake : 0, sim);
+      F.placeHands();
       if (F.flash > 0) { F.flash -= dt; F.rig.tint("hit"); if (F.flash <= 0) F.rig.tint(F.look === "none" ? "none" : F.look, F.lookColor, F.lookK); }
       else if (F.look !== "none") F.rig.tint(F.look, F.lookColor, F.lookK);
     }
@@ -337,7 +406,7 @@ function makeCtx(S: FightStage, A: Fighter, D: Fighter): FinCtx {
     },
     trail: (F, color, hand = "R") => {
       const h = F.mirrored ? (hand === "R" ? "L" : "R") : hand;
-      return fx.trail(() => { const tip = F.tip(hand); const base = F.rig.hand(h as "L" | "R"); return [base.lerp(tip, 0.62), tip]; }, color, 9);
+      return fx.trail(() => { const tip = F.tip(hand); const base = F.gripAt(h as "L" | "R"); return [base.lerp(tip, 0.62), tip]; }, color, 9);
     },
     explode: (pos, color, size = 1) => {
       fx.flash(pos, "#fff4d0", 2.4 * size, 0.35); fx.flash(pos, color, 3.2 * size, 0.6);

@@ -32,7 +32,13 @@ function katana(scale = 1) {
   const t = tsuba(0.042); t.position.y = 0.085; g.add(t);
   g.add(handle(0.26 * scale, 0.017, WRAP()));
   const hamon = mesh(new THREE.BoxGeometry(0.002, 0.7 * scale, 0.006), std("#ffffff", 1, 0.1, { emissive: new THREE.Color("#9fc7ff"), emissiveIntensity: 0.25 }), [0, 0.09 + 0.36 * scale, 0.016]); g.add(hamon);
-  g.userData.tip = 0.09 + 0.78 * scale; return g;
+  // the scabbard (saya): shown while the sword is sheathed
+  const saya = new THREE.Group(); const sm = std("#14100e", 0.3, 0.35);
+  const sb = curvedBlade(0.8 * scale, 0.05, 0.05, sm); sb.scale.set(4.5, 1, 1.15); sb.position.y = 0.09; saya.add(sb);
+  const koi = mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.03, 12), GOLD()); koi.position.y = 0.11; koi.scale.z = 0.7; saya.add(koi);
+  const cord = mesh(new THREE.TorusGeometry(0.03, 0.007, 6, 14), std("#7a1d1d", 0, 0.8)); cord.position.set(0, 0.2, -0.02); saya.add(cord);
+  saya.visible = false; g.add(saya); g.userData.saya = saya;
+  g.userData.tip = 0.09 + 0.78 * scale; g.userData.grip2 = -0.115 * Math.max(0.8, scale); return g;
 }
 function polearm(len: number, head: "yari" | "naginata", shaftCol = "#3b2416") {
   const g = new THREE.Group();
@@ -47,7 +53,7 @@ function polearm(len: number, head: "yari" | "naginata", shaftCol = "#3b2416") {
     const t = tsuba(0.038); t.position.y = top; g.add(t);
   }
   const butt = mesh(new THREE.CylinderGeometry(0.02, 0.012, 0.06, 8), std("#8a6a3a", 0.8, 0.4)); butt.position.y = -0.55; g.add(butt);
-  g.userData.tip = top + 0.32; return g;
+  g.userData.tip = top + 0.32; g.userData.grip2 = 0.42; return g;
 }
 function staff(len: number, rings = false) {
   const g = new THREE.Group();
@@ -58,7 +64,7 @@ function staff(len: number, rings = false) {
     const loop = mesh(new THREE.TorusGeometry(0.09, 0.008, 6, 24), GOLD()); loop.position.y = top + 0.08; loop.rotation.y = Math.PI / 2; g.add(loop);
     for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; const r = mesh(new THREE.TorusGeometry(0.025, 0.004, 5, 12), GOLD()); r.position.set(0, top + 0.08 + Math.sin(a) * 0.09, Math.cos(a) * 0.09); g.add(r); }
   }
-  g.userData.tip = len * 0.65; return g;
+  g.userData.tip = len * 0.65; g.userData.grip2 = 0.42; return g;
 }
 function kanabo() {
   const g = new THREE.Group();
@@ -66,7 +72,7 @@ function kanabo() {
   const club = mesh(new THREE.CylinderGeometry(0.075, 0.035, 0.85, 8), std("#2b2b30", 0.6, 0.5)); club.position.y = 0.48; g.add(club);
   for (let i = 0; i < 28; i++) { const y = 0.2 + (i % 7) * 0.12, a = Math.floor(i / 7) * (Math.PI / 2) + (i % 2) * 0.4; const r = 0.04 + (y - 0.05) * 0.045;
     const st = mesh(new THREE.ConeGeometry(0.014, 0.05, 5), std("#a0a4ab", 0.9, 0.3)); st.position.set(Math.sin(a) * r, y, Math.cos(a) * r); st.lookAt(Math.sin(a) * 5, y, Math.cos(a) * 5); st.rotateX(Math.PI / 2); g.add(st); }
-  g.userData.tip = 0.9; return g;
+  g.userData.tip = 0.9; g.userData.grip2 = -0.12; return g;
 }
 function ono() {
   const g = new THREE.Group();
@@ -84,6 +90,10 @@ function yumi() {
   g.add(mesh(new THREE.TubeGeometry(curve, 40, 0.014, 6), std("#3a1f12", 0.1, 0.6)));
   const str = new THREE.Line(new THREE.BufferGeometry().setFromPoints([pts[0], pts[24]]), new THREE.LineBasicMaterial({ color: "#f5f0e0" })); g.add(str); g.userData.string = str;
   const grip = mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.12, 8), WRAP("#7a1d1d")); grip.position.set(0, 0, 0.12 * Math.sin((0.62 / 1.9) * Math.PI)); g.add(grip);
+  // origin = the grip (the hand closes on the stave, not the string); the string sits behind it
+  const gz = grip.position.z; g.children.forEach((c) => (c.position.z -= gz));
+  str.geometry.setFromPoints([pts[0], pts[0].clone().lerp(pts[24], 0.5), pts[24]]);
+  g.userData.stringEnds = [pts[0].clone().setZ(pts[0].z - gz), pts[24].clone().setZ(pts[24].z - gz)];
   g.userData.tip = 1.28; return g;
 }
 function arrow(glow?: string) {
@@ -163,7 +173,7 @@ function teppo() {
   const g = new THREE.Group();
   const barrel = mesh(new THREE.CylinderGeometry(0.018, 0.02, 1.0, 10), std("#3a3a40", 0.8, 0.35)); barrel.position.y = 0.55; g.add(barrel);
   const stock = mesh(new THREE.BoxGeometry(0.05, 0.5, 0.07), WOOD("#4a2a14")); stock.position.y = 0.1; g.add(stock);
-  g.userData.tip = 1.05; return g;
+  g.userData.tip = 1.05; g.userData.grip2 = 0.42; return g;
 }
 function orb(col: string) {
   const g = new THREE.Group();

@@ -20,8 +20,15 @@ export interface Pose {
   ftLy: number; ftLp: number; ftRy: number; ftRp: number; // foot yaw / toe point
   fist: number;                                   // 0 open … 1 closed
   wR: Vec3; uR: Vec3; wL: Vec3; uL: Vec3;        // weapon blade direction + edge-up direction per hand (fighter space)
+  look: number;                                   // 0 … 1: the head turns to face the opponent's head
+  up?: number;                                    // 0 … 1: strikes arrive from below (uppercut into the chin)
+  tipW?: number;                                  // 0 … 1: the right-hand weapon's tip lands on tipAt's surface (the fighter steps in / back)
+  tipAt?: "HEAD" | "CHEST" | "BELLY" | "LEGS";
+  sh: number;                                     // a katana in hand is sheathed (scabbard shown) when > .5
 }
-export type ResolvedPose = Omit<Pose, "hL" | "hR" | "fL" | "fR"> & { hL: Vec3; hR: Vec3; fL: Vec3; fR: Vec3 };
+export type ResolvedPose = Omit<Pose, "hL" | "hR" | "fL" | "fR"> & { hL: Vec3; hR: Vec3; fL: Vec3; fR: Vec3; gripL: boolean; gripR: boolean;
+  /** strike weights (1 = this limb aims at the opponent) and the body part it aims at */
+  sHR: number; sHL: number; sFR: number; sFL: number; pHR?: string; pHL?: string; pFR?: string; pFL?: string };
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const AX = { x: V(1, 0, 0), y: V(0, 1, 0), z: V(0, 0, 1) };
@@ -67,7 +74,7 @@ function ik2(A: THREE.Object3D, B: THREE.Object3D, C: THREE.Object3D, t: THREE.V
 // reference proportions (Kenshi, in body space after grounding) that every pose is authored against
 const REF = { hipY: 1.144, shY: 1.585, shZ: -0.08, arm: 0.546, leg: 0.94, ankleY: 0.15, headY: 1.74 };
 
-export interface Calib { hipY: number; hipZ: number; shY: number; shZ: number; arm: number; leg: number; ankleY: number; headY: number; armK: number; legK: number }
+export interface Calib { hipY: number; hipZ: number; shX: number; shY: number; shZ: number; hipX: number; arm: number; leg: number; ankleY: number; headY: number; armK: number; legK: number }
 
 export class Rig {
   side: -1 | 1;
@@ -86,6 +93,11 @@ export class Rig {
   visible = true;
   offset = new THREE.Vector3();   // extra world offset (launched into the sky, sinking…)
   offsetSpin = 0;                 // extra tumble
+  handLocal: Record<"L" | "R", { F: THREE.Vector3; T: THREE.Vector3 }> = { L: { F: V(1, 0, 0), T: V(0, 1, 0) }, R: { F: V(1, 0, 0), T: V(0, 1, 0) } };
+  headFwd = V(0, 0, 1);           // the face's forward in the Head bone's frame
+  assistX = 0;                    // weapon-reach assist: metres toward the opponent (set by the fighter so a weapon tip lands on the surface)
+  strikeInset = 0.11;             // a punch's target is where the knuckles land, not the wrist
+  gripOff: Record<"L" | "R", number> = { L: -0.14, R: -0.14 }; // where the support hand goes along the other hand's weapon
 
   constructor(model: THREE.Object3D, side: -1 | 1, baseX = 0.78, faceYaw = 0.32) {
     this.side = side; this.baseX = baseX; this.faceYaw = faceYaw;
@@ -115,7 +127,17 @@ export class Rig {
     const p = (n: string) => this.body.worldToLocal(wpos(this.b[n]));
     const hips = p("Hips"), sh = p("LeftArm"), fa = p("LeftForeArm"), hand = p("LeftHand"), ul = p("LeftUpLeg"), lg = p("LeftLeg"), ft = p("LeftFoot"), hd = p("Head");
     const arm = sh.distanceTo(fa) + fa.distanceTo(hand), leg = ul.distanceTo(lg) + lg.distanceTo(ft);
-    this.cal = { hipY: hips.y, hipZ: hips.z, shY: sh.y, shZ: sh.z, arm, leg, ankleY: ft.y, headY: hd.y, armK: arm / REF.arm, legK: leg / REF.leg };
+    this.cal = { hipY: hips.y, hipZ: hips.z, shX: Math.abs(sh.x), shY: sh.y, shZ: sh.z, hipX: Math.abs(ul.x), arm, leg, ankleY: ft.y, headY: hd.y, armK: arm / REF.arm, legK: leg / REF.leg };
+    // the hand's own frame (fingers / thumb) in the Hand bone's space, and the face's forward in the Head's
+    for (const s of ["L", "R"] as const) {
+      const n = s === "L" ? "Left" : "Right"; const hb = this.b[n + "Hand"]; if (!hb) continue;
+      const inv = wquat(hb).invert(); const w = wpos(hb);
+      const idx = this.b[n + "HandIndex1"], th = this.b[n + "HandThumb1"];
+      const F = idx ? wpos(idx).sub(w) : w.clone().sub(wpos(this.b[n + "ForeArm"]));
+      const T = th ? wpos(th).sub(w) : V(0, 1, 0);
+      this.handLocal[s] = { F: F.normalize().applyQuaternion(inv), T: T.normalize().applyQuaternion(inv) };
+    }
+    this.headFwd = V(0, 0, 1).applyQuaternion(wquat(this.b.Head).invert());
     const rq = wquat(this.root).invert();
     this.footRest = { L: rq.clone().multiply(wquat(this.b.LeftFoot)), R: rq.clone().multiply(wquat(this.b.RightFoot)) };
     r.rotation.y = saveR; r.position.copy(saveP); r.updateMatrixWorld(true);
@@ -139,6 +161,15 @@ export class Rig {
   }
   forward(): THREE.Vector3 { return V(0, 0, 1).applyQuaternion(wquat(this.body)).normalize(); }
 
+  /** body-space unit vector along the fight line toward the opponent */
+  towardOpp(): THREE.Vector3 {
+    const o = this.opp; const dx = o ? Math.sign(o.root.position.x - this.root.position.x) || -this.side : -this.side;
+    const a = this.body.worldToLocal(this.root.position.clone().add(V(dx, 0, 0))).sub(this.body.worldToLocal(this.root.position.clone()));
+    a.y = 0; return a.normalize();
+  }
+  /** +1 if increasing rx moves this fighter toward the opponent */
+  rxSign() { const o = this.opp; if (!o) return 1; const dx = Math.sign(o.root.position.x - this.root.position.x) || -this.side; return dx === -this.side ? 1 : -1; }
+
   resolve(p: Pose): ResolvedPose {
     const opp = this.opp;
     const T = (t: Target, hand: boolean): Vec3 => {
@@ -148,19 +179,23 @@ export class Rig {
       const part = t.slice(4) as "HEAD" | "CHEST" | "BELLY" | "LEGS";
       return this.toBody(opp.part(part));
     };
-    // GRIP: this hand closes on the other hand's weapon handle, just below it
-    const grip = (o: Vec3, w: Vec3): Vec3 => [o[0] - w[0] * 0.14, o[1] - w[1] * 0.14, o[2] - w[2] * 0.14];
+    // GRIP: this hand closes on the other hand's weapon handle (the fighter refines it on the real handle)
+    const grip = (o: Vec3, w: Vec3, k: number): Vec3 => [o[0] + w[0] * k, o[1] + w[1] * k, o[2] + w[2] * k];
     let hR: Vec3, hL: Vec3;
-    if (p.hL === "GRIP") { hR = T(p.hR, true); hL = grip(hR, p.wR); }
-    else if (p.hR === "GRIP") { hL = T(p.hL, true); hR = grip(hL, p.wL); }
+    if (p.hL === "GRIP") { hR = T(p.hR, true); hL = grip(hR, p.wR, this.gripOff.R); }
+    else if (p.hR === "GRIP") { hL = T(p.hL, true); hR = grip(hL, p.wL, this.gripOff.L); }
     else { hR = T(p.hR, true); hL = T(p.hL, true); }
-    return { ...p, hR, hL, fL: T(p.fL, false), fR: T(p.fR, false) };
+    const part = (t: Target) => (typeof t === "string" && t !== "GRIP" ? t.slice(4) : undefined);
+    const out: ResolvedPose = { ...p, hR, hL, fL: T(p.fL, false), fR: T(p.fR, false), gripL: p.hL === "GRIP", gripR: p.hR === "GRIP",
+      sHR: part(p.hR) ? 1 : 0, sHL: part(p.hL) ? 1 : 0, sFR: part(p.fR) ? 1 : 0, sFL: part(p.fL) ? 1 : 0, pHR: part(p.hR), pHL: part(p.hL), pFR: part(p.fR), pFL: part(p.fL) };
+    return out;
   }
 
   /** pose the skeleton */
-  apply(P: ResolvedPose, shake = 0) {
+  apply(P: ResolvedPose, shake = 0, dt = 1 / 60) {
     const b = this.b; this.last = P;
     this.root.position.set(this.side * this.baseX - this.side * P.rx, 0, P.rz).add(this.offset);
+    if (this.assistX && this.opp) this.root.position.x += (Math.sign(this.opp.root.position.x - this.root.position.x) || -this.side) * this.assistX;
     // body: lift, tumble about the hips, spin
     const piv = V(0, this.cal.hipY - 0.1, 0);
     this.body.rotation.set(P.tumble - this.offsetSpin, P.spin, P.roll, "YXZ");
@@ -177,13 +212,68 @@ export class Rig {
     for (const s of ["Spine", "Spine1", "Spine2"]) if (b[s]) rotWorld(b[s], cr("y", P.spYaw / 3).multiply(cr("x", P.spPitch / 3)).multiply(cr("z", P.spRoll / 3)));
     if (b.Neck) rotWorld(b.Neck, cr("y", P.hdYaw * 0.4).multiply(cr("x", P.hdPitch * 0.4)));
     rotWorld(b.Head, cr("y", P.hdYaw * 0.6).multiply(cr("x", P.hdPitch * 0.6)).multiply(cr("z", P.hdRoll)));
+    // eyes on the opponent: turn the head (and a little of the neck) toward their head
+    const o = this.opp; const lk = P.look ?? 0;
+    if (lk > 0.01 && o && o.visible && o.model.visible) {
+      const hp = wpos(b.Head); const want = o.part("HEAD").sub(hp).normalize();
+      const f = this.headFwd.clone().applyQuaternion(wquat(b.Head)).normalize();
+      const q = new THREE.Quaternion().setFromUnitVectors(f, want); const ang = 2 * Math.acos(Math.min(1, Math.abs(q.w)));
+      const k = lk * 0.75 * Math.min(1, 0.9 / Math.max(ang, 1e-3));
+      const part = new THREE.Quaternion().slerp(q, k);
+      if (b.Neck) rotWorld(b.Neck, new THREE.Quaternion().slerp(part, 0.35));
+      rotWorld(b.Head, new THREE.Quaternion().slerp(part, 0.65));
+    }
     const BW = (p: Vec3) => this.body.localToWorld(V(p[0], p[1], p[2]));
     const BD = (d: Vec3) => V(d[0], d[1], d[2]).applyQuaternion(bq).normalize();
-    ik2(b.LeftArm, b.LeftForeArm, b.LeftHand, BW(P.hL), BD(P.eL));
-    ik2(b.RightArm, b.RightForeArm, b.RightHand, BW(P.hR), BD(P.eR));
-    this.fists(P.fist);
-    ik2(b.LeftUpLeg, b.LeftLeg, b.LeftFoot, BW(P.fL), BD(P.kL));
-    ik2(b.RightUpLeg, b.RightLeg, b.RightFoot, BW(P.fR), BD(P.kR));
+    // strikes: the fist / instep lands on the opponent's surface, and the fighter steps in if it's out of reach
+    const tgt: Partial<Record<"hR" | "hL" | "fR" | "fL", THREE.Vector3>> = {};
+    const o2 = this.opp;
+    if (o2) {
+      const limbs = [["hR", P.sHR, P.pHR, "RightArm", this.cal.arm, this.strikeInset], ["hL", P.sHL, P.pHL, "LeftArm", this.cal.arm, this.strikeInset],
+        ["fR", P.sFR, P.pFR, "RightUpLeg", this.cal.leg, 0.08], ["fL", P.sFL, P.pFL, "LeftUpLeg", this.cal.leg, 0.08]] as const;
+      let shift = 0;
+      for (const [key, w, part, root, len, inset] of limbs) {
+        if (!(w > 0.01) || !part) continue;
+        const from = wpos(b[root]); const surf = ({ HEAD: 0.11, CHEST: 0.15, BELLY: 0.15, LEGS: 0.1 } as Record<string, number>)[part] ?? 0.12;
+        const c = o2.part(part as "HEAD"); const dir = c.clone().sub(from).normalize();
+        const upK = key[0] === "h" ? P.up ?? 0 : 0; if (upK > 0.01) dir.lerp(V(0, 1, 0), upK).normalize();
+        const t = c.addScaledVector(dir, -(surf * (1 - 0.4 * upK) + inset)); tgt[key] = t;
+        const deficit = t.distanceTo(from) - len * 0.985;
+        if (deficit > 0) shift = Math.max(shift, Math.min(0.5, deficit / Math.max(0.4, Math.abs(dir.x))) * Math.min(1, w));
+      }
+      if (shift > 0) {
+        const dx = Math.sign(o2.root.position.x - this.root.position.x) || -this.side;
+        this.root.position.x += dx * shift; this.root.updateMatrixWorld(true);
+      }
+      for (const key of ["hR", "hL", "fR", "fL"] as const) {
+        const t = tgt[key]; if (!t) continue; const w = Math.min(1, key === "hR" ? P.sHR : key === "hL" ? P.sHL : key === "fR" ? P.sFR : P.sFL);
+        tgt[key] = BW(P[key]).lerp(t, w);
+      }
+    }
+    ik2(b.LeftArm, b.LeftForeArm, b.LeftHand, tgt.hL || BW(P.hL), BD(P.eL));
+    ik2(b.RightArm, b.RightForeArm, b.RightHand, tgt.hR || BW(P.hR), BD(P.eR));
+    if (!this.gloved) this.fists(P.fist);
+    // feet: planted feet stay put while the body travels, then step (one at a time, a little lift) — no skating
+    const grounded = Math.abs(P.tumble) < 0.15 && P.ry < 0.06 && Math.abs(this.offset.y) < 0.01;
+    const footT = { L: tgt.fL || BW(P.fL), R: tgt.fR || BW(P.fR) };
+    for (const s of ["L", "R"] as const) {
+      const want = footT[s]; const st = this.feet[s]; const struck = s === "L" ? P.sFL > 0.01 : P.sFR > 0.01;
+      const low = want.y < this.cal.ankleY + 0.05 + (this.root.position.y);
+      if (!grounded || struck || !low || !st.plant) { st.plant = want.clone(); st.step = null; continue; }
+      const flat = (a: THREE.Vector3, c: THREE.Vector3) => Math.hypot(a.x - c.x, a.z - c.z);
+      if (st.step) {
+        st.step.to.copy(want); st.step.t += dt; const u = Math.min(1, st.step.t / st.step.dur); const e = u * u * (3 - 2 * u);
+        const p = st.step.from.clone().lerp(want, e); p.y = want.y + Math.sin(u * Math.PI) * 0.075; footT[s] = p;
+        if (u >= 1) { st.plant = want.clone(); st.step = null; }
+      } else {
+        const d = flat(want, st.plant); const other = this.feet[s === "L" ? "R" : "L"];
+        if (d > 0.9) { st.plant = want.clone(); }
+        else if (d > 0.12 && !other.step) { st.step = { from: st.plant.clone(), to: want.clone(), t: 0, dur: 0.1 + d * 0.12 }; footT[s] = st.plant.clone().setY(want.y); }
+        else footT[s] = st.plant.clone().setY(want.y);
+      }
+    }
+    ik2(b.LeftUpLeg, b.LeftLeg, b.LeftFoot, footT.L, BD(P.kL));
+    ik2(b.RightUpLeg, b.RightLeg, b.RightFoot, footT.R, BD(P.kR));
     setWorldQuat(b.LeftFoot, bq.clone().multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(P.ftLp, P.ftLy, 0, "YXZ"))).multiply(this.footRest.L));
     setWorldQuat(b.RightFoot, bq.clone().multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(P.ftRp, P.ftRy, 0, "YXZ"))).multiply(this.footRest.R));
   }
@@ -205,6 +295,22 @@ export class Rig {
   }
 
   hand(s: "L" | "R") { return wpos(this.b[s === "L" ? "LeftHand" : "RightHand"]); }
+  gloved = false;
+  feet: Record<"L" | "R", { plant: THREE.Vector3 | null; step: { from: THREE.Vector3; to: THREE.Vector3; t: number; dur: number } | null }> = { L: { plant: null, step: null }, R: { plant: null, step: null } };
+  /** shrink the sculpted hands to the wrist (the gloves replace them) */
+  hideHands() { this.gloved = true; for (const n of ["LeftHand", "RightHand"]) this.b[n]?.scale.setScalar(0.001); }
+  /** the hand's frame in the world: wrist, finger direction, thumb direction, forearm direction */
+  handFrame(s: "L" | "R") {
+    const n = s === "L" ? "Left" : "Right"; const hb = this.b[n + "Hand"]; const q = wquat(hb); const w = wpos(hb);
+    return { wrist: w, F: this.handLocal[s].F.clone().applyQuaternion(q), T: this.handLocal[s].T.clone().applyQuaternion(q), fa: w.clone().sub(wpos(this.b[n + "ForeArm"])).normalize() };
+  }
+  /** re-solve one arm so its wrist reaches a world point (pole in fighter space) */
+  reach(s: "L" | "R", target: THREE.Vector3, pole: Vec3) {
+    const n = s === "L" ? "Left" : "Right"; const b = this.b;
+    for (const k of [n + "Arm", n + "ForeArm"]) { const r = this.rest.get(b[k]); if (r) b[k].quaternion.copy(r.q); }
+    b[n + "Shoulder"]?.updateMatrixWorld(true);
+    ik2(b[n + "Arm"], b[n + "ForeArm"], b[n + "Hand"], target, V(pole[0], pole[1], pole[2]).applyQuaternion(wquat(this.body)).normalize());
+  }
   foot(s: "L" | "R") { return wpos(this.b[s === "L" ? "LeftFoot" : "RightFoot"]); }
   /** fighter-space direction → world */
   dirW(d: Vec3) { return V(d[0], d[1], d[2]).applyQuaternion(wquat(this.body)).normalize(); }

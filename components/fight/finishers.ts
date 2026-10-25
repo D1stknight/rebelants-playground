@@ -24,13 +24,13 @@ const K = {
   cut: { hR: [0, 1.12, 0.62], hL: "GRIP", eR: [-0.6, -1, 0], eL: [0.6, -1, 0], wR: [0, -0.45, 0.9], uR: [0, -0.9, -0.45], spPitch: 0.3, hipPitch: 0.15 } as PP,
   sideWind: { hR: [-0.5, 1.35, -0.05], eR: [-0.3, -1, -0.6], hL: [0.05, 1.4, 0.2], wR: [-0.85, 0.2, -0.5], uR: [0, 0, 1], hipYaw: -0.9, spYaw: -0.4, hdYaw: 1.0 } as PP,
   sideEnd: { hR: [0.35, 1.38, 0.5], eR: [-0.4, -1, 0], hL: [0.2, 1.3, -0.1], wR: [0.85, 0.05, 0.5], uR: [0, 0, -1], hipYaw: 0.5, spYaw: 0.45, hdYaw: -0.4 } as PP,
-  hip: { hR: [0.14, 1.02, 0.18], eR: [-0.5, -1, 0.3], hL: [0.2, 1.0, 0.05], wR: [-0.15, -0.3, -0.94], uR: [0, 1, 0] } as PP,     // hand on the hilt, blade sheathed along the left hip
-  down: { hR: [-0.25, 1.05, 0.25], eR: [-0.6, -1, 0], hL: [0.25, 1.2, 0.1], wR: [-0.3, -0.75, 0.6], uR: [0, 0.6, 0.8] } as PP,    // blade lowered, relaxed
+  hip: { hR: [0.14, 1.02, 0.18], eR: [-0.5, -1, 0.3], hL: [0.2, 1.0, 0.05], wR: [-0.15, -0.3, -0.94], uR: [0, 1, 0], sh: 1 } as PP,     // hand on the hilt, blade sheathed along the left hip
+  down: { hR: [-0.25, 1.05, 0.25], eR: [-0.6, -1, 0], hL: [0.25, 1.2, 0.1], wR: [-0.3, -0.75, 0.6], uR: [0, -1, 0.2] } as PP,    // blade lowered, relaxed
 };
 const pole = {
-  guard: { hR: [-0.08, 1.2, 0.05], eR: [-0.6, -1, -0.2], hL: [0.06, 1.32, 0.45], eL: [0.6, -1, 0], wR: [0, 0.18, 1], uR: [0, 1, 0] } as PP,
-  thrust: { rx: 0.35, hR: [-0.02, 1.32, 0.45], hL: [0.04, 1.36, 0.85], eL: [0.6, -1, 0], wR: [0, 0.02, 1], uR: [0, 1, 0], hipYaw: -0.6, spYaw: -0.3, spPitch: 0.15, fL: [0.17, 0.15, 0.5] } as PP,
-  overhead: { hR: [-0.05, 1.85, 0.0], hL: [0.05, 1.95, 0.3], eR: [-0.8, 0.3, 0], eL: [0.8, 0.3, 0], wR: [0, 0.6, -0.8], uR: [0, 0.8, 0.6] } as PP,
+  guard: { hR: [-0.26, 1.12, 0.12], eR: [-0.6, -1, -0.2], hL: "GRIP", eL: [0.6, -1, 0], wR: [0.18, 0.2, 1], uR: [0, -1, 0] } as PP,
+  thrust: { rx: 0.35, hR: [-0.16, 1.3, 0.38], hL: "GRIP", eL: [0.6, -1, 0], wR: [0.1, 0.03, 1], uR: [0, -1, 0], hipYaw: -0.6, spYaw: -0.3, spPitch: 0.15, fL: [0.17, 0.15, 0.5] } as PP,
+  overhead: { hR: [-0.05, 1.85, 0.0], hL: "GRIP", eR: [-0.8, 0.3, 0], eL: [0.8, 0.3, 0], wR: [0, 0.6, -0.8], uR: [0, 0.8, 0.6] } as PP,
 };
 const k = (t: number, p: PP | string, e?: Key["e"]): Key => ({ t, p: typeof p === "string" ? p : ({ ...S.stance, ...p } as Pose), e });
 const mix = (...ps: PP[]): PP => Object.assign({}, ...ps);
@@ -45,7 +45,7 @@ add({
     [0, (c) => { c.cam("wide", 3); c.act(c.A, [k(0.25, { ...S.crouch, rx: -0.35 }, "out"), k(0.5, { ...S.throwWind, rx: -0.4, ry: 0.5 }, "out"), k(0.62, { ...S.throwRel, rx: -0.3, ry: 0.55 }, "snap"), k(0.78, { ...S.throwWind, rx: -0.3, ry: 0.4 }, "io"), k(0.9, { ...S.throwRel, rx: -0.25, ry: 0.3 }, "snap"), k(1.05, { ...S.throwWind, rx: -0.2, ry: 0.1 }), k(1.17, { ...S.throwRel, rx: -0.2 }, "snap"), k(1.6, { ...S.stance, rx: -0.2 }, "io")]); }],
     ...[0.62, 0.9, 1.17].map((t, kk) => [t, (c: FinCtx) => {
       for (let i = 0; i < 4; i++) {
-        const from = c.A.rig.hand(c.A.mirrored ? "L" : "R");
+        const from = c.A.gripAt(c.A.mirrored ? "L" : "R");
         const parts = ["HEAD", "CHEST", "BELLY", "LEGS"] as const; const part = parts[(i + kk) % 4];
         const off = V(0, (i - 1.5) * 0.07, 0.14 + i * 0.02); let stuck: THREE.Vector3 | null = null;
         const target = () => stuck || c.D.rig.part(part).add(off);
@@ -71,7 +71,7 @@ add({
     }],
     [1.1, (c) => { const tr = c.trail(c.A, "#e6fbff"); c.S.later(0.35, () => tr.stop()); }],
     [1.26, (c) => { c.flash("#ffffff", 1); c.stop(0.22); c.slow(0.3, 1.0); c.hit(3, undefined, "CHEST", "#bff3ff"); c.fx.beam(c.at(c.D, 0.6, 1.25), c.at(c.D, -0.6, 1.35), "#dff8ff", 0.03, 0.6); c.look(c.D, "glow", 0.3, "#bff3ff"); }],
-    [2.9, (c) => { c.fx.sparks(c.A.rig.hand("R"), "#ffffff", 6, 1.5, 0.2); c.shake(0.6); }],
+    [2.9, (c) => { c.fx.sparks(c.A.gripAt(c.A.mirrored ? "L" : "R"), "#ffffff", 6, 1.5, 0.2); c.shake(0.6); }],
     [3.05, (c) => { c.end("dissolve", "#9be8ff"); c.fx.smoke(c.D.center(), "#1e2230", 20, 0.8); c.cam("wide", 2); }],
     [3.5, (c) => c.title("VANISHING BLADE")],
   ],
@@ -85,7 +85,7 @@ add({
     [1.1, (c) => { c.cam("side", 7); c.act(c.A, [k(0.06, mix({ rx: 2.7, hip: [0, -0.2, 0.05], spPitch: 0.25, fL: [0.17, 0.15, 0.55], fR: [-0.15, 0.15, -0.45] }, K.sideEnd), "snap"), k(1.3, mix({ rx: 2.7, hip: [0, -0.2, 0.05], spPitch: 0.25, fL: [0.17, 0.15, 0.55], fR: [-0.15, 0.15, -0.45] }, K.sideEnd)), k(2.0, mix({ rx: 2.7 }, K.down), "io"), k(2.5, mix({ rx: 2.7 }, K.hip), "io")]); }],
     [1.14, (c) => { c.flash("#ffffff", 1); c.stop(0.3); c.fx.beam(c.at(c.A, -2.1, 1.2), c.at(c.A, 0.15, 1.2), "#ffffff", 0.025, 0.9); c.fx.sparks(c.D.center(), "#ffffff", 20, 4, 0.4); c.look(c.D, "glow", 0.25, "#ffdddd"); }],
     [1.5, (c) => { c.cam("wide", 2); c.slow(0.45, 1.6); }],
-    [3.55, (c) => { c.fx.sparks(c.A.rig.hand("R"), "#ffffff", 6, 1.5, 0.2); c.shake(0.8); c.end("petals"); c.fx.flash(c.D.center(), c.A.color, 1.6, 0.4); }],
+    [3.55, (c) => { c.fx.sparks(c.A.gripAt(c.A.mirrored ? "L" : "R"), "#ffffff", 6, 1.5, 0.2); c.shake(0.8); c.end("petals"); c.fx.flash(c.D.center(), c.A.color, 1.6, 0.4); }],
     [3.8, (c) => c.title("IAIJUTSU")],
   ],
 });
@@ -171,8 +171,8 @@ add({
   id: "ashigaru-volley", name: "Teppo Volley", faction: "ashigaru", dur: 4.4,
   steps: [
     [0, (c) => { c.weapon(c.A, "teppo"); c.cam("side", 3);
-      const aim = { hR: [-0.06, 1.55, 0.1], eR: [-0.8, -0.6, -0.2], hL: [0.04, 1.52, 0.5], eL: [0.6, -1, 0], wR: [0, 0.04, 1], uR: [0, 1, 0], hipYaw: -0.7, spYaw: -0.25, hdYaw: 0.55, hdPitch: 0.05 } as PP;
-      const kick = { ...aim, hR: [-0.06, 1.62, 0.0], hL: [0.04, 1.62, 0.38], wR: [0, 0.35, 0.94], spPitch: -0.1 } as PP;
+      const aim = { hR: [-0.06, 1.55, 0.1], eR: [-0.8, -0.6, -0.2], hL: "GRIP", eL: [0.6, -1, 0], wR: [0, 0.04, 1], uR: [0, 1, 0], hipYaw: -0.7, spYaw: -0.25, hdYaw: 0.55, hdPitch: 0.05 } as PP;
+      const kick = { ...aim, hR: [-0.06, 1.62, 0.0], wR: [0, 0.35, 0.94], spPitch: -0.1 } as PP;
       c.act(c.A, [k(0.4, aim, "io"), k(0.9, aim), k(0.95, kick, "snap"), k(1.2, aim, "io"), k(1.55, aim), k(1.6, kick, "snap"), k(1.9, aim, "io"), k(2.3, aim), k(2.36, kick, "snap"), k(3.2, aim, "io")]);
     }],
     ...[0.95, 1.6, 2.36].map((t, i) => [t, (c: FinCtx) => {
@@ -187,7 +187,7 @@ add({
 });
 
 // ── BUSHI (naginata) ──────────────────────────────────────────────────────────
-const spinNag = (t0: number, n: number, rx: number): Key[] => { const out: Key[] = []; for (let i = 0; i <= n; i++) { const a = (i / n) * Math.PI * 4; out.push(k(t0 + i * 0.07, { rx, hR: [-0.15, 1.45, 0.3], hL: [0.15, 1.45, 0.3], wR: [Math.sin(a), Math.cos(a), 0.15], uR: [0, 0, 1], eR: [-1, -0.3, 0], eL: [1, -0.3, 0], hipYaw: -0.2, hdYaw: 0.2 }, "lin")); } return out; };
+const spinNag = (t0: number, n: number, rx: number): Key[] => { const out: Key[] = []; for (let i = 0; i <= n; i++) { const a = (i / n) * Math.PI * 4; out.push(k(t0 + i * 0.07, { rx, hR: [-0.05, 1.45, 0.32], hL: "GRIP", wR: [Math.sin(a), Math.cos(a), 0.15], uR: [Math.cos(a), -Math.sin(a), 0], eR: [-1, -0.3, 0], eL: [1, -0.3, 0], hipYaw: -0.2, hdYaw: 0.2 }, "lin")); } return out; };
 add({
   id: "bushi-crescent", name: "Crescent Moon", faction: "bushi", dur: 4.6,
   steps: [
@@ -278,7 +278,7 @@ add({
   steps: [
     [0, (c) => { c.weapon(c.A, "arrow", "yumi"); c.cam("overA", 3); const B = { rx: -0.55 }; c.act(c.A, [k(0.35, mix(BOW, B, { hR: [0.08, 1.58, 0.5], wR: [0.04, 0, 1], uR: [0, 1, 0] }), "io"), k(1.0, mix(DRAW, B), "io"), k(1.6, mix(DRAW, B)), k(1.66, mix(BOW, B, { hR: [-0.15, 1.65, -0.15], eR: [-1, 0.2, -0.6] }), "snap"), k(3.2, mix(BOW, B, { hR: [-0.15, 1.65, -0.15] }))]); }],
     [0.9, (c) => { c.S.follow(c.fx.glowSprite(c.A.color, 0.6), () => c.A.tip("R"), 0.8); c.fx.seal(c.at(c.A, 0, 0.04), c.A.color, 1.2, 1.0, { ch: "射" }); }],
-    [1.66, (c) => { c.weapon(c.A, null); const from = c.A.rig.hand(c.A.mirrored ? "L" : "R"); const ar = makeWeapon("arrow", c.A.color); const tgt = () => c.D.rig.part("CHEST"); c.slow(0.25, 0.9);
+    [1.66, (c) => { c.weapon(c.A, null); const from = c.A.gripAt(c.A.mirrored ? "L" : "R"); const ar = makeWeapon("arrow", c.A.color); const tgt = () => c.D.rig.part("CHEST"); c.slow(0.25, 0.9);
       c.fx.projectile(ar, from, tgt, 0.45, { face: true, trail: c.A.color, keep: 0.6, arrive: () => { c.hit(3, tgt(), "CHEST", c.A.color); c.stop(0.15); c.flash(c.A.color, 0.8); c.fx.beam(tgt(), tgt().add(c.A.rig.forward().setY(0).normalize().multiplyScalar(6)), c.A.color, 0.05, 0.5); } });
       const mid = from.clone().lerp(c.D.rig.part("CHEST"), 0.5); c.cam({ pos: mid.clone().add(V(0, 0.25, 1.3)), look: c.D.rig.part("CHEST"), fov: 40 }, 3);
     }],
@@ -291,7 +291,7 @@ add({
   steps: [
     [0, (c) => { c.weapon(c.A, "arrow", "yumi"); c.cam("wide", 3); const up = { wL: [0, 0.6, 0.8], hL: [0.1, 2.05, 0.4], uL: [0, -0.8, 0.6], hdPitch: -0.5, spPitch: -0.25 } as PP;
       const B = { rx: -0.45 }; c.act(c.A, [k(0.35, mix(BOW, up, B, { hR: [0.06, 1.9, 0.3], wR: [0.02, 0.6, 0.8] }), "io"), k(0.95, mix(DRAW, up, B, { hR: [0.04, 1.7, 0.0], wR: [0.02, 0.6, 0.8] }), "io"), k(1.0, mix(BOW, up, B, { hR: [-0.2, 1.7, -0.2] }), "snap"), k(3.6, mix(BOW, up, B, { hR: [-0.2, 1.7, -0.2] }))]); }],
-    [1.0, (c) => { c.weapon(c.A, null); const ar = makeWeapon("arrow", c.A.color); const from = c.A.rig.hand(c.A.mirrored ? "L" : "R"); c.fx.projectile(ar, from, () => c.at(c.A, 0.6, 7), 0.5, { face: true, trail: c.A.color }); c.cam("sky", 2); }],
+    [1.0, (c) => { c.weapon(c.A, null); const ar = makeWeapon("arrow", c.A.color); const from = c.A.gripAt(c.A.mirrored ? "L" : "R"); c.fx.projectile(ar, from, () => c.at(c.A, 0.6, 7), 0.5, { face: true, trail: c.A.color }); c.cam("sky", 2); }],
     [1.6, (c) => { c.cam("high", 3); c.fx.seal(c.at(c.D, 0, 0.04), c.A.color, 2.2, 2.6, { ch: "雨" });
       for (let i = 0; i < 34; i++) c.S.later(i * 0.035, () => { const a = rnd(0, Math.PI * 2), r = i % 3 === 0 ? rnd(0, 0.18) : rnd(0.15, 0.9); const land = c.at(c.D, Math.cos(a) * r, i % 3 === 0 ? rnd(0.4, 1.6) : 0.02, Math.sin(a) * r * 0.6);
         const ar = makeWeapon("arrow", c.A.color); c.fx.projectile(ar, land.clone().add(V(rnd(-0.6, 0.6), 6, rnd(-0.4, 0.4))), () => land, 0.35, { face: true, trail: i % 4 ? undefined : c.A.color, keep: 2.6 - i * 0.03, arrive: () => { c.fx.sparks(land, "#e6ffd0", 4, 1.2, 0.15); if (i % 3 === 0) { c.hit(1, land, "CHEST", c.A.color); dizzyHit(c); } } }); });
@@ -307,7 +307,7 @@ add({
   id: "wokou-keg", name: "Powder Keg", faction: "wokou", dur: 4.7,
   steps: [
     [0, (c) => { c.weapon(c.A, "bomb"); c.cam("wide", 3); c.act(c.A, [k(0.35, mix(S.throwWind, { hR: [-0.3, 1.2, -0.3], hip: [0, -0.2, 0] }), "out"), k(0.62, mix(S.throwRel, { hR: [0.0, 0.9, 0.65], hip: [0, -0.3, 0.05], spPitch: 0.4 }), "snap"), k(1.2, mix(S.tall, { rx: -0.35, hR: [-0.25, 1.5, 0.2], hL: [0.25, 1.55, 0.2] }), "io"), k(2.0, mix(S.tall, { rx: -0.5, hR: [-0.12, 1.75, 0.0], hL: [0.12, 1.75, 0.0], hdPitch: 0.2, spPitch: 0.15 }), "io"), k(3.2, mix(S.tall, { rx: -0.5, hR: [-0.12, 1.75, 0.0], hL: [0.12, 1.75, 0.0] }))]); }],
-    [0.62, (c) => { c.weapon(c.A, null); const b = makeWeapon("bomb"); const from = c.A.rig.hand(c.A.mirrored ? "L" : "R"); const land = c.at(c.D, 0.32, 0.0, 0.12);
+    [0.62, (c) => { c.weapon(c.A, null); const b = makeWeapon("bomb"); const from = c.A.gripAt(c.A.mirrored ? "L" : "R"); const land = c.at(c.D, 0.32, 0.0, 0.12);
       c.fx.projectile(b, from, () => land, 0.55, { arc: 0.35, spin: V(0, 0, -14), keep: 1.6, arrive: () => { c.cam({ pos: c.at(c.D, 1.3, 0.7, 2.0), look: c.at(c.D, 0, 0.6), fov: 40 }, 3); } });
       for (let i = 0; i < 40; i++) c.S.later(0.55 + i * 0.04, () => c.fx.sprite(b.position.clone().add(V(0, 0.3, 0)), i % 2 ? "#ffd04a" : "#ff8a3a", 0.08, 0.25, { vel: V(rnd(-0.5, 0.5), 1, rnd(-0.5, 0.5)), grow: 0.5 }));
     }],
@@ -350,8 +350,8 @@ add({
     [0, (c) => { c.weapon(c.A, "bo"); c.cam("side", 3);
       const keys: Key[] = [k(0.3, mix(pole.guard, { rx: 0.2 }), "io")];
       for (let i = 0; i < 9; i++) { const t0 = 0.4 + i * 0.12; const hi = i % 3; const y = [1.65, 1.3, 1.05][hi];
-        keys.push(k(t0, mix(pole.guard, { rx: 0.25, hR: [-0.1, 1.2, 0.0], hL: [0.05, 1.25, 0.35], hipYaw: -0.4 })), k(t0 + 0.06, mix(pole.thrust, { rx: 0.45, hL: [0.04, y, 0.95], hR: [-0.02, y - 0.04, 0.55], wR: [0, (y - 1.3) * 0.2, 1] }), "snap")); }
-      keys.push(k(1.65, mix(pole.overhead, { rx: 0.3 }), "out"), k(1.85, mix(pole.guard, { rx: 0.55, spin: -Math.PI * 2, hR: [-0.3, 1.4, 0.4], hL: [0.3, 1.45, 0.5], wR: [1, 0.1, 0.2] }), "snap"), k(3.2, mix(pole.guard, { rx: 0.4 }), "io"));
+        keys.push(k(t0, mix(pole.guard, { rx: 0.25, hR: [-0.1, 1.2, 0.0], hipYaw: -0.4 })), k(t0 + 0.06, mix(pole.thrust, { rx: 0.3, hR: [-0.02, y - 0.04, 0.5], wR: [0, (y - 1.3) * 0.25, 1], tipW: 1, tipAt: (["HEAD", "CHEST", "BELLY"] as const)[hi] }), "snap"), k(t0 + 0.1, mix(pole.thrust, { rx: 0.27, hR: [-0.02, y - 0.04, 0.45], wR: [0, (y - 1.3) * 0.25, 1], tipW: 1, tipAt: (["HEAD", "CHEST", "BELLY"] as const)[hi] }))); }
+      keys.push(k(1.65, mix(pole.overhead, { rx: 0.3 }), "out"), k(1.85, mix(pole.guard, { rx: 0.55, spin: -Math.PI * 2, hR: [-0.3, 1.4, 0.4], wR: [1, 0.1, 0.2], uR: [0, 0, -1] }), "snap"), k(3.2, mix(pole.guard, { rx: 0.4 }), "io"));
       c.act(c.A, keys);
     }],
     ...Array.from({ length: 9 }, (_, i) => [0.46 + i * 0.12, (c: FinCtx) => { c.hit(i % 3 === 0 ? 2 : 1, c.A.tip("R"), ["HEAD", "CHEST", "BELLY"][i % 3] as any); dizzyHit(c); }] as [number, (c: FinCtx) => void]),
