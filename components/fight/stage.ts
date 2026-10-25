@@ -34,6 +34,7 @@ export class Fighter {
   extra = new THREE.Group();     // props that move with the fighter
   gloves: Record<"R" | "L", Glove>;
   poleK: Record<"R" | "L", number | null> = { R: null, L: null };
+  audio = { prev: {} as Record<string, THREE.Vector3>, armed: {} as Record<string, boolean>, cd: {} as Record<string, number>, hipY: null as number | null, fallCd: 0 };
   lastPole: Record<"R" | "L", number> = { R: 0, L: 0 }; private lastPoleNext = 0;   // where a support hand holds a long shaft (smoothed)
   constructor(rig: Rig, side: Side, faction: string, color: string, props: THREE.Object3D) {
     this.rig = rig; this.side = side; this.faction = faction; this.color = color; this.mirrored = side === "enemy";
@@ -197,8 +198,13 @@ export type StageEvent =
   | { type: "title"; text: string; color: string; sub?: string }
   | { type: "finisherStart"; side: Side; id: string; name: string }
   | { type: "finisherEnd"; side: Side; id: string }
-  | { type: "ko"; side: Side };
+  | { type: "ko"; side: Side }
+  | { type: "sfx"; name: string; vol?: number };
 
+/** what a weapon sounds like when it swings / lands */
+const BLADES = new Set(["katana", "wakizashi", "naginata", "cutlass", "yari", "ono"]), HEAVY = new Set(["kanabo", "bo", "shakujo"]);
+const SWISH = new Set(["katana", "wakizashi", "cutlass"]);   // light blades swish; long / heavy weapons whoosh
+export type HitKind = "fist" | "foot" | "blade" | "blunt" | "magic" | "star" | "arrow" | "bullet" | "none";
 export interface CamShot { pos: THREE.Vector3; look: THREE.Vector3; fov?: number; ease?: number }
 
 export class FightStage {
@@ -214,7 +220,7 @@ export class FightStage {
   koSide: Side | null = null;
   rand = Math.random;
 
-  constructor() { this.group.add(this.fx.group); this.group.add(this.props); }
+  constructor() { this.group.add(this.fx.group); this.group.add(this.props); this.fx.snd = (n, v) => this.sfx(n, v); }
   on(fn: (e: StageEvent) => void) { this.listeners.push(fn); return () => { this.listeners = this.listeners.filter((x) => x !== fn); }; }
   emit(e: StageEvent) { for (const l of this.listeners) l(e); }
   other(s: Side): Side { return s === "player" ? "enemy" : "player"; }
@@ -267,14 +273,41 @@ export class FightStage {
     if (m === "wR" || m === "wL") { const a = m === "wR" ? "R" : "L"; const w = F.weapons[a]; return w ? weaponTip(w.obj) : F.fistAt(a); }
     return m[0] === "h" ? F.fistAt(m[1] as "L" | "R") : F.rig.foot(m[1] as "L" | "R");
   }
-  contact(attacker: Side, at: THREE.Vector3, power: 1 | 2 | 3, part: "HEAD" | "CHEST" | "BELLY" = "HEAD", opts: { noReact?: boolean; color?: string } = {}) {
+  sfx(name: string, vol = 1) { this.emit({ type: "sfx", name, vol }); }
+  /** the sound of a blow, by what landed it */
+  private hitSound(kind: HitKind, power: number, blocked: boolean) {
+    if (blocked) { this.sfx("block", 0.8 + power * 0.1); return; }
+    const p = Math.max(1, Math.min(3, power));
+    switch (kind) {
+      case "fist": this.sfx(p === 1 ? "punch_light" : p === 2 ? "punch_med" : "punch_heavy"); break;
+      case "foot": this.sfx("kick_hit", 0.85 + p * 0.07); if (p === 3) this.sfx("punch_heavy", 0.6); break;
+      case "blade": this.sfx("slash_hit", 0.8 + p * 0.08); if (p === 3) this.sfx("punch_heavy", 0.45); break;
+      case "blunt": this.sfx("staff_hit", 0.85 + p * 0.06); if (p >= 2) this.sfx("punch_med", 0.55); break;
+      case "magic": this.sfx("magic_hit", 0.8 + p * 0.1); break;
+      case "star": this.sfx("star_hit"); this.sfx("punch_light", 0.4); break;
+      case "arrow": this.sfx("arrow_hit"); break;
+      case "bullet": this.sfx("punch_med", 0.8); break;
+    }
+  }
+  /** what is in the hand that struck (or the foot) */
+  kindOf(F: Fighter, limb?: string): HitKind {
+    if (limb && (limb[0] === "f" || limb === "fR" || limb === "fL")) return "foot";
+    const h = limb ? (limb[1] as "R" | "L") : F.mirrored ? "L" : "R";
+    const w = F.weapons[h] || (limb ? undefined : F.weapons[h === "R" ? "L" : "R"]); const id = w?.id as string | undefined;
+    if (!id) return "fist"; if (BLADES.has(id)) return "blade"; if (HEAVY.has(id)) return "blunt"; return "fist";
+  }
+  contact(attacker: Side, at: THREE.Vector3, power: 1 | 2 | 3, part: "HEAD" | "CHEST" | "BELLY" = "HEAD", opts: { noReact?: boolean; color?: string; kind?: HitKind } = {}) {
     const A = this.f[attacker], D = this.f[this.other(attacker)]; if (!A || !D) return;
     const target = D.rig.part(part); const pos = at.clone().lerp(target, 0.35);
+    const kind = opts.kind || this.kindOf(A);
+    A.audio.cd.any = 0.25;   // the hit sound covers the follow-through: no whoosh right after it
     if (D.guarding && D.state === "fight") {
+      this.hitSound(kind, power, true);
       this.fx.impact(pos, "#8fd0ff", 1, true); D.play("blockHit"); this.stop(0.06); D.shake = 0.02;
       this.emit({ type: "impact", target: D.side, blocked: true, power }); this.emit({ type: "shake", amount: 0.4 }); return;
     }
-    this.fx.impact(pos, opts.color || A.color, power); D.flash = 0.1 + power * 0.03; D.shake = 0.02 + power * 0.012;
+    this.hitSound(kind, power, false);
+    this.fx.impact(pos, opts.color || A.color, power, false, kind === "magic"); D.flash = 0.1 + power * 0.03; D.shake = 0.02 + power * 0.012;
     this.stop([0, 0.05, 0.08, 0.13][power]);
     if (!opts.noReact && D.state === "fight") {
       const trading = D.offensive && D.act && D.act.t < 0.35;
@@ -287,7 +320,7 @@ export class FightStage {
   private handle(F: Fighter, e: Ev) {
     const O = this.f[this.other(F.side)];
     switch (e.k) {
-      case "hit": if (O) this.contact(F.side, this.limbPos(F, e.limb), e.power, e.at || "HEAD"); break;
+      case "hit": if (O) { const m = F.limb(e.limb); this.contact(F.side, this.limbPos(F, e.limb), e.power, e.at || "HEAD", { kind: m === "wR" || m === "wL" ? this.kindOf(F, "h" + m[1]) : this.kindOf(F, m) }); } break;
       case "proj": {
         if (!O) break; const n = e.n || 1;
         for (let i = 0; i < n; i++) {
@@ -299,7 +332,8 @@ export class FightStage {
             this.fx.projectile(obj, from, to, e.dur, {
               arc: e.arc || 0, spin: what === "shuriken" ? V(0, 0, 40) : undefined, face: what !== "shuriken" && what !== "orb",
               trail: what === "orb" ? F.color : what === "shuriken" ? "#cfe8ff" : undefined,
-              arrive: () => this.contact(F.side, to(), (i === n - 1 ? e.power : 1) as 1 | 2 | 3, part as any, { color: F.color }),
+              arrive: () => this.contact(F.side, to(), (i === n - 1 ? e.power : 1) as 1 | 2 | 3, part as any, { color: F.color, kind: what === "orb" ? "magic" : "star" }),
+              silentHit: true,
             });
             if (what === "orb") { obj.scale.setScalar(1.2); }
             if (what === "shuriken") { obj.lookAt(this.fx.camera ? this.fx.camera.position : V(0, 1, 5)); }
@@ -309,11 +343,43 @@ export class FightStage {
         break;
       }
       case "weapon": if (e.R !== undefined) F.setWeapon("R", e.R, this.props); if (e.L !== undefined) F.setWeapon("L", e.L, this.props); break;
-      case "vis": F.rig.model.visible = e.on; F.rig.visible = e.on; break;
-      case "smoke": this.fx.smoke(F.center(), "#7d8496", 10, 0.5); break;
-      case "charge": this.follow(this.glowAt(F.color, 0.5), () => F.gripAt("R").lerp(F.gripAt("L"), 0.5), 0.45); break;
+      case "vis": if (!e.on && F.rig.model.visible) this.sfx("vanish", 0.8); F.rig.model.visible = e.on; F.rig.visible = e.on; break;
+      case "smoke": this.fx.smoke(F.center(), "#7d8496", 10, 0.5, true); break;
+      case "charge": this.sfx("magic_charge"); this.follow(this.glowAt(F.color, 0.5), () => F.gripAt("R").lerp(F.gripAt("L"), 0.5), 0.45); break;
       case "whoosh": break;
     }
+  }
+  /** sounds the picture makes by itself: a limb or weapon moving fast whooshes, a body hitting the floor thuds */
+  private listen(F: Fighter, sim: number) {
+    const R = F.rig; const au = F.audio;
+    if (!R.model.visible) { au.prev = {}; return; }
+    const swinging = (F.state === "finishing" || F.offensive) && Math.abs(R.last?.tumble ?? 0) < 0.4 && R.offset.y < 0.1;
+    const pts: [string, THREE.Vector3, number, string][] = [];
+    for (const h of ["R", "L"] as const) {
+      const w = F.weapons[h]; const id = w?.id as string | undefined;
+      if (id && (BLADES.has(id) || HEAVY.has(id) || id === "tessen")) pts.push(["w" + h, weaponTip(w!.obj), 6.5, SWISH.has(id) ? "swing_blade" : id === "tessen" ? "swing_punch" : "swing_heavy"]);
+      else if (!id && !F.weapons.R && !F.weapons.L) pts.push(["h" + h, F.fistAt(h), 4.2, "swing_punch"]);   // a hand helping hold a weapon doesn't swish on its own
+      pts.push(["f" + h, R.foot(h), 5.2, "swing_kick"]);
+    }
+    // speed relative to the hips: a dash or a teleport moves the whole body, it isn't a swing
+    const hp = R.b.Hips.getWorldPosition(new THREE.Vector3()); const hPrev = au.prev.hips; au.prev.hips = hp.clone();
+    const dh = hPrev ? hp.clone().sub(hPrev) : null; const jump = !dh || dh.length() > 0.35;
+    au.cd.any = Math.max(0, (au.cd.any || 0) - sim);
+    for (const [k, p, thr, snd] of pts) {
+      const prev = au.prev[k]; au.prev[k] = p.clone(); au.cd[k] = Math.max(0, (au.cd[k] || 0) - sim);
+      if (!prev || !swinging || jump) continue;
+      const vr = p.clone().sub(prev).sub(dh!); const v = vr.length() / sim;
+      const out = k[0] === "w" || vr.dot(p.clone().sub(hp).normalize()) > 0.25 * vr.length();   // a fist or foot reaching out, not pulling back (a blade sweeps either way)
+      const kickUp = k[0] !== "f" || p.y > 0.4;   // a foot only whooshes when it's off the floor kicking, not running
+      if (v > thr && out && kickUp && au.armed[k] !== false && !(au.cd[k] > 0) && !(au.cd.any > 0)) { this.sfx(snd, Math.min(1.1, 0.45 + (v - thr) / (thr * 1.5))); au.armed[k] = false; au.cd[k] = 0.16; au.cd.any = 0.12; }
+      else if (v < thr * 0.55) au.armed[k] = true;
+    }
+    // falls: the hips come down fast and land low
+    if (R.offset.y < -0.02 || F.state === "done") { au.hipY = null; return; }   // sinking into the ground / finished: its own sound covers it
+    const hy = R.b.Hips.getWorldPosition(new THREE.Vector3()).y; const vy = au.hipY == null ? 0 : (hy - au.hipY) / sim; au.fallCd = Math.max(0, au.fallCd - sim);
+    if (au.hipY != null && hy < 0.62 && au.hipY >= 0.62 - 1e-3 + 0 && vy < -1.2 && au.fallCd <= 0) { this.sfx("body_fall", Math.min(1.1, 0.6 + -vy * 0.08)); au.fallCd = 0.5; }
+    else if (au.hipY != null && hy < 0.45 && vy < -2.5 && au.fallCd <= 0) { this.sfx("body_fall", 0.9); au.fallCd = 0.5; }
+    au.hipY = hy;
   }
   glowAt(color: string, size: number) { return this.fx.glowSprite(color, size); }
   private timers: { t: number; fn: () => void }[] = [];
@@ -342,6 +408,7 @@ export class FightStage {
       if (F.flash > 0) { F.flash -= dt; F.rig.tint("hit"); if (F.flash <= 0) F.rig.tint(F.look === "none" ? "none" : F.look, F.lookColor, F.lookK); }
       else if (F.look !== "none") F.rig.tint(F.look, F.lookColor, F.lookK);
     }
+    if (sim > 0) for (const s of ["player", "enemy"] as Side[]) { const F = this.f[s]; if (F) this.listen(F, sim); }
     for (let i = this.followers.length - 1; i >= 0; i--) { const f = this.followers[i]; f.life -= sim; const p = f.fn(); if (p) f.o.position.copy(p); if (f.life <= 0) { this.props.remove(f.o); this.followers.splice(i, 1); } }
     this.fx.update(this.hitstop > 0 ? dt * 0.3 : dt * Math.max(0.35, this.timeScale));
   }
@@ -379,7 +446,9 @@ export interface FinCtx {
   weapon: (F: Fighter, R?: WeaponId | null, L?: WeaponId | null) => void;
   cam: (shot: "wide" | "closeA" | "closeD" | "low" | "high" | "overA" | "sky" | "side" | CamShot, ease?: number) => void;
   slow: (scale: number, dur: number) => void; stop: (sec: number) => void;
-  hit: (power: 1 | 2 | 3, at?: THREE.Vector3, part?: "HEAD" | "CHEST" | "BELLY", color?: string) => void;
+  hit: (power: 1 | 2 | 3, at?: THREE.Vector3, part?: "HEAD" | "CHEST" | "BELLY", color?: string, kind?: HitKind) => void;
+  /** a sound on this frame (see components/fight/audio.ts) */
+  sfx: (name: string, vol?: number) => void;
   flash: (color?: string, strength?: number) => void; shake: (amount: number) => void;
   title: (text: string, sub?: string) => void;
   /** defender endings */
@@ -400,7 +469,9 @@ function makeCtx(S: FightStage, A: Fighter, D: Fighter): FinCtx {
   return {
     S, A, D, fx,
     act: (F, keys, ev, loop) => F.play({ name: "fin", keys, ev, loop }),
-    weapon: (F, R, L) => { if (R !== undefined) F.setWeapon("R", R, S.props); if (L !== undefined) F.setWeapon("L", L, S.props); },
+    weapon: (F, R, L) => {
+      if (R !== undefined) F.setWeapon("R", R, S.props); if (L !== undefined) F.setWeapon("L", L, S.props);
+    },
     cam: (shot, ease = 4) => {
       if (typeof shot !== "string") { S.cam = { ...shot, ease }; return; }
       const m = mid(); const a = A.rig.root.position, d = D.rig.root.position; const sx = dirX(A);
@@ -409,7 +480,7 @@ function makeCtx(S: FightStage, A: Fighter, D: Fighter): FinCtx {
         closeA: { pos: V(a.x + sx * 1.1, 1.55, 2.3), look: V(a.x, 1.35, 0), fov: 34 },
         closeD: { pos: V(d.x - sx * 1.0, 1.5, 2.3), look: V(d.x, 1.25, 0), fov: 34 },
         low: { pos: V(m.x - sx * 0.6, 0.35, 3.2), look: V(m.x, 1.3, 0), fov: 40 },
-        high: { pos: V(m.x, 4.2, 3.4), look: V(m.x, 0.6, 0), fov: 38 },
+        high: { pos: V(m.x, 2.9, 2.9), look: V(m.x, 0.85, 0), fov: 40 },
         overA: { pos: V(a.x - sx * 1.4, 1.9, 1.4), look: V(d.x, 1.2, 0), fov: 38 },
         sky: { pos: V(m.x, 1.1, 5.2), look: V(d.x, 2.4, -1.2), fov: 46 },
         side: { pos: V(m.x, 1.3, 3.4), look: V(m.x, 1.1, 0), fov: 34 },
@@ -417,20 +488,22 @@ function makeCtx(S: FightStage, A: Fighter, D: Fighter): FinCtx {
       S.cam = { ...shots[shot], ease };
     },
     slow: (s, d) => S.slow(s, d), stop: (s) => S.stop(s),
-    hit: (power, p, part = "HEAD", color) => S.contact(A.side, p || D.rig.part(part), power, part, { noReact: true, color }),
+    hit: (power, p, part = "HEAD", color, kind) => S.contact(A.side, p || D.rig.part(part), power, part, { noReact: true, color, kind }),
+    sfx: (name, vol) => S.sfx(name, vol),
     flash: (color = "#ffffff", strength = 0.8) => S.emit({ type: "screenFlash", color, strength }),
     shake: (amount) => S.emit({ type: "shake", amount }),
-    title: (text, sub) => S.emit({ type: "title", text, color: A.color, sub }),
+    title: (text, sub) => { S.sfx("title"); S.emit({ type: "title", text, color: A.color, sub }); },
     look: (F, look, k, color) => { F.look = look; F.lookK = k; if (color) F.lookColor = color; },
     end: (how, color = A.color) => {
       const pts = D.bodyPoints(); const c = D.center();
       const hide = () => { D.rig.model.visible = false; D.rig.visible = false; D.state = "done"; for (const h of ["R", "L"] as const) D.setWeapon(h, null, S.props); };
+      S.sfx(({ shatter: "shatter", petals: "petals", ash: "ash", stone: "stone", gold: "gold", sky: "sky", sink: "sink", dissolve: "dissolve", vanish: "vanish" } as Record<string, string>)[how]);
       switch (how) {
-        case "shatter": fx.shards(pts, color, { n: 90, speed: 3.2, from: c, emissive: 0.9 }); fx.flash(c, color, 2.2, 0.35); fx.sparks(c, "#ffffff", 30, 6, 0.5); hide(); break;
-        case "petals": fx.motes(pts, "#ffb7c9", "petals", 140, 2.6); fx.flash(c, "#ffd0dc", 1.4, 0.3); hide(); break;
+        case "shatter": fx.shards(pts, color, { n: 110, speed: 3.2, from: c, emissive: 0.45, size: 0.038 }); fx.flash(c, color, 1.1, 0.25); fx.sparks(c, "#ffffff", 30, 6, 0.5); hide(); break;
+        case "petals": fx.motes(pts, "#ffb7c9", "petals", 140, 2.6); fx.flash(c, "#ffd0dc", 0.45, 0.18); hide(); break;
         case "ash": fx.motes(pts, color, "ash", 120, 2.4); fx.motes(pts, "#ff8a3a", "embers", 50, 1.8); hide(); break;
         case "stone": fx.shards(pts, "#8a8278", { n: 70, speed: 1.2, emissive: 0, gravity: 9, size: 0.08, metal: 0 }); fx.dust(D.rig.root.position, 1.2); hide(); break;
-        case "gold": fx.shards(pts, "#ffcc55", { n: 80, speed: 2.2, emissive: 0.5, metal: 1 }); fx.flash(c, "#fff1b0", 1.8, 0.35); hide(); break;
+        case "gold": fx.shards(pts, "#ffcc55", { n: 100, speed: 2.2, emissive: 0.35, metal: 1, size: 0.04 }); fx.flash(c, "#fff1b0", 0.9, 0.25); hide(); break;
         case "dissolve": fx.motes(pts, color, "spirit", 120, 2.2); hide(); break;
         case "vanish": hide(); break;
         case "sky": { const R = D.rig; const vx = -dirX(A) * 2.2;
@@ -441,12 +514,13 @@ function makeCtx(S: FightStage, A: Fighter, D: Fighter): FinCtx {
     },
     trail: (F, color, hand = "R") => {
       const h = F.mirrored ? (hand === "R" ? "L" : "R") : hand;
-      return fx.trail(() => { const tip = F.tip(hand); const base = F.gripAt(h as "L" | "R"); return [base.lerp(tip, 0.62), tip]; }, color, 9);
+      return fx.trail(() => { const tip = F.tip(hand); const base = F.gripAt(h as "L" | "R"); return [base.lerp(tip, 0.74), tip]; }, color, 8);
     },
     explode: (pos, color, size = 1) => {
-      fx.flash(pos, "#fff4d0", 2.4 * size, 0.35); fx.flash(pos, color, 3.2 * size, 0.6);
-      fx.sparks(pos, "#ffd27a", 40, 7 * size, 0.6); fx.ring(pos, color, 2.6 * size, 0.5); fx.groundRing(pos, color, 3 * size, 0.8);
-      for (let i = 0; i < 18; i++) fx.sprite(pos.clone().add(V((Math.random() - 0.5) * 0.6, (Math.random() - 0.3) * 0.6, (Math.random() - 0.5) * 0.6)), i % 2 ? color : "#3a302c", (0.5 + Math.random() * 0.6) * size, 0.8 + Math.random() * 0.6, { tex: "smoke", add: i % 2 === 1, vel: V((Math.random() - 0.5) * 4, Math.random() * 3, (Math.random() - 0.5) * 4).multiplyScalar(size), grow: 1.6, fade: 0.8 });
+      S.sfx(size >= 0.9 ? "explosion" : "explosion_small");
+      fx.flash(pos, "#fff4d0", 1.1 * size, 0.22); fx.flash(pos, color, 1.6 * size, 0.38);
+      fx.sparks(pos, "#ffd27a", 40, 7 * size, 0.6); fx.ring(pos, color, 1.5 * size, 0.35); fx.groundRing(pos, color, 2.2 * size, 0.6);
+      for (let i = 0; i < 18; i++) fx.sprite(pos.clone().add(V((Math.random() - 0.5) * 0.6, (Math.random() - 0.3) * 0.6, (Math.random() - 0.5) * 0.6)), i % 2 ? color : "#3a302c", (0.3 + Math.random() * 0.4) * size, 0.6 + Math.random() * 0.5, { tex: "smoke", add: i % 2 === 1, vel: V((Math.random() - 0.5) * 4, Math.random() * 3, (Math.random() - 0.5) * 4).multiplyScalar(size), grow: 1.6, fade: 0.8 });
       S.emit({ type: "shake", amount: 2.5 * size }); S.emit({ type: "screenFlash", color: "#fff1d0", strength: 0.7 });
     },
     sideX: dirX, at,

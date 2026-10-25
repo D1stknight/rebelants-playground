@@ -14,7 +14,7 @@ function canvasTex(w: number, h: number, draw: (g: CanvasRenderingContext2D, w: 
 function tex() {
   if (TEX) return TEX;
   const glow = canvasTex(128, 128, (g) => { const r = g.createRadialGradient(64, 64, 0, 64, 64, 64); r.addColorStop(0, "rgba(255,255,255,1)"); r.addColorStop(0.25, "rgba(255,255,255,0.75)"); r.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = r; g.fillRect(0, 0, 128, 128); });
-  const smoke = canvasTex(128, 128, (g) => { for (let i = 0; i < 9; i++) { const x = 64 + rnd(-22, 22), y = 64 + rnd(-22, 22), rr = rnd(26, 46); const r = g.createRadialGradient(x, y, 0, x, y, rr); r.addColorStop(0, "rgba(255,255,255,0.55)"); r.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = r; g.fillRect(0, 0, 128, 128); } });
+  const smoke = canvasTex(128, 128, (g) => { for (let i = 0; i < 26; i++) { const a = rnd(0, 6.3), d = rnd(0, 26); const x = 64 + Math.cos(a) * d, y = 64 + Math.sin(a) * d, rr = rnd(18, 40); const r = g.createRadialGradient(x, y, 0, x, y, rr); r.addColorStop(0, "rgba(255,255,255,0.2)"); r.addColorStop(0.6, "rgba(255,255,255,0.08)"); r.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = r; g.fillRect(0, 0, 128, 128); } });
   const petal = canvasTex(64, 64, (g) => { g.fillStyle = "#fff"; g.beginPath(); g.moveTo(32, 4); g.bezierCurveTo(60, 20, 52, 54, 32, 60); g.bezierCurveTo(12, 54, 4, 20, 32, 4); g.fill(); g.fillStyle = "rgba(255,180,200,0.6)"; g.beginPath(); g.moveTo(32, 12); g.lineTo(32, 52); g.lineWidth = 2; g.strokeStyle = "rgba(255,150,180,0.7)"; g.stroke(); });
   const star = canvasTex(64, 64, (g) => { g.translate(32, 32); g.fillStyle = "#fff"; g.beginPath(); for (let i = 0; i < 10; i++) { const a = (i / 10) * Math.PI * 2 - Math.PI / 2, r = i % 2 ? 11 : 30; g.lineTo(Math.cos(a) * r, Math.sin(a) * r); } g.fill(); });
   TEX = { glow, smoke, petal, star };
@@ -40,6 +40,8 @@ export class FxSystem {
   group = new THREE.Group();
   items: Item[] = [];
   camera: THREE.Camera | null = null;
+  /** sound hook: the stage turns these into "sfx" events on the same frame */
+  snd: (name: string, vol?: number) => void = () => {};
   constructor() { this.group.name = "fight-fx"; }
   add(it: Item) { this.items.push(it); return it; }
   update(dt: number) {
@@ -79,22 +81,26 @@ export class FxSystem {
     for (let i = 0; i < n; i++) vel.push(V(rnd(-1, 1), rnd(-0.6, 1), rnd(-1, 1)).normalize().multiplyScalar(speed * rnd(0.5, 1.2)));
     let t = 0; const a = g.attributes.position as THREE.BufferAttribute;
     return this.add({ update: (dt) => { t += dt; const u = t / life; if (u >= 1) return false;
-      for (let i = 0; i < n; i++) { const v = vel[i]; const h = pos.clone().addScaledVector(v, t * 0.6 + 0.03), tl = pos.clone().addScaledVector(v, t * 0.6 * 0.55); h.y -= 2 * t * t; tl.y -= 1.6 * t * t; a.setXYZ(i * 2, h.x, h.y, h.z); a.setXYZ(i * 2 + 1, tl.x, tl.y, tl.z); }
+      for (let i = 0; i < n; i++) { const v = vel[i]; const h = pos.clone().addScaledVector(v, t * 0.6 + 0.02); h.y -= 2 * t * t; const tl = h.clone().addScaledVector(v, -Math.min(0.03, 0.5 / v.length()) * (1 - u * 0.6)); a.setXYZ(i * 2, h.x, h.y, h.z); a.setXYZ(i * 2 + 1, tl.x, tl.y, tl.z); }
       a.needsUpdate = true; m.opacity = 1 - u; return true; }, dispose: () => this.kill(L) });
   }
   /** a hit: flash + streaks + shock ring */
-  impact(pos: THREE.Vector3, color: string, power: number, blocked = false) {
-    const c = blocked ? "#8fd0ff" : color;
-    this.flash(pos, blocked ? "#cfe9ff" : "#fff0c8", 0.3 + power * 0.22, 0.14 + power * 0.04);
-    this.sparks(pos, blocked ? "#bfe6ff" : "#ffe1a0", 10 + power * 7, 2.6 + power * 1.2, 0.22 + power * 0.06);
-    this.ring(pos, c, 0.3 + power * 0.22, 0.18 + power * 0.05);
+  impact(pos: THREE.Vector3, color: string, power: number, blocked = false, magic = false) {
+    // tight and quick: a hot core, a star, short streaks; a thin shock ring only on strong blows
+    if (blocked) { this.flash(pos, "#d8efff", 0.28, 0.08); this.sparks(pos, "#cfeaff", 8, 2.6, 0.14); return; }
+    this.flash(pos, "#fff6dc", 0.2 + power * 0.1, 0.06 + power * 0.02);
+    this.sprite(pos, magic ? color : "#ffe8b0", 0.22 + power * 0.1, 0.07 + power * 0.02, { tex: "star", grow: 0.5, rot: Math.random() * 6 });
+    if (magic) this.sprite(pos, color, 0.5 + power * 0.18, 0.22, { grow: 0.8, fade: 0.8 });
+    this.sparks(pos, magic ? color : "#ffe1a0", 8 + power * 6, 3 + power * 1.4, 0.12 + power * 0.04);
+    if (power >= 2) this.ring(pos, color, 0.13 + power * 0.06, 0.09 + power * 0.025);
   }
   dust(pos: THREE.Vector3, size = 1.4) {
     this.groundRing(pos, "#b89a78", size, 0.7, false);
     for (let i = 0; i < 10; i++) { const a = (i / 10) * Math.PI * 2; this.sprite(V(pos.x + Math.cos(a) * 0.2, 0.12, pos.z + Math.sin(a) * 0.2), "#a08670", rnd(0.35, 0.6), rnd(0.6, 1.0), { tex: "smoke", add: false, vel: V(Math.cos(a) * 1.4, rnd(0.2, 0.6), Math.sin(a) * 1.4), fade: 0.6, grow: 1.4 }); }
   }
-  smoke(pos: THREE.Vector3, color = "#8d93a3", n = 14, size = 0.5) {
-    for (let i = 0; i < n; i++) this.sprite(pos.clone().add(V(rnd(-0.25, 0.25), rnd(-0.6, 0.6), rnd(-0.25, 0.25))), color, rnd(size * 0.6, size), rnd(0.45, 0.8), { tex: "smoke", add: false, vel: V(rnd(-1, 1), rnd(-0.2, 1), rnd(-1, 1)), grow: 1.2, fade: 0.55, rot: rnd(0, 6) });
+  smoke(pos: THREE.Vector3, color = "#8d93a3", n = 14, size = 0.5, silent = false) {
+    if (!silent) this.snd("smoke", Math.min(1, 0.3 + n * 0.03));
+    for (let i = 0; i < n; i++) this.sprite(pos.clone().add(V(rnd(-0.25, 0.25), rnd(-0.6, 0.6), rnd(-0.25, 0.25))), color, rnd(size * 0.6, size), rnd(0.45, 0.8), { tex: "smoke", add: false, vel: V(rnd(-1, 1), rnd(-0.2, 1), rnd(-1, 1)), grow: 1.4, fade: 0.75, rot: rnd(0, 6) });
   }
   /** ribbon behind a moving point pair (sword trail) — call trail.stop() to let it fade */
   trail(get: () => [THREE.Vector3, THREE.Vector3], color: string, len = 14) {
@@ -103,18 +109,25 @@ export class FxSystem {
     const idx: number[] = []; for (let i = 0; i < n - 1; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); } g.setIndex(idx);
     const m = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, uniforms: { c: { value: new THREE.Color(color) }, k: { value: 1 } },
       vertexShader: "attribute float a; varying float va; void main(){ va = a; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }",
-      fragmentShader: "uniform vec3 c; uniform float k; varying float va; void main(){ gl_FragColor = vec4(mix(c, vec3(1.), va*va*0.6), va*k); }" });
+      fragmentShader: "uniform vec3 c; uniform float k; varying float va; void main(){ gl_FragColor = vec4(mix(c, vec3(1.), va*0.5), va*k); }" });
     const mesh = this.obj(new THREE.Mesh(g, m)); mesh.frustumCulled = false;
-    const hist: [THREE.Vector3, THREE.Vector3][] = []; let live = true, fade = 1;
+    // each sample remembers how fast the tip was moving: a slow or still blade leaves no ribbon, only a real swing does
+    const hist: [THREE.Vector3, THREE.Vector3, number][] = []; let live = true, fade = 1;
     const it = this.add({ update: (dt) => {
-      if (live) { const [a, b] = get(); hist.unshift([a.clone(), b.clone()]); if (hist.length > n) hist.pop(); } else { fade -= dt * 5; if (fade <= 0) return false; hist.pop(); if (hist.length < 2) return false; }
-      for (let i = 0; i < n; i++) { const h = hist[Math.min(i, hist.length - 1)]; if (!h) continue; pos.set([h[0].x, h[0].y, h[0].z, h[1].x, h[1].y, h[1].z], i * 6); const al = hist.length > 1 ? (1 - i / (hist.length - 1)) * 0.8 : 0; alpha[i * 2] = 0; alpha[i * 2 + 1] = al; }
+      if (live) { const [a, b] = get(); const p = hist[0]; const sp = p && dt > 0 ? b.distanceTo(p[1]) / dt : 0; const jump = p ? b.distanceTo(p[1]) > 0.45 || a.distanceTo(p[0]) > 0.45 : false; const w = jump ? 0 : Math.max(0, Math.min(1, (sp - 2) / 4)); if (jump) for (const q of hist) q[2] = 0; hist.unshift([a.clone(), b.clone(), w]); if (hist.length > n) hist.pop(); } else { fade -= dt * 6; if (fade <= 0) return false; hist.pop(); if (hist.length < 2) return false; }
+      for (let i = 0; i < n; i++) { const h = hist[Math.min(i, hist.length - 1)]; if (!h) continue; pos.set([h[0].x, h[0].y, h[0].z, h[1].x, h[1].y, h[1].z], i * 6); const r = hist.length > 1 ? 1 - i / (hist.length - 1) : 0; const al = r * r * 0.6 * h[2]; alpha[i * 2] = 0; alpha[i * 2 + 1] = al; }
       (g.attributes.position as THREE.BufferAttribute).needsUpdate = true; (g.attributes.a as THREE.BufferAttribute).needsUpdate = true; m.uniforms.k.value = fade; return true; }, dispose: () => this.kill(mesh) });
     return { stop: () => { live = false; }, it };
   }
   /** fly an object from → to (optional arc), spinning, then call arrive() */
-  projectile(o: THREE.Object3D, from: THREE.Vector3, to: () => THREE.Vector3, dur: number, opts: { arc?: number; spin?: THREE.Vector3; face?: boolean; trail?: string; arrive?: () => void; keep?: number } = {}) {
+  projectile(o: THREE.Object3D, from: THREE.Vector3, to: () => THREE.Vector3, dur: number, opts: { arc?: number; spin?: THREE.Vector3; face?: boolean; trail?: string; arrive?: () => void; keep?: number; silentHit?: boolean; quiet?: number } = {}) {
     this.group.add(o); o.position.copy(from); let t = 0, done = false; const prev = from.clone();
+    // launch / landing sounds by what flies
+    const id = o.userData.id as string | undefined; const qv = opts.quiet ?? 1;
+    const launch: Record<string, string> = { shuriken: "star_throw", kunai: "star_throw", arrow: "arrow_whiz", orb: "magic_launch", bomb: "swing_heavy" };
+    const land: Record<string, string> = { shuriken: "star_hit", kunai: "star_hit", arrow: "arrow_hit", orb: "magic_hit" };
+    if (id && launch[id]) this.snd(launch[id], qv);
+    const arriveUser = opts.arrive; opts = { ...opts, arrive: () => { if (!opts.silentHit && id && land[id]) this.snd(land[id], qv); arriveUser?.(); } };
     const tr = opts.trail ? this.trail(() => { const d = o.position.clone().sub(prev).normalize().multiplyScalar(0.02); return [o.position.clone().sub(d), o.position.clone().add(V(0, 0.03, 0))]; }, opts.trail, 10) : null;
     let keep = opts.keep ?? 0;
     return this.add({ update: (dt) => {
@@ -153,6 +166,7 @@ export class FxSystem {
     }
   }
   lightning(from: THREE.Vector3, to: THREE.Vector3, color: string, life = 0.25, width = 3) {
+    this.snd("thunder", Math.min(1, 0.6 + life));
     const segs = 14; const pts: THREE.Vector3[] = [];
     const build = () => { pts.length = 0; for (let i = 0; i <= segs; i++) { const u = i / segs; const p = from.clone().lerp(to, u); if (i && i < segs) p.add(V(rnd(-0.18, 0.18), rnd(-0.1, 0.1), rnd(-0.18, 0.18))); pts.push(p); } };
     build(); const g = new THREE.BufferGeometry().setFromPoints(pts);
@@ -167,16 +181,18 @@ export class FxSystem {
     const len = from.distanceTo(to);
     const mk = (r: number, o: number) => { const m = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: o, blending: THREE.AdditiveBlending, depthWrite: false }); const b = this.obj(new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 12, 1, true), m)); b.position.copy(from).lerp(to, 0.5); b.quaternion.setFromUnitVectors(V(0, 1, 0), to.clone().sub(from).normalize()); return { b, m, o }; };
     const parts = [mk(width, 0.9), mk(width * 2.4, 0.35)]; let t = 0;
-    return this.add({ update: (dt) => { t += dt; const u = t / life; if (u >= 1) return false; for (const p of parts) { p.m.opacity = p.o * (1 - u); p.b.scale.set(1 - u * 0.6, 1, 1 - u * 0.6); } return true; }, dispose: () => parts.forEach((p) => this.kill(p.b)) });
+    return this.add({ update: (dt) => { t += dt; const u = t / life; if (u >= 1) return false; const f = (1 - u) * (1 - u); for (const p of parts) { p.m.opacity = p.o * f; p.b.scale.set(1 - u * 0.7, 1, 1 - u * 0.7); } return true; }, dispose: () => parts.forEach((p) => this.kill(p.b)) });
   }
   /** a glowing seal disc (kanji ring) — flat on the ground or facing a direction */
   seal(pos: THREE.Vector3, color: string, size: number, life: number, opts: { ch?: string; normal?: THREE.Vector3; spin?: number; grow?: [number, number] } = {}) {
+    this.snd("seal", Math.min(1, 0.55 + size * 0.15));
     const m = new THREE.MeshBasicMaterial({ map: sealTex(opts.ch || "封"), color, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
     const s = this.obj(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), m)); s.position.copy(pos);
     const n = opts.normal || V(0, 1, 0); s.lookAt(pos.clone().add(n)); let t = 0; const [g0, g1] = opts.grow || [0.6, 1];
     return this.add({ update: (dt) => { t += dt; const u = t / life; if (u >= 1) return false; s.rotateZ((opts.spin ?? 1) * dt); const k = size * (g0 + (g1 - g0) * Math.min(1, u * 3)); s.scale.setScalar(k); m.opacity = (u < 0.12 ? u / 0.12 : 1) * (u > 0.8 ? (1 - u) / 0.2 : 1); return true; }, dispose: () => this.kill(s) });
   }
   tornado(pos: () => THREE.Vector3, color: string, life: number, h = 2.6) {
+    this.snd(life > 2 ? "wind" : "wind_short");
     const n = 170; const T = tex(); const sprites: { s: THREE.Sprite; a: number; y: number; r: number; m: THREE.SpriteMaterial }[] = [];
     for (let i = 0; i < n; i++) { const m = new THREE.SpriteMaterial({ map: i % 3 ? T.smoke : T.glow, color: i % 3 ? "#d9dde6" : color, transparent: true, depthWrite: false, blending: i % 3 ? THREE.NormalBlending : THREE.AdditiveBlending });
       const s = this.obj(new THREE.Sprite(m)); s.scale.setScalar(rnd(0.07, 0.22)); sprites.push({ s, a: rnd(0, 6.28), y: rnd(0, h), r: 0, m }); }
@@ -186,6 +202,7 @@ export class FxSystem {
       return true; }, dispose: () => sprites.forEach((p) => this.kill(p.s)) });
   }
   rocks(center: THREE.Vector3, n = 10, radius = 0.6, life = 2.2, color = "#6b5d50") {
+    this.snd("rocks", Math.min(1, 0.5 + n * 0.04));
     const geo = new THREE.DodecahedronGeometry(1, 0); const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.95, flatShading: true });
     const im = this.obj(new THREE.InstancedMesh(geo, mat, n)); im.castShadow = true; im.frustumCulled = false;
     const R = Array.from({ length: n }, (_, i) => { const a = (i / n) * Math.PI * 2 + rnd(-0.2, 0.2); const r = radius * rnd(0.6, 1.1); return { x: center.x + Math.cos(a) * r, z: center.z + Math.sin(a) * r, s: rnd(0.12, 0.28), tilt: new THREE.Euler(rnd(-0.6, 0.6), rnd(0, 6), rnd(-0.6, 0.6)), d: rnd(0, 0.15) }; });
@@ -196,8 +213,9 @@ export class FxSystem {
   }
   /** spectral spikes erupting from the ground (spears, ice) */
   spikes(center: THREE.Vector3, color: string, n = 8, radius = 0.55, life = 1.8, height = 1.3, inward = 0.5) {
-    const g = new THREE.ConeGeometry(0.05, 1, 6); g.translate(0, 0.5, 0);
-    const m = new THREE.MeshStandardMaterial({ color, emissive: new THREE.Color(color), emissiveIntensity: 1.2, transparent: true, opacity: 0.9, metalness: 0.4, roughness: 0.3 });
+    this.snd("spikes", Math.min(1, 0.6 + n * 0.03));
+    const g = new THREE.ConeGeometry(0.045, 1, 8); g.translate(0, 0.5, 0);
+    const m = new THREE.MeshStandardMaterial({ color, emissive: new THREE.Color(color), emissiveIntensity: 0.55, transparent: true, opacity: 0.9, metalness: 0.4, roughness: 0.3 });
     const im = this.obj(new THREE.InstancedMesh(g, m, n)); im.frustumCulled = false;
     const S = Array.from({ length: n }, (_, i) => { const a = (i / n) * Math.PI * 2; return { x: center.x + Math.cos(a) * radius, z: center.z + Math.sin(a) * radius, a, d: i * 0.04 }; });
     let t = 0; const M = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();

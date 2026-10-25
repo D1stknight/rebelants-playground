@@ -7,7 +7,7 @@ export const EASE: Record<Ease, (u: number) => number> = {
   back: (u) => { const c = 1.7; return 1 + (c + 1) * Math.pow(u - 1, 3) + c * Math.pow(u - 1, 2); },
 };
 
-export type WeaponId = "katana" | "wakizashi" | "yari" | "naginata" | "bo" | "kanabo" | "ono" | "yumi" | "arrow" | "shuriken" | "kunai" | "tessen" | "scroll" | "cutlass" | "bomb" | "gourd" | "shakujo" | "conch" | "teppo" | "orb";
+export type WeaponId = "katana" | "wakizashi" | "yari" | "naginata" | "bo" | "kanabo" | "ono" | "yumi" | "arrow" | "shuriken" | "kunai" | "tessen" | "scroll" | "cutlass" | "bomb" | "gourd" | "shakujo" | "conch" | "teppo" | "orb" | "keg";
 export type Limb = "hL" | "hR" | "fL" | "fR" | "wR" | "wL";
 export type Ev =
   | { k: "hit"; limb: Limb; power: 1 | 2 | 3; at?: "HEAD" | "CHEST" | "BELLY" }
@@ -74,10 +74,10 @@ export const POSES: Record<string, Pose> = {
   winFist: P({ look: 0, rx: 0.0, hip: [0, -0.03, 0], hipYaw: -0.15, spYaw: 0, spPitch: -0.05, hdYaw: 0.15, hdPitch: -0.2, hR: [-0.12, 2.35, 0.15], eR: [-1, 0, 0.3], hL: [0.25, 1.35, 0.2], fL: [0.15, 0.15, 0.2], fR: [-0.15, 0.15, -0.2], ftRy: -0.3 }),
   bow: P({ look: 0, hip: [0, -0.05, -0.05], hipYaw: -0.1, hipPitch: 0.35, spPitch: 0.35, hdPitch: 0.3, hdYaw: 0.1, hL: [0.1, 1.25, 0.25], eL: [1, -0.5, 0], hR: [-0.08, 1.24, 0.25], eR: [-1, -0.5, 0], fL: [0.12, 0.15, 0.05], fR: [-0.12, 0.15, -0.05], ftRy: 0, fist: 0.5 }),
   // knock-down
-  launch: P({ look: 0, rx: -0.45, ry: 0.35, tumble: -0.7, hipPitch: -0.2, spPitch: -0.4, hdPitch: -0.6, hL: [0.5, 1.9, 0.2], eL: [1, 0, 0], hR: [-0.5, 1.95, 0.1], eR: [-1, 0, 0], fL: [0.2, 0.5, 0.45], kL: [0, 0.3, 1], fR: [-0.2, 0.25, 0.25], kR: [0, 0.3, 1], ftLp: 0.6, ftRp: 0.6, fist: 0 }),
-  fall: P({ look: 0, rx: -0.85, ry: -0.35, tumble: -1.45, hipPitch: -0.1, spPitch: -0.15, hdPitch: -0.3, hL: [0.6, 1.6, -0.2], eL: [1, 0, 0], hR: [-0.6, 1.62, -0.25], eR: [-1, 0, 0], fL: [0.2, 0.4, 0.5], kL: [0, 0.5, 1], fR: [-0.2, 0.3, 0.45], kR: [0, 0.5, 1], ftLp: 0.7, ftRp: 0.7, fist: 0 }),
-  down: P({ look: 0, rx: -0.95, ry: -0.72, tumble: -1.57, hip: [0, -0.05, 0], hipYaw: 0, hipPitch: 0, spYaw: 0, spPitch: 0, hdYaw: 0.3, hdPitch: 0.15, hL: [0.62, 1.4, 0.06], eL: [1, 0, 0], hR: [-0.6, 1.5, 0.06], eR: [-1, 0, 0], fL: [0.25, 0.18, 0.12], kL: [0.3, 0, 1], fR: [-0.22, 0.12, 0.02], kR: [-0.3, 0, 1], ftLp: 0.9, ftRp: 0.9, ftLy: 0, ftRy: 0, fist: 0 }),
-  bounce: P({ look: 0, rx: -1.0, ry: -0.6, tumble: -1.5, hip: [0, -0.05, 0], hipYaw: 0, spYaw: 0, hdPitch: -0.2, hL: [0.65, 1.55, 0.08], eL: [1, 0, 0], hR: [-0.62, 1.6, 0.08], eR: [-1, 0, 0], fL: [0.25, 0.4, 0.4], kL: [0.3, 0, 1], fR: [-0.22, 0.35, 0.3], kR: [-0.3, 0, 1], ftLp: 0.9, ftRp: 0.9, ftLy: 0, ftRy: 0, fist: 0 }),
+  launch: P({ look: 0, rx: -0.35, ry: 0.35, tumble: -0.7, hipPitch: -0.2, spPitch: -0.4, hdPitch: -0.6, hL: [0.5, 1.9, 0.2], eL: [1, 0, 0], hR: [-0.5, 1.95, 0.1], eR: [-1, 0, 0], fL: [0.2, 0.5, 0.45], kL: [0, 0.3, 1], fR: [-0.2, 0.25, 0.25], kR: [0, 0.3, 1], ftLp: 0.6, ftRp: 0.6, fist: 0 }),
+  fall: P({ look: 0, rx: -0.6, ry: -0.35, tumble: -1.45, hipPitch: -0.1, spPitch: -0.15, hdPitch: -0.3, hL: [0.6, 1.6, -0.2], eL: [1, 0, 0], hR: [-0.6, 1.62, -0.25], eR: [-1, 0, 0], fL: [0.2, 0.4, 0.5], kL: [0, 0.5, 1], fR: [-0.2, 0.3, 0.45], kR: [0, 0.5, 1], ftLp: 0.7, ftRp: 0.7, fist: 0 }),
+  down: P({ look: 0, rx: -0.68, ry: -0.72, tumble: -1.57, hip: [0, -0.05, 0], hipYaw: 0, hipPitch: 0, spYaw: 0, spPitch: 0, hdYaw: 0.3, hdPitch: 0.15, hL: [0.62, 1.4, 0.06], eL: [1, 0, 0], hR: [-0.6, 1.5, 0.06], eR: [-1, 0, 0], fL: [0.25, 0.18, 0.12], kL: [0.3, 0, 1], fR: [-0.22, 0.12, 0.02], kR: [-0.3, 0, 1], ftLp: 0.9, ftRp: 0.9, ftLy: 0, ftRy: 0, fist: 0 }),
+  bounce: P({ look: 0, rx: -0.72, ry: -0.6, tumble: -1.5, hip: [0, -0.05, 0], hipYaw: 0, spYaw: 0, hdPitch: -0.2, hL: [0.65, 1.55, 0.08], eL: [1, 0, 0], hR: [-0.62, 1.6, 0.08], eR: [-1, 0, 0], fL: [0.25, 0.4, 0.4], kL: [0.3, 0, 1], fR: [-0.22, 0.35, 0.3], kR: [-0.3, 0, 1], ftLp: 0.9, ftRp: 0.9, ftLy: 0, ftRy: 0, fist: 0 }),
   kneel: P({ look: 0, hip: [0, -0.55, -0.05], hipYaw: -0.1, hipPitch: 0.1, spPitch: 0.15, hdPitch: 0.2, hL: [0.22, 0.95, 0.35], eL: [1, -0.5, 0], hR: [-0.2, 1.0, 0.1], eR: [-1, -0.5, 0], fL: [0.18, 0.15, 0.35], kL: [0, 0.2, 1], fR: [-0.16, 0.12, -0.45], kR: [0, -1, 0.3], ftRp: 1.2, ftLy: 0, ftRy: 0 }),
 };
 
@@ -104,7 +104,7 @@ export const ACTIONS: Record<string, ActionDef> = {
   },
   roundhouse: {
     name: "roundhouse", offensive: true, next: "stance",
-    keys: [{ t: 0.14, p: "chamber", e: "out" }, { t: 0.3, p: "kickHigh", e: "snap" }, { t: 0.55, p: "kickBack", e: "io" }, { t: 0.85, p: "stance", e: "io" }],
+    keys: [{ t: 0.14, p: "chamber", e: "out" }, { t: 0.3, p: "kickHigh", e: "snap" }, { t: 0.36, p: "kickHigh" }, { t: 0.52, p: "chamber", e: "io" }, { t: 0.84, p: "stance", e: "io" }],   // the leg rebounds the way it came
     ev: [[0.3, { k: "hit", limb: "fR", power: 3 }]],
   },
   uppercut: {
@@ -114,7 +114,7 @@ export const ACTIONS: Record<string, ActionDef> = {
   },
   bodyKick: {
     name: "bodyKick", offensive: true, next: "stance",
-    keys: [{ t: 0.12, p: "chamber", e: "out" }, { t: 0.26, p: "kickMid", e: "snap" }, { t: 0.42, p: "kickBack", e: "io" }, { t: 0.5, p: "crossWind", e: "io" }, { t: 0.58, p: "cross", e: "snap" }, { t: 0.9, p: "stance", e: "io" }],
+    keys: [{ t: 0.12, p: "chamber", e: "out" }, { t: 0.26, p: "kickMid", e: "snap" }, { t: 0.31, p: "kickMid" }, { t: 0.42, p: "chamber", e: "io" }, { t: 0.5, p: "crossWind", e: "io" }, { t: 0.58, p: "cross", e: "snap" }, { t: 0.9, p: "stance", e: "io" }],
     ev: [[0.26, { k: "hit", limb: "fR", power: 2, at: "CHEST" }], [0.58, { k: "hit", limb: "hR", power: 2 }]],
   },
   block: { name: "block", next: "stance", guard: [0, 1.25], keys: [{ t: 0.1, p: "block", e: "out" }, { t: 1.25, p: "block" }, { t: 1.45, p: "stance", e: "io" }] },
@@ -136,13 +136,13 @@ export const ACTIONS: Record<string, ActionDef> = {
   vanish: {
     name: "vanish", offensive: true, next: "stance",
     keys: [{ t: 0.08, p: { ...POSES.crouch, rx: 0 }, e: "out" }, { t: 0.14, p: { ...POSES.crouch, rx: 0 } }, { t: 0.15, p: { ...POSES.chamber, rx: 2.15, spin: Math.PI } }, { t: 0.3, p: { ...POSES.chamber, rx: 2.0, spin: Math.PI } },
-      { t: 0.4, p: { ...POSES.kickMid, fR: "OPP_CHEST", rx: 1.95, spin: Math.PI }, e: "snap" }, { t: 0.62, p: { ...POSES.kickBack, rx: 2.05, spin: Math.PI }, e: "io" }, { t: 0.66, p: { ...POSES.stance, rx: 2.1, spin: Math.PI } }, { t: 0.67, p: "stance" }, { t: 0.9, p: "stance" }],
+      { t: 0.4, p: { ...POSES.kickMid, fR: "OPP_CHEST", rx: 1.95, spin: Math.PI }, e: "snap" }, { t: 0.62, p: { ...POSES.chamber, rx: 2.05, spin: Math.PI }, e: "io" }, { t: 0.66, p: { ...POSES.stance, rx: 2.1, spin: Math.PI } }, { t: 0.67, p: "stance" }, { t: 0.9, p: "stance" }],
     ev: [[0.1, { k: "smoke" }], [0.12, { k: "vis", on: false }], [0.17, { k: "vis", on: true }], [0.17, { k: "smoke" }], [0.4, { k: "hit", limb: "fR", power: 2, at: "CHEST" }], [0.62, { k: "smoke" }], [0.64, { k: "vis", on: false }], [0.68, { k: "vis", on: true }], [0.68, { k: "smoke" }]],
   },
   winFist: { name: "winFist", keys: [{ t: 0.35, p: "winFist", e: "out" }, { t: 0.9, p: { ...POSES.winFist, hR: [-0.1, 2.38, 0.18] }, e: "io" }] },
   bow: { name: "bow", keys: [{ t: 0.3, p: "tall", e: "io" }, { t: 0.8, p: "bow", e: "io" }, { t: 1.6, p: "bow" }, { t: 2.1, p: "tall", e: "io" }] },
   knockdown: { name: "knockdown", keys: [{ t: 0.06, p: "launch", e: "snap" }, { t: 0.4, p: "fall", e: "lin" }, { t: 0.56, p: "down", e: "in" }, { t: 0.7, p: "bounce", e: "out" }, { t: 0.86, p: "down", e: "io" }] },
-  collapse: { name: "collapse", keys: [{ t: 0.3, p: "kneel", e: "in" }, { t: 0.6, p: { ...POSES.down, rx: -0.2, tumble: 1.45, ry: -0.75 }, e: "in" }] },
+  collapse: { name: "collapse", keys: [{ t: 0.35, p: "kneel", e: "io" }, { t: 0.55, p: { ...POSES.kneel, spPitch: 0.45, hdPitch: 0.45, hip: [0, -0.62, 0.02] }, e: "io" }, { t: 0.85, p: { ...POSES.down, rx: -0.2, tumble: 1.45, ry: -0.75 }, e: "in" }, { t: 0.95, p: { ...POSES.down, rx: -0.2, tumble: 1.38, ry: -0.68 }, e: "out" }, { t: 1.08, p: { ...POSES.down, rx: -0.2, tumble: 1.45, ry: -0.75 }, e: "io" }] },
 };
 
 /** the offensive actions per FW move type (picked at random each time) */

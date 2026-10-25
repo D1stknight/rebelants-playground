@@ -12,6 +12,7 @@
 // and consolidate. Both are safe.
 
 import * as React from "react";
+import { fightAudio } from "../components/fight/audio";
 
 export function useFWAudio() {
   const [muted, setMuted] = React.useState<boolean>(() => {
@@ -19,6 +20,7 @@ export function useFWAudio() {
   });
   const mutedRef = React.useRef(muted);
   mutedRef.current = muted;
+  React.useEffect(() => { fightAudio.setMuted(muted); }, [muted]);
   const musicRef = React.useRef<HTMLAudioElement | null>(null);
   const lowHpFiredRef = React.useRef(false);
   const play = React.useCallback((file: string, vol = 1) => {

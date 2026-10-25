@@ -1,5 +1,6 @@
 // components/FactionWars.tsx — FACTION WARS
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { fightAudio } from "./fight/audio";
 import Link from "next/link";
 import { pointsConfig as defaultPointsConfig } from "../lib/pointsConfig";
 import { usePoints } from "../lib/usePoints";
@@ -18,6 +19,7 @@ function useFWAudio() {
   });
   const mutedRef = React.useRef(muted);
   mutedRef.current = muted;
+  React.useEffect(() => { fightAudio.setMuted(muted); }, [muted]);
   const musicRef = React.useRef<HTMLAudioElement | null>(null);
   const lowHpFiredRef = React.useRef(false);
   const play = React.useCallback((file: string, vol = 1) => {
@@ -785,7 +787,7 @@ setPhase("battle"); startMusic(); setBusy(false);
   if (!selectedMove || busy || fightInFlightRef.current) return;
   showStage();
   if (solo.session && !solo.session.abandoned) {
-    fightInFlightRef.current = true; setBusy(true); setBattleAnim("clash"); sfx.clash();
+    fightInFlightRef.current = true; setBusy(true); setBattleAnim("clash");
     const chosen = selectedMove;
     setPlayer3DAnim(getSamuraiAnimForMove(chosen));
     try {
@@ -833,11 +835,7 @@ if (typeof window !== "undefined") {
     if (sacrificeBonus > 0) setSacrificeBonus(0);
     if (powerBuffRounds > 0) setPowerBuffRounds(n => n - 1);
     if (commandActive) setCommandActive(false); // consumed after one use
-    setBusy(true); setBattleAnim("clash"); sfx.clash();
-    if (selectedMove.type === "attack") sfx.attackHit();
-    else if (selectedMove.type === "defend") sfx.defendBlock();
-    else if (selectedMove.type === "magic") sfx.magicCast();
-    else if (selectedMove.type === "trick") sfx.trickDodge();
+    setBusy(true); setBattleAnim("clash");   // the arena plays the swing / hit / block sounds on the frames they happen
    await new Promise(r=>setTimeout(r,450));
 if (fightSeq !== fightSeqRef.current) return;
 
@@ -857,7 +855,7 @@ if (typeof window !== "undefined") {
     setUsedMoves(prev => ({ ...prev, [selectedMove.id]: (prev[selectedMove.id]||0)+1 }));
     if (selectedMove.oneTime) setOneTimeUsed(prev => [...prev, selectedMove.id]);
     // ── Special move effects ──────────────────────────────────────
-    if (selectedMove.id === "berserker_rage") { setBerserkerActive(true); sfx.berserker(); }
+    if (selectedMove.id === "berserker_rage") { setBerserkerActive(true); fightAudio.play("finish_them", { vol: 0.7 }); }
     if (selectedMove.id === "imperial_decree" || selectedMove.id === "final_command") sfx.imperial();
     if (selectedMove.id === "iron_meditation") sfx.heal();
     if (selectedMove.id === "plunder") sfx.plunder();
@@ -940,7 +938,7 @@ if (typeof window !== "undefined") {
     const newEnemyHp  = Math.max(0, enemyHp  - playerDmg);
     setPlayerHp(newPlayerHp);
     setEnemyHp(newEnemyHp);
-    if (playerDmg > 18) sfx.hitHeavy(); else if (playerDmg < 10) sfx.hitLight();
+
     if (newPlayerHp < 25 && playerHp >= 25) sfx.lowHp();
 
     // Floating dmg numbers

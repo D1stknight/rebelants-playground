@@ -277,13 +277,7 @@ function ActiveMatchView({
 
       // SFX cascade: clash → move-type → hit-light/heavy
       try {
-        sfx.clash();
-        if (moveObj?.type === "attack") sfx.attackHit();
-        else if (moveObj?.type === "defend") sfx.defendBlock();
-        else if (moveObj?.type === "magic") sfx.magicCast();
-        else if (moveObj?.type === "trick") sfx.trickDodge();
-        if (newest.damageDealt > 18) sfx.hitHeavy();
-        else if (newest.damageDealt > 0 && newest.damageDealt < 10) sfx.hitLight();
+        // swing / hit / block sounds come from the arena on the frames they happen
       } catch {}
 
       // 2D card animation: clash flash + floating damage on the defender's side

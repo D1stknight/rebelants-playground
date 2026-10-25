@@ -15,6 +15,7 @@ import { Color, Fog, type PerspectiveCamera, type PointLight, type SpotLight } f
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { FightStage, type StageEvent } from "./fight/stage";
 import { finishersFor, type Finisher } from "./fight/finishers";
+import { fightAudio } from "./fight/audio";
 
 export type FWAnim = "idle" | "attack" | "magic" | "trick" | "defend" | "hit" | "win" | "lose";
 export type FWBattleAnim = "idle" | "clash" | "win" | "lose";
@@ -238,12 +239,13 @@ export default function FactionWarsArena({ player, enemy, battleAnim, registerGl
   const timers = useRef<number[]>([]);
   const later = useCallback((ms: number, fn: () => void) => { const t = window.setTimeout(fn, ms); timers.current.push(t); return t; }, []);
   const sfxRef = useRef(sfx); sfxRef.current = sfx;
-  const finState = useRef<{ active: boolean; running: boolean; waiters: (() => void)[] }>({ active: false, running: false, waiters: [] });
+  const finState = useRef<{ active: boolean; running: boolean; picked: boolean; waiters: (() => void)[] }>({ active: false, running: false, picked: false, waiters: [] });
   const pending = useRef<{ float: Partial<Record<Side, Float[]>>; ko: Side | null; koTimer: number | null }>({ float: {}, ko: null, koTimer: null });
   const lastImpact = useRef<Record<Side, number>>({ player: 0, enemy: 0 });
   const colors = useRef({ player: player.color, enemy: enemy.color }); colors.current = { player: player.color, enemy: enemy.color };
   const choiceRef = useRef(finisherChoice); choiceRef.current = finisherChoice;
   useEffect(() => () => { timers.current.forEach(clearTimeout); finState.current.waiters.splice(0).forEach((r) => r()); }, []);
+  useEffect(() => { fightAudio.preload(); }, []);
 
   // warm the rest of the roster only after the current pair has had the network to itself
   const preloadKey = (preload || []).join(",");
@@ -287,20 +289,20 @@ export default function FactionWarsArena({ player, enemy, battleAnim, registerGl
   const runFinisher = useCallback((winner: Side, f: Finisher) => {
     setChoice(null);
     const Wf = stage.f[winner]; if (!stage.koSide || !Wf || !finishersFor(Wf.faction).includes(f)) return;   // stale choice from an earlier match-up
-    finState.current.running = true;
-    sfxRef.current?.clash?.();
+    if (finState.current.picked) return;   // one finisher per knock-out (the auto-pick timer must not start a second one)
+    finState.current.running = true; finState.current.picked = true;
     stage.runFinisher(winner, f).then(finishDone);
   }, [stage, finishDone]);
 
   const startKO = useCallback((loser: Side) => {
     const pd = pending.current; if (pd.koTimer) { clearTimeout(pd.koTimer); pd.koTimer = null; } pd.ko = null;
     if (stage.koSide) return;
-    stage.ko(loser);
+    stage.ko(loser); finState.current.picked = false;
     dir.current.ko = { side: loser, at: performance.now() };
     const winner: Side = loser === "player" ? "enemy" : "player";
     const W = stage.f[winner]; if (!W) { finishDone(); return; }
     const options = finishersFor(W.faction);
-    later(650, () => { setCallout({ text: "FINISH THEM!", color: "#ff3b3b", n: idRef.current++ }); sfxRef.current?.berserker?.(); });
+    later(650, () => { setCallout({ text: "FINISH THEM!", color: "#ff3b3b", n: idRef.current++ }); fightAudio.play("finish_them"); });
     if (winner === "player" && choiceRef.current) {
       // every delayed step checks it still belongs to this knock-out (a new match-up can arrive before the 5 s choice runs out)
       const same = () => stage.f[winner] === W && stage.koSide === loser;
@@ -319,11 +321,12 @@ export default function FactionWarsArena({ player, enemy, battleAnim, registerGl
       flushFloats(ev.target);
       if (pending.current.ko === ev.target) startKO(ev.target);
       d.punch = Math.max(d.punch, ev.blocked ? 0.3 : 0.5 + ev.power * 0.2);
-      if (stage.fin) (ev.power >= 3 ? sfxRef.current?.hitHeavy : sfxRef.current?.hitLight)?.();
     }
     if (ev.type === "shake") d.shake = Math.max(d.shake, ev.amount);
-    if (ev.type === "screenFlash") setWhiteFlash((w) => ({ n: w.n + 1, color: ev.color, a: Math.min(0.85, ev.strength) }));
-    if (ev.type === "title") { setFinTitle({ text: ev.text, color: ev.color, n: idRef.current++ }); sfxRef.current?.ultra?.(); }
+    if (ev.type === "screenFlash") setWhiteFlash((w) => ({ n: w.n + 1, color: ev.color, a: Math.min(0.42, ev.strength * 0.45) }));
+    if (ev.type === "title") setFinTitle({ text: ev.text, color: ev.color, n: idRef.current++ });
+    // every fight sound is played on the frame the engine reports it (slow motion lowers the pitch a little)
+    if (ev.type === "sfx") fightAudio.play(ev.name, { vol: ev.vol, rate: 0.72 + 0.28 * Math.min(1, stage.timeScale) });
   }), [stage, flushFloats, startKO]);
 
   // ── fresh match-up → fly-in + banner + reset

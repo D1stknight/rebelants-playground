@@ -158,6 +158,16 @@ function bomb() {
   const fuse = mesh(new THREE.CylinderGeometry(0.005, 0.005, 0.08, 5), std("#c9a46a", 0, 0.9)); fuse.position.set(0.01, 0.27, 0); fuse.rotation.z = 0.3; g.add(fuse);
   g.userData.tip = 0.3; return g;
 }
+function keg() {
+  // a small powder keg: wooden staves, two iron hoops, a fuse on top — held from underneath
+  const g = new THREE.Group(); const wood = WOOD("#7a4a22"); const iron = std("#2c2c30", 0.8, 0.45);
+  const body = mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.3, 16), wood); body.position.y = 0.17; body.scale.set(1, 1, 1); g.add(body);
+  const belly = mesh(new THREE.SphereGeometry(0.15, 16, 10), wood); belly.position.y = 0.17; belly.scale.set(1, 0.9, 1); g.add(belly);
+  for (const y of [0.07, 0.27]) { const h = mesh(new THREE.TorusGeometry(0.14, 0.012, 6, 20), iron); h.rotation.x = Math.PI / 2; h.position.y = y; g.add(h); }
+  const lid = mesh(new THREE.CylinderGeometry(0.115, 0.115, 0.012, 16), WOOD("#5a3416")); lid.position.y = 0.325; g.add(lid);
+  const fuse = mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.1, 5), std("#c9a46a", 0, 0.9)); fuse.position.set(0.02, 0.37, 0); fuse.rotation.z = 0.35; g.add(fuse);
+  g.userData.tip = 0.42; return g;
+}
 function gourd() {
   const g = new THREE.Group(); const m = std("#c8862a", 0.1, 0.6);
   const a = mesh(new THREE.SphereGeometry(0.07, 14, 10), m); a.position.y = 0.05; g.add(a);
@@ -185,6 +195,9 @@ function orb(col: string) {
 }
 
 export function makeWeapon(id: WeaponId, color = "#ffffff", flip = false): THREE.Group {
+  const g = makeWeapon0(id, color, flip); g.userData.id = id; return g;
+}
+function makeWeapon0(id: WeaponId, color: string, flip: boolean): THREE.Group {
   switch (id) {
     case "katana": return katana();
     case "wakizashi": return katana(0.68);
@@ -202,6 +215,7 @@ export function makeWeapon(id: WeaponId, color = "#ffffff", flip = false): THREE
     case "scroll": return scroll(flip);
     case "cutlass": return cutlass();
     case "bomb": return bomb();
+    case "keg": return keg();
     case "gourd": return gourd();
     case "conch": return conch();
     case "teppo": return teppo();
