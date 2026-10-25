@@ -41,6 +41,7 @@ const _m = new THREE.Matrix4(), _x = new THREE.Vector3(), _y = new THREE.Vector3
 
 export class Glove {
   root = new THREE.Group();        // world placement (scale = hand length)
+  cuff = new THREE.Group();        // the cuff follows the forearm (like the Forge Rigger's ForeArmCuff bone), not the bending hand
   side: "L" | "R";
   L: number;
   joints: Record<F5, THREE.Object3D[]> = {} as any;
@@ -63,8 +64,10 @@ export class Glove {
       const g = new THREE.SphereGeometry(1, 20, 14); g.scale(s[0], s[1], s[2]); g.translate(c[0], c[1] * my, c[2]); add(g, gm, this.root);
     }
     // cuff: an oval tube reaching back into the sleeve
-    { const g = new THREE.CapsuleGeometry(0.13, 0.17, 6, 18); g.rotateZ(Math.PI / 2); g.scale(1, (0.17 / 0.13) * cuffK, cuffK); g.translate(-0.135, 0, 0); add(g, cm, this.root);
-      const band = new THREE.TorusGeometry(0.138, 0.02, 8, 24); band.rotateY(Math.PI / 2); band.scale(1, (0.172 / 0.138) * cuffK, cuffK); band.translate(-0.01, 0, 0); add(band, cm, this.root); }
+    { const g = new THREE.CapsuleGeometry(0.13, 0.17, 6, 18); g.rotateZ(Math.PI / 2); g.scale(1, (0.17 / 0.13) * cuffK, cuffK); g.translate(-0.16, 0, 0); add(g, cm, this.cuff);
+      const band = new THREE.TorusGeometry(0.138, 0.02, 8, 24); band.rotateY(Math.PI / 2); band.scale(1, (0.172 / 0.138) * cuffK, cuffK); band.translate(-0.04, 0, 0); add(band, cm, this.cuff);
+      // a short glove wrist that fills the gap between the cuff and the palm when the hand bends
+      const wr = new THREE.SphereGeometry(1, 16, 12); wr.scale(0.1, 0.15, 0.1); wr.translate(0.02, 0, 0); add(wr, gm, this.root); }
     // fingers: three capsule segments on a joint chain
     for (const f of Object.keys(FINGERS) as F5[]) {
       const d = FINGERS[f]; const dir = new THREE.Vector3(d.d[0], d.d[1] * my, d.d[2]).normalize();
@@ -88,7 +91,7 @@ export class Glove {
         const inv = chain[0].quaternion.clone().invert(); this.axes[f] = ax.applyQuaternion(inv);
       } else this.axes[f] = new THREE.Vector3(0, 1, 0);
     }
-    this.root.scale.setScalar(L);
+    this.root.scale.setScalar(L); this.cuff.scale.setScalar(L);
     // measure the grip hole and the knuckles in the canonical frame
     this.setPose("grip");
     const mid = this.joints.Middle, idx = this.joints.Index;
@@ -126,8 +129,9 @@ export class Glove {
     const L3 = (x: number[], y: number[]) => [0, 1, 2].map((i) => x[i] + (y[i] - x[i]) * u) as [number, number, number];
     this.apply(out, L3(ta, tb), L3(ba, bb));
   }
-  /** put the wrist at `wrist`, fingers along X, thumb toward `thumb` (world vectors) */
-  place(wrist: THREE.Vector3, X: THREE.Vector3, thumb: THREE.Vector3) {
+  /** put the wrist at `wrist`, fingers along X, thumb toward `thumb` (world vectors); the cuff along the forearm `fa` */
+  place(wrist: THREE.Vector3, X: THREE.Vector3, thumb: THREE.Vector3, fa?: THREE.Vector3) {
+    this.placeCuff(wrist, fa || X, thumb);
     _x.copy(X).normalize();
     _y.copy(thumb).sub(_x.clone().multiplyScalar(thumb.dot(_x)));
     if (_y.lengthSq() < 1e-8) _y.set(0, 1, 0).sub(_x.clone().multiplyScalar(_x.y));
@@ -136,7 +140,12 @@ export class Glove {
     _m.makeBasis(_x, _y, _z); this.root.quaternion.setFromRotationMatrix(_m); this.root.position.copy(wrist);
     this.root.updateMatrixWorld(true);
   }
+  placeCuff(wrist: THREE.Vector3, fa: THREE.Vector3, thumb: THREE.Vector3) {
+    const x = fa.clone().normalize(); const y = thumb.clone().addScaledVector(x, -thumb.dot(x)); if (y.lengthSq() < 1e-8) y.set(0, 1, 0).addScaledVector(x, -x.y);
+    y.normalize(); if (this.side === "L") y.negate(); const z = new THREE.Vector3().crossVectors(x, y).normalize();
+    this.cuff.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z)); this.cuff.position.copy(wrist); this.cuff.updateMatrixWorld(true);
+  }
   /** world point of a glove-local (hand length 1) point */
   world(p: THREE.Vector3, out = new THREE.Vector3()) { return out.copy(p).applyMatrix4(this.root.matrixWorld); }
-  dispose() { this.root.traverse((o: any) => o.geometry?.dispose?.()); this.mats.forEach((m) => m.dispose()); }
+  dispose() { this.cuff.traverse((o: any) => o.geometry?.dispose?.()); this.root.traverse((o: any) => o.geometry?.dispose?.()); this.mats.forEach((m) => m.dispose()); }
 }

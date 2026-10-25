@@ -33,7 +33,8 @@ export class Fighter {
   look: "none" | "stone" | "gold" | "char" | "glow" = "none"; lookK = 0; lookColor = "#fff"; opacity = 1;
   extra = new THREE.Group();     // props that move with the fighter
   gloves: Record<"R" | "L", Glove>;
-  poleK: Record<"R" | "L", number | null> = { R: null, L: null };   // where a support hand holds a long shaft (smoothed)
+  poleK: Record<"R" | "L", number | null> = { R: null, L: null };
+  lastPole: Record<"R" | "L", number> = { R: 0, L: 0 }; private lastPoleNext = 0;   // where a support hand holds a long shaft (smoothed)
   constructor(rig: Rig, side: Side, faction: string, color: string, props: THREE.Object3D) {
     this.rig = rig; this.side = side; this.faction = faction; this.color = color; this.mirrored = side === "enemy";
     rig.root.add(this.extra);
@@ -43,11 +44,11 @@ export class Fighter {
     // sized like the model's own sculpted hands (wrist → middle fingertip ≈ .95 L), cuff as thick as its wrist
     const L = Math.min(0.31, Math.max(0.19, rig.cal.handLen / 0.95)); const cuffK = Math.min(1.2, Math.max(0.9, rig.cal.wristR / (0.16 * L)));
     this.gloves = { R: new Glove("R", L, gc, cc, cuffK), L: new Glove("L", L, gc, cc, cuffK) };
-    props.add(this.gloves.R.root, this.gloves.L.root);
+    props.add(this.gloves.R.root, this.gloves.L.root, this.gloves.R.cuff, this.gloves.L.cuff);
     rig.hideHands();
     rig.strikeInset = (this.gloves.R.knuckles.x) * L;
   }
-  disposeGloves(props: THREE.Object3D) { for (const g of [this.gloves.R, this.gloves.L]) { props.remove(g.root); g.dispose(); } }
+  disposeGloves(props: THREE.Object3D) { for (const g of [this.gloves.R, this.gloves.L]) { props.remove(g.root, g.cuff); g.dispose(); } }
   get acting() { return this.act?.def.name; }
   get offensive() { return !!this.act?.def.offensive && this.act.t < this.lastKeyT(this.act.def); }
   lastKeyT(d: ActionDef) { return d.keys[d.keys.length - 1].t; }
@@ -88,12 +89,17 @@ export class Fighter {
   placeHands() {
     const R = this.rig, P = R.last; if (!P) return; const vis = R.model.visible;
     const W = (h: "R" | "L") => R.dirW(h === "R" ? P.wR : P.wL), U = (h: "R" | "L") => R.dirW(h === "R" ? P.uR : P.uL);
-    const perp = (fa: THREE.Vector3, w: THREE.Vector3, F: THREE.Vector3) => { const x = fa.clone().addScaledVector(w, -fa.dot(w)); if (x.lengthSq() < 1e-4) x.copy(F).addScaledVector(w, -F.dot(w)); return x.normalize(); };
+    // fingers across the handle, turned toward the forearm as far as a real grip allows (the handle runs up to 35° across the palm)
+    const perp = (fa: THREE.Vector3, w: THREE.Vector3, F: THREE.Vector3) => {
+      const x = fa.clone().addScaledVector(w, -fa.dot(w)); if (x.lengthSq() < 1e-4) x.copy(F).addScaledVector(w, -F.dot(w)); x.normalize();
+      const a = Math.acos(Math.min(1, Math.max(-1, x.dot(fa)))); const t = Math.min(a, 0.61); const sg = Math.sign(fa.dot(w)) || 1;
+      return x.multiplyScalar(Math.cos(t)).addScaledVector(w, sg * Math.sin(t)).normalize();
+    };
     const done = { R: false, L: false };
     for (const h of ["R", "L"] as const) {
       const wp = this.weapons[h]; if (!wp) continue; const g = this.gloves[h];
       const f = R.handFrame(h); const w = W(h);
-      g.setCurl(0, true); g.place(f.wrist, perp(f.fa, w, f.F), w);
+      g.setCurl(0, true); g.place(f.wrist, perp(f.fa, w, f.F), w, f.fa);
       placeWeapon(wp.obj, g.world(g.gripCenter), w, U(h)); wp.obj.visible = vis;
       const saya = wp.obj.userData.saya as THREE.Object3D | undefined; if (saya) saya.visible = (P.sh ?? 0) > 0.5;
       done[h] = true;
@@ -113,16 +119,31 @@ export class Fighter {
         this.poleK[h] = this.poleK[h] == null ? k : this.poleK[h]! + (k - this.poleK[h]!) * 0.35; k = this.poleK[h]!;
       } else this.poleK[h] = null;
       const handle = wp.obj.position.clone().addScaledVector(w, k);
-      let f = R.handFrame(h); g.setCurl(0, true); g.place(f.wrist, perp(f.fa, w, f.F), w);
-      const off = g.world(g.gripCenter).sub(f.wrist);
-      R.reach(h, handle.clone().sub(off), h === "R" ? P.eR : P.eL);
-      f = R.handFrame(h); g.place(f.wrist, perp(f.fa, w, f.F), w);
+      let f = R.handFrame(h); g.setCurl(0, true);
+      // pick the elbow that brings the forearm across the handle (a straight wrist), then settle the grip in two passes
+      const authored = (h === "R" ? P.eR : P.eL) as [number, number, number]; const sx = h === "R" ? -1 : 1;
+      const poles: [number, number, number][] = [authored, [sx, -0.6, 0], [0, -1, 0.2], [sx * 0.6, -0.6, -0.6], [sx * 0.4, 0.2, -1]];
+      let bestPole = authored, bestS = Infinity;
+      for (const pl of poles) {
+        g.place(f.wrist, perp(f.fa, w, f.F), w, f.fa); const off0 = g.world(g.gripCenter).sub(f.wrist);
+        R.reach(h, handle.clone().sub(off0), pl); const ff = R.handFrame(h);
+        const pi = poles.indexOf(pl); const sc = Math.abs(ff.fa.dot(w)) + (pi === 0 ? 0 : 0.15) - (this.lastPole[h] === pi ? 0.12 : 0) + ff.wrist.distanceTo(handle.clone().sub(off0)) * 4;
+        if (sc < bestS) { bestS = sc; bestPole = pl; this.lastPoleNext = pi; }
+        f = R.handFrame(h);
+      }
+      this.lastPole[h] = this.lastPoleNext;
+      for (let it = 0; it < 2; it++) {
+        g.place(f.wrist, perp(f.fa, w, f.F), w, f.fa); const off = g.world(g.gripCenter).sub(f.wrist);
+        R.reach(h, handle.clone().sub(off), bestPole); f = R.handFrame(h);
+      }
+      g.place(f.wrist, perp(f.fa, w, f.F), w, f.fa);
       // close the last few cm onto the handle, but never pull the glove off the wrist
       const gap = handle.sub(g.world(g.gripCenter)); const gl = gap.length(); if (gl > 0.035) gap.multiplyScalar(0.035 / gl);
       g.root.position.add(gap); g.root.updateMatrixWorld(true);
       done[h] = true;
     }
-    for (const h of ["R", "L"] as const) { if (done[h]) continue; const g = this.gloves[h]; const f = R.handFrame(h); g.setCurl(P.fist, false); g.place(f.wrist, f.F, f.T); }
+    // free hands: a straight wrist (fingers along the forearm), the thumb where the arm's roll puts it
+    for (const h of ["R", "L"] as const) { if (done[h]) continue; const g = this.gloves[h]; const f = R.handFrame(h); g.setCurl(P.fist, false); g.place(f.wrist, f.fa.clone().lerp(f.F, 0.15).normalize(), f.T, f.fa); }
     // weapon strikes: the tip stops on the target's surface (no blade / staff through the body); corrects next frame through rig.assistX
     { const tw = Math.min(1, Number(P.tipW) || 0), opp = R.opp, wp = this.weapons[this.mirrored ? "L" : "R"]; let goal = 0;
       if (tw > 0.01 && P.tipAt && opp && wp) {
@@ -135,7 +156,7 @@ export class Fighter {
       // this frame too: move the fighter, gloves and weapons together (the next pose already includes it)
       const dx = (R.assistX - prev) * (R.opp ? Math.sign(R.opp.root.position.x - R.root.position.x) || -R.side : 0);
       if (dx) { R.root.position.x += dx; R.root.updateMatrixWorld(true);
-        for (const h of ["R", "L"] as const) { this.gloves[h].root.position.x += dx; this.gloves[h].root.updateMatrixWorld(true); const w = this.weapons[h]; if (w) w.obj.position.x += dx; } } }
+        for (const h of ["R", "L"] as const) { for (const o of [this.gloves[h].root, this.gloves[h].cuff]) { o.position.x += dx; o.updateMatrixWorld(true); } const w = this.weapons[h]; if (w) w.obj.position.x += dx; } } }
     // bow + arrow: the arrow lies from the nock (draw hand) across the bow grip, and the string follows the nock when drawn
     for (const h of ["R", "L"] as const) {
       const bow = this.weapons[h], arr = this.weapons[h === "R" ? "L" : "R"];
@@ -152,7 +173,7 @@ export class Fighter {
       }
       pos.setXYZ(1, mid.x, mid.y, mid.z); pos.needsUpdate = true; str.geometry.computeBoundingSphere();
     }
-    this.gloves.R.root.visible = vis; this.gloves.L.root.visible = vis;
+    for (const g of [this.gloves.R, this.gloves.L]) { g.root.visible = vis; g.cuff.visible = vis; }
   }
   /** the business end of a hand: the weapon's tip, else the glove's knuckles */
   tip(h: "R" | "L") { const a = this.mirrored ? (h === "R" ? "L" : "R") : h; const w = this.weapons[a]; return w ? weaponTip(w.obj) : this.gloves[a].world(this.gloves[a].knuckles); }
