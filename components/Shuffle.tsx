@@ -1374,7 +1374,7 @@ async function submitShipping() {
           }} />
 
           {/* Queen — paper-doll canvas over the whole scene (she stands above the egg rail; her lightning is drawn over the eggs) */}
-          <QueenStage apiRef={stageRef} active={phase === "shuffling"} getEggRect={(i) => eggRefs.current[i]?.getBoundingClientRect() || null} onHatch={(i) => setHatched(i)} onCrack={() => setCrackHit((n) => n + 1)} onSfx={(n) => { const f = (shuffleSfx as any)[n]; if (typeof f === "function") f(); }} />
+          <QueenStage apiRef={stageRef} active={phase === "shuffling"} getEggRect={(i) => eggRefs.current[i]?.getBoundingClientRect() || null} onHatch={(i) => setHatched(i)} onCrack={() => setCrackHit((n) => n + 1)} onSfx={(n) => { const f = (shuffleSfx as any)[n]; if (typeof f === "function") f(); }} muted={shuffleMuted} />
 
           {/* Rails */}
           <div className="rail rail-top" style={{ zIndex:4 }} />

@@ -13,3 +13,9 @@ rendered from the real `public/models/queen/queen.glb` so she matches the model 
   `gltf-transform meshopt queen_web_raw.glb q_mo.glb` → `public/models/queen/queen_web.glb` (~1.2 MB).
 - QueenStage draws the live model (two-bone IK + springs per pose) and lays the painted faces over the head; faces are rebuilt from
   the rig's rest render (`dev-q3d-page.tsx`, pose "rest", 0 s) with `build_faces_v2.py` so they match the live shading exactly.
+
+## Voice (public/queen/voice)
+- `build_voice.py`: every Egg Shuffle line spoken by Kokoro-82M (Apache-2.0, offline; model from npm `kokoro-q8-shards`, voices from npm
+  `kokoro-js`), a little throne-room echo, loudness-normalised mp3 + `lines.json` (duration + loudness envelope at 30 fps).
+  QueenStage plays the line and drives the mouth from the envelope (closes in the dips, opens on loud vowels). Change the voice with
+  `VOICE=bf_isabella` (any kokoro-js voice) and re-run. New lines in Shuffle need adding to LINES here.

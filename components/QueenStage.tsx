@@ -14,12 +14,15 @@ function loadRig(): Promise<QueenRig | null> {
   rigP = (async () => { try { const cv = document.createElement("canvas"); if (!cv.getContext("webgl2") && !cv.getContext("webgl")) return null; const { QueenRig } = await import("./QueenRig"); return await QueenRig.load("/models/queen/queen_web.glb"); } catch (e) { console.warn("queen rig", e); return null; } })();
   return rigP;
 }
+type VoiceLines = { voice: string; lines: Record<string, { file: string; dur: number; env: number[] }> };
+let voiceP: Promise<VoiceLines | null> | null = null;
+const loadVoice = () => (voiceP ||= fetch("/queen/voice/lines.json").then((r) => (r.ok ? r.json() : null)).catch(() => null));
 const VIEW: [number, number, number, number] = [-260, -220, 1284, 1000];   // region of the 1024 frame the live queen is drawn in (room for the raised staff)
 
 export type Rarity = "none" | "common" | "rare" | "ultra";
 export type StageSfx = "charge" | "bolt" | "crack1" | "crack2" | "crack3" | "hatch" | "fizzle";
 export type QueenStageHandle = { point: (i: number) => void; cast: (i: number, rarity: Rarity) => Promise<void>; idle: () => void; talk: (line: string) => void };
-type Props = { active?: boolean; apiRef?: React.MutableRefObject<QueenStageHandle | null>; getEggRect: (i: number) => DOMRect | null; onHatch?: (i: number) => void; onCrack?: (i: number, stage: number) => void; onSfx?: (n: StageSfx) => void };
+type Props = { active?: boolean; apiRef?: React.MutableRefObject<QueenStageHandle | null>; getEggRect: (i: number) => DOMRect | null; onHatch?: (i: number) => void; onCrack?: (i: number, stage: number) => void; onSfx?: (n: StageSfx) => void; muted?: boolean };
 
 type Layers = { body: HTMLImageElement; staff: HTMLImageElement; arm: HTMLImageElement; faces: Record<string, HTMLImageElement>; meta: any };
 let cache: Promise<Layers> | null = null;
@@ -46,7 +49,9 @@ const D = Math.PI / 180;
 // staff = world angle of the staff (gem direction), −90° = straight up
 const POSE = { rest: { arm: 0, staff: -90 }, point: { arm: 34, staff: -140 }, raise: { arm: 104, staff: -132 }, droop: { arm: 8, staff: -128 } };
 
-const QueenStage = forwardRef<QueenStageHandle, Props>(function QueenStage({ active = false, apiRef, getEggRect, onHatch, onCrack, onSfx }, ref) {
+const QueenStage = forwardRef<QueenStageHandle, Props>(function QueenStage({ active = false, apiRef, getEggRect, onHatch, onCrack, onSfx, muted = false }, ref) {
+  const mutedRef = useRef(muted); mutedRef.current = muted;
+  useEffect(() => { const v = st.current?.voice; if (muted && v) { try { v.audio.pause(); } catch {} st.current.voice = null; } }, [muted]);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const st = useRef({
     L: null as Layers | null, Q: null as QueenRig | null, qFaces: false, qPose: "rest" as QueenPose, qSize: "", t: 0, raf: 0, last: 0, W: 0, H: 0, dpr: 1,
@@ -58,7 +63,9 @@ const QueenStage = forwardRef<QueenStageHandle, Props>(function QueenStage({ act
     eggGlow: 0, eggGlowC: "167,139,250",
     expr: "idle", exprHold: 0, blinkAt: 2.5, blinkT: 0, fCur: null as string | null, fPrev: null as string | null, fT: 1, vCur: null as string | null, vPrev: null as string | null, vT: 1,
     talk: [] as { v: string | null; d: number }[], talkT: 0,
+    voice: null as null | { audio: HTMLAudioElement; env: number[]; vowels: string[]; dur: number }, voiceV: null as string | null,
   });
+  if (typeof window !== "undefined" && process.env.NODE_ENV !== "production") (window as any).__queenSt = st;
   const setFace = (n: string, hold = 0) => { const s = st.current; s.expr = n; s.exprHold = hold; };
   const pose = (p: QueenPose) => { const s = st.current; s.qPose = p; s.Q?.setPose(p); };
 
@@ -144,8 +151,17 @@ const QueenStage = forwardRef<QueenStageHandle, Props>(function QueenStage({ act
       }
       const total = seq.reduce((a, x) => a + x.d, 0); const f = total > 4 ? 4 / total : 1; seq.forEach((x) => (x.d *= f));
       s.talk = seq; s.talkT = 0;
+      // her recorded voice (Kokoro TTS, public/queen/voice): lip-sync follows the audio's loudness, mouth shapes follow the vowels
+      if (s.voice) { try { s.voice.audio.pause(); } catch {} s.voice = null; }
+      loadVoice().then((V) => {
+        const e = V?.lines[line]; if (!e || mutedRef.current) return;
+        const audio = new Audio(`/queen/voice/${e.file}`); audio.volume = 0.95;
+        const vowels = [...String(line).toLowerCase()].filter((c) => "aeiouy".includes(c)).map((c) => ("a".includes(c) ? "talk_a" : "ou".includes(c) ? "talk_o" : "talk_e"));
+        s.voice = { audio, env: e.env, vowels, dur: e.dur }; s.talk = [];
+        audio.play().catch(() => { s.voice = null; s.talk = seq; s.talkT = 0; });
+      });
     },
-    idle() { const s = st.current; s.talk = []; pose("rest"); s.armT = 0; s.staffT = -90; s.leanT = 0; s.faceT = 1; s.gemT = 0; s.crack = null; s.eggGlow = 0; setFace("idle"); },
+    idle() { const s = st.current; s.talk = []; if (s.voice) { try { s.voice.audio.pause(); } catch {} s.voice = null; } pose("rest"); s.armT = 0; s.staffT = -90; s.leanT = 0; s.faceT = 1; s.gemT = 0; s.crack = null; s.eggGlow = 0; setFace("idle"); },
   });
   useImperativeHandle(ref, () => api); useEffect(() => { if (apiRef) apiRef.current = api; return () => { if (apiRef) apiRef.current = null; }; });
 
@@ -160,6 +176,14 @@ const QueenStage = forwardRef<QueenStageHandle, Props>(function QueenStage({ act
       // pose easing (arm slower than the wrist; the flip is a quick snap)
       s.arm += (s.armT - s.arm) * Math.min(1, dt * 7); s.staff += (s.staffT - s.staff) * Math.min(1, dt * 9); s.lean += (s.leanT - s.lean) * Math.min(1, dt * 6); s.gem += (s.gemT - s.gem) * Math.min(1, dt * 8);
       s.face += (s.faceT - s.face) * Math.min(1, dt * 12); if (Math.abs(s.face) < 0.08) s.face = s.faceT * 0.08;
+      if (s.voice) {
+        const a = s.voice.audio; const t = a.currentTime; const i = Math.floor(t * 30);
+        if (a.ended || i >= s.voice.env.length) { s.voice = null; s.voiceV = null; }
+        else { const e = s.voice.env[i] ?? 0; const vw = s.voice.vowels[Math.min(s.voice.vowels.length - 1, Math.floor((t / s.voice.dur) * s.voice.vowels.length))] || "talk_e";
+          // syllable rhythm: the mouth closes in the dips between syllables, opens wide on the loud vowels
+          let pk = 0; for (let k = Math.max(0, i - 4); k <= Math.min(s.voice.env.length - 1, i + 4); k++) pk = Math.max(pk, s.voice.env[k]);
+          s.voiceV = e < 0.06 ? null : e < pk * 0.55 || e < 0.16 ? "talk_m" : e > 0.62 ? (vw === "talk_e" ? "talk_a" : vw) : vw === "talk_a" ? "talk_e" : vw; }
+      }
       if (s.talk.length) { s.talkT += dt; while (s.talk.length && s.talkT >= s.talk[0].d) { s.talkT -= s.talk[0].d; s.talk.shift(); } }
       if (s.exprHold > 0) { s.exprHold -= dt; if (s.exprHold <= 0) s.expr = "idle"; }
       if (s.expr === "idle") { s.blinkAt -= dt; if (s.blinkAt <= 0) { s.blinkT = 0.13; s.blinkAt = 2.2 + Math.random() * 3; } } if (s.blinkT > 0) s.blinkT -= dt;
@@ -183,14 +207,14 @@ const QueenStage = forwardRef<QueenStageHandle, Props>(function QueenStage({ act
         const want = s.expr === "idle" ? (s.blinkT > 0 ? "blink" : null) : s.expr;
         if (want !== s.fCur) { s.fPrev = s.fT < 0.5 ? s.fPrev : s.fCur; s.fCur = want; s.fT = 0; }
         s.fT = Math.min(1, s.fT + dt / (want === "blink" || s.fPrev === "blink" ? 0.06 : 0.16));
-        const vWant = s.expr !== "shock" ? s.talk[0]?.v || null : null;
+        const vWant = s.expr !== "shock" ? (s.voice ? s.voiceV : s.talk[0]?.v || null) : null;
         if (vWant !== s.vCur) { s.vPrev = s.vCur; s.vCur = vWant; s.vT = 0; } s.vT = Math.min(1, s.vT + dt / 0.07);
         const ease = (x: number) => x * x * (3 - 2 * x);
         if (Q && !s.qFaces && s.L.meta?.face?.box) { Q.setFaces(s.L.faces, s.L.meta.face.box, s.L.meta.face.mouth || null); s.qFaces = true; }
         if (Q) Q.setFaceState(s.fCur, s.fPrev, ease(s.fT), s.vCur, s.vPrev, ease(s.vT));
         if (Q) {
           // live queen: talk gestures while a line plays, then render the crop of her 1024 frame and lay it where the doll stood
-          Q.setPose(s.talk.length && s.qPose === "rest" ? "talk" : s.qPose); Q.update(dt);
+          Q.setPose((s.talk.length || s.voice) && s.qPose === "rest" ? "talk" : s.qPose); Q.update(dt);
           const vw = (VIEW[2] - VIEW[0]) * u, vh = (VIEW[3] - VIEW[1]) * u; const key = `${Math.round(vw)}x${Math.round(vh)}@${s.dpr}`;
           if (key !== s.qSize) { s.qSize = key; Q.setView(VIEW, vw, vh, s.dpr); }
           Q.render(); ctx.drawImage(Q.renderer.domElement, g.x + (VIEW[0] - bx0) * u, g.y + (VIEW[1] - by0) * u, vw, vh);
