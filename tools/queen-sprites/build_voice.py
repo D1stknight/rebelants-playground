@@ -3,7 +3,8 @@
 public/queen/voice/<slug>.mp3 + lines.json { text: { file, dur, env } } (env = loudness per 1/30 s, drives the lip-sync).
 Needs: pip install kokoro-onnx ; the model from npm `kokoro-q8-shards` (6 parts, cat them → kokoro-q8.onnx) ;
 voices from npm `kokoro-js` (voices/*.bin). Run with python3 -I.
-  VOICE=bf_isabella SPEED=0.92 python3 -I build_voice.py <kokoro-q8.onnx> <voices dir> public/queen/voice
+  (defaults = the live voice: af_heart, +5 semitones, a little faster, light echo — a cartoony little-ant queen)
+  VOICE=af_heart SPEED=1.0 PITCH=5 TEMPO=1.05 ECHO=0 python3 -I build_voice.py <kokoro-q8.onnx> <voices dir> public/queen/voice
 """
 import sys, os, re, json, glob, subprocess, wave
 import numpy as np
@@ -22,8 +23,8 @@ SPOKEN = { "MAGNIFICENT. The colony bows to you.": "Magnificent! The colony bows
 def slug(t): return re.sub(r"[^a-z0-9]+", "-", t.lower()).strip("-")[:40]
 
 def main(model, vdir, out):
-    voice = os.environ.get("VOICE", "bf_isabella"); speed = float(os.environ.get("SPEED", "0.92"))
-    pitch = float(os.environ.get("PITCH", "0")); tempo = float(os.environ.get("TEMPO", "1"))
+    voice = os.environ.get("VOICE", "af_heart"); speed = float(os.environ.get("SPEED", "1.0"))
+    pitch = float(os.environ.get("PITCH", "5")); tempo = float(os.environ.get("TEMPO", "1.05"))
     voices = {os.path.basename(f)[:-4]: np.fromfile(f, dtype=np.float32).reshape(510, 1, 256) for f in glob.glob(vdir + "/*.bin")}
     np.savez("/tmp/kokoro_voices.npz", **voices)
     k = Kokoro(model, "/tmp/kokoro_voices.npz"); os.makedirs(out, exist_ok=True); meta = {}
@@ -37,7 +38,7 @@ def main(model, vdir, out):
         f = slug(line) + ".mp3"
         # cartoon pitch: resample up PITCH semitones (formants rise too → small, bright "little ant" voice), atempo sets the pace
         r = 2 ** (pitch / 12); fx = f"asetrate={int(sr * r)},aresample={sr},atempo={tempo / r:.4f}," if pitch else ""
-        echo = "aecho=0.8:0.6:35|70:0.12|0.07," if os.environ.get("ECHO", "1") == "1" else "aecho=0.8:0.5:22:0.06,"
+        echo = "aecho=0.8:0.6:35|70:0.12|0.07," if os.environ.get("ECHO", "0") == "1" else "aecho=0.8:0.5:22:0.06,"
         subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", tmp, "-af", fx + echo + "loudnorm=I=-16:TP=-1.5", "-ac", "1", "-ar", "24000", "/tmp/_q2.wav"], check=True)
         w = wave.open("/tmp/_q2.wav"); sr2 = w.getframerate(); b = np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(np.float32) / 32767; w.close()
         subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", "/tmp/_q2.wav", "-b:a", "56k", os.path.join(out, f)], check=True)
