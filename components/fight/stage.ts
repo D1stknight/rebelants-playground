@@ -123,6 +123,7 @@ export class FightStage {
     const o = this.f[this.other(side)]; if (o) { rig.opp = o.rig; o.rig.opp = rig; }
     fi.play("stance"); fi.act!.t = this.rand() * 0.6; fi.act!.from = null;
     this.koSide = null; this.fin = null; this.cam = null; this.timeScale = 1; this.hitstop = 0;
+    this.fx.clear(); this.timers = []; for (const f of this.followers) this.props.remove(f.o); this.followers = []; // new match-up: no leftovers
     if (o) { o.state = "fight"; o.opacity = 1; o.rig.offset.set(0, 0, 0); o.rig.offsetSpin = 0; o.rig.visible = true; o.rig.setOpacity(1); o.rig.model.visible = true; o.rig.tint("none"); o.look = "none"; if (o.act?.def.name !== "stance") o.play("stance"); for (const h of ["R", "L"] as const) o.setWeapon(h, null, this.props); }
     return fi;
   }
