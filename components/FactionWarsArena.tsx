@@ -260,6 +260,12 @@ export default function FactionWarsArena({ player, enemy, battleAnim, registerGl
     return () => { if (window.__fw3dPlayPlayer === p.play) delete window.__fw3dPlayPlayer; if (window.__fw3dPlayEnemy === e.play) delete window.__fw3dPlayEnemy; };
   }, [registerGlobals, p.play, e.play]);
 
+  // a new match-up drops the previous knock-out's choice and lets anyone waiting on its finisher move on
+  useEffect(() => {
+    setChoice(null); const fs = finState.current;
+    if (fs.active && !stage.fin) { fs.active = false; fs.running = false; fs.waiters.splice(0).forEach((r) => r()); }
+  }, [player.id, enemy.id, stage]);
+
   // the game can wait for the finishing move before it moves on
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -279,7 +285,9 @@ export default function FactionWarsArena({ player, enemy, battleAnim, registerGl
     later(900, () => { fs.active = false; fs.waiters.splice(0).forEach((r) => r()); });
   }, [later]);
   const runFinisher = useCallback((winner: Side, f: Finisher) => {
-    setChoice(null); finState.current.running = true;
+    setChoice(null);
+    const Wf = stage.f[winner]; if (!stage.koSide || !Wf || !finishersFor(Wf.faction).includes(f)) return;   // stale choice from an earlier match-up
+    finState.current.running = true;
     sfxRef.current?.clash?.();
     stage.runFinisher(winner, f).then(finishDone);
   }, [stage, finishDone]);
@@ -294,10 +302,12 @@ export default function FactionWarsArena({ player, enemy, battleAnim, registerGl
     const options = finishersFor(W.faction);
     later(650, () => { setCallout({ text: "FINISH THEM!", color: "#ff3b3b", n: idRef.current++ }); sfxRef.current?.berserker?.(); });
     if (winner === "player" && choiceRef.current) {
-      later(1100, () => setChoice({ side: winner, options, until: performance.now() + 5000 }));
-      later(6100, () => { if (finState.current.active && !finState.current.running && !stage.fin) runFinisher(winner, options[Math.floor(Math.random() * options.length)]); });
+      // every delayed step checks it still belongs to this knock-out (a new match-up can arrive before the 5 s choice runs out)
+      const same = () => stage.f[winner] === W && stage.koSide === loser;
+      later(1100, () => { if (same()) setChoice({ side: winner, options, until: performance.now() + 5000 }); });
+      later(6100, () => { if (same() && finState.current.active && !finState.current.running && !stage.fin) runFinisher(winner, options[Math.floor(Math.random() * options.length)]); });
     } else {
-      later(1900, () => runFinisher(winner, options[Math.floor(Math.random() * options.length)]));
+      later(1900, () => { if (stage.f[winner] === W && stage.koSide === loser) runFinisher(winner, options[Math.floor(Math.random() * options.length)]); });
     }
   }, [stage, later, runFinisher, finishDone]);
 
