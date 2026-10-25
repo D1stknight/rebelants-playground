@@ -161,7 +161,7 @@ const QueenStage = forwardRef<QueenStageHandle, Props>(function QueenStage({ act
         audio.play().catch(() => { s.voice = null; s.talk = seq; s.talkT = 0; });
       });
     },
-    idle() { const s = st.current; s.talk = []; if (s.voice) { try { s.voice.audio.pause(); } catch {} s.voice = null; } pose("rest"); s.armT = 0; s.staffT = -90; s.leanT = 0; s.faceT = 1; s.gemT = 0; s.crack = null; s.eggGlow = 0; setFace("idle"); },
+    idle() { const s = st.current; s.talk = []; pose("rest"); /* her voice keeps going: idle() comes mid-sentence when the shuffle starts */ s.armT = 0; s.staffT = -90; s.leanT = 0; s.faceT = 1; s.gemT = 0; s.crack = null; s.eggGlow = 0; setFace("idle"); },
   });
   useImperativeHandle(ref, () => api); useEffect(() => { if (apiRef) apiRef.current = api; return () => { if (apiRef) apiRef.current = null; }; });
 
