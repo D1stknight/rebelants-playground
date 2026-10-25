@@ -163,9 +163,9 @@ export class QueenRig {
       if (m.isSkinnedMesh) m.skeleton.update();
       for (let i = 0; i < pos.count; i++) {
         if (m.isSkinnedMesh) m.getVertexPosition(i, p); else p.fromBufferAttribute(pos, i); p.applyMatrix4(m.matrixWorld);
-        const head = p.y > 0.5; p.project(cam); const fx = (p.x * 0.5 + 0.5) * 1024, fy = (-p.y * 0.5 + 0.5) * 1024;
-        const u = (fx - box[0]) / bw, v = (fy - box[1]) / bh; const ok = head && u > -0.02 && u < 1.02 && v > -0.02 && v < 1.02;
-        uv[i * 2] = ok ? u : -1; uv[i * 2 + 1] = ok ? v : -1;
+        // front of the body only (z > 0): the true projected uv everywhere, so uvs interpolate cleanly across every triangle
+        const front = p.z > -0.02; p.project(cam); const fx = (p.x * 0.5 + 0.5) * 1024, fy = (-p.y * 0.5 + 0.5) * 1024;
+        uv[i * 2] = front ? (fx - box[0]) / bw : -5; uv[i * 2 + 1] = front ? (fy - box[1]) / bh : -5;
       }
       m.geometry.setAttribute("faceUV", new THREE.BufferAttribute(uv, 2));
       const mat = m.material as THREE.MeshStandardMaterial;
@@ -174,8 +174,8 @@ export class QueenRig {
         sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute vec2 faceUV; varying vec2 vFaceUV;").replace("#include <begin_vertex>", "#include <begin_vertex>\nvFaceUV = faceUV;");
         sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nvarying vec2 vFaceUV; uniform sampler2D uFaceA; uniform sampler2D uFaceB; uniform float uFaceMix; uniform sampler2D uMouthA; uniform sampler2D uMouthB; uniform float uMouthMix; uniform vec4 uMouth;")
           .replace("#include <dithering_fragment>", `#include <dithering_fragment>
-            if (vFaceUV.x >= 0.0) {
-              vec2 fu = clamp(vFaceUV, 0.0, 1.0);
+            if (vFaceUV.x > 0.0 && vFaceUV.x < 1.0 && vFaceUV.y > 0.0 && vFaceUV.y < 1.0) {
+              vec2 fu = vFaceUV;
               vec4 fa = texture2D(uFaceA, fu), fb = texture2D(uFaceB, fu);
               float fA = mix(fb.a, fa.a, uFaceMix); vec3 fP = mix(fb.rgb * fb.a, fa.rgb * fa.a, uFaceMix);
               gl_FragColor.rgb = mix(gl_FragColor.rgb, fP / max(fA, 1e-3), fA);

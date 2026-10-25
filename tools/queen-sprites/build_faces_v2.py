@@ -169,7 +169,7 @@ def dome(x0, y0, x1, y1, pad=5):
     z = np.sqrt(np.clip(1 - r2, 0, 1))
     lx, ly, lz = -0.35, -0.55, 0.76
     d = np.clip(nx * lx + ny * ly + z * lz, 0, 1)
-    shade = 0.74 + 0.42 * d
+    shade = 0.84 + 0.4 * d
     spec = np.clip(d, 0, 1) ** 18 * 0.10
     col = np.clip(SKIN[None, None, :] * shade[..., None] + 255 * spec[..., None], 0, 255)
     a = np.clip((1.0 - r2) * 6.0, 0, 1) * 255
@@ -286,6 +286,12 @@ if __name__ == "__main__":
         # only the face oval: fade the layer out at the box edges so it never shows a seam on the head
         m = Image.new("L", (tw, th), 0); ImageDraw.Draw(m).rounded_rectangle([3, 2, tw - 4, th - 3], radius=int(th * 0.32), fill=255)
         a = np.minimum(np.array(img.getchannel("A")), np.array(m.filter(ImageFilter.GaussianBlur(3))))
+        # keep only what the expression changes (eyes, lids, brows, mouth, blush): everywhere else the live 3-D skin shows,
+        # so the layer has no edge to see when the head turns in the light
+        raw = np.array(up(BASE_RAW).resize((tw, th), Image.LANCZOS).convert("RGB")).astype(np.int16)
+        diff = np.abs(np.array(img.convert("RGB")).astype(np.int16) - raw).max(axis=2)
+        ch = Image.fromarray(((diff > 6) * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(7)).filter(ImageFilter.GaussianBlur(2.5))
+        a = np.minimum(a, np.clip(np.array(ch).astype(np.float32) * 1.6, 0, 255))
         img.putalpha(Image.fromarray(a.astype(np.uint8)))
         img.save(f"{out}/face_{n}.png", optimize=True); names.append(n)
     meta.setdefault("face", {}); meta["face"]["box"] = list(BOX); meta["face"]["names"] = names; meta["face"]["v"] = 2; meta["face"]["mouth"] = [528, 452, 54, 32]   # talk visemes are drawn clipped to this ellipse (render coords)
