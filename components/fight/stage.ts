@@ -82,7 +82,7 @@ export class Fighter {
   setWeapon(hand: "R" | "L", id: WeaponId | null, parent: THREE.Object3D) {
     const h = this.mirrored ? (hand === "R" ? "L" : "R") : hand;
     const cur = this.weapons[h]; if (cur) { parent.remove(cur.obj); disposeTree(cur.obj); delete this.weapons[h]; }
-    if (id) { const obj = makeWeapon(id, this.color); parent.add(obj); this.weapons[h] = { id, obj }; }
+    if (id) { const obj = makeWeapon(id, this.color, this.mirrored); parent.add(obj); this.weapons[h] = { id, obj }; }
     this.rig.gripOff[h] = id ? ((this.weapons[h]!.obj.userData.grip2 as number) ?? -0.14) : -0.14;
   }
   /** gloves on the wrists; a weapon hand closes round its handle, a support hand finds the same handle, free hands follow the fist value */

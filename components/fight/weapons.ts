@@ -130,7 +130,7 @@ function tessen(col: string) {
   g.userData.tip = R; return g;
 }
 let scrollTex: THREE.Texture | null = null;
-function scroll() {
+function scroll(flip = false) {   // flip: the mirrored (enemy) side, so the paper still opens toward the body
   const g = new THREE.Group();
   if (!scrollTex && typeof document !== "undefined") {
     const c = document.createElement("canvas"); c.width = 256; c.height = 192; const x = c.getContext("2d")!;
@@ -138,9 +138,9 @@ function scroll() {
     ["勅", "命", "令"].forEach((ch, i) => x.fillText(ch, 200 - i * 70, 110)); x.fillStyle = "#b3121a"; x.fillRect(22, 132, 34, 34);
     scrollTex = new THREE.CanvasTexture(c); scrollTex.colorSpace = THREE.SRGBColorSpace;
   }
-  // a handscroll held open by its near rod: the rods run along the handle axis (Y), the paper opens out along +X facing +Z
-  const paper = mesh(new THREE.PlaneGeometry(0.42, 0.3), std("#ffffff", 0, 0.9, { side: THREE.DoubleSide, map: scrollTex || undefined })); paper.position.x = 0.24; g.add(paper);
-  for (const x of [0.02, 0.46]) { const r = mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.38, 8), WOOD("#3a1f12")); r.position.x = x; g.add(r);
+  // a handscroll held by its outer rod: the rods run along the handle axis (Y), the paper opens back toward the body (-X) facing +Z
+  const paper = mesh(new THREE.PlaneGeometry(0.42, 0.3), std("#ffffff", 0, 0.9, { side: THREE.DoubleSide, map: scrollTex || undefined })); const sx = flip ? -1 : 1; paper.position.x = -0.24 * sx; g.add(paper);
+  for (const x of [-0.02 * sx, -0.46 * sx]) { const r = mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.38, 8), WOOD("#3a1f12")); r.position.x = x; g.add(r);
     for (const y of [-0.2, 0.2]) { const cap = mesh(new THREE.SphereGeometry(0.024, 8, 6), GOLD()); cap.position.set(x, y, 0); g.add(cap); } }
   g.userData.paper = paper; g.userData.tip = 0.2; return g;
 }
@@ -184,7 +184,7 @@ function orb(col: string) {
   g.userData.tip = 0; return g;
 }
 
-export function makeWeapon(id: WeaponId, color = "#ffffff"): THREE.Group {
+export function makeWeapon(id: WeaponId, color = "#ffffff", flip = false): THREE.Group {
   switch (id) {
     case "katana": return katana();
     case "wakizashi": return katana(0.68);
@@ -199,7 +199,7 @@ export function makeWeapon(id: WeaponId, color = "#ffffff"): THREE.Group {
     case "shuriken": return shuriken();
     case "kunai": return kunai();
     case "tessen": return tessen(color);
-    case "scroll": return scroll();
+    case "scroll": return scroll(flip);
     case "cutlass": return cutlass();
     case "bomb": return bomb();
     case "gourd": return gourd();
