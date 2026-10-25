@@ -49,7 +49,7 @@ const POSE = { rest: { arm: 0, staff: -90 }, point: { arm: 34, staff: -140 }, ra
 const QueenStage = forwardRef<QueenStageHandle, Props>(function QueenStage({ active = false, apiRef, getEggRect, onHatch, onCrack, onSfx }, ref) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const st = useRef({
-    L: null as Layers | null, Q: null as QueenRig | null, qPose: "rest" as QueenPose, qSize: "", t: 0, raf: 0, last: 0, W: 0, H: 0, dpr: 1,
+    L: null as Layers | null, Q: null as QueenRig | null, qFaces: false, qPose: "rest" as QueenPose, qSize: "", t: 0, raf: 0, last: 0, W: 0, H: 0, dpr: 1,
     arm: 0, armT: 0, staff: -90, staffT: -90, face: 1, faceT: 1, lean: 0, leanT: 0, hop: 0, gem: 0, gemT: 0, shake: 0, flash: 0, flashC: "#fff",
     bolts: [] as { pts: { x: number; y: number }[]; life: number; w: number; c: string; core: string }[],
     parts: [] as { x: number; y: number; vx: number; vy: number; life: number; c: string; s: number; g: number }[],
@@ -179,36 +179,34 @@ const QueenStage = forwardRef<QueenStageHandle, Props>(function QueenStage({ act
         ctx.save();
         ctx.translate(g.cx + sx, g.y + g.bh + bob + sy); ctx.rotate(s.lean * 0.05); ctx.scale(s.face < 0 ? -1 : 1, 1); ctx.translate(-g.cx, -(g.y + g.bh));   // lean + mirror about her centre line
         const Q = s.Q; const bx0 = s.L.meta.body.box[0], by0 = s.L.meta.body.box[1]; const u = g.sc * g.k;
-        let head = { dx: 0, dy: 0, da: 0, px: 0, py: 0 };
+        // expression + mouth state (cross-faded); the live queen paints it onto her head in 3-D, the doll layers it in 2-D
+        const want = s.expr === "idle" ? (s.blinkT > 0 ? "blink" : null) : s.expr;
+        if (want !== s.fCur) { s.fPrev = s.fT < 0.5 ? s.fPrev : s.fCur; s.fCur = want; s.fT = 0; }
+        s.fT = Math.min(1, s.fT + dt / (want === "blink" || s.fPrev === "blink" ? 0.06 : 0.16));
+        const vWant = s.expr !== "shock" ? s.talk[0]?.v || null : null;
+        if (vWant !== s.vCur) { s.vPrev = s.vCur; s.vCur = vWant; s.vT = 0; } s.vT = Math.min(1, s.vT + dt / 0.07);
+        const ease = (x: number) => x * x * (3 - 2 * x);
+        if (Q && !s.qFaces && s.L.meta?.face?.box) { Q.setFaces(s.L.faces, s.L.meta.face.box, s.L.meta.face.mouth || null); s.qFaces = true; }
+        if (Q) Q.setFaceState(s.fCur, s.fPrev, ease(s.fT), s.vCur, s.vPrev, ease(s.vT));
         if (Q) {
           // live queen: talk gestures while a line plays, then render the crop of her 1024 frame and lay it where the doll stood
           Q.setPose(s.talk.length && s.qPose === "rest" ? "talk" : s.qPose); Q.update(dt);
           const vw = (VIEW[2] - VIEW[0]) * u, vh = (VIEW[3] - VIEW[1]) * u; const key = `${Math.round(vw)}x${Math.round(vh)}@${s.dpr}`;
           if (key !== s.qSize) { s.qSize = key; Q.setView(VIEW, vw, vh, s.dpr); }
           Q.render(); ctx.drawImage(Q.renderer.domElement, g.x + (VIEW[0] - bx0) * u, g.y + (VIEW[1] - by0) * u, vw, vh);
-          head = Q.headPx();
         } else ctx.drawImage(s.L.body, g.x, g.y, g.bw, g.bh);
-        ctx.save(); if (Q) { const hx = g.x + (head.px - bx0) * u, hy = g.y + (head.py - by0) * u; ctx.translate(hx + head.dx * u, hy + head.dy * u); ctx.rotate(head.da); ctx.translate(-hx, -hy); }
+        ctx.save();
         // expression layer over her face
-        { const fb = s.L.meta?.face?.box; const mo = s.L.meta?.face?.mouth;
-          // expressions cross-fade (0.14 s, blinks 0.05 s) instead of popping; the live 3-D face shows through when no layer is up
-          const want = s.expr === "idle" ? (s.blinkT > 0 ? "blink" : null) : s.expr;
-          if (want !== s.fCur) { s.fPrev = s.fT < 0.5 ? s.fPrev : s.fCur; s.fCur = want; s.fT = 0; }
-          s.fT = Math.min(1, s.fT + dt / (want === "blink" || s.fPrev === "blink" ? 0.05 : 0.14));
-          const vWant = s.expr !== "shock" ? s.talk[0]?.v || null : null;
-          if (vWant !== s.vCur) { s.vPrev = s.vCur; s.vCur = vWant; s.vT = 0; } s.vT = Math.min(1, s.vT + dt / 0.06);
+        if (!Q) { const fb = s.L.meta?.face?.box; const mo = s.L.meta?.face?.mouth;
           if (fb) {
             const bx = s.L.meta.body.box[0], by = s.L.meta.body.box[1]; const fx = g.x + (fb[0] - bx) * g.sc * g.k, fy = g.y + (fb[1] - by) * g.sc * g.k;
             const draw = (n: string | null, a: number) => { const fi = n && n !== "idle" ? s.L!.faces[n] : null; if (!fi || a <= 0.01) return; ctx.globalAlpha = a; ctx.drawImage(fi, fx, fy, fi.width * g.k, fi.height * g.k); ctx.globalAlpha = 1; };
-            const ease = (x: number) => x * x * (3 - 2 * x);
             draw(s.fPrev, 1 - ease(s.fT)); draw(s.fCur, ease(s.fT));
             // talking: the mouth of the current viseme over whatever the eyes are doing, blended between shapes
             if (mo && (s.vCur || s.vPrev)) { const T = (px: number, py: number) => ({ x: g.x + (px - bx) * g.sc * g.k, y: g.y + (py - by) * g.sc * g.k }); const c = T(mo[0], mo[1]); const r = T(mo[0] + mo[2], mo[1] + mo[3]);
               ctx.save(); ctx.beginPath(); ctx.ellipse(c.x, c.y, Math.abs(r.x - c.x), Math.abs(r.y - c.y), 0, 0, Math.PI * 2); ctx.clip(); draw(s.vPrev, 1 - ease(s.vT)); draw(s.vCur, ease(s.vT)); ctx.restore(); }
           } }
         ctx.restore();
-        // the staff (and the hand holding it) goes back on top of the painted face, so it never vanishes behind it
-        if (Q && Q.renderStaff()) ctx.drawImage(Q.renderer.domElement, g.x + (VIEW[0] - bx0) * u, g.y + (VIEW[1] - by0) * u, (VIEW[2] - VIEW[0]) * u, (VIEW[3] - VIEW[1]) * u);
         // paper-doll fallback: arm swings from the shoulder; the staff is held in the fist with its own wrist angle
         if (!Q) {
         ctx.save(); ctx.translate(g.shoulder.x, g.shoulder.y); ctx.rotate(s.arm * D); ctx.translate(-g.shoulder.x, -g.shoulder.y);

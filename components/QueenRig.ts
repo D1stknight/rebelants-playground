@@ -145,6 +145,52 @@ export class QueenRig {
     b.quaternion.copy(pq.invert().multiply(nq)); b.updateMatrixWorld(true);
   }
   render() { this.renderer.render(this.scene, this.camera); }
+
+  // ── painted faces, glued to the head in 3-D ────────────────────────────────────────────────────────────────
+  // Each head vertex gets the (u, v) where it appeared in the 1024 frame the faces were painted on (its rest-pose projection
+  // through this camera, inside the face box). The body shader blends the painted expression over the final colour at that
+  // uv, so the face moves, leans and tilts with the head exactly — no separate layer that can drift or double up.
+  faceU: Record<string, { value: any }> | null = null; faceTex: Record<string, THREE.Texture> = {};
+  setFaces(images: Record<string, HTMLImageElement>, box: number[], mouth: number[] | null) {
+    const bw = box[2] - box[0], bh = box[3] - box[1]; const cam = this.camera.clone(); cam.clearViewOffset(); cam.updateProjectionMatrix();
+    for (const [n, img] of Object.entries(images)) { if (n === "idle") continue; const t = new THREE.Texture(img); t.colorSpace = THREE.NoColorSpace; t.flipY = false; t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; t.needsUpdate = true; this.faceTex[n] = t; }
+    const blank = new THREE.DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1); blank.needsUpdate = true; this.faceTex.__none = blank;
+    const U = this.faceU = { uFaceA: { value: blank }, uFaceB: { value: blank }, uFaceMix: { value: 1 }, uMouthA: { value: blank }, uMouthB: { value: blank }, uMouthMix: { value: 1 }, uMouth: { value: new THREE.Vector4(mouth ? (mouth[0] - box[0]) / bw : 0.5, mouth ? (mouth[1] - box[1]) / bh : 0.8, mouth ? mouth[2] / bw : 0.1, mouth ? mouth[3] / bh : 0.1) } };
+    this.root.updateMatrixWorld(true); for (const n of Object.keys(this.bones)) this.bones[n].quaternion.copy(this.rest[n]); this.root.updateMatrixWorld(true);
+    const p = new THREE.Vector3();
+    for (const m of this.bodyMeshes as any[]) {
+      const pos = m.geometry.getAttribute("position"); const uv = new Float32Array(pos.count * 2);
+      if (m.isSkinnedMesh) m.skeleton.update();
+      for (let i = 0; i < pos.count; i++) {
+        if (m.isSkinnedMesh) m.getVertexPosition(i, p); else p.fromBufferAttribute(pos, i); p.applyMatrix4(m.matrixWorld);
+        const head = p.y > 0.5; p.project(cam); const fx = (p.x * 0.5 + 0.5) * 1024, fy = (-p.y * 0.5 + 0.5) * 1024;
+        const u = (fx - box[0]) / bw, v = (fy - box[1]) / bh; const ok = head && u > -0.02 && u < 1.02 && v > -0.02 && v < 1.02;
+        uv[i * 2] = ok ? u : -1; uv[i * 2 + 1] = ok ? v : -1;
+      }
+      m.geometry.setAttribute("faceUV", new THREE.BufferAttribute(uv, 2));
+      const mat = m.material as THREE.MeshStandardMaterial;
+      mat.onBeforeCompile = (sh) => {
+        Object.assign(sh.uniforms, U);
+        sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute vec2 faceUV; varying vec2 vFaceUV;").replace("#include <begin_vertex>", "#include <begin_vertex>\nvFaceUV = faceUV;");
+        sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nvarying vec2 vFaceUV; uniform sampler2D uFaceA; uniform sampler2D uFaceB; uniform float uFaceMix; uniform sampler2D uMouthA; uniform sampler2D uMouthB; uniform float uMouthMix; uniform vec4 uMouth;")
+          .replace("#include <dithering_fragment>", `#include <dithering_fragment>
+            if (vFaceUV.x >= 0.0) {
+              vec2 fu = clamp(vFaceUV, 0.0, 1.0);
+              vec4 fa = texture2D(uFaceA, fu), fb = texture2D(uFaceB, fu);
+              float fA = mix(fb.a, fa.a, uFaceMix); vec3 fP = mix(fb.rgb * fb.a, fa.rgb * fa.a, uFaceMix);
+              gl_FragColor.rgb = mix(gl_FragColor.rgb, fP / max(fA, 1e-3), fA);
+              vec2 md = (fu - uMouth.xy) / uMouth.zw; float inM = 1.0 - smoothstep(0.8, 1.0, length(md));
+              if (inM > 0.0) { vec4 ma = texture2D(uMouthA, fu), mb = texture2D(uMouthB, fu); float mA = mix(mb.a, ma.a, uMouthMix); vec3 mP = mix(mb.rgb * mb.a, ma.rgb * ma.a, uMouthMix); gl_FragColor.rgb = mix(gl_FragColor.rgb, mP / max(mA, 1e-3), mA * inM); }
+            }`);
+      };
+      mat.needsUpdate = true;
+    }
+  }
+  /** expression cross-fade: from `prev` to `cur` by `mix` (0..1); mouth viseme the same way; null = the bare 3-D face */
+  setFaceState(cur: string | null, prev: string | null, mix: number, vCur: string | null, vPrev: string | null, vMix: number) {
+    const U = this.faceU; if (!U) return; const T = (n: string | null) => (n && this.faceTex[n]) || this.faceTex.__none;
+    U.uFaceA.value = T(cur); U.uFaceB.value = T(prev); U.uFaceMix.value = mix; U.uMouthA.value = T(vCur); U.uMouthB.value = T(vPrev); U.uMouthMix.value = vMix;
+  }
   /** second pass: only the staff + gripping hand, depth-tested against the body (so it still hides behind her), for drawing over the face layers */
   renderStaff() {
     if (!this.staff) return false; const prev = this.bodyMeshes.map((m) => (m.material as THREE.Material).colorWrite);
