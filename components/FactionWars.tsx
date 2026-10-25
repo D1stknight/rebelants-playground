@@ -90,6 +90,15 @@ function useFWAudio() {
 type SamuraiAnimState = "idle" | "attack" | "magic" | "trick" | "defend" | "hit" | "win" | "lose";
 
 
+/** Wait for the arena's knock-out + finishing move (if one is playing), at least `minMs` in total. */
+async function waitArenaFinish(minMs: number) {
+  const t0 = Date.now();
+  const w = typeof window !== "undefined" ? window.__fwArenaFinish : undefined;
+  if (w) await Promise.race([w(), new Promise((r) => setTimeout(r, 25000))]);
+  const spent = Date.now() - t0;
+  if (spent < 1200 && spent < minMs) await new Promise((r) => setTimeout(r, minMs - spent));
+}
+
 function getSamuraiAnimForMove(move: Move | null): SamuraiAnimState {
   if (!move) return "idle";
   if (move.type === "attack") return "attack";
@@ -696,7 +705,8 @@ const fightInFlightRef = useRef(false);
       factionWarsHealMax: session.config.healMaximum, factionWarsPlunderBonus: session.config.plunder,
       factionWarsAIDifficulty: session.config.difficulty, rewards: { ...c.rewards, ...session.config.rewards } }));
   }, []);
-  useEffect(() => { if (solo.session) applySolo(solo.session); }, [solo.session, applySolo]);
+  const holdSoloApply = useRef(false); // the arena is still playing the knock-out / finishing move
+  useEffect(() => { if (solo.session && !holdSoloApply.current) applySolo(solo.session); }, [solo.session, applySolo]);
   const displayedSoloOwner = useRef<string | null>(null);
   useEffect(() => {
     if (displayedSoloOwner.current && displayedSoloOwner.current !== effectivePlayerId) {
@@ -771,6 +781,7 @@ setPhase("battle"); startMusic(); setBusy(false);
     const chosen = selectedMove;
     setPlayer3DAnim(getSamuraiAnimForMove(chosen));
     try {
+      holdSoloApply.current = true;
       const saved = await solo.act({ kind: "MOVE", moveId: chosen.id });
       const round = saved.state.rounds[saved.state.rounds.length - 1];
       if (round) { setEnemy3DAnim(getSamuraiAnimForMove(round.enemyMove));
@@ -778,10 +789,17 @@ setPhase("battle"); startMusic(); setBusy(false);
         setDmgFloats([{ id: fid, side: "player", dmg: round.enemyDmg }, { id: fid + 1, side: "enemy", dmg: round.playerDmg }]);
         setTimeout(() => setDmgFloats(prev => prev.filter(x => x.id !== fid && x.id !== fid + 1)), 1500);
       }
+      // the territory ended: show the final blow and the finishing move before the result screen
+      if (round && saved.state.phase !== "battle") {
+        setPlayerHp(round.playerHpAfter); setEnemyHp(round.enemyHpAfter);
+        setBattleAnim(round.enemyHpAfter <= 0 ? "win" : round.playerHpAfter <= 0 ? "lose" : "idle");
+        await waitArenaFinish(1500);
+      }
+      holdSoloApply.current = false;
       applySolo(saved); await refresh(); setRunMessage("");
       setBattleAnim(saved.state.enemyHp <= 0 ? "win" : saved.state.playerHp <= 0 ? "lose" : "idle");
     } catch (error) { setRunMessage((error as Error).message); setBattleAnim("idle"); }
-    finally { setBusy(false); fightInFlightRef.current = false; }
+    finally { holdSoloApply.current = false; setBusy(false); fightInFlightRef.current = false; }
     return;
   }
 
@@ -991,7 +1009,7 @@ setBattleAnim(newEnemyHp <= 0 ? "win" : newPlayerHp <= 0 ? "lose" : "idle");
     if (fightSeq === fightSeqRef.current) fightInFlightRef.current = false;
 
 if (over) {
-  await new Promise(r=>setTimeout(r,3500));
+  await waitArenaFinish(3500);
   if (fightSeq !== fightSeqRef.current) return;
   setBattleAnim("idle");
   const playerWon = newEnemyHp <= 0;
@@ -1511,6 +1529,8 @@ setPlayerHp(MAX_HP); setEnemyHp(MAX_HP); setCurrentRound(0); setRoundLog([]); se
                   battleAnim={battleAnim}
                   preload={[...team, ...defenders]}
                   title={`TERRITORY ${currentTerritory+1} · ${currentDefenderFD.name.toUpperCase()}\u2019S HOLD`}
+                  finisherChoice
+                  sfx={sfx}
                 />
 
                 {/* ── HP BARS ── MK Style ───────────────────────── */}

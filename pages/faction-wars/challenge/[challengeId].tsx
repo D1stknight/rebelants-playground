@@ -124,6 +124,16 @@ type AnimState = "idle" | "attack" | "magic" | "trick" | "defend" | "hit" | "win
 
 // Maps a Move's type to the animation state used by FactionWars3DCharacter.
 // Mirrors getSamuraiAnimForMove() in lib/factionWarsCore.ts.
+/** Hold at least `minMs`, and until the arena's knock-out + finishing move is over (capped). */
+async function holdForArena(minMs: number) {
+  const t0 = Date.now();
+  await new Promise((r) => setTimeout(r, 1600));            // let the final blow land and the KO register
+  const w = typeof window !== "undefined" ? window.__fwArenaFinish : undefined;
+  if (w) await Promise.race([w(), new Promise((r) => setTimeout(r, 20000))]);
+  const spent = Date.now() - t0;
+  if (spent < minMs) await new Promise((r) => setTimeout(r, minMs - spent));
+}
+
 function moveToAnim(mv: Move | null | undefined): AnimState {
   if (!mv) return "idle";
   if (mv.type === "attack") return "attack";
@@ -1184,8 +1194,9 @@ export default function ChallengePage() {
     prevStatusRef.current = curr;
     if (prev === "active" && curr === "completed") {
       setCompletionPending(true);
-      const timer = setTimeout(() => setCompletionPending(false), 3500);
-      return () => clearTimeout(timer);
+      let live = true;
+      void holdForArena(3500).then(() => { if (live) setCompletionPending(false); });
+      return () => { live = false; };
     }
     // If we land on a completed match from a fresh page load (no prior "active"
     // state seen by this client), skip the delay — the player wasn't watching
@@ -1632,11 +1643,11 @@ export default function ChallengePage() {
             currentTerritory: match.currentTerritory,
           };
           setMatch(stageMatch);
-          // Hold the stage view, then apply the real (rotated) match.
-          setTimeout(() => {
+          // Hold the stage view (and the arena's finishing move), then apply the real (rotated) match.
+          void holdForArena(3500).then(() => {
             setMatch(newMatch);
             setBusy(false);
-          }, 3500);
+          });
           return;
         }
       }

@@ -1,19 +1,22 @@
 // components/FactionWarsArena.tsx
 //
-// PRESENTATION ONLY. The shared 3D duel stage for Faction Wars (solo + PvP):
-// one r3f scene with both fighters facing each other, lit in the defending faction's colour.
-// It replaces the two white 120x140 portrait canvases. Game logic never changes here —
-// it still drives animations through `player3DAnim` / `enemy3DAnim` props and the
-// legacy `window.__fw3dPlayPlayer(anim)` / `window.__fw3dPlayEnemy(anim)` globals.
+// PRESENTATION ONLY. The shared 3D duel stage for Faction Wars (solo + PvP): both fighters in one r3f scene,
+// lit in the defending faction's colour. Game logic never changes here — it still drives the fighters through
+// `player.anim` / `enemy.anim` and the legacy `window.__fw3dPlayPlayer(anim)` / `window.__fw3dPlayEnemy(anim)` globals.
 //
-// Everything cinematic in here (hit reactions, hit-stop, damage numbers, move VFX, KO slow-mo,
-// camera work, territory fly-in) is derived from the props the game already sends — anims and HP.
+// The fighters are driven by the code fight engine (components/fight): real punches, kicks, blocks, thrown stars and
+// spells that land on the opponent, hit-stop and sparks — and when a fighter is knocked out, a finishing move
+// (two per faction, stylised, no gore). The winner picks one when `finisherChoice` is on (solo), otherwise it's automatic.
+// `window.__fwArenaFinish()` resolves once the finishing move is over, so the game can wait for it before moving on.
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { AdditiveBlending, Color, DoubleSide, Fog, type Group, type Mesh, type PointLight, type SpotLight } from "three";
-import ArenaCharacter, { preloadFaction, type ArenaAnim } from "./arena/ArenaCharacter";
+import { useGLTF } from "@react-three/drei";
+import { Color, Fog, type PerspectiveCamera, type PointLight, type SpotLight } from "three";
+import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
+import { FightStage, type StageEvent } from "./fight/stage";
+import { finishersFor, type Finisher } from "./fight/finishers";
 
-export type FWAnim = ArenaAnim;
+export type FWAnim = "idle" | "attack" | "magic" | "trick" | "defend" | "hit" | "win" | "lose";
 export type FWBattleAnim = "idle" | "clash" | "win" | "lose";
 
 export type ArenaFighter = {
@@ -33,26 +36,30 @@ export type FactionWarsArenaProps = {
   battleAnim: FWBattleAnim;
   /** Register the legacy window.__fw3dPlay* globals (solo mode calls them). Default true. */
   registerGlobals?: boolean;
-  height?: string;       // CSS height; default clamp(230px, 40vw, 340px)
+  height?: string;       // CSS height; default clamp(250px, 44vw, 380px)
   /** Faction ids to warm up in the background (the whole team + all defenders) so rotations are instant. */
   preload?: string[];
   /** Banner shown during the fly-in when a new match-up starts, e.g. "TERRITORY 3 · SHOGUN'S HOLD". */
   title?: string;
+  /** Let the player pick the finishing move when they win (solo). Otherwise it's picked automatically. */
+  finisherChoice?: boolean;
+  /** optional game sound hooks (useFWAudio().sfx) for the finishing moves */
+  sfx?: Partial<Record<"clash" | "hitLight" | "hitHeavy" | "imperial" | "ultra" | "berserker", () => void>>;
 };
 
 declare global {
   interface Window {
     __fw3dPlayPlayer?: (a: FWAnim) => void;
     __fw3dPlayEnemy?: (a: FWAnim) => void;
+    __fwArenaFinish?: () => Promise<void>;
   }
 }
 
 type Side = "player" | "enemy";
-const SIDE_X: Record<Side, number> = { player: -0.9, enemy: 0.9 };
-const OFFENSIVE: FWAnim[] = ["attack", "magic", "trick"];
-const IMPACT_MS = 300;      // when the swing lands inside the clip
-const HITSTOP_MS = 90;
-const CLIP_BUSY_MS = 650;   // don't interrupt an offensive clip younger than this with a "hit"
+const SIDE_X: Record<Side, number> = { player: -0.78, enemy: 0.78 };
+const SUPPORTED = ["ashigaru", "buke", "bushi", "kenshi", "ronin", "samurai", "shogun", "sohei", "warrior", "wokou", "yamabushi"];
+const modelPath = (f: string) => `/faction-wars/characters/${SUPPORTED.includes(f) ? f : "samurai"}/${SUPPORTED.includes(f) ? f : "samurai"}.glb`;
+export function preloadFaction(f: string) { useGLTF.preload(modelPath(f)); }
 
 // ── palette from a faction colour ─────────────────────────────────────────────
 function mix(a: string, b: string, t: number) { return "#" + new Color(a).lerp(new Color(b), t).getHexString(); }
@@ -70,16 +77,8 @@ function palette(defenderColor: string, playerColor: string) {
 }
 
 // ── shared mutable "director" state, read by useFrame components ─────────────
-type Director = {
-  punch: number;                 // camera punch-in impulse (decays)
-  shake: number;
-  intro: number | null;          // ms timestamp when fly-in started
-  ko: { side: Side; at: number } | null;
-  lowHp: { player: boolean; enemy: boolean };
-  knock: { player: number; enemy: number }; // knockback offsets
-  lunge: boolean;
-};
-const newDirector = (): Director => ({ punch: 0, shake: 0, intro: null, ko: null, lowHp: { player: false, enemy: false }, knock: { player: 0, enemy: 0 }, lunge: false });
+type Director = { punch: number; shake: number; intro: number | null; ko: { side: Side; at: number } | null; lowHp: { player: boolean; enemy: boolean } };
+const newDirector = (): Director => ({ punch: 0, shake: 0, intro: null, ko: null, lowHp: { player: false, enemy: false } });
 
 function Atmosphere({ fog, dir }: { fog: string; dir: React.MutableRefObject<Director> }) {
   const { scene } = useThree();
@@ -88,18 +87,18 @@ function Atmosphere({ fog, dir }: { fog: string; dir: React.MutableRefObject<Dir
   useFrame((_, dt) => {
     const f = fogRef.current; if (!f) return;
     const low = dir.current.lowHp.player || dir.current.lowHp.enemy;
-    const targetFar = dir.current.ko ? 9 : low ? 11 : 15;
+    const targetFar = dir.current.ko ? 12 : low ? 11 : 15;
     f.far += (targetFar - f.far) * Math.min(1, dt * 2);
   });
   return null;
 }
 
 function Motes({ color, count = 45 }: { color: string; count?: number }) {
-  const ref = useRef<Group | null>(null);
+  const ref = useRef<any>(null);
   const seeds = useMemo(() => Array.from({ length: count }, (_, i) => ({ x: (Math.sin(i * 12.9898) * 43758.5453) % 1, y: (Math.sin(i * 78.233) * 43758.5453) % 1, z: (Math.sin(i * 39.346) * 43758.5453) % 1, s: 0.5 + ((i * 7) % 5) / 5 })), [count]);
   useFrame(({ clock }) => {
     const g = ref.current; if (!g) return; const t = clock.getElapsedTime();
-    g.children.forEach((m, i) => { const sd = seeds[i]; m.position.set(sd.x * 9 - 4.5, ((sd.y * 3 + t * 0.1 * sd.s) % 3) + 0.1, sd.z * 6 - 4); m.scale.setScalar(0.011 + Math.sin(t * 2 + i) * 0.004); });
+    g.children.forEach((m: any, i: number) => { const sd = seeds[i]; m.position.set(sd.x * 9 - 4.5, ((sd.y * 3 + t * 0.1 * sd.s) % 3) + 0.1, sd.z * 6 - 4); m.scale.setScalar(0.011 + Math.sin(t * 2 + i) * 0.004); });
   });
   return (
     <group ref={ref}>
@@ -108,15 +107,19 @@ function Motes({ color, count = 45 }: { color: string; count?: number }) {
   );
 }
 
-const CAM_BASE = { y: 1.1, z: 4.15, lookY: 0.98 };
+const CAM_BASE = { y: 1.1, z: 4.15, lookY: 0.98, fov: 36 };
 
-function CameraRig({ dir }: { dir: React.MutableRefObject<Director> }) {
+function CameraRig({ dir, stage }: { dir: React.MutableRefObject<Director>; stage: FightStage }) {
   const { camera } = useThree();
-  const cur = useRef({ x: 0, y: CAM_BASE.y, z: CAM_BASE.z, lx: 0, ly: CAM_BASE.lookY, lz: 0 });
+  const cur = useRef({ x: 0, y: CAM_BASE.y, z: CAM_BASE.z, lx: 0, ly: CAM_BASE.lookY, lz: 0, fov: CAM_BASE.fov });
+  useEffect(() => { stage.fx.camera = camera; }, [camera, stage]);
   useFrame(({ clock }, dt) => {
     const d = dir.current; const t = clock.getElapsedTime(); const now = performance.now();
-    let tx = Math.sin(t * 0.25) * 0.1, ty = CAM_BASE.y + Math.sin(t * 0.4) * 0.03, tz = CAM_BASE.z, lx = 0, ly = CAM_BASE.lookY, lz = 0, ease = 6;
-    if (d.intro != null) {
+    let tx = Math.sin(t * 0.25) * 0.1, ty = CAM_BASE.y + Math.sin(t * 0.4) * 0.03, tz = CAM_BASE.z, lx = 0, ly = CAM_BASE.lookY, lz = 0, ease = 6, fov = CAM_BASE.fov;
+    const shot = stage.cam;
+    if (shot) {
+      tx = shot.pos.x; ty = shot.pos.y; tz = shot.pos.z; lx = shot.look.x; ly = shot.look.y; lz = shot.look.z; ease = shot.ease || 4; fov = shot.fov || CAM_BASE.fov;
+    } else if (d.intro != null) {
       const k = Math.min(1, (now - d.intro) / 1500);
       const e = 1 - Math.pow(1 - k, 3);
       // start low over the player's shoulder, swing round to the duel angle
@@ -124,17 +127,16 @@ function CameraRig({ dir }: { dir: React.MutableRefObject<Director> }) {
       lx = 0.9 * (1 - e); ly = 1.0 - 0.08 * e; ease = 30;
       if (k >= 1) d.intro = null;
     } else if (d.ko) {
-      const k = Math.min(1, (now - d.ko.at) / 1100);
       const sx = SIDE_X[d.ko.side];
-      // drift toward the fallen fighter but keep the whole body in frame (fighters are ~2 units tall)
-      tx = sx * 0.4; ty = 1.15 - 0.05 * k; tz = 3.35; lx = sx * 0.55; ly = 0.95; ease = 3;
+      tx = sx * 0.35; ty = 1.18; tz = 3.6; lx = sx * 0.45; ly = 1.0; ease = 3;
     }
-    d.punch *= Math.exp(-dt * 9); tz -= d.punch * (d.ko ? 0.12 : 0.35);
+    d.punch *= Math.exp(-dt * 9); tz -= d.punch * 0.25;
     d.shake *= Math.exp(-dt * 7);
     const s = d.shake;
     const c = cur.current; const a = Math.min(1, dt * ease);
-    c.x += (tx - c.x) * a; c.y += (ty - c.y) * a; c.z += (tz - c.z) * a; c.lx += (lx - c.lx) * a; c.ly += (ly - c.ly) * a; c.lz += (lz - c.lz) * a;
+    c.x += (tx - c.x) * a; c.y += (ty - c.y) * a; c.z += (tz - c.z) * a; c.lx += (lx - c.lx) * a; c.ly += (ly - c.ly) * a; c.lz += (lz - c.lz) * a; c.fov += (fov - c.fov) * a;
     camera.position.set(c.x + (Math.random() - 0.5) * s * 0.09, c.y + (Math.random() - 0.5) * s * 0.06, c.z);
+    const pc = camera as PerspectiveCamera; if (Math.abs(pc.fov - c.fov) > 0.01) { pc.fov = c.fov; pc.updateProjectionMatrix(); }
     camera.lookAt(c.lx, c.ly, c.lz);
   });
   return null;
@@ -146,7 +148,7 @@ function Lights({ pal, playerColor, enemyColor, dir }: { pal: ReturnType<typeof 
   const pc = useMemo(() => new Color(playerColor), [playerColor]); const ec = useMemo(() => new Color(enemyColor), [enemyColor]);
   useFrame(({ clock }, dt) => {
     const d = dir.current; const t = clock.getElapsedTime(); const a = Math.min(1, dt * 4);
-    const dim = d.ko ? 0.25 : 1;
+    const dim = d.ko ? 0.6 : 1;
     if (amb.current) amb.current.intensity += (1.15 * dim - amb.current.intensity) * a;
     if (key.current) key.current.intensity += (1.9 * dim - key.current.intensity) * a;
     const pulse = 0.5 + 0.5 * Math.sin(t * 6);
@@ -154,7 +156,7 @@ function Lights({ pal, playerColor, enemyColor, dir }: { pal: ReturnType<typeof 
     if (el.current) { el.current.color.copy(ec); if (d.lowHp.enemy) el.current.color.lerp(red, 0.5 + 0.5 * pulse); el.current.intensity += ((d.lowHp.enemy ? 2.2 + pulse * 1.6 : 2.2) - el.current.intensity) * a; }
     if (spot.current) {
       const winnerX = d.ko ? -SIDE_X[d.ko.side] : 0;
-      spot.current.intensity += ((d.ko ? 14 : 0) - spot.current.intensity) * a;
+      spot.current.intensity += ((d.ko ? 10 : 0) - spot.current.intensity) * a;
       spot.current.position.set(winnerX, 4.2, 1.2); spot.current.target.position.set(winnerX, 0.8, 0.1); spot.current.target.updateMatrixWorld();
     }
   });
@@ -174,15 +176,15 @@ function Lights({ pal, playerColor, enemyColor, dir }: { pal: ReturnType<typeof 
 function Ground({ ring }: { ring: string }) {
   return (
     <group>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} receiveShadow>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.0, 0]} receiveShadow>
         <circleGeometry args={[3.8, 48]} />
         <meshStandardMaterial color="#0b0c12" roughness={0.95} metalness={0.05} />
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.025, 0]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]}>
         <ringGeometry args={[3.6, 3.8, 64]} />
         <meshBasicMaterial color={ring} transparent opacity={0.35} />
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.008, 0]}>
         <ringGeometry args={[1.25, 1.3, 48]} />
         <meshBasicMaterial color={ring} transparent opacity={0.16} />
       </mesh>
@@ -190,53 +192,16 @@ function Ground({ ring }: { ring: string }) {
   );
 }
 
-/** Lunge toward the centre on clash, knockback on hit, hold ground otherwise. */
-function Stance({ side, dir, children }: { side: Side; dir: React.MutableRefObject<Director>; children: React.ReactNode }) {
-  const ref = useRef<Group | null>(null);
-  useFrame((_, dt) => {
-    const g = ref.current; if (!g) return; const d = dir.current;
-    const dirIn = side === "player" ? 1 : -1;
-    d.knock[side] *= Math.exp(-dt * 6);
-    const target = (d.lunge ? dirIn * 0.28 : 0) - dirIn * d.knock[side];
-    g.position.x += (target - g.position.x) * Math.min(1, dt * 12);
-  });
-  return <group ref={ref}>{children}</group>;
-}
-
-// ── VFX ───────────────────────────────────────────────────────────────────────
-type FxKind = "sparks" | "slash" | "glyph" | "embers" | "shadow" | "dome" | "dust";
-type Fx = { id: number; kind: FxKind; side: Side; color: string; t0: number; life: number };
-const FX_LIFE: Record<FxKind, number> = { sparks: 450, slash: 280, glyph: 900, embers: 900, shadow: 500, dome: 700, dust: 900 };
-
-function FxNode({ fx }: { fx: Fx }) {
-  const g = useRef<Group | null>(null);
-  const seeds = useMemo(() => Array.from({ length: 14 }, (_, i) => ({ a: (i / 14) * Math.PI * 2 + (Math.sin(i * 7.1) % 1) * 0.4, v: 0.9 + ((i * 37) % 10) / 10, r: 0.3 + ((i * 13) % 7) / 10 })), []);
-  const x = SIDE_X[fx.side]; const facing = fx.side === "player" ? 1 : -1;
-  useFrame(() => {
-    const G = g.current; if (!G) return;
-    const k = Math.min(1, (performance.now() - fx.t0) / fx.life); const e = 1 - Math.pow(1 - k, 2);
-    G.visible = k < 1;
-    switch (fx.kind) {
-      case "sparks": G.children.forEach((m, i) => { const s = seeds[i]; m.position.set(x + Math.cos(s.a) * e * s.r * 1.2 - facing * 0.15, 1.05 + Math.sin(s.a) * e * s.r - e * e * 0.4, 0.35 + Math.sin(i) * 0.1); m.scale.setScalar(0.035 * (1 - k) * s.v); }); break;
-      case "slash": { const m = G.children[0] as Mesh; m.position.set(x - facing * 0.1, 1.0, 0.4); m.rotation.z = -facing * (0.6 + e * 1.4); m.scale.setScalar(0.55 + e * 0.5); (m.material as any).opacity = 0.85 * (1 - k); break; }
-      case "glyph": { const m = G.children[0] as Mesh; m.position.set(x, 0.035, 0.1); m.rotation.z = e * 2.5; m.scale.setScalar(0.6 + e * 0.5); (m.material as any).opacity = 0.9 * (1 - k * k); break; }
-      case "embers": G.children.forEach((m, i) => { const s = seeds[i]; m.position.set(x + Math.cos(s.a) * s.r * 0.7, 0.1 + e * (1.4 + s.v * 0.8), 0.1 + Math.sin(s.a) * s.r * 0.5); m.scale.setScalar(0.028 * (1 - k)); }); break;
-      case "shadow": { const m = G.children[0] as Mesh; m.position.set(x, 0.9, 0.1); m.scale.set(0.5 + e * 1.3, 0.9 + e * 0.6, 1); (m.material as any).opacity = 0.7 * (1 - k); break; }
-      case "dome": { const m = G.children[0] as Mesh; m.position.set(x, 0.85, 0.1); m.scale.setScalar(0.9 + Math.sin(k * Math.PI) * 0.12); (m.material as any).opacity = 0.2 * Math.sin(k * Math.PI); break; }
-      case "dust": { const m = G.children[0] as Mesh; m.position.set(x, 0.04, 0.1); m.scale.setScalar(0.3 + e * 1.4); (m.material as any).opacity = 0.55 * (1 - k); break; }
-    }
-  });
-  return (
-    <group ref={g}>
-      {fx.kind === "sparks" && seeds.map((_, i) => (<mesh key={i}><sphereGeometry args={[1, 5, 5]} /><meshBasicMaterial color={i % 3 ? "#ffd166" : "#ffffff"} transparent blending={AdditiveBlending} depthWrite={false} /></mesh>))}
-      {fx.kind === "slash" && (<mesh><ringGeometry args={[0.62, 0.8, 32, 1, 0, 1.9]} /><meshBasicMaterial color="#ffffff" transparent opacity={0.85} side={DoubleSide} blending={AdditiveBlending} depthWrite={false} /></mesh>)}
-      {fx.kind === "glyph" && (<mesh rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[0.45, 0.62, 6, 1]} /><meshBasicMaterial color={fx.color} transparent opacity={0.9} side={DoubleSide} blending={AdditiveBlending} depthWrite={false} /></mesh>)}
-      {fx.kind === "embers" && seeds.map((_, i) => (<mesh key={i}><sphereGeometry args={[1, 5, 5]} /><meshBasicMaterial color={fx.color} transparent blending={AdditiveBlending} depthWrite={false} /></mesh>))}
-      {fx.kind === "shadow" && (<mesh><planeGeometry args={[1, 1]} /><meshBasicMaterial color="#1a0a2a" transparent opacity={0.7} depthWrite={false} /></mesh>)}
-      {fx.kind === "dome" && (<mesh><sphereGeometry args={[0.72, 24, 16]} /><meshBasicMaterial color={fx.color} transparent opacity={0.2} side={DoubleSide} blending={AdditiveBlending} depthWrite={false} /></mesh>)}
-      {fx.kind === "dust" && (<mesh rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[0.5, 0.9, 32]} /><meshBasicMaterial color="#8a8073" transparent opacity={0.55} side={DoubleSide} depthWrite={false} /></mesh>)}
-    </group>
-  );
+/** loads both fighters' models into the fight engine and ticks it */
+function Fighters({ stage, player, enemy }: { stage: FightStage; player: ArenaFighter; enemy: ArenaFighter }) {
+  const gp = useGLTF(modelPath(player.id)) as any;
+  const ge = useGLTF(modelPath(enemy.id)) as any;
+  useEffect(() => { const m = cloneSkinned(gp.scene); m.scale.setScalar(0.011); stage.setFighter("player", m, player.id, player.color); // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gp.scene, player.id, stage]);
+  useEffect(() => { const m = cloneSkinned(ge.scene); m.scale.setScalar(0.011); stage.setFighter("enemy", m, enemy.id, enemy.color); // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ge.scene, enemy.id, stage]);
+  useFrame((_, dt) => stage.update(dt));
+  return <primitive object={stage.group} />;
 }
 
 // ── anim plumbing: prop path + legacy globals → (anim, animKey) ───────────────
@@ -255,24 +220,30 @@ function useAnimChannel(propAnim: FWAnim) {
   return { ...state, play };
 }
 
-const HOLD: FWAnim[] = ["win", "lose"];
 type Float = { id: number; side: Side; text: string; color: string; big: boolean };
+type Choice = { side: Side; options: Finisher[]; until: number };
 
-export default function FactionWarsArena({ player, enemy, battleAnim, registerGlobals = true, height = "clamp(250px, 44vw, 380px)", preload, title }: FactionWarsArenaProps) {
+export default function FactionWarsArena({ player, enemy, battleAnim, registerGlobals = true, height = "clamp(250px, 44vw, 380px)", preload, title, finisherChoice = false, sfx }: FactionWarsArenaProps) {
   const p = useAnimChannel(player.anim);
   const e = useAnimChannel(enemy.anim);
   const dir = useRef<Director>(newDirector());
-  const speedRef = useRef(1);
-  const [fx, setFx] = useState<Fx[]>([]);
+  const stage = useMemo(() => new FightStage(), []);
   const [floats, setFloats] = useState<Float[]>([]);
-  const [flash, setFlash] = useState<{ player: number; enemy: number }>({ player: 0, enemy: 0 });
   const [banner, setBanner] = useState<string | null>(null);
-  const [whiteFlash, setWhiteFlash] = useState(0);
+  const [whiteFlash, setWhiteFlash] = useState<{ n: number; color: string; a: number }>({ n: 0, color: "#fff", a: 0.75 });
+  const [callout, setCallout] = useState<{ text: string; color: string; n: number } | null>(null);
+  const [finTitle, setFinTitle] = useState<{ text: string; color: string; n: number } | null>(null);
+  const [choice, setChoice] = useState<Choice | null>(null);
   const idRef = useRef(1);
   const timers = useRef<number[]>([]);
-  const lastOffensive = useRef<{ player: number; enemy: number }>({ player: 0, enemy: 0 });
-  const later = useCallback((ms: number, fn: () => void) => { const t = window.setTimeout(fn, ms); timers.current.push(t); }, []);
-  useEffect(() => () => { timers.current.forEach(clearTimeout); }, []);
+  const later = useCallback((ms: number, fn: () => void) => { const t = window.setTimeout(fn, ms); timers.current.push(t); return t; }, []);
+  const sfxRef = useRef(sfx); sfxRef.current = sfx;
+  const finState = useRef<{ active: boolean; running: boolean; waiters: (() => void)[] }>({ active: false, running: false, waiters: [] });
+  const pending = useRef<{ float: Partial<Record<Side, Float[]>>; ko: Side | null; koTimer: number | null }>({ float: {}, ko: null, koTimer: null });
+  const lastImpact = useRef<Record<Side, number>>({ player: 0, enemy: 0 });
+  const colors = useRef({ player: player.color, enemy: enemy.color }); colors.current = { player: player.color, enemy: enemy.color };
+  const choiceRef = useRef(finisherChoice); choiceRef.current = finisherChoice;
+  useEffect(() => () => { timers.current.forEach(clearTimeout); finState.current.waiters.splice(0).forEach((r) => r()); }, []);
 
   // warm the rest of the roster only after the current pair has had the network to itself
   const preloadKey = (preload || []).join(",");
@@ -289,86 +260,115 @@ export default function FactionWarsArena({ player, enemy, battleAnim, registerGl
     return () => { if (window.__fw3dPlayPlayer === p.play) delete window.__fw3dPlayPlayer; if (window.__fw3dPlayEnemy === e.play) delete window.__fw3dPlayEnemy; };
   }, [registerGlobals, p.play, e.play]);
 
-  const spawnFx = useCallback((kind: FxKind, side: Side, color: string) => {
-    const id = idRef.current++; const life = FX_LIFE[kind];
-    setFx((f) => [...f, { id, kind, side, color, t0: performance.now(), life }]);
-    later(life + 50, () => setFx((f) => f.filter((x) => x.id !== id)));
-  }, [later]);
-  const spawnFloat = useCallback((side: Side, text: string, color: string, big = false) => {
-    const id = idRef.current++;
-    setFloats((f) => [...f, { id, side, text, color, big }]);
-    later(1150, () => setFloats((f) => f.filter((x) => x.id !== id)));
-  }, [later]);
+  // the game can wait for the finishing move before it moves on
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const fn = () => (finState.current.active ? new Promise<void>((res) => finState.current.waiters.push(res)) : Promise.resolve());
+    window.__fwArenaFinish = fn;
+    return () => { if (window.__fwArenaFinish === fn) delete window.__fwArenaFinish; };
+  }, []);
 
-  // ── fresh match-up → fly-in + banner + idle
+  const spawnFloat = useCallback((f: Float) => {
+    setFloats((x) => [...x, f]);
+    later(1150, () => setFloats((x) => x.filter((y) => y.id !== f.id)));
+  }, [later]);
+  const flushFloats = useCallback((side: Side) => { const list = pending.current.float[side]; if (list?.length) { list.forEach(spawnFloat); pending.current.float[side] = []; } }, [spawnFloat]);
+
+  const finishDone = useCallback(() => {
+    const fs = finState.current; fs.running = false;
+    later(900, () => { fs.active = false; fs.waiters.splice(0).forEach((r) => r()); });
+  }, [later]);
+  const runFinisher = useCallback((winner: Side, f: Finisher) => {
+    setChoice(null); finState.current.running = true;
+    sfxRef.current?.clash?.();
+    stage.runFinisher(winner, f).then(finishDone);
+  }, [stage, finishDone]);
+
+  const startKO = useCallback((loser: Side) => {
+    const pd = pending.current; if (pd.koTimer) { clearTimeout(pd.koTimer); pd.koTimer = null; } pd.ko = null;
+    if (stage.koSide) return;
+    stage.ko(loser);
+    dir.current.ko = { side: loser, at: performance.now() };
+    const winner: Side = loser === "player" ? "enemy" : "player";
+    const W = stage.f[winner]; if (!W) { finishDone(); return; }
+    const options = finishersFor(W.faction);
+    later(650, () => { setCallout({ text: "FINISH THEM!", color: "#ff3b3b", n: idRef.current++ }); sfxRef.current?.berserker?.(); });
+    if (winner === "player" && choiceRef.current) {
+      later(1100, () => setChoice({ side: winner, options, until: performance.now() + 5000 }));
+      later(6100, () => { if (finState.current.active && !finState.current.running && !stage.fin) runFinisher(winner, options[Math.floor(Math.random() * options.length)]); });
+    } else {
+      later(1900, () => runFinisher(winner, options[Math.floor(Math.random() * options.length)]));
+    }
+  }, [stage, later, runFinisher, finishDone]);
+
+  // engine events → overlays, shake, sounds; the HP numbers pop exactly when the blow lands
+  useEffect(() => stage.on((ev: StageEvent) => {
+    const d = dir.current;
+    if (ev.type === "impact") {
+      lastImpact.current[ev.target] = performance.now();
+      flushFloats(ev.target);
+      if (pending.current.ko === ev.target) startKO(ev.target);
+      d.punch = Math.max(d.punch, ev.blocked ? 0.3 : 0.5 + ev.power * 0.2);
+      if (stage.fin) (ev.power >= 3 ? sfxRef.current?.hitHeavy : sfxRef.current?.hitLight)?.();
+    }
+    if (ev.type === "shake") d.shake = Math.max(d.shake, ev.amount);
+    if (ev.type === "screenFlash") setWhiteFlash((w) => ({ n: w.n + 1, color: ev.color, a: Math.min(0.85, ev.strength) }));
+    if (ev.type === "title") { setFinTitle({ text: ev.text, color: ev.color, n: idRef.current++ }); sfxRef.current?.ultra?.(); }
+  }), [stage, flushFloats, startKO]);
+
+  // ── fresh match-up → fly-in + banner + reset
   const matchKey = `${player.id}|${enemy.id}`;
   useEffect(() => {
     p.play("idle"); e.play("idle");
-    const d = dir.current; d.ko = null; d.intro = performance.now(); d.knock.player = 0; d.knock.enemy = 0; speedRef.current = 1;
+    const d = dir.current; d.ko = null; d.intro = performance.now();
+    pending.current = { float: {}, ko: null, koTimer: null };
+    setChoice(null); setCallout(null); setFinTitle(null);
+    const fs = finState.current; fs.active = false; fs.running = false; fs.waiters.splice(0).forEach((r) => r());
     if (title) { setBanner(title); later(1700, () => setBanner(null)); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [matchKey]);
 
-  // ── impact choreography: an offensive clip on one side lands on the other side ~IMPACT_MS later
-  const impact = useCallback((attacker: Side, kind: FWAnim) => {
-    const target: Side = attacker === "player" ? "enemy" : "player";
-    const tColor = attacker === "player" ? player.color : enemy.color;
-    if (kind === "magic") { spawnFx("glyph", attacker, tColor); spawnFx("embers", attacker, tColor); }
-    if (kind === "trick") spawnFx("shadow", attacker, tColor);
-    later(IMPACT_MS, () => {
-      const d = dir.current;
-      if (kind === "attack") spawnFx("slash", target, "#ffffff");
-      spawnFx("sparks", target, tColor);
-      d.knock[target] = 0.22; d.punch = 1; d.shake = Math.max(d.shake, 1);
-      setFlash((f) => ({ ...f, [target]: f[target] + 1 }));
-      speedRef.current = 0.02; later(HITSTOP_MS, () => { if (!d.ko) speedRef.current = 1; });
-      const busy = performance.now() - lastOffensive.current[target] < CLIP_BUSY_MS;
-      const targetAnim = target === "player" ? p.anim : e.anim;
-      if (!busy && targetAnim !== "defend" && targetAnim !== "lose" && targetAnim !== "win") (target === "player" ? p : e).play("hit");
-    });
-  }, [player.color, enemy.color, spawnFx, later, p, e]);
+  // game anims → engine
+  useEffect(() => { if (p.key > 0) stage.play("player", p.anim); }, [p.key, p.anim, stage]);
+  useEffect(() => { if (e.key > 0) stage.play("enemy", e.anim); }, [e.key, e.anim, stage]);
 
-  useEffect(() => { if (p.key > 0 && OFFENSIVE.includes(p.anim)) { lastOffensive.current.player = performance.now(); impact("player", p.anim); } if (p.key > 0 && p.anim === "defend") spawnFx("dome", "player", player.color); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [p.key]);
-  useEffect(() => { if (e.key > 0 && OFFENSIVE.includes(e.anim)) { lastOffensive.current.enemy = performance.now(); impact("enemy", e.anim); } if (e.key > 0 && e.anim === "defend") spawnFx("dome", "enemy", enemy.color); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [e.key]);
-
-  // ── HP deltas → damage / heal numbers on the fighters, KO drama
+  // ── HP deltas → damage / heal numbers, KO
   const prevHp = useRef({ player: player.hp, enemy: enemy.hp, key: matchKey });
   useEffect(() => {
     const prev = prevHp.current;
     if (prev.key !== matchKey) { prevHp.current = { player: player.hp, enemy: enemy.hp, key: matchKey }; return; }
-    (["player", "enemy"] as Side[]).forEach((side) => {
+    (["enemy", "player"] as Side[]).forEach((side) => {   // the game checks the defender first: if both drop to 0, the player wins
       const now = side === "player" ? player.hp : enemy.hp; const was = prev[side];
       if (now === was) return;
       const delta = now - was;
-      const guarded = (side === "player" ? p.anim : e.anim) === "defend";
-      // line the number up with the attacker's swing landing (HP often updates before the clip connects)
-      const attacker: Side = side === "player" ? "enemy" : "player";
-      const sinceSwing = performance.now() - lastOffensive.current[attacker];
-      const wait = sinceSwing < IMPACT_MS ? IMPACT_MS - sinceSwing : 0;
       if (delta < 0) {
+        const guarded = stage.f[side]?.guarding || (side === "player" ? p.anim : e.anim) === "defend";
         const big = -delta >= 20;
-        later(wait, () => {
-          spawnFloat(side, `${guarded ? "🛡 " : ""}-${-delta}`, guarded ? "#9ca3af" : big ? "#fde68a" : "#ffffff", big);
-          if (big) { setWhiteFlash((w) => w + 1); dir.current.shake = Math.max(dir.current.shake, 1.6); }
-          if (now <= 0) {
-            const d = dir.current; d.ko = { side, at: performance.now() };
-            speedRef.current = 0.3; later(1000, () => { speedRef.current = 1; });
-            later(420, () => spawnFx("dust", side, "#8a8073"));
-          }
-        });
+        const f: Float = { id: idRef.current++, side, text: `${guarded ? "🛡 " : ""}-${-delta}`, color: guarded ? "#9ca3af" : big ? "#fde68a" : "#ffffff", big };
+        // the blow may already have landed (the result arrives after the swing) — otherwise wait for it
+        const landed = performance.now() - lastImpact.current[side] < 700;
+        if (landed) spawnFloat(f); else { (pending.current.float[side] ||= []).push(f); later(1100, () => flushFloats(side)); }
+        if (big) dir.current.shake = Math.max(dir.current.shake, 0.8);
+        if (now <= 0 && !stage.koSide && !pending.current.ko) {
+          pending.current.ko = side; finState.current.active = true;
+          pending.current.koTimer = later(landed ? 150 : 1200, () => { if (pending.current.ko === side) startKO(side); });
+        }
       } else if (delta > 0) {
-        spawnFloat(side, `+${delta}`, "#4ade80");
+        spawnFloat({ id: idRef.current++, side, text: `+${delta}`, color: "#4ade80", big: false });
       }
     });
     prevHp.current = { player: player.hp, enemy: enemy.hp, key: matchKey };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [player.hp, enemy.hp, matchKey]);
 
-  // low-HP cues / clash lunge
+  // low-HP cues
   dir.current.lowHp.player = player.hp > 0 && player.hp < 25;
   dir.current.lowHp.enemy = enemy.hp > 0 && enemy.hp < 25;
-  dir.current.lunge = battleAnim === "clash";
-  useEffect(() => { if (battleAnim === "clash") dir.current.shake = Math.max(dir.current.shake, 0.7); }, [battleAnim]);
+  useEffect(() => { if (battleAnim === "clash") dir.current.shake = Math.max(dir.current.shake, 0.4); }, [battleAnim]);
+
+  // finisher-choice countdown
+  const [, force] = useState(0);
+  useEffect(() => { if (!choice) return; const t = setInterval(() => force((x) => x + 1), 100); return () => clearInterval(t); }, [choice]);
 
   const pal = useMemo(() => palette(enemy.color, player.color), [enemy.color, player.color]);
   const clash = battleAnim === "clash";
@@ -385,31 +385,26 @@ export default function FactionWarsArena({ player, enemy, battleAnim, registerGl
       </div>
     </div>
   );
+  const left = choice ? Math.max(0, choice.until - performance.now()) : 0;
 
   return (
     <div style={{ position: "relative", width: "100%", height, borderRadius: 14, overflow: "hidden", marginBottom: 14, border: "1px solid rgba(255,255,255,0.08)",
       background: `radial-gradient(ellipse at 50% 15%, ${pal.skyTop} 0%, ${pal.skyBottom} 60%, #000 100%)` }}>
       <div style={{ position: "absolute", inset: 0, background: `radial-gradient(ellipse at 22% 55%, ${player.color}33 0%, transparent 55%), radial-gradient(ellipse at 78% 55%, ${enemy.color}33 0%, transparent 55%)`, transition: "background .5s" }} />
-      <Canvas dpr={[1, 1.5]} shadows gl={{ alpha: true, antialias: true }} camera={{ position: [0, CAM_BASE.y, CAM_BASE.z], fov: 36, near: 0.1, far: 40 }} style={{ position: "absolute", inset: 0 }}>
+      <Canvas dpr={[1, 1.5]} shadows gl={{ alpha: true, antialias: true }} camera={{ position: [0, CAM_BASE.y, CAM_BASE.z], fov: CAM_BASE.fov, near: 0.1, far: 60 }} style={{ position: "absolute", inset: 0 }}>
         <Atmosphere fog={pal.fog} dir={dir} />
-        <CameraRig dir={dir} />
+        <CameraRig dir={dir} stage={stage} />
         <Lights pal={pal} playerColor={player.color} enemyColor={enemy.color} dir={dir} />
         <Ground ring={pal.ring} />
         <Motes color={pal.motes} />
         <Suspense fallback={null}>
-          <Stance side="player" dir={dir}>
-            <ArenaCharacter factionId={player.id} anim={p.anim} animKey={p.key} position={[SIDE_X.player, 0, 0.1]} rotationY={0.75} dead={playerLost} holdOn={HOLD} speedRef={speedRef} flashKey={flash.player} idleSpeed={dir.current.lowHp.player ? 1.35 : 1} />
-          </Stance>
-          <Stance side="enemy" dir={dir}>
-            <ArenaCharacter factionId={enemy.id} anim={e.anim} animKey={e.key} position={[SIDE_X.enemy, 0, 0.1]} rotationY={-0.75} dead={enemyLost} holdOn={HOLD} speedRef={speedRef} flashKey={flash.enemy} idleSpeed={dir.current.lowHp.enemy ? 1.35 : 1} />
-          </Stance>
+          <Fighters stage={stage} player={player} enemy={enemy} />
         </Suspense>
-        {fx.map((f) => <FxNode key={f.id} fx={f} />)}
       </Canvas>
 
       {/* damage / heal numbers over the fighters */}
       {floats.map((f) => (
-        <div key={f.id} style={{ position: "absolute", left: f.side === "player" ? "30%" : "70%", top: "34%", pointerEvents: "none",
+        <div key={f.id} style={{ position: "absolute", left: f.side === "player" ? "32%" : "68%", top: "30%", pointerEvents: "none",
           fontWeight: 900, fontSize: f.big ? 34 : 24, color: f.color, letterSpacing: "0.02em",
           textShadow: `0 0 18px ${f.color}aa, 0 2px 4px rgba(0,0,0,0.9)`, animation: `fwFloat ${f.big ? "1.1s" : "1s"} cubic-bezier(0.2,0.9,0.3,1) both` }}>
           {f.text}
@@ -432,16 +427,48 @@ export default function FactionWarsArena({ player, enemy, battleAnim, registerGl
           <div style={{ fontWeight: 900, fontSize: "clamp(16px, 3.2vw, 30px)", letterSpacing: "0.3em", color: "#fff", textShadow: `0 0 30px ${enemy.color}, 0 2px 8px rgba(0,0,0,0.9)`, padding: "10px 22px", borderTop: `1px solid ${enemy.color}88`, borderBottom: `1px solid ${enemy.color}88`, background: "rgba(0,0,0,0.35)" }}>{banner}</div>
         </div>
       )}
-      {player.hp < 25 && <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "linear-gradient(90deg, rgba(248,113,113,0.28), transparent 45%)", animation: "fwPulse 1.1s ease-in-out infinite" }} />}
-      {enemy.hp < 25 && <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "linear-gradient(270deg, rgba(248,113,113,0.28), transparent 45%)", animation: "fwPulse 1.1s ease-in-out infinite" }} />}
-      {whiteFlash > 0 && <div key={whiteFlash} style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "#fff", animation: "fwWhite .28s ease-out both" }} />}
+      {callout && (
+        <div key={callout.n} style={{ position: "absolute", left: 0, right: 0, top: "14%", textAlign: "center", pointerEvents: "none", animation: "fwCallout 1.6s ease-out both" }}>
+          <span style={{ fontWeight: 900, fontStyle: "italic", fontSize: "clamp(26px, 6.5vw, 58px)", letterSpacing: "0.04em", color: "#ffe1d0", WebkitTextStroke: "2px #5a0000", textShadow: `0 0 24px ${callout.color}, 0 4px 0 #2a0000` }}>{callout.text}</span>
+        </div>
+      )}
+      {choice && (
+        <div style={{ position: "absolute", left: 0, right: 0, bottom: 12, display: "flex", flexDirection: "column", alignItems: "center", gap: 8, animation: "fwRise .35s ease-out both" }}>
+          <div style={{ fontSize: 10, fontWeight: 900, letterSpacing: "0.22em", color: "#fff", opacity: 0.8, textShadow: "0 1px 4px #000" }}>CHOOSE YOUR FINISHER</div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center", padding: "0 10px" }}>
+            {choice.options.map((f) => (
+              <button key={f.id} onClick={() => runFinisher(choice.side, f)}
+                style={{ cursor: "pointer", padding: "10px 16px", borderRadius: 10, border: `2px solid ${player.color}`, background: "linear-gradient(180deg, rgba(20,8,8,0.92), rgba(60,10,10,0.92))", color: "#fff", fontWeight: 900, fontSize: 13, letterSpacing: "0.06em", boxShadow: `0 0 18px ${player.color}88`, textTransform: "uppercase" }}>
+                ☠ {f.name}
+              </button>
+            ))}
+          </div>
+          <div style={{ width: 180, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.15)", overflow: "hidden" }}>
+            <div style={{ height: "100%", width: `${(left / 5000) * 100}%`, background: player.color }} />
+          </div>
+        </div>
+      )}
+      {finTitle && (
+        <div key={finTitle.n} style={{ position: "absolute", left: 0, right: 0, bottom: "16%", textAlign: "center", pointerEvents: "none", animation: "fwTitle 2.4s ease-out both" }}>
+          <div style={{ fontWeight: 900, fontSize: "clamp(22px, 5.6vw, 50px)", letterSpacing: "0.12em", color: "#fff", WebkitTextStroke: `1.5px ${finTitle.color}`, textShadow: `0 0 26px ${finTitle.color}, 0 0 60px ${finTitle.color}aa, 0 3px 6px #000` }}>{finTitle.text}</div>
+          <div style={{ fontWeight: 900, fontSize: "clamp(10px, 1.8vw, 14px)", letterSpacing: "0.5em", color: finTitle.color, marginTop: 4, textShadow: "0 1px 4px #000" }}>FINISHER</div>
+        </div>
+      )}
+      {player.hp < 25 && player.hp > 0 && <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "linear-gradient(90deg, rgba(248,113,113,0.28), transparent 45%)", animation: "fwPulse 1.1s ease-in-out infinite" }} />}
+      {enemy.hp < 25 && enemy.hp > 0 && <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "linear-gradient(270deg, rgba(248,113,113,0.28), transparent 45%)", animation: "fwPulse 1.1s ease-in-out infinite" }} />}
+      {whiteFlash.n > 0 && <div key={whiteFlash.n} style={{ position: "absolute", inset: 0, pointerEvents: "none", background: whiteFlash.color, opacity: 0, animation: "fwWhite .32s ease-out both", ["--fwA" as any]: whiteFlash.a }} />}
       <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(0,0,0,0.5) 100%)" }} />
       <style>{`
         @keyframes fwFloat{0%{opacity:0;transform:translate(-50%,14px) scale(.6)}18%{opacity:1;transform:translate(-50%,-4px) scale(1.15)}70%{opacity:1;transform:translate(-50%,-26px) scale(1)}100%{opacity:0;transform:translate(-50%,-46px) scale(.95)}}
         @keyframes fwBanner{0%{opacity:0;transform:scale(1.08)}12%{opacity:1;transform:scale(1)}80%{opacity:1}100%{opacity:0}}
         @keyframes fwPulse{0%,100%{opacity:.55}50%{opacity:1}}
-        @keyframes fwWhite{0%{opacity:.75}100%{opacity:0}}
+        @keyframes fwWhite{0%{opacity:var(--fwA,.75)}100%{opacity:0}}
+        @keyframes fwCallout{0%{opacity:0;transform:scale(2.2)}14%{opacity:1;transform:scale(1)}78%{opacity:1;transform:scale(1.04)}100%{opacity:0;transform:scale(1.1)}}
+        @keyframes fwTitle{0%{opacity:0;transform:scale(1.5);filter:blur(6px)}12%{opacity:1;transform:scale(1);filter:blur(0)}85%{opacity:1}100%{opacity:0}}
+        @keyframes fwRise{0%{opacity:0;transform:translateY(16px)}100%{opacity:1;transform:translateY(0)}}
       `}</style>
     </div>
   );
 }
+
+SUPPORTED.forEach((f) => useGLTF.preload(modelPath(f)));
