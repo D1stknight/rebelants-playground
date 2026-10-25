@@ -9,7 +9,7 @@ import sys, os, re, json, glob, subprocess, wave
 import numpy as np
 from kokoro_onnx import Kokoro
 
-LINES = [
+LINES = [l for l in os.environ.get("ONLY", "").split("|") if l] or [
   "A Royal Egg… the colony's fortune rides with you today.",
   "Watch closely, little one.", "Eyes on the golden egg.", "The colony remembers the attentive.", "Follow it… if you can.",
   "Choose.",
@@ -23,6 +23,7 @@ def slug(t): return re.sub(r"[^a-z0-9]+", "-", t.lower()).strip("-")[:40]
 
 def main(model, vdir, out):
     voice = os.environ.get("VOICE", "bf_isabella"); speed = float(os.environ.get("SPEED", "0.92"))
+    pitch = float(os.environ.get("PITCH", "0")); tempo = float(os.environ.get("TEMPO", "1"))
     voices = {os.path.basename(f)[:-4]: np.fromfile(f, dtype=np.float32).reshape(510, 1, 256) for f in glob.glob(vdir + "/*.bin")}
     np.savez("/tmp/kokoro_voices.npz", **voices)
     k = Kokoro(model, "/tmp/kokoro_voices.npz"); os.makedirs(out, exist_ok=True); meta = {}
@@ -34,10 +35,15 @@ def main(model, vdir, out):
         a = np.concatenate([a, np.zeros(int(0.45 * sr), np.float32)])           # room for the echo to ring out
         tmp = "/tmp/_q.wav"; w = wave.open(tmp, "wb"); w.setnchannels(1); w.setsampwidth(2); w.setframerate(sr); w.writeframes((np.clip(a, -1, 1) * 32767).astype(np.int16).tobytes()); w.close()
         f = slug(line) + ".mp3"
-        # a touch of throne-room echo, then loudness-normalised
-        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", tmp, "-af", "aecho=0.8:0.6:35|70:0.12|0.07,loudnorm=I=-16:TP=-1.5", "-ac", "1", "-ar", "24000", "-b:a", "56k", os.path.join(out, f)], check=True)
-        hop = sr // 30; env = [float(np.sqrt((a[i:i + hop] ** 2).mean())) for i in range(0, len(a), hop)]
+        # cartoon pitch: resample up PITCH semitones (formants rise too → small, bright "little ant" voice), atempo sets the pace
+        r = 2 ** (pitch / 12); fx = f"asetrate={int(sr * r)},aresample={sr},atempo={tempo / r:.4f}," if pitch else ""
+        echo = "aecho=0.8:0.6:35|70:0.12|0.07," if os.environ.get("ECHO", "1") == "1" else "aecho=0.8:0.5:22:0.06,"
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", tmp, "-af", fx + echo + "loudnorm=I=-16:TP=-1.5", "-ac", "1", "-ar", "24000", "/tmp/_q2.wav"], check=True)
+        w = wave.open("/tmp/_q2.wav"); sr2 = w.getframerate(); b = np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(np.float32) / 32767; w.close()
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", "/tmp/_q2.wav", "-b:a", "56k", os.path.join(out, f)], check=True)
+        hop = sr2 // 30; env = [float(np.sqrt((b[i:i + hop] ** 2).mean())) for i in range(0, len(b), hop)]
         mx = max(env) or 1; env = [round(min(1.0, e / mx * 1.25), 2) for e in env]
+        a, sr = b, sr2
         meta[line] = {"file": f, "dur": round(len(a) / sr, 2), "env": env}
         print(f, meta[line]["dur"])
     json.dump({"voice": voice, "lines": meta}, open(os.path.join(out, "lines.json"), "w"), separators=(",", ":"))
