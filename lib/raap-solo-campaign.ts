@@ -14,12 +14,12 @@ export async function soloRequest(body: object) {
   const response = await fetch("/api/raap/solo-campaign", { method: "POST", headers: { "content-type": "application/json" },
     credentials: "same-origin", cache: "no-store", redirect: "error", body: JSON.stringify(body), signal: AbortSignal.timeout(55000) });
   const value = await response.json();
-  if (!response.ok) throw Error(value.error === "SOLO_PLAYER_SIGN_IN_REQUIRED" ? "Sign in to Playground again before sharing a campaign." :
+  if (!response.ok) throw Object.assign(Error(value.error === "SOLO_PLAYER_SIGN_IN_REQUIRED" ? "Sign in to Playground again before sharing a campaign." :
     value.error === "SOLO_UNCONFIGURED" ? "Rebel sharing is unavailable here. You can still play normally." :
     value.error === "SOLO_PRICE_CHANGED" ? "The point cost changed. Check the saved campaign before continuing." :
     value.error === "SOLO_NO_PLAYS_REMAINING" ? "No plays left today." :
     value.error === "SOLO_INSUFFICIENT_POINTS" ? "Not enough REBEL to start this campaign." :
-    "The result could not be confirmed. Check the saved campaign before continuing.");
+    "The result could not be confirmed. Check the saved campaign before continuing."), { code: String(value.error || "") });
   return value;
 }
 
@@ -71,7 +71,15 @@ export function useSoloCampaign(playerId: string) {
       const result = accept(value, actor);
       if (missing) setMessage("No campaign is active. The older game record is no longer available here. Your saved Rebel history is unchanged.");
       return result;
-    } catch (error) { if (identity.current === actor) { setMessage((error as Error).message); setUncertain(true); blocked.current = true; } }
+    } catch (error) {
+      if (identity.current !== actor) return;
+      setMessage((error as Error).message);
+      // A status READ the server refused outright (signed out / sharing off) is not a lost write:
+      // it only turns sharing off — normal play stays available. Anything else keeps the safety hold.
+      const code = (error as { code?: string }).code;
+      if (code === "SOLO_PLAYER_SIGN_IN_REQUIRED" || code === "SOLO_UNCONFIGURED") { setSharing(false); return; }
+      setUncertain(true); blocked.current = true;
+    }
     finally { inFlight.current = false; if (identity.current === actor) setBusy(false); }
   }, [playerId, accept]);
   useEffect(() => {

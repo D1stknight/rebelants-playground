@@ -725,6 +725,8 @@ const showStage = useCallback(() => {
     if (solo.session) displayedSoloOwner.current = solo.session.playerId;
   }, [effectivePlayerId, solo.session]);
 
+  // one rule for the Launch button: what disables it also greys it out and says why
+  const launchOff = team.length < TEAM_SIZE || busy || balance < fwCost || solo.requiresSavedCheck || (solo.sharing && (solo.busy || solo.uncertain));
   const startCampaign = async () => {
     if (team.length < TEAM_SIZE || busy) return;
     if (solo.requiresSavedCheck) { setRunMessage("Check the saved campaign before starting another one."); return; }
@@ -1346,14 +1348,14 @@ setPlayerHp(MAX_HP); setEnemyHp(MAX_HP); setCurrentRound(0); setRoundLog([]); se
                   <p role="status" style={{ fontSize: 12, color: "#cbd5e1", margin: "8px 0", lineHeight: 1.5 }}>{campaignBalanceMessage || solo.message}</p>
                   <button type="button" style={{ padding: "7px 12px", border: "1px solid #64748b", borderRadius: 8, fontSize: 12 }} disabled={solo.busy || busy || checkingSavedCampaign} onClick={() => void checkSavedCampaign()}>{checkingSavedCampaign ? "Checking saved campaign…" : "Check saved campaign"}</button>
                 </div>}
-                <button onClick={startCampaign} disabled={team.length<TEAM_SIZE||busy||balance<fwCost||solo.requiresSavedCheck||solo.sharing&&(solo.busy||solo.uncertain)}
+                <button onClick={startCampaign} disabled={launchOff}
                   style={{ minWidth:280, height:48, padding:'0 28px', fontSize:13, fontWeight:900, letterSpacing:'0.1em', textTransform:'uppercase',
                     display:'inline-flex', alignItems:'center', justifyContent:'center', borderRadius:24, border:'1px solid rgba(251,191,36,0.4)',
-                    background:team.length<TEAM_SIZE||busy||balance<fwCost?'rgba(255,255,255,0.05)':'linear-gradient(135deg,rgba(251,191,36,0.25),rgba(248,113,113,0.25))',
-                    color:team.length<TEAM_SIZE||busy||balance<fwCost?'rgba(255,255,255,0.4)':'#fbbf24',
-                    cursor:team.length<TEAM_SIZE||busy||balance<fwCost?'not-allowed':'pointer',
-                    filter:team.length<TEAM_SIZE||busy||balance<fwCost?'none':'drop-shadow(0 0 12px rgba(251,191,36,0.3))' }}>
-                  {team.length<TEAM_SIZE?`Select ${TEAM_SIZE-team.length} more`:busy?"Assembling…":`⚔️ Launch Campaign (${team.includes("ashigaru") ? Math.max(0, fwCost-25) : fwCost} ${currency})`}
+                    background:launchOff?'rgba(255,255,255,0.05)':'linear-gradient(135deg,rgba(251,191,36,0.25),rgba(248,113,113,0.25))',
+                    color:launchOff?'rgba(255,255,255,0.4)':'#fbbf24',
+                    cursor:launchOff?'not-allowed':'pointer',
+                    filter:launchOff?'none':'drop-shadow(0 0 12px rgba(251,191,36,0.3))' }}>
+                  {team.length<TEAM_SIZE?`Select ${TEAM_SIZE-team.length} more`:busy?"Assembling…":solo.requiresSavedCheck||solo.sharing&&solo.uncertain?"Check saved campaign first":balance<fwCost?`Not enough ${currency}`:`⚔️ Launch Campaign (${team.includes("ashigaru") ? Math.max(0, fwCost-25) : fwCost} ${currency})`}
                 </button>
                 <button onClick={()=>setShowBuyPoints(true)}
                   style={{ padding:'10px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.1em', textTransform:'uppercase', borderRadius:20, border:'1px solid rgba(255,255,255,0.15)', background:'rgba(0,0,0,0.4)', color:'rgba(255,255,255,0.8)', cursor:'pointer' }}>
