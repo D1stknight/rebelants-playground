@@ -1,6 +1,7 @@
 // components/FactionWars.tsx — FACTION WARS
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { fightAudio } from "./fight/audio";
+import { useMovePeek, noTouchSelect } from "./fight/useMovePeek";
 import Link from "next/link";
 import { pointsConfig as defaultPointsConfig } from "../lib/pointsConfig";
 import { usePoints } from "../lib/usePoints";
@@ -597,6 +598,9 @@ export default function FactionWars() {
   const [currentTerritory, setCurrentT] = useState(0);
   const [currentFactionIdx, setCurrentFI] = useState(0);
  const [selectedMove, setSelectedMove] = useState<Move|null>(null);
+ // one-tap moves: a tap strikes; a 1× move (or one that costs HP / ends the territory) is armed by the first tap and played by the second
+ const [armedMove, setArmedMove] = useState<string|null>(null);
+ const movePeek = useMovePeek<Move>();
   const [enemy3DAnim, setEnemy3DAnim] = useState<SamuraiAnimState>("idle");
 const [player3DAnim, setPlayer3DAnim] = useState<SamuraiAnimState>("idle");
   const [results, setResults]           = useState<TerritoryResult[]>([]);
@@ -770,7 +774,7 @@ setPhase("battle"); startMusic(); setBusy(false);
   fightSeqRef.current += 1;
   fightInFlightRef.current = false;
   sfx.roundStart();
-  setSelectedMove(null);
+  setSelectedMove(null); setArmedMove(null);
   setBattleAnim("idle");
   setPlayer3DAnim("idle");
   setEnemy3DAnim("idle");
@@ -785,8 +789,18 @@ setPhase("battle"); startMusic(); setBusy(false);
     if (meditationStacks > 0) { setPowerBuffAmt(meditationStacks * 2); setPowerBuffRounds(99); }
   };
 
- const fightTerritory = async () => {
+ const chosenMove = selectedMove;
+ const movesLocked = !!solo.session && (solo.busy || solo.uncertain);
+ const CONFIRM_MOVES = ["blood_price", "noble_sacrifice"];
+ const tapMove = (m: Move, exhausted: boolean) => {
+  if (busy || exhausted || movesLocked || fightInFlightRef.current) return;
+  if ((m.oneTime || CONFIRM_MOVES.includes(m.id)) && armedMove !== m.id) { setArmedMove(m.id); setSelectedMove(m); return; }
+  movePeek.setPeek(null); setSelectedMove(m); void fightTerritory(m);
+ };
+ const fightTerritory = async (pick?: Move) => {
+  const selectedMove = pick ?? chosenMove;
   if (!selectedMove || busy || fightInFlightRef.current) return;
+  setArmedMove(null);
   showStage();
   if (solo.session && !solo.session.abandoned) {
     fightInFlightRef.current = true; setBusy(true); setBattleAnim("clash");
@@ -1594,17 +1608,18 @@ setPlayerHp(MAX_HP); setEnemyHp(MAX_HP); setCurrentRound(0); setRoundLog([]); se
                   <div className="fw-move-grid" style={{ display:"grid", gridTemplateColumns: "repeat(auto-fit, minmax(128px, 1fr))", gap:6 }}>
                   {currentPlayerFD.moves.map(m=>{
                     const tc: Record<string,string> = { attack:"#f87171", defend:"#34d399", magic:"#c084fc", trick:"#fbbf24" };
-                    const isSel = selectedMove?.id===m.id;
+                    const isSel = selectedMove?.id===m.id; const isArmed = armedMove===m.id;
                     const timesUsedM = usedMoves[m.id] || 0;
                     const degradedPow = Math.max(1, m.power - timesUsedM);
                     const isExhausted = (m.oneTime && oneTimeUsed.includes(m.id)) || (berserkerActive && m.type === "defend");
                     return (
-                      <button key={m.id} title={m.id === "plunder" ? `+${fwPlunderBonus} REBEL if win` : m.desc} onClick={()=>!busy&&!isExhausted&&setSelectedMove(m)} disabled={busy||isExhausted}
+                      <button key={m.id} {...movePeek.bind(m, () => tapMove(m, isExhausted))} disabled={busy||isExhausted||movesLocked}
                         style={{ display:"flex", flexDirection:"column", gap:3, padding:"8px 9px", borderRadius:10, textAlign:"left",
-                          border:`2px solid ${isExhausted?"rgba(255,255,255,0.04)":isSel ? currentPlayerFD.borderColor : "rgba(255,255,255,0.08)"}`,
+                          ...noTouchSelect, position:"relative",
+                          border:`2px solid ${isExhausted?"rgba(255,255,255,0.04)":isArmed ? "#fbbf24" : isSel ? currentPlayerFD.borderColor : "rgba(255,255,255,0.08)"}`,
                           background: isExhausted ? "rgba(0,0,0,0.2)" : isSel ? currentPlayerFD.bgColor : "rgba(255,255,255,0.03)",
                           cursor: busy||isExhausted?"not-allowed":"pointer", opacity: isExhausted ? 0.4 : 1,
-                          boxShadow: isSel ? `0 0 16px ${currentPlayerFD.color}44` : "none",
+                          boxShadow: isArmed ? "0 0 18px rgba(251,191,36,0.55)" : isSel ? `0 0 16px ${currentPlayerFD.color}44` : "none",
                           transform: isSel ? "scale(1.01)" : "scale(1)", transition:"all 0.18s" }}>
                         {/* Row 1: emoji + name · Row 2: type + power */}
                         <div style={{ display:"flex", alignItems:"center", gap:5, minWidth:0 }}>
@@ -1623,6 +1638,7 @@ setPlayerHp(MAX_HP); setEnemyHp(MAX_HP); setCurrentRound(0); setRoundLog([]); se
                             </div>
                           </div>
                         </div>
+                        {isArmed && <span style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", borderRadius:8, background:"rgba(0,0,0,0.62)", color:"#fbbf24", fontWeight:900, fontSize:12, letterSpacing:"0.06em", pointerEvents:"none" }}>TAP AGAIN TO USE</span>}
                         {/* Badges */}
                         {(m.oneTime || isExhausted) && (
                           <div style={{ display:"flex", gap:3 }}>
@@ -1636,20 +1652,12 @@ setPlayerHp(MAX_HP); setEnemyHp(MAX_HP); setCurrentRound(0); setRoundLog([]); se
                   })}
                   </div>
 
-                  <div style={{ fontSize:10, opacity:0.6, margin:"7px 2px 0", minHeight:13, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                    {selectedMove ? <><b style={{ opacity:0.9 }}>{selectedMove.label}:</b> {selectedMove.id === "plunder" ? `+${fwPlunderBonus} REBEL if win` : selectedMove.desc}</> : "Pick a move, then strike. The fight plays out above."}
-                  </div>
-                  <div style={{ display:"flex", gap:8, marginTop:8, alignItems:"stretch", flexWrap:"wrap" }}>
-                  <button onClick={fightTerritory} disabled={!selectedMove||busy||!!solo.session&&(solo.busy||solo.uncertain)}
-                    style={{ flex:"1 1 220px", minWidth:0, padding:"12px 18px", borderRadius:12, border:"none",
-                      cursor:!selectedMove||busy?"not-allowed":"pointer",
-                      background:selectedMove?"linear-gradient(135deg,#fbbf24,#f59e0b)":"rgba(255,255,255,0.06)",
-                      color:selectedMove?"#000":"white", fontWeight:900, fontSize:15,
-                      opacity:!selectedMove?0.45:1, transition:"all 0.2s",
-                      boxShadow:selectedMove?"0 4px 24px rgba(251,191,36,0.4)":"none",
-                      transform:selectedMove?"translateY(-1px)":"none" }}>
-                    {busy?"⚔️ Fighting...":selectedMove?`⚔️ Strike with ${selectedMove.label}!`:"← Select a move above"}
-                  </button>
+                  <div style={{ display:"flex", gap:8, marginTop:8, alignItems:"center" }}>
+                  {(() => { const shown = (armedMove ? currentPlayerFD.moves.find(x => x.id === armedMove) : null) || movePeek.peek;
+                    return <div style={{ flex:"1 1 auto", minWidth:0, fontSize:11, lineHeight:1.35, opacity: shown ? 0.85 : 0.55 }}>
+                      {busy ? <b>⚔️ Fighting…</b> : shown ? <><b>{shown.emoji} {shown.label}:</b> {shown.id === "plunder" ? `+${fwPlunderBonus} REBEL if win` : shown.desc}{armedMove === shown.id ? <b style={{ color:"#fbbf24" }}> · tap again to use</b> : null}</>
+                        : "Tap a move to strike. Hover it (or press and hold on a phone) to read what it does."}
+                    </div>; })()}
                 {/* Healing Potion button */}
                 {(() => {
                   const healCost = Number(cfg?.factionWarsHealCost ?? 25);

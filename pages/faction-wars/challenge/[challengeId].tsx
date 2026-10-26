@@ -8,6 +8,7 @@ import { ChatDrawer, useChatState } from "../../../components/PvpChatPanel";
 import { FACTIONS, FACTION_IDS, TEAM_SIZE, TERRITORY_COUNT, MAX_HP, type FactionId, type Move, type RoundResult, type TerritoryResult, type Rarity } from "../../../lib/factionWarsCore";
 import FactionWarsBattleScene, { type BattleSceneState, type BattleSceneActions } from "../../../components/FactionWarsBattleScene";
 import { useFWAudio } from "../../../lib/useFWAudio";
+import { useMovePeek, noTouchSelect } from "../../../components/fight/useMovePeek";
 import { recordCompletedPlaygroundMatch } from "../../../lib/raap-completed-match";
 import { isSignedPlayerId, matchHasGuestSide, rewardsWithheldText, crateCapText } from "../../../lib/fwpvpRewards";
 
@@ -233,6 +234,10 @@ function ActiveMatchView({
   // ── 2D card animation state (clash flash + floating dmg numbers) ──────────
   // Mirrors AI mode's BattleScene-driven card shake / overlay flashes.
   const [battleAnim, setBattleAnim] = useState<"idle" | "clash" | "win" | "lose">("idle");
+  // one-tap moves (tap = play, hover / press-and-hold = read, a 1× move needs a second tap)
+  const [armedMove, setArmedMove] = useState<string | null>(null);
+  const movePeek = useMovePeek<Move>();
+  useEffect(() => { setArmedMove(null); }, [isMyTurn]);
   const [dmgFloats, setDmgFloats] = useState<{ id: number; side: "player" | "enemy" | "plunder"; dmg: number }[]>([]);
   const dmgIdRef = useRef(0);
 
@@ -617,20 +622,28 @@ function ActiveMatchView({
                 </button>
               )}
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 150px), 1fr))", gap: 6, marginBottom: 12 }}>
+            <div className="fw-move-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(128px, 1fr))", gap: 6 }}>
               {myMoves.map((mv) => {
                 const tColor = moveTypeColor[mv.type] || "rgba(255,255,255,0.6)";
                 const disabled = !isMyTurn || busy;
+                const isArmed = armedMove === mv.id;
                 return (
                   <button
                     key={mv.id}
-                    onClick={() => { try { sfx.cardSelect(); } catch {} onSubmitMove(mv.id); showScene(); }}
+                    {...movePeek.bind(mv, () => {
+                      if (disabled) return;
+                      if (mv.oneTime && !isArmed) { setArmedMove(mv.id); return; }   // a 1× move: first tap arms it, second plays it
+                      setArmedMove(null); movePeek.setPeek(null);
+                      try { sfx.cardSelect(); } catch {} onSubmitMove(mv.id); showScene();
+                    })}
                     disabled={disabled}
                     style={{
+                      ...noTouchSelect, position: "relative",
+                      boxShadow: isArmed ? "0 0 18px rgba(251,191,36,0.55)" : "none",
                       background: "rgba(0,0,0,0.4)",
-                      border: `1px solid ${tColor}55`,
+                      border: `${isArmed ? 2 : 1}px solid ${isArmed ? "#fbbf24" : tColor + "55"}`,
                       borderRadius: 10,
-                      padding: "10px 12px",
+                      padding: "8px 10px",
                       cursor: disabled ? "not-allowed" : "pointer",
                       opacity: disabled ? 0.4 : 1,
                       color: "white",
@@ -652,11 +665,16 @@ function ActiveMatchView({
                         ⚡{mv.power}
                       </span>
                     </div>
-                    <div style={{ fontSize: 10, opacity: 0.55, lineHeight: 1.3 }}>{mv.desc}</div>
+                    {isArmed && <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 9, background: "rgba(0,0,0,0.62)", color: "#fbbf24", fontWeight: 900, fontSize: 12, letterSpacing: "0.06em", pointerEvents: "none" }}>TAP AGAIN TO USE</span>}
                   </button>
                 );
               })}
             </div>
+            {(() => { const shown = (armedMove ? myMoves.find((x) => x.id === armedMove) : null) || movePeek.peek;
+              return <div style={{ fontSize: 11, lineHeight: 1.35, opacity: shown ? 0.85 : 0.55, margin: "8px 2px 12px", minHeight: 15 }}>
+                {shown ? <><b>{shown.emoji} {shown.label}:</b> {shown.desc}{armedMove === shown.id ? <b style={{ color: "#fbbf24" }}> · tap again to use</b> : null}</>
+                  : isMyTurn ? "Tap a move to play it. Hover it (or press and hold on a phone) to read what it does." : ""}
+              </div>; })()}
             {!isMyTurn && (
               <div style={{ fontSize: 11, opacity: 0.5, textAlign: "center", marginTop: 8 }}>
                 You'll be notified when it's your turn. This page polls automatically.
