@@ -799,7 +799,7 @@ setPhase("battle"); startMusic(); setBusy(false);
  };
  const fightTerritory = async (pick?: Move) => {
   const selectedMove = pick ?? chosenMove;
-  if (!selectedMove || busy || fightInFlightRef.current) return;
+  if (!selectedMove || busy || fightInFlightRef.current || phase !== "battle" || playerHp <= 0 || enemyHp <= 0) return;
   setArmedMove(null);
   showStage();
   if (solo.session && !solo.session.abandoned) {
@@ -1027,8 +1027,9 @@ setBattleAnim(newEnemyHp <= 0 ? "win" : newPlayerHp <= 0 ? "lose" : "idle");
     if (!over) { setBattleAnim("idle"); }
 
     setSelectedMove(null);
-    setBusy(false);
-    if (fightSeq === fightSeqRef.current) fightInFlightRef.current = false;
+    // a round that ends the territory keeps the moves locked through the finisher until the result is recorded
+    // (a tap during the finishing move used to fight a second round and record the territory twice)
+    if (!over) { setBusy(false); if (fightSeq === fightSeqRef.current) fightInFlightRef.current = false; }
 
 if (over) {
   await waitArenaFinish(3500);
@@ -1052,6 +1053,7 @@ if (over) {
       setResults(prev => [...prev, result]);
       setSelectedMove(null);
       setPhase("territory_result");
+      setBusy(false); fightInFlightRef.current = false;
     }
   };
 
