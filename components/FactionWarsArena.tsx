@@ -10,8 +10,10 @@
 // `window.__fwArenaFinish()` resolves once the finishing move is over, so the game can wait for it before moving on.
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useGLTF } from "@react-three/drei";
-import { Color, Fog, type PerspectiveCamera, type PointLight, type SpotLight } from "three";
+import { useGLTF, PerformanceMonitor } from "@react-three/drei";
+import { EffectComposer, Bloom, ChromaticAberration, SMAA, ToneMapping, Vignette } from "@react-three/postprocessing";
+import { BlendFunction, ToneMappingMode, type ChromaticAberrationEffect } from "postprocessing";
+import { CanvasTexture, Color, Fog, HalfFloatType, Object3D as Object3DCtor, SRGBColorSpace, Vector2, type PerspectiveCamera, type PointLight, type SpotLight } from "three";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { FightStage, type StageEvent } from "./fight/stage";
 import { finishersFor, type Finisher } from "./fight/finishers";
@@ -174,6 +176,58 @@ function Lights({ pal, playerColor, enemyColor, dir }: { pal: ReturnType<typeof 
   );
 }
 
+/** the sky behind the arena, drawn into the scene (so glow / tone mapping treat it like everything else) */
+function Sky({ pal, playerColor, enemyColor }: { pal: ReturnType<typeof palette>; playerColor: string; enemyColor: string }) {
+  const { scene } = useThree();
+  useEffect(() => {
+    const c = document.createElement("canvas"); c.width = 512; c.height = 288; const g = c.getContext("2d")!;
+    const sky = g.createRadialGradient(256, 40, 10, 256, 40, 420); sky.addColorStop(0, pal.skyTop); sky.addColorStop(0.6, pal.skyBottom); sky.addColorStop(1, "#000000");
+    g.fillStyle = sky; g.fillRect(0, 0, 512, 288);
+    for (const [x, col] of [[0.22, playerColor], [0.78, enemyColor]] as const) {
+      const r = g.createRadialGradient(512 * x, 160, 4, 512 * x, 160, 230); r.addColorStop(0, col + "38"); r.addColorStop(1, col + "00"); g.fillStyle = r; g.fillRect(0, 0, 512, 288);
+    }
+    const t = new CanvasTexture(c); t.colorSpace = SRGBColorSpace; const prev = scene.background; scene.background = t;
+    return () => { scene.background = prev; t.dispose(); };
+  }, [scene, pal.skyTop, pal.skyBottom, playerColor, enemyColor]);
+  return null;
+}
+
+/** a light behind each fighter that traces their outline — dark armour (Ronin, Wokou, Warrior) reads against the dark arena */
+function RimLights({ playerColor, enemyColor, dir }: { playerColor: string; enemyColor: string; dir: React.MutableRefObject<Director> }) {
+  const a = useRef<SpotLight | null>(null), b = useRef<SpotLight | null>(null);
+  const ta = useMemo(() => { const o = new Object3DCtor(); o.position.set(SIDE_X.player, 1.1, 0); return o; }, []);
+  const tb = useMemo(() => { const o = new Object3DCtor(); o.position.set(SIDE_X.enemy, 1.1, 0); return o; }, []);
+  useFrame(() => {
+    for (const [l, t] of [[a.current, ta], [b.current, tb]] as const) { if (!l) continue; l.target = t; t.updateMatrixWorld(); }
+    const k = dir.current.ko ? 0.7 : 1; if (a.current) a.current.intensity = 26 * k; if (b.current) b.current.intensity = 26 * k;
+  });
+  return (
+    <>
+      <primitive object={ta} /><primitive object={tb} />
+      <spotLight ref={a} position={[SIDE_X.player - 0.6, 2.7, -2.6]} angle={0.55} penumbra={0.9} distance={9} decay={1.6} color={mix(playerColor, "#ffffff", 0.45)} intensity={26} />
+      <spotLight ref={b} position={[SIDE_X.enemy + 0.6, 2.7, -2.6]} angle={0.55} penumbra={0.9} distance={9} decay={1.6} color={mix(enemyColor, "#ffffff", 0.45)} intensity={26} />
+    </>
+  );
+}
+
+/** glow, film tone, soft vignette, and a colour-split kick on big hits; switches itself off on devices that can't keep up */
+function ArenaPost({ dir, stage, on }: { dir: React.MutableRefObject<Director>; stage: FightStage; on: boolean }) {
+  const ca = useRef<ChromaticAberrationEffect | null>(null);
+  const off = useMemo(() => new Vector2(0, 0), []);
+  useEffect(() => { stage.fx.hdr = on ? 2.4 : 1; return () => { stage.fx.hdr = 1; }; }, [on, stage]);
+  useFrame(() => { const s = Math.min(1, dir.current.shake * 0.5); off.set(0.0022 * s, 0.0012 * s); if (ca.current) (ca.current as any).offset = off; });
+  if (!on) return null;
+  return (
+    <EffectComposer multisampling={0} frameBufferType={HalfFloatType} enableNormalPass={false}>
+      <Bloom mipmapBlur intensity={0.85} luminanceThreshold={1.05} luminanceSmoothing={0.25} radius={0.72} />
+      <ChromaticAberration ref={ca as any} offset={off} radialModulation={false} modulationOffset={0} blendFunction={BlendFunction.NORMAL} />
+      <Vignette offset={0.32} darkness={0.55} />
+      <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
+      <SMAA />
+    </EffectComposer>
+  );
+}
+
 function Ground({ ring }: { ring: string }) {
   return (
     <group>
@@ -229,6 +283,8 @@ export default function FactionWarsArena({ player, enemy, battleAnim, registerGl
   const e = useAnimChannel(enemy.anim);
   const dir = useRef<Director>(newDirector());
   const stage = useMemo(() => new FightStage(), []);
+  // glow + film look; turned off for good if the device starts dropping frames
+  const [fxOn, setFxOn] = useState(true);
   const [floats, setFloats] = useState<Float[]>([]);
   const [banner, setBanner] = useState<string | null>(null);
   const [whiteFlash, setWhiteFlash] = useState<{ n: number; color: string; a: number }>({ n: 0, color: "#fff", a: 0.75 });
@@ -404,10 +460,14 @@ export default function FactionWarsArena({ player, enemy, battleAnim, registerGl
     <div style={{ position: "relative", width: "100%", height, borderRadius: 14, overflow: "hidden", marginBottom: 14, border: "1px solid rgba(255,255,255,0.08)",
       background: `radial-gradient(ellipse at 50% 15%, ${pal.skyTop} 0%, ${pal.skyBottom} 60%, #000 100%)` }}>
       <div style={{ position: "absolute", inset: 0, background: `radial-gradient(ellipse at 22% 55%, ${player.color}33 0%, transparent 55%), radial-gradient(ellipse at 78% 55%, ${enemy.color}33 0%, transparent 55%)`, transition: "background .5s" }} />
-      <Canvas dpr={[1, 1.5]} shadows gl={{ alpha: true, antialias: true }} camera={{ position: [0, CAM_BASE.y, CAM_BASE.z], fov: CAM_BASE.fov, near: 0.1, far: 60 }} style={{ position: "absolute", inset: 0 }}>
+      <Canvas dpr={[1, 1.5]} shadows gl={{ alpha: false, antialias: true, powerPreference: "high-performance" }} camera={{ position: [0, CAM_BASE.y, CAM_BASE.z], fov: CAM_BASE.fov, near: 0.1, far: 60 }} style={{ position: "absolute", inset: 0 }}>
+        <PerformanceMonitor onDecline={() => setFxOn(false)} flipflops={1} />
+        <Sky pal={pal} playerColor={player.color} enemyColor={enemy.color} />
         <Atmosphere fog={pal.fog} dir={dir} />
         <CameraRig dir={dir} stage={stage} />
         <Lights pal={pal} playerColor={player.color} enemyColor={enemy.color} dir={dir} />
+        <RimLights playerColor={player.color} enemyColor={enemy.color} dir={dir} />
+        <ArenaPost dir={dir} stage={stage} on={fxOn} />
         <Ground ring={pal.ring} />
         <Motes color={pal.motes} />
         <Suspense fallback={null}>

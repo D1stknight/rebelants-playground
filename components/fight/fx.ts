@@ -42,6 +42,9 @@ export class FxSystem {
   camera: THREE.Camera | null = null;
   /** sound hook: the stage turns these into "sfx" events on the same frame */
   snd: (name: string, vol?: number) => void = () => {};
+  /** brightness headroom for glowing effects: 1 = plain; above 1 when the arena renders with bloom, so sparks, slashes and magic glow */
+  hdr = 1;
+  private hot(color: string | THREE.Color, k = 1) { return new THREE.Color(color).multiplyScalar(1 + (this.hdr - 1) * k); }
   constructor() { this.group.name = "fight-fx"; }
   add(it: Item) { this.items.push(it); return it; }
   update(dt: number) {
@@ -53,7 +56,7 @@ export class FxSystem {
 
   sprite(pos: THREE.Vector3, color: string, size: number, life: number, opts: { tex?: "glow" | "smoke" | "star"; grow?: number; vel?: THREE.Vector3; add?: boolean; fade?: number; rot?: number } = {}) {
     const T = tex();
-    const m = new THREE.SpriteMaterial({ map: T[opts.tex || "glow"], color, transparent: true, depthWrite: false, blending: opts.add === false ? THREE.NormalBlending : THREE.AdditiveBlending, rotation: opts.rot || 0 });
+    const m = new THREE.SpriteMaterial({ map: T[opts.tex || "glow"], color: opts.add === false ? new THREE.Color(color) : this.hot(color, opts.tex === "smoke" ? 0 : opts.tex === "star" ? 0.7 : 0.15), transparent: true, depthWrite: false, blending: opts.add === false ? THREE.NormalBlending : THREE.AdditiveBlending, rotation: opts.rot || 0 });
     const s = this.obj(new THREE.Sprite(m)); s.position.copy(pos); s.scale.setScalar(size);
     let t = 0; const v = opts.vel?.clone();
     return this.add({ update: (dt) => { t += dt; const u = t / life; if (u >= 1) return false; const sc = size * (1 + (opts.grow ?? 0.6) * u); s.scale.setScalar(sc); m.opacity = (opts.fade ?? 1) * (1 - u) * (u < 0.1 ? u / 0.1 : 1); if (v) { s.position.addScaledVector(v, dt); v.multiplyScalar(Math.exp(-dt * 2.2)); } return true; }, dispose: () => this.kill(s) });
@@ -62,7 +65,7 @@ export class FxSystem {
   glowSprite(color: string, size: number) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex().glow, color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); s.scale.setScalar(size); return s; }
   flash(pos: THREE.Vector3, color = "#fff2c0", size = 0.9, life = 0.2) { return this.sprite(pos, color, size, life, { grow: 0.9 }); }
   ring(pos: THREE.Vector3, color: string, size: number, life: number, normal?: THREE.Vector3) {
-    const m = new THREE.MeshBasicMaterial({ color, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    const m = new THREE.MeshBasicMaterial({ color: this.hot(color, 0.5), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
     const r = this.obj(new THREE.Mesh(new THREE.RingGeometry(0.82, 1, 48), m)); r.position.copy(pos);
     if (normal) r.lookAt(pos.clone().add(normal)); else if (this.camera) r.lookAt(this.camera.position);
     let t = 0;
@@ -76,7 +79,7 @@ export class FxSystem {
   }
   sparks(pos: THREE.Vector3, color: string, n = 16, speed = 4, life = 0.32) {
     const g = new THREE.BufferGeometry(); const pts = new Float32Array(n * 6); g.setAttribute("position", new THREE.BufferAttribute(pts, 3));
-    const m = new THREE.LineBasicMaterial({ color, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+    const m = new THREE.LineBasicMaterial({ color: this.hot(color), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
     const L = this.obj(new THREE.LineSegments(g, m)); const vel: THREE.Vector3[] = [];
     for (let i = 0; i < n; i++) vel.push(V(rnd(-1, 1), rnd(-0.6, 1), rnd(-1, 1)).normalize().multiplyScalar(speed * rnd(0.5, 1.2)));
     let t = 0; const a = g.attributes.position as THREE.BufferAttribute;
@@ -107,7 +110,7 @@ export class FxSystem {
     const n = len; const pos = new Float32Array(n * 2 * 3); const alpha = new Float32Array(n * 2);
     const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setAttribute("a", new THREE.BufferAttribute(alpha, 1));
     const idx: number[] = []; for (let i = 0; i < n - 1; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); } g.setIndex(idx);
-    const m = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, uniforms: { c: { value: new THREE.Color(color) }, k: { value: 1 } },
+    const m = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, uniforms: { c: { value: this.hot(color, 0.8) }, k: { value: 1 } },
       vertexShader: "attribute float a; varying float va; void main(){ va = a; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }",
       fragmentShader: "uniform vec3 c; uniform float k; varying float va; void main(){ gl_FragColor = vec4(mix(c, vec3(1.), va*0.5), va*k); }" });
     const mesh = this.obj(new THREE.Mesh(g, m)); mesh.frustumCulled = false;
@@ -179,7 +182,7 @@ export class FxSystem {
   }
   beam(from: THREE.Vector3, to: THREE.Vector3, color: string, width = 0.12, life = 0.5) {
     const len = from.distanceTo(to);
-    const mk = (r: number, o: number) => { const m = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: o, blending: THREE.AdditiveBlending, depthWrite: false }); const b = this.obj(new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 12, 1, true), m)); b.position.copy(from).lerp(to, 0.5); b.quaternion.setFromUnitVectors(V(0, 1, 0), to.clone().sub(from).normalize()); return { b, m, o }; };
+    const mk = (r: number, o: number) => { const m = new THREE.MeshBasicMaterial({ color: this.hot(color), transparent: true, opacity: o, blending: THREE.AdditiveBlending, depthWrite: false }); const b = this.obj(new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 12, 1, true), m)); b.position.copy(from).lerp(to, 0.5); b.quaternion.setFromUnitVectors(V(0, 1, 0), to.clone().sub(from).normalize()); return { b, m, o }; };
     const parts = [mk(width, 0.9), mk(width * 2.4, 0.35)]; let t = 0;
     return this.add({ update: (dt) => { t += dt; const u = t / life; if (u >= 1) return false; const f = (1 - u) * (1 - u); for (const p of parts) { p.m.opacity = p.o * f; p.b.scale.set(1 - u * 0.7, 1, 1 - u * 0.7); } return true; }, dispose: () => parts.forEach((p) => this.kill(p.b)) });
   }
