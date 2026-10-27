@@ -66,8 +66,8 @@ add({
     [0.3, (c) => { c.sfx("vanish"); c.fx.smoke(c.A.center(), "#2a2e3a", 22, 0.8, true); c.fx.smoke(c.at(c.A, 0, 0.3), "#555c6e", 10, 0.6, true); }],
     [0.42, (c) => { c.A.rig.model.visible = false; c.A.rig.visible = false; c.cam("closeD", 3); }],
     [0.9, (c) => { // reappear behind the opponent, blade drawn
-      c.weapon(c.A, "katana"); c.A.rig.model.visible = true; c.A.rig.visible = true; c.fx.smoke(c.at(c.D, -0.6, 1.1), "#2a2e3a", 14, 0.6, true); c.sfx("vanish", 0.8); c.sfx("draw", 0.7);
-      c.act(c.A, [k(0, mix({ rx: 2.05, spin: Math.PI }, K.guard)), k(0.25, mix({ rx: 2.0, spin: Math.PI }, K.sideWind), "out"), k(0.36, mix({ rx: 1.95, spin: Math.PI }, K.sideEnd), "snap"), k(1.3, mix({ rx: 1.95, spin: Math.PI }, K.sideEnd)), k(1.7, mix({ rx: 1.95, spin: Math.PI }, K.down), "io"), k(2.1, mix({ rx: 1.95, spin: Math.PI }, K.hip), "io")]);
+      c.weapon(c.A, "katana"); c.A.rig.model.visible = true; c.A.rig.visible = true; c.fx.smoke(c.at(c.D, -0.85, 1.1), "#2a2e3a", 14, 0.6, true); c.sfx("vanish", 0.8); c.sfx("draw", 0.7);
+      c.act(c.A, [k(0, mix({ rx: 2.55, spin: Math.PI }, K.guard)), k(0.25, mix({ rx: 2.5, spin: Math.PI }, K.sideWind), "out"), k(0.36, mix({ rx: 2.48, spin: Math.PI }, K.sideEnd), "snap"), k(1.3, mix({ rx: 2.48, spin: Math.PI }, K.sideEnd)), k(1.7, mix({ rx: 2.48, spin: Math.PI }, K.down), "io"), k(2.1, mix({ rx: 2.48, spin: Math.PI }, K.hip), "io")]);
     }],
     [1.1, (c) => { const tr = c.trail(c.A, "#e6fbff"); c.S.later(0.35, () => tr.stop()); }],
     [1.26, (c) => { c.flash("#ffffff", 1); c.stop(0.22); c.slow(0.3, 1.0); c.hit(3, undefined, "CHEST", "#bff3ff"); c.fx.beam(c.at(c.D, 0.6, 1.25), c.at(c.D, -0.6, 1.35), "#dff8ff", 0.012, 0.3); c.look(c.D, "glow", 0.3, "#bff3ff"); }],
@@ -123,14 +123,16 @@ add({
   id: "ronin-storm", name: "Wandering Storm", faction: "ronin", dur: 4.8,
   steps: [
     [0, (c) => { c.weapon(c.A, "katana"); c.sfx("draw"); c.cam("high", 3);
-      const spots: [number, number, number][] = [[1.0, 0.55, 0.6], [2.2, 0.45, Math.PI], [1.0, -0.6, -0.7], [2.25, -0.45, Math.PI + 0.6], [1.0, 0.0, 0]];
+      const spots: [number, number, number][] = [[0.8, 0.6, 0.6], [2.4, 0.5, Math.PI], [0.8, -0.65, -0.7], [2.42, -0.5, Math.PI + 0.6], [0.78, 0.0, 0]];   // a sword-length from the target, so the cut ends past the body
       const keys: Key[] = [k(0.2, mix({ rx: 0 }, K.guard), "out")];
       spots.forEach(([rx, rz, spin], i) => { const t0 = 0.3 + i * 0.32; keys.push(k(t0, mix({ rx, rz, spin }, K.sideWind)), k(t0 + 0.1, mix({ rx, rz, spin }, K.sideEnd), "snap"), k(t0 + 0.3, mix({ rx, rz, spin }, K.sideEnd))); });
-      keys.push(k(2.2, mix({ rx: 2.2, spin: 0 }, K.sideEnd)), k(2.9, mix({ rx: 2.2 }, K.down), "io"), k(3.3, mix({ rx: 2.2 }, K.hip), "io"));
+      keys.push(k(1.9, mix({ rx: 0.78, spin: 0 }, K.sideEnd)), k(1.93, mix({ rx: 2.4, spin: 0 }, K.sideEnd), "snap"), k(2.2, mix({ rx: 2.4, spin: 0 }, K.sideEnd)),   // a flash-step through the target (never walks through the body)
+         k(2.9, mix({ rx: 2.4 }, K.down), "io"), k(3.3, mix({ rx: 2.4 }, K.hip), "io"));
       c.act(c.A, keys);
     }],
     ...[0, 1, 2, 3, 4].map((i) => [0.3 + i * 0.32, (c: FinCtx) => { c.fx.smoke(c.A.center(), "#3a2a2a", 6, 0.45, true); c.sfx("smoke", 0.45); const tr = c.trail(c.A, "#ff9a8a"); c.S.later(0.28, () => tr.stop()); }] as [number, (c: FinCtx) => void]),
     ...[0, 1, 2, 3, 4].map((i) => [0.41 + i * 0.32, (c: FinCtx) => { c.hit(i === 4 ? 3 : 2, undefined, i % 2 ? "CHEST" : "BELLY"); dizzyHit(c); if (i === 4) { c.slow(0.35, 1.2); c.flash("#ffffff", 0.7); } }] as [number, (c: FinCtx) => void]),
+    [1.9, (c) => { c.fx.smoke(c.A.center(), "#3a2a2a", 8, 0.5, true); c.sfx("vanish", 0.5); }],
     [2.0, (c) => c.cam("wide", 2)],
     [3.35, (c) => { c.shake(0.8); c.look(c.D, "char", 1); c.end("ash"); }],
     [3.7, (c) => c.title("WANDERING STORM")],
@@ -208,7 +210,7 @@ add({
 add({
   id: "bushi-honor", name: "Code of Honor", faction: "bushi", dur: 4.4,
   steps: [
-    [0, (c) => { c.weapon(c.A, "naginata"); c.cam("closeA", 3); c.act(c.A, [k(0.4, mix(S.tall, { hR: [-0.25, 1.15, 0.15], wR: [0, 1, 0.05], uR: [0, 0, 1] }), "io"), k(0.9, mix(S.bow, { hR: [-0.25, 1.1, 0.25], wR: [0, 1, 0.1] }), "io"), k(1.5, mix(S.bow, { hR: [-0.25, 1.1, 0.25], wR: [0, 1, 0.1] })), k(1.85, mix(pole.guard), "io"), k(2.1, mix(pole.guard, { rx: -0.1, hR: [-0.1, 1.25, -0.15], hL: [0.05, 1.3, 0.25] }), "out"), k(2.22, mix(pole.thrust, { rx: 0.55 }), "snap"), k(3.4, mix(pole.thrust, { rx: 0.55 })), k(3.9, mix(pole.guard), "io")]); }],
+    [0, (c) => { c.weapon(c.A, "naginata"); c.cam("closeA", 3); c.act(c.A, [k(0.4, mix(S.tall, { hR: [-0.36, 1.15, 0.2], wR: [0, 1, 0.05], uR: [0, 0, 1] }), "io"), k(0.9, mix(S.bow, { hR: [-0.38, 1.1, 0.32], wR: [0, 1, 0.1] }), "io"), k(1.5, mix(S.bow, { hR: [-0.38, 1.1, 0.32], wR: [0, 1, 0.1] })), k(1.85, mix(pole.guard), "io"), k(2.1, mix(pole.guard, { rx: -0.1, hR: [-0.1, 1.25, -0.15], hL: [0.05, 1.3, 0.25] }), "out"), k(2.22, mix(pole.thrust, { rx: 0.55 }), "snap"), k(3.4, mix(pole.thrust, { rx: 0.55 })), k(3.9, mix(pole.guard), "io")]); }],
     [1.9, (c) => { c.cam("side", 4); c.fx.seal(c.at(c.A, 0, 0.04), "#ffd24a", 1.4, 1.2, { ch: "誠" }); }],
     [2.22, (c) => { c.sfx("zap", 0.8); const from = c.A.tip("R"); const to = from.clone().add(c.A.rig.forward().setY(0).normalize().multiplyScalar(8)); c.fx.beam(from, to, "#ffd24a", 0.03, 0.35); c.hit(3, undefined, "CHEST", "#ffd24a"); c.stop(0.12); c.flash("#fff1b0", 0.9); c.end("sky"); c.cam("sky", 2.5); }],
     [3.3, (c) => c.cam("wide", 2)],
@@ -292,7 +294,7 @@ add({
   id: "buke-rain", name: "Rain of a Hundred", faction: "buke", dur: 4.7,
   steps: [
     [0, (c) => { c.weapon(c.A, "arrow", "yumi"); c.cam("wide", 3); const up = { wL: [0, 0.6, 0.8], hL: [0.1, 2.05, 0.4], uL: [0, -0.8, 0.6], hdPitch: -0.5, spPitch: -0.25 } as PP;
-      c.sfx("bow_draw", 0.8); const B = { rx: -0.45 }; c.act(c.A, [k(0.35, mix(BOW, up, B, { hR: [0.06, 1.9, 0.3], wR: [0.02, 0.6, 0.8] }), "io"), k(0.95, mix(DRAW, up, B, { hR: [0.04, 1.7, 0.0], wR: [0.02, 0.6, 0.8] }), "io"), k(1.0, mix(BOW, up, B, { hR: [-0.2, 1.7, -0.2] }), "snap"), k(3.6, mix(BOW, up, B, { hR: [-0.2, 1.7, -0.2] }))]); }],
+      c.sfx("bow_draw", 0.8); const B = { rx: -0.45 }; c.act(c.A, [k(0.35, mix(BOW, up, B, { hR: [0.06, 1.9, 0.3], wR: [0.02, 0.6, 0.8] }), "io"), k(0.95, mix(DRAW, up, B, { hR: [0.04, 1.7, 0.0], wR: [0.02, 0.6, 0.8] }), "io"), k(1.0, mix(BOW, up, B, { hR: [-0.4, 1.62, 0.0] }), "snap"), k(3.6, mix(BOW, up, B, { hR: [-0.42, 1.6, 0.02] }))]); }],
     [1.0, (c) => { c.sfx("bow_release"); c.weapon(c.A, null); const ar = makeWeapon("arrow", c.A.color); const from = c.A.gripAt(c.A.mirrored ? "L" : "R"); c.fx.projectile(ar, from, () => c.at(c.A, 0.6, 7), 0.5, { face: true, trail: c.A.color }); c.cam("sky", 2); }],
     [1.6, (c) => { c.cam("high", 3); c.fx.seal(c.at(c.D, 0, 0.04), c.A.color, 2.2, 2.6, { ch: "雨" });
       for (let i = 0; i < 34; i++) c.S.later(i * 0.035, () => { const a = rnd(0, Math.PI * 2), r = i % 3 === 0 ? rnd(0, 0.18) : rnd(0.15, 0.9); const land = c.at(c.D, Math.cos(a) * r, i % 3 === 0 ? rnd(0.4, 1.6) : 0.02, Math.sin(a) * r * 0.6);

@@ -149,6 +149,7 @@ export class Rig {
       this.handLocal[s] = { F: F.normalize().applyQuaternion(inv), T: T ? T.normalize().applyQuaternion(inv) : V(s === "L" ? -1 : 1, 0, 0) };
     }
     this.measureHands();
+    this.measureBody();
     this.headFwd = V(0, 0, 1).applyQuaternion(wquat(this.b.Head).invert());
     const rq = wquat(this.root).invert();
     this.footRest = { L: rq.clone().multiply(wquat(this.b.LeftFoot)), R: rq.clone().multiply(wquat(this.b.RightFoot)) };
@@ -174,12 +175,26 @@ export class Rig {
   toBody(w: THREE.Vector3): Vec3 { const v = this.body.worldToLocal(w.clone()); return [v.x, v.y, v.z]; }
   part(name: "HEAD" | "CHEST" | "BELLY" | "LEGS"): THREE.Vector3 {
     const b = this.b;
-    if (name === "HEAD") return wpos(b.Head).add(V(0, 0.06, 0));
+    if (name === "HEAD") return this.headCenter();
     if (name === "CHEST") return wpos(b.Spine2);
     if (name === "BELLY") return wpos(b.Spine);
     return wpos(b.LeftLeg).add(wpos(b.RightLeg)).multiplyScalar(0.5);
   }
   forward(): THREE.Vector3 { return V(0, 0, 1).applyQuaternion(wquat(this.body)).normalize(); }
+  /** measured body: head sphere (centre in Head-bone space), torso radius, front depth of chest and belly */
+  bodyR = { head: 0.12, torso: 0.15, chest: 0.15, belly: 0.15, headOff: V(0, 0.06, 0) };
+  headCenter() { return this.b.Head.localToWorld(this.bodyR.headOff.clone()); }
+  /** how far in front of the part() point the body's surface is (where a fist / blade should stop) */
+  surf(part: string) { const r = this.bodyR; return part === "HEAD" ? r.head : part === "CHEST" ? r.chest : part === "BELLY" ? r.belly : 0.1; }
+  /** keep a hand target out of the fighter's own head and torso (a hand inside the helmet or chest reads as a missing hand) */
+  private keepOut(t: THREE.Vector3, margin: number) {
+    const r = this.bodyR; const hc = this.headCenter(); const d = t.clone().sub(hc); const hr = r.head + margin;
+    if (d.lengthSq() < hr * hr) { if (d.lengthSq() < 1e-8) d.copy(this.forward()); t.copy(hc).addScaledVector(d.normalize(), hr); }
+    const a = wpos(this.b.Spine), c = wpos(this.b.Neck || this.b.Spine2); const ab = c.clone().sub(a); const k = Math.max(0, Math.min(1, t.clone().sub(a).dot(ab) / Math.max(1e-6, ab.lengthSq())));
+    const q = a.addScaledVector(ab, k); const e = t.clone().sub(q); const tr = r.torso * 0.9 + margin;
+    if (e.lengthSq() < tr * tr) { if (e.lengthSq() < 1e-8) e.copy(this.forward()); t.copy(q).addScaledVector(e.normalize(), tr); }
+    return t;
+  }
 
   /** body-space unit vector along the fight line toward the opponent */
   towardOpp(): THREE.Vector3 {
@@ -254,7 +269,7 @@ export class Rig {
       let shift = 0;
       for (const [key, w, part, root, len, inset] of limbs) {
         if (!(w > 0.01) || !part) continue;
-        const from = wpos(b[root]); const surf = ({ HEAD: 0.11, CHEST: 0.15, BELLY: 0.15, LEGS: 0.1 } as Record<string, number>)[part] ?? 0.12;
+        const from = wpos(b[root]); const surf = o2.surf(part);
         const c = o2.part(part as "HEAD"); const dir = c.clone().sub(from).normalize();
         const upK = key[0] === "h" ? P.up ?? 0 : 0; if (upK > 0.01) dir.lerp(V(0, 1, 0), upK).normalize();
         const t = c.addScaledVector(dir, -(surf * (1 - 0.4 * upK) + inset)); tgt[key] = t;
@@ -265,13 +280,20 @@ export class Rig {
         const dx = Math.sign(o2.root.position.x - this.root.position.x) || -this.side;
         this.root.position.x += dx * shift; this.root.updateMatrixWorld(true);
       }
+      // never stand inside the other fighter: keep the torsos apart (a lunge stops at the body, it doesn't merge into it)
+      if (o2.model.visible && o2.visible && Math.abs(this.offset.y) < 0.05 && Math.abs(o2.offset.y) < 0.05) {
+        const minD = (this.bodyR.torso + o2.bodyR.torso) * 1.05; const ox = o2.root.position.x, oz = o2.root.position.z;
+        const dxx = this.root.position.x - ox, dz = this.root.position.z - oz; const d = Math.hypot(dxx, dz);
+        if (d < minD) { const sx = Math.sign(dxx) || this.side; const need = Math.sqrt(Math.max(0, minD * minD - dz * dz)); this.root.position.x = ox + sx * need; this.root.updateMatrixWorld(true); }
+      }
       for (const key of ["hR", "hL", "fR", "fL"] as const) {
         const t = tgt[key]; if (!t) continue; const w = Math.min(1, key === "hR" ? P.sHR : key === "hL" ? P.sHL : key === "fR" ? P.sFR : P.sFL);
         tgt[key] = BW(P[key]).lerp(t, w);
       }
     }
-    ik2(b.LeftArm, b.LeftForeArm, b.LeftHand, tgt.hL || BW(P.hL), BD(P.eL));
-    ik2(b.RightArm, b.RightForeArm, b.RightHand, tgt.hR || BW(P.hR), BD(P.eR));
+    const mg = Math.max(0.035, this.cal.handLen * 0.3);
+    ik2(b.LeftArm, b.LeftForeArm, b.LeftHand, this.keepOut(tgt.hL || BW(P.hL), mg), BD(P.eL));
+    ik2(b.RightArm, b.RightForeArm, b.RightHand, this.keepOut(tgt.hR || BW(P.hR), mg), BD(P.eR));
     if (!this.gloved) this.fists(P.fist);
     // feet: planted feet stay put while the body travels, then step (one at a time, a little lift) — no skating
     const grounded = Math.abs(P.tumble) < 0.15 && P.ry < 0.06 && Math.abs(this.offset.y) < 0.01;
@@ -374,6 +396,30 @@ export class Rig {
     const avg = (a: number[], d: number) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : d);
     const e2 = ext as any; if (e2.c0) this.cal.handColor = "#" + [e2.c0, e2.c1, e2.c2].map((a: number[]) => Math.round(avg(a, 0)).toString(16).padStart(2, "0")).join("");
     this.cal.handLen = avg(ext.len, 0.19 * this.cal.armK); this.cal.handW = avg(ext.w, 0.09 * this.cal.armK); this.cal.wristR = avg(ext.r, 0.045 * this.cal.armK);
+  }
+  /** head sphere, torso radius and chest / belly depth from the skinned vertices (rest pose) */
+  private measureBody() {
+    const v = new THREE.Vector3(); const head: THREE.Vector3[] = []; const torso: number[] = [], chest: number[] = [], belly: number[] = [];
+    const fwd = this.forward(); const sp = wpos(this.b.Spine), s2 = wpos(this.b.Spine2), nk = wpos(this.b.Neck || this.b.Spine2);
+    const ax = nk.clone().sub(sp);
+    this.model.traverse((o: any) => {
+      if (!o.isSkinnedMesh) return; const sk = o.skeleton, si = o.geometry.attributes.skinIndex, sw = o.geometry.attributes.skinWeight, pos = o.geometry.attributes.position; if (!si || !pos) return;
+      const nm = sk.bones.map((bn: THREE.Bone) => bn.name.replace(/^mixamorig[_:]?/, ""));
+      for (let i = 0; i < pos.count; i += 2) {
+        const ws = [sw.getX(i), sw.getY(i), sw.getZ(i), sw.getW(i)], is = [si.getX(i), si.getY(i), si.getZ(i), si.getW(i)]; let best = -1, bw = 0; for (let k = 0; k < 4; k++) if (ws[k] > bw) { bw = ws[k]; best = is[k]; }
+        const n = nm[best]; if (!n) continue;
+        if (n === "Head" || n.startsWith("HeadTop")) { o.getVertexPosition(i, v); head.push(o.localToWorld(v.clone())); continue; }
+        if (n === "Spine1" || n === "Spine2" || n === "Spine" || n === "Hips") {
+          o.getVertexPosition(i, v); o.localToWorld(v); const kk = Math.max(0, Math.min(1, v.clone().sub(sp).dot(ax) / Math.max(1e-6, ax.lengthSq())));
+          if (n !== "Hips") torso.push(v.distanceTo(sp.clone().addScaledVector(ax, kk)));
+          if (n === "Spine2" || n === "Spine1") chest.push(Math.abs(v.clone().sub(s2).dot(fwd))); else belly.push(Math.abs(v.clone().sub(sp).dot(fwd)));
+        }
+      }
+    });
+    const pc = (a: number[], q: number, d: number) => { if (a.length < 20) return d; a.sort((x, y) => x - y); return a[Math.floor(a.length * q)]; };
+    const r = this.bodyR;
+    if (head.length > 20) { const med = (k: 'x' | 'y' | 'z') => head.map((p) => p[k]).sort((x, y) => x - y)[head.length >> 1]; const c = V(med('x'), med('y'), med('z')); r.head = pc(head.map((p) => p.distanceTo(c)), 0.55, r.head); r.headOff = this.b.Head.worldToLocal(c.clone()); }
+    r.torso = pc(torso, 0.5, r.torso); r.chest = pc(chest, 0.85, r.chest); r.belly = pc(belly, 0.85, r.belly);
   }
   hand(s: "L" | "R") { return wpos(this.b[s === "L" ? "LeftHand" : "RightHand"]); }
   gloved = false;

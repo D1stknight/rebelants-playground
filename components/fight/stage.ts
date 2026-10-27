@@ -20,7 +20,23 @@ function lerpR(a: ResolvedPose, b: ResolvedPose, u: number): ResolvedPose {
     else if (Array.isArray(x) && Array.isArray(y)) o[k] = x.map((v: number, i: number) => v + (y[i] - v) * u);
     else o[k] = u < 0.5 ? (x ?? y) : (y ?? x);   // strings / booleans / missing: the nearer key's, else whichever exists
   }
+  // a held weapon turns as one rigid thing: blend its whole frame (blade + edge) along the shortest rotation,
+  // instead of blending the two directions apart (that flips the blade 180° in a single frame when keys disagree)
+  for (const [w, up] of [["wR", "uR"], ["wL", "uL"]] as const) {
+    const aw = (a as any)[w], au = (a as any)[up], bw = (b as any)[w], bu = (b as any)[up];
+    if (![aw, au, bw, bu].every((v) => Array.isArray(v) && v.length === 3)) continue;
+    const q = frameQ(aw, au).slerp(frameQ(bw, bu), u);
+    const Y = V(0, 1, 0).applyQuaternion(q), Z = V(0, 0, 1).applyQuaternion(q);
+    o[w] = [Y.x, Y.y, Y.z]; o[up] = [Z.x, Z.y, Z.z];
+  }
   return o;
+}
+/** the rotation whose +Y is the blade direction and +Z the edge / up direction */
+function frameQ(w: number[], u: number[]) {
+  const y = V(w[0], w[1], w[2]); if (y.lengthSq() < 1e-8) y.set(0, 1, 0); y.normalize();
+  const z = V(u[0], u[1], u[2]); z.addScaledVector(y, -z.dot(y)); if (z.lengthSq() < 1e-6) { z.set(0, 0, 1).addScaledVector(y, -y.z); if (z.lengthSq() < 1e-6) z.set(1, 0, 0); } z.normalize();
+  const x = V().crossVectors(y, z).normalize();
+  return new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z));
 }
 const poseOf = (p: Key["p"]): Pose => (typeof p === "string" ? POSES[p] || POSES.stance : P(p));
 function disposeTree(o: THREE.Object3D) { o.traverse((c: any) => { c.geometry?.dispose?.(); (Array.isArray(c.material) ? c.material : c.material ? [c.material] : []).forEach((m: any) => m.dispose?.()); }); }
@@ -149,7 +165,7 @@ export class Fighter {
     { const tw = Math.min(1, Number(P.tipW) || 0), opp = R.opp, wp = this.weapons[this.mirrored ? "L" : "R"]; let goal = 0;
       if (tw > 0.01 && P.tipAt && opp && wp) {
         const tip = weaponTip(wp.obj), dir = tip.clone().sub(wp.obj.position).normalize();
-        const surf = ({ HEAD: 0.11, CHEST: 0.15, BELLY: 0.15, LEGS: 0.1 } as Record<string, number>)[P.tipAt] ?? 0.12;
+        const surf = opp.surf(P.tipAt);
         const want = opp.part(P.tipAt).addScaledVector(dir, -surf); const fx = Math.sign(opp.root.position.x - R.root.position.x) || 1;
         goal = Math.max(-0.5, Math.min(0.5, R.assistX - (tip.x - want.x) * fx)) * tw;
       }
