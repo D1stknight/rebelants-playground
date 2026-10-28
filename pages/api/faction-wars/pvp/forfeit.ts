@@ -29,6 +29,7 @@ import {
   matchAccounts,
   onTournamentMatchComplete,
 } from "../../../../lib/server/fwpvp";
+import { pvpMatchBadges } from "../../../../lib/server/fw-badges";
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Cache-Control", "no-store");
@@ -148,6 +149,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       pot,
     ).catch(() => {});
 
+    if (!withheld) await pvpMatchBadges(match).catch(() => undefined);
     await unmarkActive(challengeId).catch(() => {});
     await tightenChatTTL(challengeId, chatTtlMins).catch(() => {});
 

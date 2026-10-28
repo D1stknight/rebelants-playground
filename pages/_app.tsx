@@ -9,6 +9,7 @@ import { RainbowKitProvider, getDefaultConfig } from "@rainbow-me/rainbowkit";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { apeChain } from "../lib/apechain";
 import SignInAgain from "../components/SignInAgain";
+import BadgeToast from "../components/BadgeToast";
 
 const queryClient = new QueryClient();
 
@@ -73,6 +74,7 @@ export default function App({ Component, pageProps }: AppProps) {
           <RainbowKitProvider>
             <Component {...pageProps} />
             <SignInAgain />
+            <BadgeToast />
           </RainbowKitProvider>
         </QueryClientProvider>
       </WagmiProvider>

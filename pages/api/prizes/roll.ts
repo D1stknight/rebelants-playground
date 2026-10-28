@@ -16,6 +16,7 @@ import { saveWonPrize } from "../../../lib/server/prizesWon";
 import { prizeFor } from "../../../lib/server/prizeTable";
 import { economyCredit, idemKey } from "../../../lib/economy";
 import { addToEarnedTotal, updateBalanceLeaderboard } from "../../../lib/server/leaderboards";
+import { resultEvent, sendBadges, type BadgeOp } from "../../../lib/server/badges";
 
 const ECON_KEY = "ra:config:economy";
 
@@ -180,6 +181,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await redis.set(ROLL_KEY(run.id), JSON.stringify(result), { ex: RUN_TTL });
     rolling = null; // rolled: a repeat answers this result
     if (run.game !== "shuffle") return res.status(200).json({ ...result, credited: 0 });
+    await shuffleBadges(run.userId, result).catch(() => undefined);
     const pay = await payRoll(run, result);
     if (!pay.ok) return res.status(502).json({ ok: false, error: "Economy credit failed: pick again in a moment." });
     if (pay.credited > 0) {
@@ -193,4 +195,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.error("prizes/roll error:", err);
     return res.status(500).json({ ok: false, error: "Server error" });
   }
+}
+
+/** Badges from a Shuffle roll (decided on the server above). */
+async function shuffleBadges(userId: string, r: any) {
+  const award: string[] = [];
+  const counters: BadgeOp[] = [{ key: "shuffle.rounds", op: "add" }, { key: "shuffle.trackstreak", op: "streak", hit: !!r.tracked }];
+  if (r.tracked) counters.push({ key: "shuffle.tracked", op: "add" });
+  if (r.blessed) counters.push({ key: "shuffle.blessed", op: "add" });
+  if (r.royal) counters.push({ key: "shuffle.royaldays", op: "dayCount" });
+  if (r.pity) counters.push({ key: "shuffle.pity", op: "add" });
+  if (r.rarity === "rare") counters.push({ key: "shuffle.rares", op: "add" });
+  if (r.rarity === "ultra") {
+    counters.push({ key: "shuffle.ultras", op: "add" }, { key: "ultras", op: "add" }, { key: "ultrasday", op: "dayAdd" });
+    if (r.royal) counters.push({ key: "shuffle.royalultras", op: "add" });
+    if (r.royal && r.tracked) award.push("pgsecret.royalgaze");
+  }
+  if (r.tracked && r.rarity === "none") award.push("pgsecret.empty");
+  if (r.prize?.type === "nft") counters.push({ key: "shuffle.nfts", op: "add" }, { key: "treasures", op: "add" });
+  if (r.prize?.type === "merch") { award.push("shuffle.merch"); counters.push({ key: "treasures", op: "add" }); }
+  await sendBadges([resultEvent(userId, "shuffle", { award, counters, context: { rarity: r.rarity } })]);
 }

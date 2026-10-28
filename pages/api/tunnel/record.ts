@@ -3,6 +3,7 @@ import { redis } from "../../../lib/server/redis";
 import { actingPlayer } from "../../../lib/server/player-auth";
 import { firstRecord, readRun } from "../../../lib/server/gameRuns";
 import { TUNNEL_LAYOUT_COUNT, tunnelSlot } from "../../../lib/server/tunnelLayouts";
+import { resultEvent, sendBadges, type BadgeOp } from "../../../lib/server/badges";
 
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") return res.status(405).json({ ok: false });
@@ -52,8 +53,33 @@ export default async function handler(req: any, res: any) {
       }
     }
     if (layoutIndex !== null) await redis.sadd("tunnel:player:" + playerId + ":explored", String(layoutIndex));
+    await tunnelBadges(who.user.userId, playerId, { score, fullClear, clearTimeMs, crystals: crystalsCollected, slot: layoutIndex, raw: rawLayout, member }).catch(() => undefined);
     return res.status(200).json({ ok: true });
   } catch (e: any) {
     return res.status(500).json({ ok: false, error: e?.message || "error" });
   }
+}
+
+/** Badges from a recorded Tunnel run (score capped to what the run paid, clear time checked against the run). */
+async function tunnelBadges(userId: string, pid: string, r: { score: number; fullClear: boolean; clearTimeMs: number; crystals: number; slot: number | null; raw: number | null; member: string }) {
+  const award: string[] = [];
+  const counters: BadgeOp[] = [{ key: "tunnel.runs", op: "add" }, { key: "tunnel.crystals", op: "add", by: Math.min(200, Math.max(0, Math.floor(r.crystals))) }];
+  if (r.slot !== null) counters.push({ key: "tunnel.layouts", op: "distinct", item: String(r.slot) });
+  if (r.fullClear) {
+    award.push("tunnel.clear");
+    if (r.clearTimeMs > 0 && r.clearTimeMs < 40_000) award.push("tunnel.swift");
+    if (r.clearTimeMs > 0 && r.clearTimeMs < 25_000) award.push("tunnel.lightning");
+    if (r.raw === TUNNEL_LAYOUT_COUNT - 1) award.push("tunnel.boss");
+  }
+  if (r.score >= 250) award.push("tunnel.crumb");
+  if (r.score >= 1000) award.push("tunnel.sugar");
+  if (r.score >= 3000) award.push("tunnel.crystal");
+  if (r.score >= 4500) award.push("tunnel.emperor");
+  if (r.score >= 5000) award.push("tunnel.perfect");
+  if (r.slot !== null && r.score > 0 && (await redis.zrevrank("tunnel:layout:" + r.slot + ":scores", r.member).catch(() => null)) === 0) {
+    const topKey = "ra:badge:tunneltops:" + userId;
+    await redis.sadd(topKey, String(r.slot));
+    counters.push({ key: "tunnel.tops", op: "max", by: Number(await redis.scard(topKey)) || 1 });
+  }
+  await sendBadges([resultEvent(userId, "tunnel", { award, counters, context: { score: r.score } })]);
 }
