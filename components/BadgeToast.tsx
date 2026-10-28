@@ -1,28 +1,30 @@
 // The badge pop-up: on every Playground page, a new badge slides in once the server hands it out
 // (checked every 20 s while the tab is open). Gold and Mythic badges get the big treatment.
-// Tap to open the Badge Wall (every app's badges, on the Rebel Economy).
+// Tap to open the badge case (Playground badges first; the Badge Wall has every app).
+// A finished mission pops up the same way.
 import { useEffect, useRef, useState } from "react";
 
-type NewBadge = { id: string; name: string; tier: string; tierLabel: string };
-const COLOR: Record<string, string> = { common: "#c98a4b", rare: "#cfd8e3", epic: "#b77bff", legendary: "#fbbf24", mythic: "#ff3b6b", secret: "#8ff0b8" };
+export type NewBadge = { id: string; name: string; tier: string; tierLabel?: string };
+export const COLOR: Record<string, string> = { mission: "#7fe0a8", common: "#c98a4b", rare: "#cfd8e3", epic: "#b77bff", legendary: "#fbbf24", mythic: "#ff3b6b", secret: "#8ff0b8" };
 const HEX = "polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%)";
 
-function playerId(): string {
+export function playerId(): string {
   try { return JSON.parse(localStorage.getItem("ra_profile_v1") || "{}")?.primaryId || "guest"; } catch { return "guest"; }
 }
 
-function Medal({ b, size }: { b: NewBadge; size: number }) {
+/** A Playground badge: its art once loaded, else a drawn hexagon. Locked = dim hexagon with "?". */
+export function Medal({ b, size, earned = true }: { b: NewBadge; size: number; earned?: boolean }) {
   const [loaded, setLoaded] = useState(false);
   const col = COLOR[b.tier] || "#fbbf24";
   const [app, rest] = b.id.split(":");
   const art = "https://economy.rebelants.io/badges/" + app + "/" + rest + ".webp";
-  if (loaded) return <img src={art} alt="" style={{ width: size, height: size * 1.1, objectFit: "contain", filter: `drop-shadow(0 0 12px ${col}88)` }} />;
+  if (earned && loaded) return <img src={art} alt="" style={{ width: size, height: size * 1.1, objectFit: "contain", filter: `drop-shadow(0 0 12px ${col}88)` }} />;
   return (
     <>
-      <img src={art} alt="" onLoad={() => setLoaded(true)} style={{ display: "none" }} />
-      <span style={{ width: size, height: size * 1.08, clipPath: HEX, display: "inline-grid", placeItems: "center", background: b.tier === "mythic" ? "linear-gradient(160deg,#ff3b6b,#fff 50%,#ff3b6b)" : "linear-gradient(160deg,#ef4444,#f97316 50%,#fbbf24)" }}>
-        <span style={{ width: size - 8, height: size * 1.08 - 8, clipPath: HEX, display: "grid", placeItems: "center", background: "#120b0b", font: `900 ${Math.round(size / 2.8)}px 'Noto Serif JP', Georgia, serif`, color: col }}>
-          {b.name.replace(/[^A-Za-z0-9]/g, "").slice(0, 1)}
+      {earned && <img src={art} alt="" onLoad={() => setLoaded(true)} style={{ display: "none" }} />}
+      <span style={{ width: size, height: size * 1.08, clipPath: HEX, display: "inline-grid", placeItems: "center", opacity: earned ? 1 : 0.5, background: !earned ? "rgba(255,255,255,.18)" : b.tier === "mythic" ? "linear-gradient(160deg,#ff3b6b,#fff 50%,#ff3b6b)" : "linear-gradient(160deg,#ef4444,#f97316 50%,#fbbf24)" }}>
+        <span style={{ width: size - 8, height: size * 1.08 - 8, clipPath: HEX, display: "grid", placeItems: "center", background: "#120b0b", font: `900 ${Math.round(size / 2.8)}px 'Noto Serif JP', Georgia, serif`, color: earned ? col : "rgba(241,236,228,.4)" }}>
+          {earned ? b.name.replace(/[^A-Za-z0-9]/g, "").slice(0, 1) : "?"}
         </span>
       </span>
     </>
@@ -67,9 +69,10 @@ export default function BadgeToast() {
   if (!shown) return null;
   const col = COLOR[shown.tier] || "#fbbf24";
   const big = shown.tier === "legendary" || shown.tier === "mythic";
+  const mission = shown.tier === "mission";
   return (
     <a
-      href={"/api/badges/wall?playerId=" + encodeURIComponent(playerId())}
+      href={mission ? "/missions" : "/badges"}
       role="status"
       aria-live="polite"
       style={{
@@ -82,11 +85,13 @@ export default function BadgeToast() {
       }}
     >
       <style>{`@keyframes pgBadgeIn{from{opacity:0;transform:${big ? "translate(-50%,50%) scale(.6)" : "translate(-50%,30px)"}}to{opacity:1}}`}</style>
-      <Medal b={shown} size={big ? 130 : 56} />
+      {mission
+        ? <span aria-hidden="true" style={{ width: 56, height: 60, clipPath: HEX, display: "grid", placeItems: "center", fontSize: 28, background: "linear-gradient(160deg,#16a34a,#7fe0a8)" }}>🎯</span>
+        : <Medal b={shown} size={big ? 130 : 56} />}
       <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-        <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".22em", color: col }}>{shown.tier === "secret" ? "SECRET BADGE FOUND" : "NEW BADGE · " + String(shown.tierLabel || "").toUpperCase()}</span>
+        <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".22em", color: col }}>{mission ? "MISSION DONE · " + shown.tierLabel + " POINTS" : shown.tier === "secret" ? "SECRET BADGE FOUND" : "NEW BADGE · " + String(shown.tierLabel || "").toUpperCase()}</span>
         <span style={{ fontSize: big ? 22 : 16, fontWeight: 900, color: "#fff" }}>{shown.name}</span>
-        <span style={{ fontSize: 11, color: "#b9ae96", fontFamily: "system-ui, sans-serif" }}>Tap to see your Badge Wall</span>
+        <span style={{ fontSize: 11, color: "#b9ae96", fontFamily: "system-ui, sans-serif" }}>{mission ? "Tap to see your missions" : "Tap to see your badges"}</span>
       </span>
     </a>
   );

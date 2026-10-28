@@ -42,8 +42,13 @@ export async function sendBadges(events: BadgeEvent[]): Promise<void> {
     const results: any[] = chunk.length === 1 ? [data] : data?.results || [];
     // new badges wait for the player's screen (the badge pop-up), at most 20, a week
     for (let i = 0; i < results.length; i++) {
-      const got = results[i]?.awarded;
-      if (!Array.isArray(got) || !got.length) continue;
+      // finished missions pop up too (tier "mission", label = the points it paid)
+      const done: any[] = Array.isArray(results[i]?.missions) ? results[i].missions : [];
+      const got = [
+        ...done.map((m: any) => ({ id: "mission:" + m.id, name: m.name, tier: "mission", tierLabel: "+" + m.reward })),
+        ...(Array.isArray(results[i]?.awarded) ? results[i].awarded : []),
+      ];
+      if (!got.length) continue;
       const key = NEW_KEY(chunk[i].userId);
       await redis.rpush(key, ...got.map((a: any) => JSON.stringify({ id: a.id, name: a.name, tier: a.tier, tierLabel: a.tierLabel })));
       await redis.ltrim(key, -20, -1);
@@ -94,4 +99,16 @@ export async function takeNewBadges(userId: string): Promise<{ id: string; name:
   const raw = ((await redis.lrange(key, 0, -1).catch(() => [])) || []) as any[];
   if (raw.length) await redis.del(key).catch(() => 0);
   return raw.map((x) => (typeof x === "string" ? JSON.parse(x) : x)).filter((x) => x && x.id);
+}
+
+/** Reads from the economy for this player (badge case, missions). Never throws. */
+export async function economyRead(path: string): Promise<any | null> {
+  if (!SERVICE_API_KEY) return null;
+  try {
+    const r = await fetch(ECONOMY_BASE_URL + path, { headers: { Authorization: "Bearer " + SERVICE_API_KEY }, cache: "no-store" });
+    const j: any = await r.json().catch(() => null);
+    return r.ok && j?.ok ? j : null;
+  } catch {
+    return null;
+  }
 }
