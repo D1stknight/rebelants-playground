@@ -24,7 +24,7 @@ function Mission({ m }: { m: Card }) {
   const pct = Math.round((100 * Math.min(m.have, m.need)) / m.need);
   const body = (
     <>
-      <span className="pm-game">{m.game}{m.app === "underground" ? " · THE UNDERGROUND" : ""}</span>
+      <span className="pm-game">{m.game}{m.app === "underground" && m.game !== "THE UNDERGROUND" ? " · THE UNDERGROUND" : ""}</span>
       <span className="pm-name">{m.name}</span>
       <span className="pm-bar" aria-hidden="true"><i style={{ width: pct + "%" }} /></span>
       <span className="pm-foot"><span>{m.done ? "Done" : `${fmt(m.have)} of ${fmt(m.need)}`}</span><b>{m.done ? "✓ " : "+"}{fmt(m.reward)} <small>points</small></b></span>
