@@ -27,7 +27,9 @@ import {
   getPvpEconomyConfig,
   recordPvpResult,
   matchAccounts,
+  onTournamentMatchComplete,
 } from "../../../../lib/server/fwpvp";
+import { pvpMatchBadges } from "../../../../lib/server/fw-badges";
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Cache-Control", "no-store");
@@ -112,10 +114,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     match.updatedAt = now;
     match.forfeitedBy = match.challengerPlayerId;
 
-    // Pot = both antes if both paid, else whatever was collected
+    // Pot = what is on the table, as submit-move pays it: both antes, or a tournament round's pot
+    // (paid only when the match pays rewards). Older matches without pvpPotPaid: the antes collected.
     let pot = 0;
-    if (match.challengerPaid && cost > 0) pot += cost;
-    if (match.opponentPaid && cost > 0) pot += cost;
+    if (match.pvpPotPaid != null) {
+      pot = withheld && match.tournamentId ? 0 : Number(match.pvpPotPaid || 0);
+    } else {
+      if (match.challengerPaid && cost > 0) pot += cost;
+      if (match.opponentPaid && cost > 0) pot += cost;
+    }
+    match.pvpPotPaid = 0;
 
     // Pay pot to opponent
     let payoutBalance: number | null = null;
@@ -141,8 +149,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       pot,
     ).catch(() => {});
 
+    if (!withheld) await pvpMatchBadges(match).catch(() => undefined);
     await unmarkActive(challengeId).catch(() => {});
     await tightenChatTTL(challengeId, chatTtlMins).catch(() => {});
+
+    // A forfeited tournament match advances the bracket like a played one (it used to stall it).
+    if (match.tournamentId && match.winnerPlayerId && match.loserPlayerId) {
+      try {
+        await onTournamentMatchComplete(match.tournamentId, match.challengeId, match.winnerPlayerId, match.loserPlayerId);
+      } catch {
+        // match is saved; the bracket can be repaired by an admin
+      }
+    }
 
     return res.status(200).json({
       ok: true,

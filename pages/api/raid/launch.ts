@@ -9,6 +9,7 @@ import { randomBytes } from "crypto";
 import { redis } from "../../../lib/server/redis";
 import { actingPlayer } from "../../../lib/server/player-auth";
 import { economyCredit, economyDebit, idemKey } from "../../../lib/economy";
+import { isFirstMinuteAfterMidnight, runEvent, sendBadges, type BadgeOp } from "../../../lib/server/badges";
 import { loadLiveConfig } from "../../../lib/server/gameRuns";
 import { prizeFor } from "../../../lib/server/prizeTable";
 import { saveWonPrize } from "../../../lib/server/prizesWon";
@@ -88,6 +89,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await redis.set(RESULT_KEY(raidId), JSON.stringify(result), { ex: 7 * 24 * 60 * 60 });
 
     const pay = await payPrize(result);
+    await raidBadges(userId, result).catch(() => undefined);
     if (!pay.ok) return res.status(502).json({ ok: false, raidId, error: "Your crate is safe: its REBEL could not be paid yet. Try again in a moment." });
     if (pay.credited > 0) {
       await addToEarnedTotal(who.playerId, pay.credited).catch(() => {});
@@ -98,4 +100,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.error("raid/launch", e);
     return res.status(500).json({ ok: false, error: "Server error" });
   }
+}
+
+/** Badges from a raid (decided on the server above). */
+async function raidBadges(userId: string, r: { raidId: string; repeat: boolean; slots: { role: string; survived: boolean | null }[]; rarity: string; prize: any }) {
+  const award: string[] = [];
+  const counters: BadgeOp[] = [{ key: "raid.raids", op: "add" }, { key: "raid.ultrastreak", op: "streak", hit: r.rarity === "ultra" }, { key: "raid.freshstreak", op: "streak", hit: !r.repeat }];
+  const slots = r.slots;
+  const crate = r.rarity !== "none";
+  const carriers = slots.filter((s) => s.role === "carrier");
+  const carriersHome = carriers.filter((s) => s.survived).length;
+  const survivors = slots.filter((s) => s.survived).length;
+  if (r.rarity === "rare") counters.push({ key: "raid.rares", op: "add" });
+  if (r.rarity === "ultra") counters.push({ key: "raid.ultras", op: "add" }, { key: "ultras", op: "add" }, { key: "ultrasday", op: "dayAdd" });
+  if (carriers.length >= 4 && carriersHome === carriers.length) counters.push({ key: "raid.carriers", op: "add" });
+  if (slots.filter((s) => s.role !== "bomber").every((s) => s.survived)) counters.push({ key: "raid.nobody", op: "add" });
+  if (carriers.length && slots.every((s, i) => s.role !== "carrier" || (s.survived && slots[i - 1]?.role === "guard" && slots[i + 1]?.role === "guard"))) award.push("raid.wall");
+  if (crate && slots.slice(0, 4).every((s) => s.role === "scout")) award.push("raid.scouts");
+  if (crate && slots.filter((s) => s.role === "bomber").length >= 3) award.push("raid.bombers");
+  if (r.rarity === "rare" && carriersHome === 1) award.push("raid.lone");
+  if (r.rarity === "ultra" && !slots.some((s) => s.role === "guard")) award.push("raid.boldultra");
+  if (crate && slots.every((s) => s.role === "soldier")) award.push("pgsecret.allsoldiers");
+  if (survivors === 0) counters.push({ key: "raid.mourns", op: "add" });
+  if (isFirstMinuteAfterMidnight()) award.push("pgsecret.midnight");
+  // the first raid of the (Eastern) day earned a crate: counts once a day
+  const day = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
+  const first = await redis.set("ra:badge:raidday:" + userId + ":" + day, "1", { nx: true, ex: 36 * 3600 }).catch(() => null);
+  if (first && crate) counters.push({ key: "raid.morning", op: "dayCount" });
+  if (r.prize?.type === "nft") { award.push("raid.nft"); counters.push({ key: "treasures", op: "add" }); }
+  else if (r.prize?.type === "merch") counters.push({ key: "treasures", op: "add" });
+  await sendBadges([runEvent(userId, "raid", { award, counters, context: { raidId: r.raidId, rarity: r.rarity } })]);
 }

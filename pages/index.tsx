@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+import HallButton from "../components/hall/HallButton";
 import { OLD_NAME_PIN_NOTE } from '../lib/commanderPins';
 import { loadProfile, saveProfile, signOutProfile } from '../lib/profile';
 import { getEffectivePlayerId } from '../lib/profile';
@@ -22,7 +23,7 @@ const GAMES = [
   { id:'fw',     title:'FACTION WARS',       desc:'CHOOSE YOUR FACTION. CONQUER TERRITORIES. CRUSH YOUR ENEMIES.', icon:'⚔️',  path:'/faction-wars', color:'#ef4444', glow:'rgba(239,68,68,0.4)',   badge:'STRATEGY', bg:'rgba(239,68,68,0.08)'   },
   { id:'raid',   title:'THE RAID',           desc:'DEPLOY YOUR SQUAD. SURVIVE THE COLONY. BRING HOME THE LOOT.',  icon:'🗡️',  path:'/the-raid',     color:'#f97316', glow:'rgba(249,115,22,0.4)',  badge:'SQUAD',    bg:'rgba(249,115,22,0.08)'  },
   { id:'tunnel', title:'ANT TUNNEL',         desc:'NAVIGATE THE UNDERGROUND. COLLECT CRYSTALS. OUTRUN THE SPIDER.', icon:'🐜', path:'/tunnel',       color:'#3b82f6', glow:'rgba(59,130,246,0.4)', badge:'ARCADE',   bg:'rgba(59,130,246,0.08)'  },
-  { id:'shuffle',title:"QUEEN'S EGG SHUFFLE",desc:"FIND THE QUEEN'S EGG. BEAT THE ODDS. WIN BIG.",               icon:'🥚',  path:'/shuffle',       color:'#a855f7', glow:'rgba(168,85,247,0.4)', badge:'LUCK',     bg:'rgba(168,85,247,0.08)'  },
+  { id:'shuffle',title:"QUEEN'S EGG SHUFFLE",desc:"FOLLOW THE QUEEN'S EGG. TRUST YOUR EYES. CLAIM HER CRATES.",               icon:'🥚',  path:'/shuffle',       color:'#a855f7', glow:'rgba(168,85,247,0.4)', badge:'EGG HUNT',     bg:'rgba(168,85,247,0.08)'  },
   { id:'descent',title:'HIVE DESCENT',        desc:'DESCEND THROUGH 10 FLOORS. FACE THE QUEEN. WIN OR DIE.', icon:'🐜',  path:'/descent',     color:'#ff3399', glow:'rgba(255,51,153,0.45)',badge:'ROGUELITE', bg:'rgba(255,51,153,0.08)' },
   { id:'bounty', title:'BOUNTY HUNTERS',      desc:'RUN. GUN. TAKE THE HEAD. FOUR BOARDS OF CORRUPTED HIVE, FOUR WANTED BOSSES.', icon:'🏹',  path:'/bounty',      color:'#a78bfa', glow:'rgba(167,139,250,0.45)', badge:'RUN & GUN', bg:'rgba(167,139,250,0.08)' },
   { id:'gp',     title:'REBEL GRAND PRIX',    desc:'KART RACING. FIVE CUPS, FIFTEEN TRACKS, EIGHT ANTS ON THE GRID. DRIFT. BOX. WASP.', icon:'🏁',  path:'/grand-prix',  color:'#ffd166', glow:'rgba(255,209,102,0.45)', badge:'KART RACING', bg:'rgba(255,209,102,0.08)' },
@@ -32,7 +33,7 @@ const GAMES = [
 const ECONOMY = [
   { icon:'🎮', title:'CONNECT DISCORD', desc:'LINK YOUR DISCORD ACCOUNT TO TRACK YOUR WINS, USE YOUR REBEL POINTS AND STAY CONNECTED WITH THE COLONY.', color:'#5865F2' },
   { icon:'💎', title:'CONNECT WALLET',  desc:'CONNECT YOUR APECHAIN WALLET TO PURCHASE REBEL POINTS WHEN NEEDED AND CLAIM NFT AND MERCH PRIZES.', color:'#f97316' },
-  { icon:'⚔️', title:'PLAY TO EARN',   desc:'CHOOSE YOUR GAME. BATTLE HARD. EARN REBEL TOKENS. CLIMB THE LEADERBOARDS AND WIN REAL PRIZES.', color:'#ef4444' },
+  { icon:'⚔️', title:'PLAY & COLLECT',   desc:'CHOOSE YOUR GAME. BATTLE HARD. EARN REBEL POINTS. CLIMB THE LEADERBOARDS AND WIN REAL PRIZES.', color:'#ef4444' },
 ];
 
 interface Legend { label: string; icon: string; player: string; value: string; }
@@ -571,7 +572,7 @@ export default function LandingPage() {
               borderBottom:'1px solid rgba(255,255,255,0.1)',
               padding:'20px 0',
             }}>
-              PLAY MINI-GAMES. EARN REBEL TOKENS. WIN NFTs, MERCH AND MORE.<br/>
+              PLAY MINI-GAMES. EARN REBEL POINTS. WIN NFTs, MERCH AND MORE.<br/>
               <span style={{ color:'rgba(255,255,255,0.35)', fontSize:'clamp(10px,1.2vw,13px)', letterSpacing:'0.2em' }}>
                 THE ULTIMATE REBEL ANTS ARENA.
               </span>
@@ -636,11 +637,14 @@ export default function LandingPage() {
                 <div style={{ fontFamily:'inherit', fontSize:28, fontWeight:900, color:'#fbbf24', letterSpacing:'0.05em', filter:'drop-shadow(0 0 12px rgba(251,191,36,0.4))' }}>
                   {effectiveId !== 'guest' && pts.balance !== undefined ? pts.balance.toLocaleString() : '—'}
                 </div>
-                <div style={{ fontFamily:'inherit', fontSize:10, color:'rgba(255,255,255,0.25)', letterSpacing:'0.08em' }}>REBEL TOKENS</div>
+                <div style={{ fontFamily:'inherit', fontSize:10, color:'rgba(255,255,255,0.25)', letterSpacing:'0.08em' }}>REBEL POINTS</div>
               </div>
 
               {/* Right — Actions */}
               <div style={{ display:'flex', flexWrap:'wrap', gap:8, alignItems:'center' }}>
+
+                {/* Hall of Badges: missions + badges (both apps) in one place */}
+                {effectiveId && effectiveId !== 'guest' && <HallButton />}
 
                 {/* Claim Daily + countdown — countdown is absolute so it doesn't affect button alignment */}
                 <div style={{ position:'relative' }}>

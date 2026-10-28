@@ -1643,6 +1643,8 @@ export async function onTournamentMatchComplete(
   }
 
   await saveTournament(t);
+  // badges: the last 4, the final, the champion (best-effort, never blocks the bracket)
+  try { const { tournamentBadges } = await import("./fw-badges"); await tournamentBadges(t as any, loc.roundIndex, winnerPlayerId, loserPlayerId); } catch {}
 }
 
 
@@ -1658,6 +1660,7 @@ export async function seedDraftTournament(t: Tournament): Promise<boolean> {
   t.rounds = buildBracket(t.size, ids, t.potPerRound);
   t.status = "seeded";
   t.startedAt = Date.now();
+  try { const { tournamentSeededBadges } = await import("./fw-badges"); await tournamentSeededBadges(t.participants); } catch {}
 
   const round0 = t.rounds[0];
   for (const slot of round0.matches) {

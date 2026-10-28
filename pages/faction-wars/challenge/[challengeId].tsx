@@ -13,7 +13,7 @@ import { recordCompletedPlaygroundMatch } from "../../../lib/raap-completed-matc
 import { isSignedPlayerId, matchHasGuestSide, rewardsWithheldText, crateCapText } from "../../../lib/fwpvpRewards";
 
 // Shown before a match with a guest side (lib/fwpvpRewards.ts): it plays, but pays no crate and takes no side bets.
-const PRACTICE_NOTE = "Practice match: crates and side bets only come when both players are signed in.";
+const PRACTICE_NOTE = "Practice match: crates and side picks only come when both players are signed in.";
 
 const JP = `'Noto Serif JP', 'Hiragino Mincho ProN', serif`;
 
@@ -2026,7 +2026,7 @@ export default function ChallengePage() {
                       {Number(match.pvpCost ?? 0) > 0 && (
                         <div style={{ marginBottom: 18, padding: "14px 16px", borderRadius: 12, border: "1px solid rgba(251,191,36,0.3)", background: "rgba(0,0,0,0.3)" }}>
                           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(255,255,255,0.5)", marginBottom: 6 }}>
-                            Wager
+                            Entry
                           </div>
                           <div style={{ fontSize: 28, fontWeight: 900, color: "#fbbf24", letterSpacing: "0.02em", lineHeight: 1 }}>
                             {Number(match.pvpCost).toLocaleString()} <span style={{ fontSize: 14, color: "rgba(251,191,36,0.7)", fontWeight: 700 }}>REBEL</span>

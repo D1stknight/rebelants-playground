@@ -26,7 +26,7 @@ export default function QueenEgg() {
   return (
     <section className="ant-card">
       <h2 className="title">Queen&apos;s Egg Hatch</h2>
-      <p className="subtitle mb-3">Crack an egg for a shot at the Queen&apos;s crates. Jackpot vibes.</p>
+      <p className="subtitle mb-3">Crack an egg for a shot at the Queen&apos;s crates.</p>
 
       <div className="flex items-center gap-4">
         <div className="egg" aria-hidden />

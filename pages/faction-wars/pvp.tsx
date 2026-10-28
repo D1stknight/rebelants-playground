@@ -500,7 +500,7 @@ export default function PvpLobbyPage() {
                               filter: isSelected ? "drop-shadow(0 0 8px rgba(251,191,36,0.3))" : "none",
                               transition: "all 0.15s ease",
                             }}
-                            title={tierCantAfford ? `Need ${tier} REBEL` : `Wager ${tier} REBEL`}
+                            title={tierCantAfford ? `Need ${tier} REBEL` : `Entry ${tier} points`}
                           >
                             {tier.toLocaleString()}
                           </button>
@@ -599,7 +599,7 @@ export default function PvpLobbyPage() {
                       </div>
                       <div style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }}>
                         {fm.status === "team_selection" ? "Picking factions" : `Territory ${Math.min(5, (fm.currentTerritory ?? 0) + 1)}/5`}
-                        {Number(fm.pvpCost ?? 0) > 0 && ` · ${Number(fm.pvpCost).toLocaleString()} REBEL wager`}
+                        {Number(fm.pvpCost ?? 0) > 0 && ` · ${Number(fm.pvpCost).toLocaleString()} points entry`}
                         <span style={{ color: "#fbbf24", marginLeft: 8 }}>{fm.challengerTerritoriesWon ?? 0}</span>
                         <span style={{ color: "rgba(255,255,255,0.4)" }}> – </span>
                         <span style={{ color: "#a5b4fc" }}>{fm.opponentTerritoriesWon ?? 0}</span>
@@ -677,7 +677,7 @@ export default function PvpLobbyPage() {
                             </div>
                             <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 4 }}>
                               {m.status === "team_selection" ? "Picking factions" : `Territory ${Math.min(5, (m.currentTerritory ?? 0) + 1)}/5`}
-                              {Number(m.pvpCost ?? 0) > 0 && ` · ${Number(m.pvpCost).toLocaleString()} REBEL wager`}
+                              {Number(m.pvpCost ?? 0) > 0 && ` · ${Number(m.pvpCost).toLocaleString()} points entry`}
                               <span style={{ color: "#fbbf24", marginLeft: 8 }}>{m.challengerTerritoriesWon ?? 0}</span>
                               <span style={{ color: "rgba(255,255,255,0.4)" }}> – </span>
                               <span style={{ color: "#a5b4fc" }}>{m.opponentTerritoriesWon ?? 0}</span>

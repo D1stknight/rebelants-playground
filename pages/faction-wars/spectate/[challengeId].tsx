@@ -255,10 +255,10 @@ export default function SpectatePage() {
       });
       const j = await r.json();
       if (!j.ok) {
-        setBetError(j.error || "Bet failed");
+        setBetError(j.error || "Pick failed");
         return;
       }
-      setBetSuccess(`✓ Bet ${amt.toLocaleString()} REBEL on ${betSide}`);
+      setBetSuccess(`✓ ${amt.toLocaleString()} points on ${betSide}`);
       setBetAmount("");
       if (typeof j.newBalance === "number") setBalance(j.newBalance);
       if (j.bets) setBetsState(j.bets as PvpBetsState);
@@ -375,7 +375,7 @@ export default function SpectatePage() {
                       ? `Match complete · Winner takes ${(Number(match.pvpCost ?? 0) * 2).toLocaleString()} REBEL`
                       : "Match cancelled"
                   ) : (
-                    `Territory ${Math.min(TERRITORY_COUNT, match.currentTerritory + 1)} of ${TERRITORY_COUNT} · Wager ${Number(match.pvpCost ?? 0).toLocaleString()} REBEL`
+                    `Territory ${Math.min(TERRITORY_COUNT, match.currentTerritory + 1)} of ${TERRITORY_COUNT} · Entry ${Number(match.pvpCost ?? 0).toLocaleString()} points`
                   )}
                 </div>
               </div>
@@ -594,7 +594,7 @@ function BetPanel({
   if (isParticipant) {
     return (
       <div style={{ padding: "16px 20px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", marginBottom: 20, fontSize: 12, color: "rgba(255,255,255,0.5)", textAlign: "center" }}>
-        Side bets are open to spectators only — you can't bet on your own match.
+        Side picks are open to spectators only — you can't pick a side in your own match.
       </div>
     );
   }
@@ -602,13 +602,13 @@ function BetPanel({
   // Side bets need two signed-in players (lib/fwpvpRewards.ts): else they are refunded at the end
   const noteStyle = { padding: "16px 20px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", marginBottom: 20, fontSize: 12, color: "rgba(255,255,255,0.6)", textAlign: "center" as const };
   if (match.status === "completed" && match.pvpRewardsWithheld && betsState && betsState.bets.length > 0) {
-    return <div style={noteStyle}>Bets refunded. {rewardsWithheldText(match.pvpRewardsWithheld)}</div>;
+    return <div style={noteStyle}>Side picks returned. {rewardsWithheldText(match.pvpRewardsWithheld)}</div>;
   }
   if (!matchTerminal && matchHasGuestSide(match)) {
     return (
       <div style={noteStyle}>
-        Side bets are only open on matches between two signed-in players.
-        {betsState && betsState.bets.length > 0 ? " Bets already placed are refunded when the match ends." : ""}
+        Side picks are only open on matches between two signed-in players.
+        {betsState && betsState.bets.length > 0 ? " Picks already in are returned when the match ends." : ""}
       </div>
     );
   }
@@ -623,20 +623,20 @@ function BetPanel({
     return (
       <div style={{ padding: "20px 22px", borderRadius: 14, border: "1px solid rgba(251,191,36,0.3)", background: "rgba(251,191,36,0.04)", marginBottom: 20 }}>
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", color: "#fbbf24", marginBottom: 12 }}>
-          Bets Settled
+          Side Picks Settled
         </div>
         <div style={{ fontSize: 14, color: "rgba(255,255,255,0.85)", marginBottom: 10 }}>
           {winnerBets.length > 0
-            ? `${winnerBets.length} bettor${winnerBets.length === 1 ? "" : "s"} on ${winnerSide} took the ${loserPool.toLocaleString()} REBEL loser pool.`
-            : `No ${winnerSide} bettors — ${loserPool.toLocaleString()} REBEL refunded to losers.`}
+            ? `${winnerBets.length} backer${winnerBets.length === 1 ? "" : "s"} of ${winnerSide} shared the ${loserPool.toLocaleString()} points put in on the other side.`
+            : `Nobody backed ${winnerSide}: ${loserPool.toLocaleString()} points returned to the other side.`}
         </div>
         {myBet && (
           <div style={{ marginTop: 10, padding: "10px 12px", borderRadius: 8, background: "rgba(0,0,0,0.3)", fontSize: 12 }}>
             {myBet.side === winnerSide
               ? winnerPool > 0
-                ? <><span style={{ color: "#34d399", fontWeight: 900 }}>You won!</span> <span style={{ color: "rgba(255,255,255,0.7)" }}>Bet {myBet.amount.toLocaleString()} on {myBet.side} → received {(myBet.amount + Math.floor((myBet.amount / winnerPool) * loserPool)).toLocaleString()} REBEL.</span></>
-                : <span style={{ color: "rgba(255,255,255,0.7)" }}>Refunded {myBet.amount.toLocaleString()} REBEL.</span>
-              : <><span style={{ color: "#f87171", fontWeight: 900 }}>You lost.</span> <span style={{ color: "rgba(255,255,255,0.7)" }}>Bet {myBet.amount.toLocaleString()} on {myBet.side}.</span></>}
+                ? <><span style={{ color: "#34d399", fontWeight: 900 }}>You won!</span> <span style={{ color: "rgba(255,255,255,0.7)" }}>Put {myBet.amount.toLocaleString()} on {myBet.side} → got back {(myBet.amount + Math.floor((myBet.amount / winnerPool) * loserPool)).toLocaleString()} REBEL.</span></>
+                : <span style={{ color: "rgba(255,255,255,0.7)" }}>Returned {myBet.amount.toLocaleString()} REBEL.</span>
+              : <><span style={{ color: "#f87171", fontWeight: 900 }}>You lost.</span> <span style={{ color: "rgba(255,255,255,0.7)" }}>Put {myBet.amount.toLocaleString()} on {myBet.side}.</span></>}
           </div>
         )}
       </div>
@@ -646,7 +646,7 @@ function BetPanel({
   if (match.status === "cancelled" && betsState && betsState.bets.length > 0) {
     return (
       <div style={{ padding: "16px 20px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", marginBottom: 20, fontSize: 12, color: "rgba(255,255,255,0.6)", textAlign: "center" }}>
-        Match cancelled — all bets refunded.
+        Match cancelled — all side picks returned.
       </div>
     );
   }
@@ -656,10 +656,10 @@ function BetPanel({
     <div style={{ padding: "20px 22px", borderRadius: 14, border: "1px solid rgba(251,191,36,0.25)", background: "rgba(251,191,36,0.02)", marginBottom: 20 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
         <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", color: "#fbbf24" }}>
-          Side Bets {locked && <span style={{ color: "#f87171", marginLeft: 6 }}>· LOCKED</span>}
+          Side Picks {locked && <span style={{ color: "#f87171", marginLeft: 6 }}>· LOCKED</span>}
         </div>
         <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)" }}>
-          Bets close at start of T{betLockTerritory} · Pari-mutuel
+          Picks close at start of T{betLockTerritory} · shared pool
         </div>
       </div>
 
@@ -674,12 +674,12 @@ function BetPanel({
         <>
           {!identity ? (
             <div style={{ padding: 12, borderRadius: 8, border: "1px dashed rgba(255,255,255,0.2)", background: "rgba(255,255,255,0.02)", textAlign: "center", fontSize: 12, color: "rgba(255,255,255,0.6)" }}>
-              <a href="/" style={{ color: "#fbbf24", textDecoration: "underline" }}>Sign in</a> to place a bet
+              <a href="/" style={{ color: "#fbbf24", textDecoration: "underline" }}>Sign in</a> to pick a side
             </div>
           ) : (
             <div>
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(255,255,255,0.5)", marginBottom: 8 }}>
-                {myBet ? `Top up your bet on ${myBet.side}` : "Place a bet"}
+                {myBet ? `Add to your pick on ${myBet.side}` : "Pick a side"}
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
                 <button
@@ -699,7 +699,7 @@ function BetPanel({
                     opacity: myBet && myBet.side !== "challenger" ? 0.4 : 1,
                   }}
                 >
-                  Bet on {match.challengerDisplayName}
+                  Back {match.challengerDisplayName}
                 </button>
                 <button
                   onClick={() => setBetSide("opponent")}
@@ -718,7 +718,7 @@ function BetPanel({
                     opacity: myBet && myBet.side !== "opponent" ? 0.4 : 1,
                   }}
                 >
-                  Bet on {match.opponentDisplayName ?? "Opponent"}
+                  Back {match.opponentDisplayName ?? "Opponent"}
                 </button>
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
@@ -762,14 +762,14 @@ function BetPanel({
                     cursor: betSubmitting ? "wait" : (!betSide || !betAmount) ? "not-allowed" : "pointer",
                   }}
                 >
-                  {betSubmitting ? "Placing…" : "💰 Place Bet"}
+                  {betSubmitting ? "Placing…" : "🎯 Lock in pick"}
                 </button>
               </div>
               {betError && <div style={{ marginTop: 10, fontSize: 12, color: "#f87171" }}>{betError}</div>}
               {betSuccess && <div style={{ marginTop: 10, fontSize: 12, color: "#34d399" }}>{betSuccess}</div>}
               {myBet && (
                 <div style={{ marginTop: 10, fontSize: 11, color: "rgba(255,255,255,0.6)" }}>
-                  Your current bet: <span style={{ color: myBet.side === "challenger" ? "#fbbf24" : "#a5b4fc", fontWeight: 700 }}>{myBet.amount.toLocaleString()} REBEL on {myBet.side}</span>
+                  Your current pick: <span style={{ color: myBet.side === "challenger" ? "#fbbf24" : "#a5b4fc", fontWeight: 700 }}>{myBet.amount.toLocaleString()} REBEL on {myBet.side}</span>
                 </div>
               )}
             </div>
@@ -781,13 +781,13 @@ function BetPanel({
       {betsState && betsState.bets.length > 0 && (
         <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(255,255,255,0.45)", marginBottom: 8 }}>
-            Recent Bets
+            Recent Side Picks
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {betsState.bets.slice(0, 5).map((b) => (
               <div key={b.playerId} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, padding: "6px 10px", borderRadius: 8, background: "rgba(255,255,255,0.02)" }}>
                 <span style={{ color: "white", fontWeight: 700 }}>{b.displayName || "Anonymous"}</span>
-                <span style={{ color: "rgba(255,255,255,0.45)" }}>bet</span>
+                <span style={{ color: "rgba(255,255,255,0.45)" }}>put</span>
                 <span style={{ color: "white", fontWeight: 900 }}>{b.amount.toLocaleString()}</span>
                 <span style={{ color: "rgba(255,255,255,0.45)" }}>on</span>
                 <span style={{ color: b.side === "challenger" ? "#fbbf24" : "#a5b4fc", fontWeight: 700 }}>{b.side === "challenger" ? match.challengerDisplayName : (match.opponentDisplayName ?? "Opponent")}</span>

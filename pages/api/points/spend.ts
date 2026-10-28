@@ -4,6 +4,7 @@ import { redis } from "../../../lib/server/redis";
 import { economyDebit, idemKey } from "../../../lib/economy";
 import { actingPlayer } from "../../../lib/server/player-auth";
 import { RUN_RULES, isRunGame, loadLiveConfig, openRun } from "../../../lib/server/gameRuns";
+import { runEvent, sendBadges } from "../../../lib/server/badges";
 
 function capBankKey(playerId: string) {
   return `ra:points:capbank:${playerId}`;
@@ -154,6 +155,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // the entry is paid: the run the game's payout (or the Shuffle's prize roll) is decided against
     const run = game ? await openRun({ game, userId: economyUser.userId, playerId, entry: amt, cfg: liveCfg }) : null;
+    if (run) await sendBadges([runEvent(economyUser.userId, run.game === "gp" ? "grand-prix" : (run.game as any), { context: { runId: run.id } })]);
 
     return res.status(200).json({
       ok: true,
