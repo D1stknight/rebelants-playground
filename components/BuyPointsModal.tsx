@@ -209,7 +209,7 @@ if (typeof window !== "undefined") {
         </a>
 
         <div style={{ marginTop: 18, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,.12)", fontSize: 13, opacity: 0.9 }}>
-          <div style={{ fontWeight: 800, marginBottom: 6 }}>Wallet for prizes and payouts</div>
+          <div style={{ fontWeight: 800, marginBottom: 6 }}>Wallet for prizes and rewards</div>
           <ConnectButton />
         </div>
 

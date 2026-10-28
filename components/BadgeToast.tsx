@@ -34,6 +34,9 @@ export function Medal({ b, size, earned = true }: { b: NewBadge; size: number; e
 export default function BadgeToast() {
   const [queue, setQueue] = useState<NewBadge[]>([]);
   const [shown, setShown] = useState<NewBadge | null>(null);
+  const [drag, setDrag] = useState({ x: 0, y: 0 });
+  const start = useRef<{ x: number; y: number } | null>(null);
+  const moved = useRef(false);
   const busy = useRef(false);
 
   useEffect(() => {
@@ -62,10 +65,31 @@ export default function BadgeToast() {
     setQueue((q) => q.slice(1));
     setShown(next);
     try { localStorage.setItem("hall-new", String(Date.now())); } catch { /* ok */ }
-    const big = next.tier === "legendary" || next.tier === "mythic";
+  }, [queue, shown]);
+
+  // hide on its own (its own effect: the queue effect above re-runs right after it shows one)
+  useEffect(() => {
+    if (!shown) return;
+    setDrag({ x: 0, y: 0 });
+    const big = shown.tier === "legendary" || shown.tier === "mythic";
     const t = setTimeout(() => setShown(null), big ? 7000 : 4500);
     return () => clearTimeout(t);
-  }, [queue, shown]);
+  }, [shown]);
+
+  // swipe it away (down or sideways), or tap the ×
+  const onStart = (e: React.TouchEvent) => { const t = e.touches[0]; start.current = { x: t.clientX, y: t.clientY }; moved.current = false; };
+  const onMove = (e: React.TouchEvent) => {
+    if (!start.current) return;
+    const t = e.touches[0];
+    const dx = t.clientX - start.current.x, dy = t.clientY - start.current.y;
+    if (Math.abs(dx) > 6 || Math.abs(dy) > 6) moved.current = true;
+    setDrag({ x: dx, y: Math.max(dy, -10) });
+  };
+  const onEnd = () => {
+    start.current = null;
+    if (drag.y > 50 || Math.abs(drag.x) > 70) setShown(null);
+    else setDrag({ x: 0, y: 0 });
+  };
 
   if (!shown) return null;
   const col = COLOR[shown.tier] || "#fbbf24";
@@ -76,13 +100,19 @@ export default function BadgeToast() {
       href={mission ? "/hall?tab=missions" : "/hall?tab=badges"}
       role="status"
       aria-live="polite"
+      onTouchStart={onStart}
+      onTouchMove={onMove}
+      onTouchEnd={onEnd}
+      onClick={(e) => { if (moved.current) { e.preventDefault(); moved.current = false; } }}
       style={{
-        position: "fixed", left: "50%", bottom: big ? "50%" : 18, transform: big ? "translate(-50%, 50%)" : "translateX(-50%)", zIndex: 9999,
+        position: "fixed", left: "50%", bottom: big ? "50%" : "calc(18px + env(safe-area-inset-bottom, 0px))", zIndex: 9999,
+        transform: `${big ? "translate(-50%, 50%)" : "translateX(-50%)"} translate(${drag.x}px, ${drag.y}px)`, opacity: Math.max(0.2, 1 - (Math.abs(drag.x) + Math.max(0, drag.y)) / 220),
+        transition: start.current ? "none" : "transform .2s ease, opacity .2s ease", touchAction: "none",
         display: "flex", flexDirection: big ? "column" : "row", alignItems: "center", gap: 12, textAlign: big ? "center" : "left",
-        padding: big ? "18px 22px" : "10px 16px 10px 10px", width: big ? "min(360px, 92vw)" : "min(420px, 92vw)",
+        padding: big ? "18px 22px" : "10px 44px 10px 10px", width: big ? "min(360px, 92vw)" : "min(420px, 92vw)",
         borderRadius: 16, textDecoration: "none", color: "#f1ece4", background: "linear-gradient(180deg,#1a0d0d,#07080d)",
         border: "1.5px solid " + col, boxShadow: `0 0 0 4px rgba(0,0,0,.4), 0 0 36px ${col}66, 0 0 60px rgba(239,68,68,.25)`,
-        fontFamily: "'Noto Serif JP', Georgia, serif", animation: "pgBadgeIn .55s cubic-bezier(.3,1.6,.5,1) both",
+        fontFamily: "'Noto Serif JP', Georgia, serif", animation: "pgBadgeIn .55s cubic-bezier(.3,1.6,.5,1) backwards",
       }}
     >
       <style>{`@keyframes pgBadgeIn{from{opacity:0;transform:${big ? "translate(-50%,50%) scale(.6)" : "translate(-50%,30px)"}}to{opacity:1}}`}</style>
@@ -92,8 +122,16 @@ export default function BadgeToast() {
       <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
         <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".22em", color: col }}>{mission ? "MISSION DONE · " + shown.tierLabel + " POINTS" : shown.tier === "secret" ? "SECRET BADGE FOUND" : "NEW BADGE · " + String(shown.tierLabel || "").toUpperCase()}</span>
         <span style={{ fontSize: big ? 22 : 16, fontWeight: 900, color: "#fff" }}>{shown.name}</span>
-        <span style={{ fontSize: 11, color: "#b9ae96", fontFamily: "system-ui, sans-serif" }}>Tap to open the Hall of Badges</span>
+        <span style={{ fontSize: 11, color: "#b9ae96", fontFamily: "system-ui, sans-serif" }}>Tap to open the Hall · swipe down to close</span>
       </span>
+      <button
+        type="button"
+        aria-label="Close"
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShown(null); }}
+        style={{ position: "absolute", top: 6, right: 6, width: 32, height: 32, borderRadius: "50%", border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.45)", color: "#f1ece4", font: "700 16px/1 system-ui, sans-serif", cursor: "pointer", display: "grid", placeItems: "center" }}
+      >
+        ×
+      </button>
     </a>
   );
 }
