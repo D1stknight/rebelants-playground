@@ -61,6 +61,7 @@ export default function BadgeToast() {
     const next = queue[0];
     setQueue((q) => q.slice(1));
     setShown(next);
+    try { localStorage.setItem("hall-new", String(Date.now())); } catch { /* ok */ }
     const big = next.tier === "legendary" || next.tier === "mythic";
     const t = setTimeout(() => setShown(null), big ? 7000 : 4500);
     return () => clearTimeout(t);
@@ -72,7 +73,7 @@ export default function BadgeToast() {
   const mission = shown.tier === "mission";
   return (
     <a
-      href={mission ? "/missions" : "/badges"}
+      href={mission ? "/hall?tab=missions" : "/hall?tab=badges"}
       role="status"
       aria-live="polite"
       style={{
@@ -91,7 +92,7 @@ export default function BadgeToast() {
       <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
         <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".22em", color: col }}>{mission ? "MISSION DONE · " + shown.tierLabel + " POINTS" : shown.tier === "secret" ? "SECRET BADGE FOUND" : "NEW BADGE · " + String(shown.tierLabel || "").toUpperCase()}</span>
         <span style={{ fontSize: big ? 22 : 16, fontWeight: 900, color: "#fff" }}>{shown.name}</span>
-        <span style={{ fontSize: 11, color: "#b9ae96", fontFamily: "system-ui, sans-serif" }}>{mission ? "Tap to see your missions" : "Tap to see your badges"}</span>
+        <span style={{ fontSize: 11, color: "#b9ae96", fontFamily: "system-ui, sans-serif" }}>Tap to open the Hall of Badges</span>
       </span>
     </a>
   );
