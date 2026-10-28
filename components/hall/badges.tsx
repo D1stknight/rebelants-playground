@@ -49,7 +49,7 @@ export function BadgesPanel() {
   const tiers = ORDER.map((t) => ({ t, n: mine.filter((b) => b.tier === t).length, all: (data?.catalog || []).filter((b) => b.tier === t).length }));
   const e = open ? earned.get(open.id) : null;
   const tg = open ? data?.toGo[open.id] : null;
-  const wall = ECONOMY + "/badges" + (data?.userId ? "/" + encodeURIComponent(data.userId) : "");
+  const wall = ECONOMY + "/badges" + (data?.userId ? "/" + encodeURIComponent(data.userId) : "") + "?from=playground";
 
   return (
     <div className="pb hall-panel">
