@@ -3,6 +3,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
 import { loadLiveConfig } from "../../../lib/server/gameRuns";
 import { economyCredit, idemKey } from "../../../lib/economy";
+import { sendBadges } from "../../../lib/server/badges";
 import { actingPlayer } from "../../../lib/server/player-auth";
 
 function balKey(playerId: string) {
@@ -122,6 +123,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(502).json({ ok: false, error: "Economy credit failed" });
     }
     const newBal = credit.balance;
+    await sendBadges([{ userId: economyUser.userId, counters: [{ key: "claims", op: "dayCount" }], context: { game: "daily-claim" } }]);
 
     return res.status(200).json({
       ok: true,

@@ -22,6 +22,7 @@ import { withSignedPlayer } from "../../../../lib/server/player-auth";
 // currently-active faction. This prevents move spoofing.
 
 import type { NextApiRequest, NextApiResponse } from "next";
+import { pvpMatchBadges } from "../../../../lib/server/fw-badges";
 import { getMatch, saveMatch, creditREBEL, getCrateRewards, recordPvpResult, unmarkActive, lockBets, payoutBets, refundBets, getPvpEconomyConfig, tightenChatTTL, onTournamentMatchComplete, matchAccounts, reserveCrateAllowance, releaseCrateAllowance } from "../../../../lib/server/fwpvp";
 import {TERRITORY_COUNT} from "../../../../lib/factionWarsCore";
 import {applyPvpMove, PvpRuleError} from "../../../../lib/server/fwpvp-rules";
@@ -153,6 +154,8 @@ export async function submitPvpMove(req: NextApiRequest, res: NextApiResponse) {
           rebelEarned,
         );
       } catch {}
+      // Badges (lib/server/fw-badges.ts): only for matches that pay rewards, like the boards.
+      if (!withheld) await pvpMatchBadges(match).catch(() => undefined);
       // Match concluded — drop from public Live Matches list. Best-effort.
       try { await unmarkActive(match.challengeId); } catch {}
       // Settle spectator side bets (Layer 2B). If there's a winner, payout;

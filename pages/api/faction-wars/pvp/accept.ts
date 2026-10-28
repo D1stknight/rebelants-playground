@@ -1,3 +1,5 @@
+import { gauntletBadge } from "../../../../lib/server/fw-badges";
+import { signInKind } from "../../../../lib/server/player-auth";
 import { withPlaygroundMatchExperience } from "../../../../lib/server/raap-fwpvp-experience";
 import { withSignedPlayer } from "../../../../lib/server/player-auth";
 // POST /api/faction-wars/pvp/accept
@@ -73,6 +75,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     await saveMatch(match);
     await addPlayerMatch(opponentPlayerId, challengeId);
+    if (signInKind(opponentPlayerId) && match.challengerPlayerId !== opponentPlayerId) await gauntletBadge(match.challengerPlayerId).catch(() => undefined);
 
     return res.status(200).json({ ok: true, match });
   } catch (e: any) {

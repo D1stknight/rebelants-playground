@@ -642,6 +642,16 @@ export default function LandingPage() {
               {/* Right — Actions */}
               <div style={{ display:'flex', flexWrap:'wrap', gap:8, alignItems:'center' }}>
 
+                {/* Badges: every Rebel Ants app's badges on the player's Badge Wall */}
+                {effectiveId && effectiveId !== 'guest' && (
+                  <a
+                    href={'/api/badges/wall?playerId=' + encodeURIComponent(effectiveId)}
+                    style={{ fontFamily:'inherit', padding:'9px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background:'transparent', border:'2px solid rgba(251,191,36,0.6)', borderRadius:50, color:'#fbbf24', textDecoration:'none', boxShadow:'0 0 14px rgba(249,115,22,0.25)' }}
+                  >
+                    🏅 BADGES
+                  </a>
+                )}
+
                 {/* Claim Daily + countdown — countdown is absolute so it doesn't affect button alignment */}
                 <div style={{ position:'relative' }}>
                   <button
