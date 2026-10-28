@@ -57,29 +57,29 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     ]);
     if (!match) return res.status(404).json({ ok: false, error: "Match not found" });
     if (!cfg.factionWarsBetEnabled) {
-      return res.status(403).json({ ok: false, error: "Side bets are currently disabled" });
+      return res.status(403).json({ ok: false, error: "Side picks are turned off right now" });
     }
-    if (locked) return res.status(409).json({ ok: false, error: "Bets are locked for this match" });
+    if (locked) return res.status(409).json({ ok: false, error: "Side picks are closed for this match" });
 
     // Status gate — only bettable while teams are picking or match is active
     // and current territory is below the lock threshold.
     if (match.status !== "team_selection" && match.status !== "active") {
-      return res.status(409).json({ ok: false, error: `Match is ${match.status} — bets closed` });
+      return res.status(409).json({ ok: false, error: `Match is ${match.status} — side picks closed` });
     }
     // factionWarsBetLockTerritory is 1-indexed (1..5). currentTerritory is 0-indexed.
     // Bets close when match has ENTERED the lock territory: currentTerritory >= lockTerritory - 1.
     const lockIdx = Math.max(1, Math.min(TERRITORY_COUNT, cfg.factionWarsBetLockTerritory)) - 1;
     if (match.currentTerritory >= lockIdx) {
-      return res.status(409).json({ ok: false, error: "Bets locked — match has progressed too far" });
+      return res.status(409).json({ ok: false, error: "Side picks closed — the match is too far along" });
     }
 
     // Participant check
     if (match.challengerPlayerId === playerId || match.opponentPlayerId === playerId) {
-      return res.status(403).json({ ok: false, error: "Players can't bet on their own match" });
+      return res.status(403).json({ ok: false, error: "Players can't pick a side in their own match" });
     }
     const { withheld, accounts } = await matchAccounts(match);
     if (withheld === "unverified") {
-      return res.status(503).json({ ok: false, error: "Bets can't be checked right now. Try again in a minute." });
+      return res.status(503).json({ ok: false, error: "Side picks can't be checked right now. Try again in a minute." });
     }
     if (withheld) {
       return res.status(403).json({
@@ -91,18 +91,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // another id of a player's own account (a Discord id and a wallet linked to it)
     const bettor = await resolveByPlayerId(playerId).catch(() => null);
     if (!bettor?.userId) {
-      return res.status(503).json({ ok: false, error: "Bets can't be checked right now. Try again in a minute." });
+      return res.status(503).json({ ok: false, error: "Side picks can't be checked right now. Try again in a minute." });
     }
     if (accounts.includes(bettor.userId)) {
-      return res.status(403).json({ ok: false, error: "Players can't bet on their own match" });
+      return res.status(403).json({ ok: false, error: "Players can't pick a side in their own match" });
     }
 
     // Bet amount limits
     if (amount < cfg.factionWarsBetMin) {
-      return res.status(400).json({ ok: false, error: `Minimum bet is ${cfg.factionWarsBetMin} REBEL` });
+      return res.status(400).json({ ok: false, error: `The smallest pick is ${cfg.factionWarsBetMin} points` });
     }
     if (amount > cfg.factionWarsBetMax) {
-      return res.status(400).json({ ok: false, error: `Maximum single bet is ${cfg.factionWarsBetMax} REBEL` });
+      return res.status(400).json({ ok: false, error: `The biggest single pick is ${cfg.factionWarsBetMax} points` });
     }
 
     // Pool cap check (per side)
@@ -129,7 +129,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       bets: fresh,
     });
   } catch (e: any) {
-    return res.status(500).json({ ok: false, error: e?.message || "bet failed" });
+    return res.status(500).json({ ok: false, error: e?.message || "Side pick failed" });
   }
 }
 

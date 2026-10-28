@@ -1446,7 +1446,7 @@ String(c.status).toUpperCase()==="PENDING"
 
           {/* Variable wager tiers (Layer 2A) — full-width row */}
           <label style={{ fontSize: 12, opacity: 0.9, gridColumn: "1 / -1", marginTop: 6 }}>
-            Wager Tiers <span style={{ opacity: 0.6 }}>(comma-separated REBEL amounts the challenger can pick)</span>
+            Entry Tiers <span style={{ opacity: 0.6 }}>(comma-separated REBEL amounts the challenger can pick)</span>
             <input
               type="text"
               value={(cfg.factionWarsPvpWagerTiers || []).join(", ")}
@@ -1495,15 +1495,15 @@ String(c.status).toUpperCase()==="PENDING"
               onChange={(e) => setCfg((c) => ({ ...c, factionWarsBetEnabled: e.target.checked }))}
               style={{ width: 16, height: 16, cursor: "pointer" }}
             />
-            <span>Spectator Side Bets Enabled <span style={{ opacity: 0.6 }}>— uncheck to hide the betting panel on spectate pages</span></span>
+            <span>Spectator Side Picks Enabled <span style={{ opacity: 0.6 }}>— uncheck to hide the side picks panel on spectate pages</span></span>
           </label>
 
           <label style={{ fontSize: 12, opacity: 0.9 }}>
-            Bet Min (REBEL)
+            Side Pick Min (REBEL)
             <input type="number" min="0" value={cfg.factionWarsBetMin} onChange={(e) => setCfg((c) => ({ ...c, factionWarsBetMin: safeNum(e.target.value, c.factionWarsBetMin) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} />
           </label>
           <label style={{ fontSize: 12, opacity: 0.9 }}>
-            Bet Max (single bet)
+            Side Pick Max (single pick)
             <input type="number" min="0" value={cfg.factionWarsBetMax} onChange={(e) => setCfg((c) => ({ ...c, factionWarsBetMax: safeNum(e.target.value, c.factionWarsBetMax) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} />
           </label>
           <label style={{ fontSize: 12, opacity: 0.9 }}>
@@ -1513,7 +1513,7 @@ String(c.status).toUpperCase()==="PENDING"
           <label style={{ fontSize: 12, opacity: 0.9 }}>
             Lock Territory <span style={{ opacity: 0.5 }}>(1–5)</span>
             <input type="number" min="1" max="5" value={cfg.factionWarsBetLockTerritory} onChange={(e) => setCfg((c) => ({ ...c, factionWarsBetLockTerritory: Math.min(5, Math.max(1, safeNum(e.target.value, c.factionWarsBetLockTerritory))) }))} style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(0,0,0,.25)", color: "white" }} />
-            <span style={{ fontSize: 10, opacity: 0.4 }}>Bets close when match enters this territory. Default: 3.</span>
+            <span style={{ fontSize: 10, opacity: 0.4 }}>Side picks close when the match enters this territory. Default: 3.</span>
           </label>
 
           {/* Per-match chat (Layer 2D) — full-width row */}
