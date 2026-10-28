@@ -1,11 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
+import { TUNNEL_LAYOUT_COUNT, isRealTunnelSlot, tunnelSlot } from "../../../lib/server/tunnelLayouts";
 
 const PLAYER_NAMES = "ra:player_names_v1";
 const TUNNEL_LB_SCORE = "tunnel:top:score";
 const TUNNEL_LB_FASTEST_CLEAR = "tunnel:top:clear";
 
-function tunnelStatsKey(playerId: string) { return `ra:tunnel:stats:${playerId}`; }
+// the same key /api/tunnel/record writes
+function tunnelStatsKey(playerId: string) { return `tunnel:player:${playerId}:stats`; }
 function cleanPlayerId(v: any) { return String(v || "guest").trim().slice(0, 64) || "guest"; }
 
 function parseZRows(z: any[]) {
@@ -38,7 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const playerId = cleanPlayerId(req.query.playerId);
     const statsRaw = await redis.hgetall<Record<string, string>>(tunnelStatsKey(playerId));
 
-    // Layout names — 30 named + 1 bonus unnamed (#31)
+    // Layout names, in client order
     const LNAMES: string[] = [
       "Split Path","Narrow Spine","Broken Cross","Double Fork","Ring Cut","Maze Teeth",
       "Cracked Chamber","Death Lanes","Twin Corridors","Spiral Trap","Pincer","Catacomb",
@@ -48,7 +50,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     ];
 
     // For each layout fetch top 3 scores AND top 3 fastest clears
-    const TOTAL_LAYOUTS = 31;
     const layoutChampions: {
       layoutIndex: number;
       layoutName: string;
@@ -56,11 +57,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       fastestClears: { rank: number; playerId: string; playerName: string; clearTimeMs: number }[];
     }[] = [];
 
-    for (let idx = 0; idx < TOTAL_LAYOUTS; idx++) {
+    for (let idx = 0; idx < TUNNEL_LAYOUT_COUNT; idx++) {
+      const slot = tunnelSlot(idx);
       const layoutName = LNAMES[idx] || "";
       const [scoresRaw, clearsRaw] = await Promise.all([
-        redis.zrange(`tunnel:layout:${idx}:scores`, 0, 2, { rev: true, withScores: true }),
-        redis.zrange(`tunnel:layout:${idx}:clears`, 0, 2, { rev: true, withScores: true }),
+        redis.zrange(`tunnel:layout:${slot}:scores`, 0, 2, { rev: true, withScores: true }),
+        redis.zrange(`tunnel:layout:${slot}:clears`, 0, 2, { rev: true, withScores: true }),
       ]);
 
       const scores = parseZRows(scoresRaw).map((row, i) => {
@@ -81,7 +83,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (playerId) {
       try {
         const explored = await redis.smembers(`tunnel:player:${playerId}:explored`);
-        layoutsExplored = Array.isArray(explored) ? explored.length : 0;
+        layoutsExplored = Array.isArray(explored) ? explored.filter((x) => isRealTunnelSlot(x)).length : 0;
       } catch {}
     }
 
