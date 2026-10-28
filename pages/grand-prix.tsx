@@ -28,7 +28,7 @@ const GPPage: NextPage = () => (
   <>
     <Head>
       <title>Rebel Grand Prix — Rebel Ants Playground</title>
-      <meta name="description" content="SNES-style kart racing with the Rebel Ants factions. Five cups, fifteen tracks, drift, items, REBEL payouts." />
+      <meta name="description" content="SNES-style kart racing with the Rebel Ants factions. Five cups, fifteen tracks, drift, items, REBEL points prizes." />
       <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
     </Head>
     <GPBoundary><RebelGP /></GPBoundary>

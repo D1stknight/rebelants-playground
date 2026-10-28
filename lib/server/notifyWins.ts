@@ -63,7 +63,7 @@ async function notifyDiscord(evt: WinEvent) {
   }).catch(() => {});
 }
 
-// ✅ Public jackpot post (separate webhook)
+// ✅ Public big-win post (separate webhook)
 async function notifyDiscordPublic(evt: WinEvent) {
   const url = process.env.DISCORD_PUBLIC_WIN_WEBHOOK_URL;
   if (!url) return;
@@ -84,13 +84,13 @@ async function notifyDiscordPublic(evt: WinEvent) {
     "🎁";
 
   // Use a stable public link
-  const link = "https://rebelants.io/shuffle";
+  const link = "https://play.rebelants.io/shuffle";
 
   const text =
-    `🔥 REBEL ANTS JACKPOT 🔥\n\n` +
+    `🔥 BIG WIN IN THE PLAYGROUND 🔥\n\n` +
     `**${name}** just opened a **${rarityUpper}** crate and won:\n\n` +
     `${emoji} **${prizeLabel}**\n\n` +
-    `Try your luck:\n${link}`;
+    `Play now:\n${link}`;
 
   await fetch(url, {
     method: "POST",

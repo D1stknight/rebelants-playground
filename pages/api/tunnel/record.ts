@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
 import { actingPlayer } from "../../../lib/server/player-auth";
 import { firstRecord, readRun } from "../../../lib/server/gameRuns";
+import { TUNNEL_LAYOUT_COUNT, tunnelSlot } from "../../../lib/server/tunnelLayouts";
 
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") return res.status(405).json({ ok: false });
@@ -22,7 +23,9 @@ export default async function handler(req: any, res: any) {
   score = Math.min(score, run.max);
   if (clearTimeMs > 0) clearTimeMs = Math.max(clearTimeMs, Date.now() - run.startedAt - 4000);
   const crystalsCollected = Math.max(0, Number(body.crystalsCollected || 0));
-  const layoutIndex = typeof body.layoutIndex === "number" ? body.layoutIndex : null;
+  const rawLayout = typeof body.layoutIndex === "number" ? Math.floor(body.layoutIndex) : null;
+  // stored in the server's slot numbering (see tunnelLayouts.ts)
+  const layoutIndex = rawLayout !== null && rawLayout >= 0 && rawLayout < TUNNEL_LAYOUT_COUNT ? tunnelSlot(rawLayout) : null;
   const layoutName = typeof body.layoutName === "string" ? String(body.layoutName) : "";
   const member = playerId + "|" + playerName + "|" + layoutName;
   try {

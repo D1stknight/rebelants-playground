@@ -1,6 +1,10 @@
 // pages/api/admin/grant.ts
+//
+// Admin grant: adds points to a player's Rebel Economy account (the real ledger), not the old
+// Playground Redis balance (ra:points:bal), which nothing reads any more.
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../lib/server/redis";
+import { economyCredit, resolveByPlayerId } from "../../../lib/economy";
 
 function headerValue(v: string | string[] | undefined) {
   return Array.isArray(v) ? v[0] : v;
@@ -15,14 +19,6 @@ function isAdmin(req: NextApiRequest) {
   const expected = process.env.ADMIN_KEY || process.env.ADMIN_TOKEN || "";
   if (!expected) return false;
   return !!provided && provided === expected;
-}
-
-function balKey(playerId: string) {
-  return `ra:points:bal:${playerId}`;
-}
-
-function lbBalanceKey() {
-  return `ra:lb:balance`;
 }
 
 function walletToPlayerKey(wallet: string) {
@@ -43,46 +39,51 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
-    const { playerId, walletAddress, amount } = (body ?? {}) as {
+    const { playerId, walletAddress, amount, requestId } = (body ?? {}) as {
       playerId?: string;
       walletAddress?: string;
       amount?: number;
+      requestId?: string;
     };
 
-    const amt = Number(amount || 0);
+    const amt = Math.floor(Number(amount || 0));
     if (!Number.isFinite(amt) || amt <= 0) {
       return res.status(400).json({ ok: false, error: "Invalid amount" });
     }
 
-    // ✅ Choose target: walletAddress > playerId
+    // Target: walletAddress > playerId
     let pid = (playerId || "").trim().slice(0, 64);
-
     const w = cleanWallet(walletAddress);
     if (w) {
       const mapped = await redis.get<string>(walletToPlayerKey(w));
-      if (!mapped) {
-        return res.status(400).json({
-          ok: false,
-          error: "Wallet is not linked to a player yet (no purchases claimed).",
-        });
-      }
-      pid = String(mapped).trim().slice(0, 64);
+      pid = mapped ? String(mapped).trim().slice(0, 64) : "wallet:" + w;
+    }
+    if (!pid || pid.startsWith("guest")) {
+      return res.status(400).json({ ok: false, error: "Pick a signed-in player (Discord, wallet or commander name)." });
     }
 
-    pid = pid || "guest";
+    const user = await resolveByPlayerId(pid);
+    if (!user) return res.status(400).json({ ok: false, error: "That player has no Rebel Economy account yet." });
 
-    const newBalance = await redis.incrby(balKey(pid), amt);
-
-    // balance leaderboard (visibility only; NOT top earners)
-    await redis.zadd(lbBalanceKey(), { score: Number(newBalance || 0), member: pid });
+    const rid = String(requestId || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 40) || Date.now().toString(36);
+    const r = await economyCredit({
+      userId: user.userId,
+      amount: amt,
+      type: "earn",
+      reason: "Playground admin grant",
+      metadata: { playerId: pid, by: "playground-admin" },
+      idempotencyKey: "pg:admingrant:" + user.userId + ":" + rid,
+    });
+    if (!r.ok) return res.status(502).json({ ok: false, error: "The economy did not take the grant: " + (r.error || "unknown") });
 
     return res.status(200).json({
       ok: true,
       playerId: pid,
+      userId: user.userId,
       walletAddress: w || undefined,
       added: amt,
-      balance: Number(newBalance || 0),
-      note: "Grant affects balance. Top Earners uses total earned from gameplay, not grants.",
+      balance: r.balance,
+      note: "Added to the player's Rebel Economy account (ledger).",
     });
   } catch (err: any) {
     console.error("admin grant error:", err);

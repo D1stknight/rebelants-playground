@@ -12,8 +12,9 @@ import {
   chatRoleForPlayer,
 } from "../../../../../lib/server/fwpvp";
 import type { PostChatRequest } from "../../../../../lib/types/fwpvp";
+import { withSignedPlayer } from "../../../../../lib/server/player-auth";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") {
     return res.status(405).json({ ok: false, error: "Method not allowed" });
@@ -47,3 +48,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ ok: false, error: e?.message || "post failed" });
   }
 }
+
+// The poster must be the player they claim to be (a signed session); guests may chat as guests.
+export default withSignedPlayer("playerId", handler);

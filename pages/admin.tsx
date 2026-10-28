@@ -719,6 +719,8 @@ async function saveConfig() {
   const payload: any = {
     amount: Number(amount || 0),
     playerId: pid,
+    // one tap = one grant, even if the request is retried
+    requestId: Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
   };
 
   console.log("🟦 GRANT payload =", payload);
