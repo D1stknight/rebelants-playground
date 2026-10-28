@@ -107,3 +107,25 @@ export async function tournamentSeededBadges(participants: { playerId: string }[
   }
   await sendBadges(events);
 }
+
+/**
+ * The Rebel Campaign (Faction Wars solo with a connected Rebel, run on the server by the RAAP solo
+ * engine). Call once when a campaign reaches its final result, with the economy userId of the player
+ * and the campaign state; `withRebel` = the Rebel made at least one move (raapActionCount > 0).
+ * Not wired yet: the call belongs in the RAAP solo settle step, which only the RAAP side changes.
+ */
+export async function soloCampaignBadges(userId: string, s: { team: string[]; results: { won: boolean; rounds: { playerMove?: { id?: string } }[] }[]; rarity: string; healUsed: number; strategicRetreatUsed?: boolean }, withRebel: boolean): Promise<void> {
+  const award: string[] = [];
+  const counters: BadgeOp[] = [{ key: "fwc.campaigns", op: "add" }];
+  const wins = s.results.filter((t) => t.won).length;
+  if (s.rarity === "ultra") {
+    counters.push({ key: "fwc.legends", op: "add" });
+    for (const f of s.team) counters.push({ key: "fwc.ultrafactions", op: "distinct", item: f });
+    if (s.team.includes("shogun")) award.push("fwc.divine");
+    if (!s.healUsed) award.push("fwc.untended");
+  }
+  if (wins === 0 && s.rarity === "common" && s.strategicRetreatUsed) award.push("fwc.retreat");
+  if (s.results.some((t) => t.won && t.rounds.length && t.rounds[t.rounds.length - 1]?.playerMove?.id === "berserker_rage")) award.push("fwc.berserker");
+  if (withRebel && wins >= 3) award.push("fwc.together");
+  await sendBadges([{ userId, award, counters, context: { game: "faction-wars", mode: "rebel-campaign" } }]);
+}
