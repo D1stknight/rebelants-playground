@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+import HallButton from "../components/hall/HallButton";
 import { OLD_NAME_PIN_NOTE } from '../lib/commanderPins';
 import { loadProfile, saveProfile, signOutProfile } from '../lib/profile';
 import { getEffectivePlayerId } from '../lib/profile';
@@ -642,23 +643,8 @@ export default function LandingPage() {
               {/* Right — Actions */}
               <div style={{ display:'flex', flexWrap:'wrap', gap:8, alignItems:'center' }}>
 
-                {/* Missions (both apps) and the badge case (Playground first; the Badge Wall has every app) */}
-                {effectiveId && effectiveId !== 'guest' && (
-                  <>
-                    <a
-                      href="/missions"
-                      style={{ fontFamily:'inherit', padding:'9px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background:'transparent', border:'2px solid rgba(251,191,36,0.6)', borderRadius:50, color:'#fbbf24', textDecoration:'none', boxShadow:'0 0 14px rgba(249,115,22,0.25)' }}
-                    >
-                      🎯 MISSIONS
-                    </a>
-                    <a
-                      href="/badges"
-                      style={{ fontFamily:'inherit', padding:'9px 16px', fontSize:11, fontWeight:900, letterSpacing:'0.15em', textTransform:'uppercase', background:'transparent', border:'2px solid rgba(251,191,36,0.6)', borderRadius:50, color:'#fbbf24', textDecoration:'none', boxShadow:'0 0 14px rgba(249,115,22,0.25)' }}
-                    >
-                      🏅 BADGES
-                    </a>
-                  </>
-                )}
+                {/* Hall of Badges: missions + badges (both apps) in one place */}
+                {effectiveId && effectiveId !== 'guest' && <HallButton />}
 
                 {/* Claim Daily + countdown — countdown is absolute so it doesn't affect button alignment */}
                 <div style={{ position:'relative' }}>
