@@ -1,5 +1,5 @@
 // Console sign-in for the Playground admin (Oct 28, 2026).
-// The Rebel Console sends a one-time admin ticket to /api/admin/sso; after the economy confirms it,
+// The Rebel Console trades a one-time admin ticket at /api/admin/pass (server to server); after the economy confirms it,
 // the Playground gives the browser an "admin pass": pga1.<expires>.<adminId>.<signature>, good for
 // 8 hours, signed with ADMIN_KEY (which never leaves the server this way). middleware.ts swaps a
 // valid pass for the real key on /api/* requests, so every existing admin route keeps working
