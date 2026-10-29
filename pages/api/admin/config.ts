@@ -59,6 +59,19 @@ const DEFAULTS = {
   raidUltraCarriers: 4,
   raidUltraRatio: 0.65,
 
+  // read by the games but not saved before Oct 29 (lib/raidRules.ts, shuffle/start.ts, points/spend.ts)
+  shuffleEggCount: 5,
+  raidRareCarriers: 1,
+  raidRareRatio: 0.40,
+  raidCommonSurvivors: 5,
+  factionWarsHealCost: 25,
+  factionWarsHealAmt: 30,
+  factionWarsHealMax: 2,
+  factionWarsPlunderBonus: 50,
+
+  // games switched off from the Rebel Console: { [game]: true } (points/spend.ts, raid/launch.ts)
+  gamesOff: {} as Record<string, boolean>,
+
   // PvP crates: REBEL a Rebel Economy account can win from crates per UTC day (0 = no cap)
   factionWarsPvpCrateDailyCap: 1000,
 
@@ -147,7 +160,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // ✅ accept BOTH shapes:
   // 1) { pointsConfig: {...} }  (admin.tsx sends this)
   // 2) { shuffleCost, dailyClaim, ... } (flat)
-  const src = body?.pointsConfig ?? body ?? {};
+  const incoming = body?.patch ?? body?.pointsConfig ?? body ?? {};
+  // Start from what is saved (over the defaults), so a partial save keeps every other setting.
+  const rawPrev = await redis.get(KEY);
+  const prev: any = rawPrev ? (typeof rawPrev === "string" ? JSON.parse(rawPrev) : rawPrev) : {};
+  const nest = (k: string) => ({ ...((DEFAULTS as any)[k] || {}), ...(prev?.[k] || {}), ...(incoming?.[k] || {}) });
+  const src: any = {
+    ...DEFAULTS,
+    ...prev,
+    ...incoming,
+    rewards: nest("rewards"),
+    rarityWeights: nest("rarityWeights"),
+    gameDailyCaps: nest("gameDailyCaps"),
+    gamesOff: nest("gamesOff"),
+  };
 
 const rawRareMerch = Number(src?.rareMerchChance ?? DEFAULTS.rareMerchChance);
 const rareMerchDecimal = Number.isFinite(rawRareMerch)
@@ -189,6 +215,13 @@ const rareMerchDecimal = Number.isFinite(rawRareMerch)
   raidCarrierSurvival: Number(src?.raidCarrierSurvival ?? DEFAULTS.raidCarrierSurvival),
   raidUltraCarriers:   Number(src?.raidUltraCarriers   ?? DEFAULTS.raidUltraCarriers),
   raidUltraRatio:      Number(src?.raidUltraRatio      ?? DEFAULTS.raidUltraRatio),
+  raidRareCarriers:    Math.max(0, Math.floor(safeNum(src?.raidRareCarriers, DEFAULTS.raidRareCarriers))),
+  raidRareRatio:       clamp(safeNum(src?.raidRareRatio, DEFAULTS.raidRareRatio), 0, 1),
+  raidCommonSurvivors: Math.max(0, Math.floor(safeNum(src?.raidCommonSurvivors, DEFAULTS.raidCommonSurvivors))),
+  shuffleEggCount:     clamp(Math.floor(safeNum(src?.shuffleEggCount, DEFAULTS.shuffleEggCount)), 3, 7),
+  gamesOff: Object.fromEntries(
+    ["shuffle", "tunnel", "gp", "descent", "bounty", "faction-wars", "raid"].filter((g) => src?.gamesOff?.[g] === true).map((g) => [g, true])
+  ),
 
   // ── Game payouts (lib/server/gameRuns.ts): the most a run pays, the daily caps per account ──
   payoutGuard: src?.payoutGuard === "watch" ? "watch" : "enforce",
@@ -204,6 +237,10 @@ const rareMerchDecimal = Number.isFinite(rawRareMerch)
   // ── Faction Wars (AI mode) ──────────────────────────────────────────────
   factionWarsCost:          Number(src?.factionWarsCost          ?? 150),
   factionWarsAIDifficulty:  Number(src?.factionWarsAIDifficulty  ?? 0.65),
+  factionWarsHealCost:      Math.max(0, Math.floor(safeNum(src?.factionWarsHealCost, DEFAULTS.factionWarsHealCost))),
+  factionWarsHealAmt:       Math.max(0, Math.floor(safeNum(src?.factionWarsHealAmt, DEFAULTS.factionWarsHealAmt))),
+  factionWarsHealMax:       Math.max(0, Math.floor(safeNum(src?.factionWarsHealMax, DEFAULTS.factionWarsHealMax))),
+  factionWarsPlunderBonus:  Math.max(0, Math.floor(safeNum(src?.factionWarsPlunderBonus, DEFAULTS.factionWarsPlunderBonus))),
 
   // ── Faction Wars PvP (Commit C + Layer 2A/2B/2C) ────────────────────────
   factionWarsPvpEnabled: src?.factionWarsPvpEnabled !== false,
