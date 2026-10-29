@@ -1,6 +1,7 @@
 // pages/api/admin/inventory/nft/debug.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { redis } from "../../../../../lib/server/redis";
+import { nftHoldKey } from "../../../../../lib/server/prizeTable";
 
 function headerValue(v: string | string[] | undefined) {
   return Array.isArray(v) ? v[0] : v;
@@ -53,6 +54,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         parsed,
       };
     });
+
+    // won but not claimed yet: held for the winner for 7 days (lib/server/prizeTable.ts)
+    const invKeys = out.map((o: any) => {
+      const p = o.parsed || {};
+      const m = p.meta || p;
+      return String(m.inventoryKey || "").trim() || `ultra:${String(m.chain || "ETH").toUpperCase()}:${String(m.contract || "").trim()}:${String(m.tokenId ?? "").trim()}`;
+    });
+    const holds = invKeys.length ? await redis.mget<unknown[]>(...invKeys.map(nftHoldKey)) : [];
+    out.forEach((o: any, i: number) => { o.heldSince = holds[i] ? Number(holds[i]) || null : null; });
 
     return res.status(200).json({
       ok: true,

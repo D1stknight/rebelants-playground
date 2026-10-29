@@ -1,4 +1,5 @@
 import { capturePlaygroundWriterRead, saveCoordinatedPlaygroundMatch, capturePlaygroundTournamentRead, saveCoordinatedPlaygroundTournament } from "./raap-pvp-coordination";
+import { etDay } from "./day";
 import { capturePlaygroundMatchRead, recordPlaygroundMatchExperience } from "./raap-fwpvp-experience";
 import { assertPlaygroundPointsConfirmed, scopedPlaygroundPointEffect } from "./raap-pvp-point-effects";
 // PvP Faction Wars — Redis persistence helpers
@@ -614,7 +615,7 @@ function crateDayKey(userId: string, day: string): string {
 // from the total after its own increment and hands back what didn't fit.
 export async function reserveCrateAllowance(userId: string, amount: number, cap: number):
   Promise<{ allowed: number; day: string }> {
-  const day = new Date().toISOString().slice(0, 10);
+  const day = etDay(); // Eastern time (lib/server/day.ts)
   if (!(amount > 0)) return { allowed: 0, day };
   if (!(cap > 0)) return { allowed: amount, day };
   const key = crateDayKey(userId, day);

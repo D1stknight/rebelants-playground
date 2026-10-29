@@ -1,5 +1,6 @@
 // pages/api/points/claim.ts
 import type { NextApiRequest, NextApiResponse } from "next";
+import { etDay, nextEtMidnight } from "../../../lib/server/day";
 import { redis } from "../../../lib/server/redis";
 import { loadLiveConfig } from "../../../lib/server/gameRuns";
 import { economyCredit, idemKey } from "../../../lib/economy";
@@ -11,11 +12,7 @@ function balKey(playerId: string) {
 }
 
 function claimKey(playerId: string) {
-  const d = new Date();
-  const yyyy = d.getUTCFullYear();
-  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(d.getUTCDate()).padStart(2, "0");
-  return `ra:points:claimed:${playerId}:${yyyy}-${mm}-${dd}`;
+  return `ra:points:claimed:${playerId}:${etDay()}`;
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -36,17 +33,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const exists = await redis.get<number>(key);
 
       const now = new Date();
-      const nextUtcMidnight = new Date(
-        Date.UTC(
-          now.getUTCFullYear(),
-          now.getUTCMonth(),
-          now.getUTCDate() + 1,
-          0,
-          0,
-          0,
-          0
-        )
-      );
+      const nextUtcMidnight = nextEtMidnight(now.getTime()); // the day resets at midnight ET (lib/server/day.ts)
 
       const nextClaimAt = nextUtcMidnight.toISOString();
       const msUntilNextClaim = Math.max(0, nextUtcMidnight.getTime() - now.getTime());

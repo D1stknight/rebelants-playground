@@ -69,6 +69,9 @@ const DEFAULTS = {
   factionWarsHealMax: 2,
   factionWarsPlunderBonus: 50,
 
+  // PvP chat language filter (lib/server/chat-filter.ts)
+  factionWarsChatFilter: true,
+
   // games switched off from the Rebel Console: { [game]: true } (points/spend.ts, raid/launch.ts)
   gamesOff: {} as Record<string, boolean>,
 
@@ -89,6 +92,8 @@ const DEFAULTS = {
 
   // ✅ Rare merch chance (decimal) — 0.01 = 1%
   rareMerchChance: 0.01,
+  // how often an ultra crate gives merch from prizePools.ultra when some is in stock (lib/server/prizeTable.ts)
+  ultraMerchChance: 0,
 
   // ✅ Prize pools per rarity (future use)
   prizePools: {
@@ -264,6 +269,7 @@ const rareMerchDecimal = Number.isFinite(rawRareMerch)
   // Per-match chat (Layer 2D)
   factionWarsChatEnabled: src?.factionWarsChatEnabled !== false,
   factionWarsChatPostCleanupMins: Math.max(0, Number(src?.factionWarsChatPostCleanupMins ?? 30)),
+  factionWarsChatFilter: src?.factionWarsChatFilter !== false,
   // Death Spell (Spell A-D)
   factionWarsSpellEnabled: src?.factionWarsSpellEnabled !== false,
   factionWarsSpellCost: Math.max(0, Number(src?.factionWarsSpellCost ?? 1000)),
@@ -300,6 +306,8 @@ const rareMerchDecimal = Number.isFinite(rawRareMerch)
     0,
     1
   ),
+
+  ultraMerchChance: clamp(safeNum(src?.ultraMerchChance, DEFAULTS.ultraMerchChance), 0, 1),
 
   // ✅ ultraMinReward (must be >= 1)
   ultraMinReward: Math.max(
