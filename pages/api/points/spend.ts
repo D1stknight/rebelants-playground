@@ -65,6 +65,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       }
     }
+    // switched off from the Rebel Console (Apps → Playground → Games)
+    if (game && liveCfg?.gamesOff?.[game] === true) {
+      return res.status(423).json({ ok: false, code: "game_off", error: `${RUN_RULES[game].label} is taking a short break. Try another game.` });
+    }
     if (reason === "faction-wars-heal" && amt !== healCost) {
       return res.status(400).json({ ok: false, error: `Invalid heal cost. Expected ${healCost}, got ${amt}`, expected: healCost, got: amt });
     }

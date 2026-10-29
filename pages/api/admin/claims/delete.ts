@@ -6,7 +6,7 @@ function isAuthed(req: NextApiRequest) {
   const token =
     String(req.headers["x-admin-key"] || req.headers["x-admin-token"] || "").trim();
 
-  const expected = String(process.env.ADMIN_TOKEN || "").trim();
+  const expected = String(process.env.ADMIN_KEY || process.env.ADMIN_TOKEN || "").trim();
 
   // If you already use a different env var name, change ADMIN_TOKEN here to match.
   return !!token && !!expected && token === expected;

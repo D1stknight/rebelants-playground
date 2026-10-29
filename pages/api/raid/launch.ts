@@ -59,6 +59,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!isSquad(body.squad)) return res.status(400).json({ ok: false, error: "A raid needs a full squad of 20 ants." });
     const squad = body.squad;
     const cfg = await loadLiveConfig();
+    // switched off from the Rebel Console (Apps → Playground → Games)
+    if (cfg?.gamesOff?.raid === true) return res.status(423).json({ ok: false, code: "game_off", error: "The Raid is taking a short break. Try another game." });
     const cost = Math.max(0, Math.floor(Number(cfg.raidCost ?? 600))) + calcSquadCost(squad);
     if (Number(who.user.balance) < cost) return res.status(400).json({ ok: false, error: "Not enough REBEL for this raid.", balance: who.user.balance, cost });
 
