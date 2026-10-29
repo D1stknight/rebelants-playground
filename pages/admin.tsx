@@ -549,6 +549,13 @@ const [log, setLog] = useState<string>("");
   useEffect(() => {
     const t = sessionStorage.getItem("ra_admin_token") || "";
     if (t) setToken(t);
+    // opened from the Rebel Console (pages/api/admin/sso.ts): check the pass straight away
+    if (t && sessionStorage.getItem("ra_admin_sso") === "1") {
+      sessionStorage.removeItem("ra_admin_sso");
+      fetch("/api/admin/ping", { headers: { "x-admin-key": t, "x-admin-token": t } })
+        .then((r) => setAuthed(r.ok))
+        .catch(() => {});
+    }
   }, []);
 
   useEffect(() => {
