@@ -19,6 +19,7 @@
 //                       | "enforce"
 // Every refused, cut or over-cap payout goes to the payout log (admin page).
 import { randomBytes } from "crypto";
+import { etDay } from "./day";
 import { redis } from "./redis";
 import { pointsConfig as DEFAULTS } from "../pointsConfig";
 import { GP_PAYOUT } from "../rgpConfig";
@@ -106,7 +107,7 @@ const runKey = (id: string) => `ra:run:${id}`;
 const paidKey = (id: string) => `ra:run:${id}:paid`;
 const countKey = (id: string) => `ra:run:${id}:n`;
 const LOG_KEY = "ra:payouts:log";
-const dayOf = (t = Date.now()) => new Date(t).toISOString().slice(0, 10);
+const dayOf = (t = Date.now()) => etDay(t); // Eastern time (lib/server/day.ts)
 const dayKey = (game: string, day: string) => `ra:payouts:day:${day}:${game}`;
 
 export const guardMode = (cfg: any): "enforce" | "watch" => (cfg?.payoutGuard === "watch" ? "watch" : "enforce");

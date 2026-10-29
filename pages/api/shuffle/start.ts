@@ -1,6 +1,7 @@
 // pages/api/shuffle/start.ts — begins a Queen's Egg Shuffle round (server-owned so the "did you track the marked egg?" bonus can't be spoofed)
 // Returns the marked egg, the swap sequence the client must animate, favor meter, and whether this round is the daily Royal Egg.
 import type { NextApiRequest, NextApiResponse } from "next";
+import { etDay } from "../../../lib/server/day";
 import { redis } from "../../../lib/server/redis";
 import { pointsConfig as DEFAULTS } from "../../../lib/pointsConfig";
 
@@ -8,7 +9,7 @@ const ECON_KEY = "ra:config:economy";
 export const ROUND_KEY = (id: string) => `ra:shuffle:round:${id}`;
 export const FAVOR_KEY = (pid: string) => `ra:shuffle:favor:${pid}`;
 export const ROYAL_KEY = (pid: string, day: string) => `ra:shuffle:royal:${pid}:${day}`;
-export const dayKey = () => new Date().toISOString().slice(0, 10);
+export const dayKey = () => etDay(); // Eastern time (lib/server/day.ts)
 
 export async function loadCfg() {
   const raw = await redis.get(ECON_KEY); const saved = raw ? (typeof raw === "string" ? JSON.parse(raw) : raw) : null;

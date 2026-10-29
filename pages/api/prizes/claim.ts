@@ -1,5 +1,6 @@
 // pages/api/prizes/claim.ts
 import type { NextApiRequest, NextApiResponse } from "next";
+import { nftHoldKey } from "../../../lib/server/prizeTable";
 import { redis } from "../../../lib/server/redis";
 import { actingPlayer, isAdminRequest, isInternalRequest } from "../../../lib/server/player-auth";
 import { markClaimed, readWonPrize, unmarkClaimed, wonBy } from "../../../lib/server/prizesWon";
@@ -122,6 +123,7 @@ if (String(prize?.type || "").toLowerCase() === "nft") {
     typeof rawMatch === "string" ? rawMatch : JSON.stringify(rawMatch);
 
   await redis.lrem(ULTRA_NFT_INVENTORY_KEY, 1, removeValue);
+  await redis.del(nftHoldKey(invKey)).catch(() => {}); // it's theirs now (lib/server/prizeTable.ts)
 
   // Ensure prize.meta has the actual token details
     const pm: any = (parsedMatch as any) || {};

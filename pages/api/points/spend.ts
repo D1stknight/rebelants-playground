@@ -1,5 +1,6 @@
 // pages/api/points/spend.ts
 import type { NextApiRequest, NextApiResponse } from "next";
+import { etDay } from "../../../lib/server/day";
 import { redis } from "../../../lib/server/redis";
 import { economyDebit, idemKey } from "../../../lib/economy";
 import { actingPlayer } from "../../../lib/server/player-auth";
@@ -11,11 +12,7 @@ function capBankKey(playerId: string) {
 }
 
 function spentTodayKey(playerId: string) {
-  const d = new Date();
-  const yyyy = d.getUTCFullYear();
-  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(d.getUTCDate()).padStart(2, "0");
-  return `ra:points:spent:${playerId}:${yyyy}-${mm}-${dd}`;
+  return `ra:points:spent:${playerId}:${etDay()}`;
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

@@ -1,5 +1,6 @@
 // pages/api/points/balance.ts
 import type { NextApiRequest, NextApiResponse } from "next";
+import { etDay } from "../../../lib/server/day";
 import { redis } from "../../../lib/server/redis";
 import { pointsConfig as defaultPointsConfig } from "../../../lib/pointsConfig";
 import { resolveByPlayerId } from "../../../lib/economy";
@@ -16,11 +17,7 @@ function capBankKey(playerId: string) {
 
 // ✅ Match spend.ts EXACTLY: daily spent key is date-based
 function todayKey(playerId: string) {
-  const d = new Date();
-  const yyyy = d.getUTCFullYear();
-  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(d.getUTCDate()).padStart(2, "0");
-  return `ra:points:spent:${playerId}:${yyyy}-${mm}-${dd}`;
+  return `ra:points:spent:${playerId}:${etDay()}`;
 }
 
 // ✅ get LIVE config (Admin -> Redis) via /api/config, fallback to defaults

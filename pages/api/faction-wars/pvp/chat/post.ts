@@ -20,6 +20,8 @@ import { DISCORD_SESSION_COOKIE, verifyDiscordSession } from "../../../../../lib
 import { readCookie, type ResolvedUser } from "../../../../../lib/economy";
 import { redis } from "../../../../../lib/server/redis";
 import type { PostChatRequest } from "../../../../../lib/types/fwpvp";
+import { filterChat, applyFilter } from "../../../../../lib/server/chat-filter";
+import { loadLiveConfig } from "../../../../../lib/server/gameRuns";
 
 // The name the room shows: the Discord name the signed session carries, a commander
 // name as it was claimed, else the Rebel Economy's name for the account.
@@ -67,7 +69,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const displayName = (await shownName(req, playerId, acting.user)).slice(0, 32);
     const role = chatRoleForPlayer(match, playerId);
-    const result = await postChatMessage({ challengeId, playerId, displayName, text, role });
+
+    // The language filter (lib/server/chat-filter.ts): swears starred, slurs blocked + 24 h mute,
+    // the third starred message in a day mutes for an hour. Console: Apps → The Playground → Chat.
+    const live = await loadLiveConfig().catch(() => ({} as any));
+    const filtered = live?.factionWarsChatFilter === false ? null : filterChat(text);
+    if (filtered?.slur) {
+      const muteMs = await applyFilter({ challengeId, playerId, displayName, original: text, result: filtered });
+      return res.status(403).json({ ok: false, error: "That message was blocked. Slurs and hate aren't allowed here.", mute: muteMs ? { playerId, expireAt: Date.now() + muteMs, displayName } : null });
+    }
+    const result = await postChatMessage({ challengeId, playerId, displayName, text: filtered ? filtered.text : text, role });
+    if (result.ok && filtered && filtered.swears > 0) {
+      await applyFilter({ challengeId, playerId, displayName, original: text, result: filtered });
+    }
     if (!result.ok) {
       // Surface mute info so the client can render the explicit "muted until X" banner.
       return res.status(403).json({ ok: false, error: result.error, mute: (result as any).mute ?? null });
