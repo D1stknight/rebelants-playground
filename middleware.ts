@@ -8,8 +8,18 @@ import { checkPass, PASS_PREFIX } from "./lib/admin-pass";
 export async function middleware(req: NextRequest) {
   const a = req.headers.get("x-admin-key") || "";
   const b = req.headers.get("x-admin-token") || "";
-  if (!a.startsWith(PASS_PREFIX) && !b.startsWith(PASS_PREFIX)) return NextResponse.next();
   const secret = process.env.ADMIN_KEY || process.env.ADMIN_TOKEN || "";
+  if (!a.startsWith(PASS_PREFIX) && !b.startsWith(PASS_PREFIX)) {
+    // Oct 28: the typed admin key is switched off; the admin opens from the Rebel Console.
+    // ALLOW_TYPED_ADMIN_KEY=true in Vercel turns typing it back on (emergency only).
+    if ((a || b) && process.env.ALLOW_TYPED_ADMIN_KEY !== "true") {
+      const headers = new Headers(req.headers);
+      headers.delete("x-admin-key");
+      headers.delete("x-admin-token");
+      return NextResponse.next({ request: { headers } });
+    }
+    return NextResponse.next();
+  }
   const pass = a.startsWith(PASS_PREFIX) ? a : b;
   const headers = new Headers(req.headers);
   headers.delete("x-admin-key");

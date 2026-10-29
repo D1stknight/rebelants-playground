@@ -4,6 +4,10 @@ import Link from "next/link";
 
 export default function AdminInventoryPage() {
   const [adminKey, setAdminKey] = React.useState("");
+  // signed in from the Rebel Console: use that pass (the typed key is switched off)
+  React.useEffect(() => {
+    try { const t = sessionStorage.getItem("ra_admin_token") || ""; if (t) setAdminKey(t); } catch {}
+  }, []);
   const [status, setStatus] = React.useState<string>("");
 
   const [summary, setSummary] = React.useState<any>({ nfts: [], merch: [] });
